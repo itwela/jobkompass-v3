@@ -1,7 +1,7 @@
 'use client'
 
 import { useJobKompassTheme } from "@/providers/jkThemeProvider";
-import JkConsoleContentHeader from "./jkConsole-Content-Header";
+import JkConsoleContentHeader from "../jkConsole-Content-Header";
 
 export default function JkCW_JobsMode() {
 

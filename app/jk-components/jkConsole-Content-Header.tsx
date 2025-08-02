@@ -1,9 +1,13 @@
 'use client'
 
+import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { useJobKompassTheme } from "@/providers/jkThemeProvider";
+import { motion } from "framer-motion";
+
 
 export default function JkConsoleContentHeader({bigText, smallText}: {bigText: string, smallText: string}) {
     const { theme, styles, utilStyles } = useJobKompassTheme()
+    const {homeHeaderText} = useJobKompassChatWindow();
     const consoleContentHeaderStyles = {
         heading: {
             fontSize: utilStyles.typography.fontSize["4xl"],
@@ -13,18 +17,30 @@ export default function JkConsoleContentHeader({bigText, smallText}: {bigText: s
         subheading: {
             fontSize: utilStyles.typography.fontSize.sm,
             fontWeight: utilStyles.typography.fontWeight.bold,
-            color: `${styles.text.secondary}71`,
+            color: `${styles.text.secondary}`,
         }
     }
 
     return (
         <>
-            <h1 className="select-none cursor-default" style={consoleContentHeaderStyles.heading}>
+            <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                delay: 0.1
+                }}
+            className="select-none cursor-default" style={consoleContentHeaderStyles.heading}>
                 {bigText}
-            </h1>
-            <h2 className="select-none cursor-default" style={consoleContentHeaderStyles.subheading}>
+            </motion.h1>
+            <motion.h2 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                delay: 0.2
+                }}
+            className="select-none cursor-default" style={consoleContentHeaderStyles.subheading}>
                 {smallText}
-            </h2>
+            </motion.h2>
         </>
     )
 }

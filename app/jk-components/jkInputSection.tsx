@@ -5,85 +5,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { useJobKompassTheme } from "@/providers/jkThemeProvider";
 import SendIcon from "../jk-icons/sendIcon";
 import React from "react";
-import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
+import { ModeType, useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import JkSelectDropdown from "./jkSelectDropdown";
 import { flushAllTraces } from "next/dist/trace";
+import Jk_AutoFill from "./jk-AutoFill";
 
 export default function JkInputSection() {
   const { theme, styles, utilStyles } = useJobKompassTheme()
-  const {allModes, currentMode, setCurrentMode, wantsToAddJob, setWantsToAddJob, setWantsToDownloadResume, setWantsTutorial} = useJobKompassChatWindow()
-  const [textValue, setTextValue] = React.useState('')
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
-  const [dynamicTextAreaHeight, setDynamicTextAreaHeight] = React.useState(0)
-
-  const commands = ['/home', '/chat', '/resume', '/jobs',]
-  const commandActions = ['/add', '/download-resume', '/start']
-  const [highlightedText, setHighlightedText] = React.useState<string | null>(null)
+  const { 
+    textareaRef, textValue, setTextValue, commands, commandActions, highlightedText, setHighlightedText,
+    allModes, currentMode, showHelperContainer, setShowHelperContainer, setCurrentMode, wantsToAddJob, setWantsToAddJob, setWantsToDownloadResume, setWantsTutorial } = useJobKompassChatWindow()
 
   const currentModeName = currentMode.name.split(' ')[0]
 
-  React.useEffect(() => {
 
-    const textarea = textareaRef.current
-    
-    if (textarea) {
-      textarea.style.height = 'auto'
-      const newHeight = Math.min(textarea.scrollHeight, 5 * 24)
-      textarea.style.height = `${newHeight}px`
-      setDynamicTextAreaHeight(newHeight)
-    }
-
-    // Check for commands in text and switch modes
-    if (!textValue) {
-      // const homeMode = allModes.find(mode => mode.id === '/home')
-      // if (homeMode) {
-      //   setCurrentMode(homeMode)
-      //   setWantsTutorial(false)
-      // }
-      // setHighlightedText(null)
-    } else {
-      const command = commands.find(cmd => textValue.startsWith(cmd))
-      setHighlightedText(command || null)
-
-      const actions = commandActions.find(cmd => textValue.startsWith(cmd))
-      setHighlightedText(actions || null)
-      
-      if (command) {
-        const modeId = command
-        const targetMode = allModes.find(mode => mode.id === modeId)
-        if (targetMode) {
-          setCurrentMode(targetMode)
-          setWantsTutorial(false)
-          setWantsToAddJob(false)
-          setWantsToDownloadResume(false)
-        }
-      } 
-
-      if (actions) {
-        if (actions === '/add') {
-          setWantsToAddJob(true)
-
-          setWantsTutorial(false)
-          setWantsToDownloadResume(false)
-        }
-
-        if (actions === '/download-resume') {
-          setWantsToDownloadResume(true)
-
-          setWantsTutorial(false)
-          setWantsToAddJob(false)
-        }
-
-        if (actions === '/start') {
-          setWantsTutorial(true)
-
-          setWantsToAddJob(false)
-          setWantsToDownloadResume(false)
-        }
-      }
-    }
-
-  }, [textValue, allModes, setCurrentMode])
 
   const inputSectionStyles = {
     container: {
@@ -123,7 +58,7 @@ export default function JkInputSection() {
 
   const renderTextWithHighlight = () => {
     if (!highlightedText) return textValue;
-    
+
     return (
       <>
         <span style={inputSectionStyles.commandBadge}>{highlightedText}</span>
@@ -132,37 +67,57 @@ export default function JkInputSection() {
     )
   }
 
+  const conditionalStyles = {
+  
+    showAutofillContainer: {
+      display: textValue.includes('/') ? 'flex' : 'none',
+    }
+  
+  }
+
   return (
     <>
-      <div className="outline ouutline-[0.618px]" style={inputSectionStyles.container}>
-        <div style={{position: 'relative'}}>
-          
-          <Textarea
-            ref={textareaRef}
-            placeholder="What's the latest? Try things like '/chat' or '/resume' to get started."
-            className="no-scrollbar absolute z-5 top-0"
-            value={textValue}
-            style={{
-              color: styles.text.primary,
-              width: '100%',
-              height: '100%'
-            }}
-            onChange={(e) => setTextValue(e.target.value)}
-          />
+
+      <div className="relative h-max">
+
+          {/* NOTE - AUTOFILL CONTAINER HELPER */}
+          <div style={conditionalStyles.showAutofillContainer} className="absolute bottom-full w-full flex place-content-center">
+            <Jk_AutoFill />
+          </div>
+
+
+        <div className="outline ouutline-[0.618px]" style={inputSectionStyles.container}>
+          <div style={{ position: 'relative' }}>
+
+            <Textarea
+              ref={textareaRef}
+              placeholder="What's the latest? Try things like '/chat' or '/resume' to get started."
+              className="no-scrollbar absolute z-5 top-0"
+              value={textValue}
+              style={{
+                color: styles.text.primary,
+                width: '100%',
+                height: '100%'
+              }}
+              onChange={(e) => setTextValue(e.target.value)}
+            />
+
+          </div>
+
+          <div className="" style={inputSectionStyles.content}>
+
+            {/* <JkSelectDropdown fontSize={12} className="rounded-full border border-[5px]" label={currentModeName} values={allModes} onChange={setCurrentMode}/> */}
+            <span></span>
+            <button style={inputSectionStyles.button}>
+              <SendIcon color={`${styles.text.primary}`} />
+            </button>
+
+          </div>
 
         </div>
-
-        <div className="" style={inputSectionStyles.content}>
-          
-          {/* <JkSelectDropdown fontSize={12} className="rounded-full border border-[5px]" label={currentModeName} values={allModes} onChange={setCurrentMode}/> */}
-          <span></span>
-          <button style={inputSectionStyles.button}>
-            <SendIcon color={`${styles.text.primary}`} />
-          </button>
-
-        </div>
-
       </div>
+
     </>
   )
+
 }

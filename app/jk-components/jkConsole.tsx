@@ -23,12 +23,20 @@ export default function JkConsole() {
             padding: '1rem',
             overflowY: 'auto' as const,
         },
+        header: {
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '0.5rem',
+        }
     }
 
     return (
         <>
         <div style={consoleStyles.container}>
-            {/* {children} */}
+            {/* Auth button in the top right */}
+            <div style={consoleStyles.header}>
+            </div>
+            
             <JkChatWindow/>
             <JkInputSection/>
         </div>

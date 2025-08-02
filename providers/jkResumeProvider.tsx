@@ -1,5 +1,7 @@
 'use client';
 
+import { api } from '@/convex/_generated/api';
+import { useQuery } from 'convex/react';
 import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react';
 
 interface userFieldData {
@@ -84,6 +86,11 @@ interface JobKompassResumeContextType {
 
   handleAddDetail: (category: string, index: number, newDetail: string) => void;
   handleRemoveDetail: (category: string, itemIndex: number, detailIndex: number) => void;
+
+  currentResumeId: string | null;
+  setCurrentResumeId: (id: string) => void;
+
+  resumes: any[] | undefined;
 
 
 }
@@ -279,12 +286,16 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
   const [readyToSaveComplexFields, setReadyToSaveComplexFields] = useState<boolean>(false);
   const [customSymbol, setCustomSymbol] = useState<any>(null);
 
+  const [currentResumeId, setCurrentResumeId] = useState<string | null>(null);
+
+  const resumes = useQuery(api.documents.listResumes, {userId: 'k9783nn9ajh5fwtm20vb5kvgfx7fyzze' as any  })
+
+
   // STUB -------- CALLBACKS
 
 
 
   // STUB -------- USEEFFECTS
-
 
   useEffect(() => {
   }, [])
@@ -494,25 +505,24 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
     });
   };
 
-
-    const clearResumeDataDeepseek = (setUserFieldData: React.Dispatch<React.SetStateAction<userFieldData>>) => {
-    setUserFieldData(prev => ({
-        ...prev,
-        education: [],
-        experience: [],
-        projects: [],
-        skills: {
-        technical: [],
-        additional: []
-        },
-        additionalInfo: {
-        interests: [],
-        hobbies: [],
-        languages: [],
-        references: []
-        }
-    }));
-    };
+  const clearResumeDataDeepseek = (setUserFieldData: React.Dispatch<React.SetStateAction<userFieldData>>) => {
+  setUserFieldData(prev => ({
+      ...prev,
+      education: [],
+      experience: [],
+      projects: [],
+      skills: {
+      technical: [],
+      additional: []
+      },
+      additionalInfo: {
+      interests: [],
+      hobbies: [],
+      languages: [],
+      references: []
+      }
+  }));
+  };
 
   const updateResumeWithAIDataDeepseek = (
     setUserFieldData: React.Dispatch<React.SetStateAction<userFieldData>>,
@@ -556,7 +566,12 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
 
     handleAddDetail,
     handleRemoveDetail,
-  
+
+    currentResumeId,
+    setCurrentResumeId,
+
+    resumes,
+    
   };
 
   return (

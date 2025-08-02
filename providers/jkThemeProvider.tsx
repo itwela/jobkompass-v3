@@ -214,7 +214,7 @@ interface JobKompassThemeContextType {
 const JobKompassThemeContext = createContext<JobKompassThemeContextType | null>(null);
 
 export function JobKompassThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   const styles: Record<'light' | 'dark', ThemeStyles> = {
     dark: {
@@ -509,7 +509,8 @@ export function JobKompassThemeProvider({ children }: { children: React.ReactNod
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
     if (savedTheme) {
-      setTheme(savedTheme);
+      // setTheme(savedTheme);
+      setTheme('light');
     } else {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(prefersDark ? 'dark' : 'light');

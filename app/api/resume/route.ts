@@ -16,8 +16,8 @@ export async function POST(req: Request) {
   try {
 
     const { data, user } = await req.json();
-    
-    const templatePath = path.join(process.cwd(), 'app/ai/prompts/resume/jakeLatex.tex');
+
+    const templatePath = path.join(process.cwd(), 'app/templates/resume/jakeLatex.tex');
     if (!fs.existsSync(templatePath)) {
       throw new Error(`LaTeX template not found at ${templatePath}`);
     }
@@ -71,9 +71,9 @@ export async function POST(req: Request) {
          \\resumeSubHeadingListEnd`
       : '';
 
-// Generate projects content dynamically, with wrapped content to prevent overflow
-const projectsContent = Array.isArray(data.projects) && data.projects.length > 0
-? `\\resumeSubHeadingListStart
+    // Generate projects content dynamically, with wrapped content to prevent overflow
+    const projectsContent = Array.isArray(data.projects) && data.projects.length > 0
+      ? `\\resumeSubHeadingListStart
    ${data.projects.map((proj: any) => `
      % Project title and date
      \\resumeProjectHeader
@@ -81,43 +81,43 @@ const projectsContent = Array.isArray(data.projects) && data.projects.length > 0
      
      % Project details in a separate block with proper wrapping
      \\resumeProjectDetails{${escapeLatex(proj.description || '')}}
-     ${Array.isArray(proj.technologies) && proj.technologies.length 
-       ? `\\resumeItem{Technologies Used: ${proj.technologies.map(escapeLatex).join(', ')}}` 
-       : ''}
-     ${Array.isArray(proj.details) && proj.details.length 
-       ? `\\resumeItemListStart
+     ${Array.isArray(proj.technologies) && proj.technologies.length
+          ? `\\resumeItem{Technologies Used: ${proj.technologies.map(escapeLatex).join(', ')}}`
+          : ''}
+     ${Array.isArray(proj.details) && proj.details.length
+          ? `\\resumeItemListStart
          ${proj.details.map((detail: any) => `\\resumeItem{${escapeLatex(detail)}}`).join('\n          ')}
-       \\resumeItemListEnd` 
-       : ''}
+       \\resumeItemListEnd`
+          : ''}
    `).join('\n')}
    \\resumeSubHeadingListEnd`
-: '';
+      : '';
 
     // Generate skills content dynamically, with technical and additional skills in a row
     const skillsContent = data.skills && (Array.isArray(data.skills.technical) || Array.isArray(data.skills.additional))
-    ? `${Array.isArray(data.skills.technical) && data.skills.technical.length 
-        ? `\\resumeFlexContent{Technical:}{${data.skills.technical.map(escapeLatex).join(', ')}}` 
+      ? `${Array.isArray(data.skills.technical) && data.skills.technical.length
+        ? `\\resumeFlexContent{Technical:}{${data.skills.technical.map(escapeLatex).join(', ')}}`
         : ''}
-      ${Array.isArray(data.skills.additional) && data.skills.additional.length 
-        ? `\\resumeFlexContent{Additional:}{${data.skills.additional.map(escapeLatex).join(', ')}}` 
+      ${Array.isArray(data.skills.additional) && data.skills.additional.length
+        ? `\\resumeFlexContent{Additional:}{${data.skills.additional.map(escapeLatex).join(', ')}}`
         : ''}`
-    : '';
+      : '';
 
     // Generate additional info content dynamically
     const additionalInfoContent = data.additionalInfo && (Array.isArray(data.additionalInfo.interests) || Array.isArray(data.additionalInfo.hobbies) || Array.isArray(data.additionalInfo.languages) || Array.isArray(data.additionalInfo.references))
-    ? `${Array.isArray(data.additionalInfo.interests) && data.additionalInfo.interests.length 
-        ? `\\resumeFlexContent{Interests:}{${data.additionalInfo.interests.map(escapeLatex).join(', ')}}` 
+      ? `${Array.isArray(data.additionalInfo.interests) && data.additionalInfo.interests.length
+        ? `\\resumeFlexContent{Interests:}{${data.additionalInfo.interests.map(escapeLatex).join(', ')}}`
         : ''}
-      ${Array.isArray(data.additionalInfo.hobbies) && data.additionalInfo.hobbies.length 
-        ? `\\resumeFlexContent{Hobbies:}{${data.additionalInfo.hobbies.map(escapeLatex).join(', ')}}` 
+      ${Array.isArray(data.additionalInfo.hobbies) && data.additionalInfo.hobbies.length
+        ? `\\resumeFlexContent{Hobbies:}{${data.additionalInfo.hobbies.map(escapeLatex).join(', ')}}`
         : ''}
-      ${Array.isArray(data.additionalInfo.languages) && data.additionalInfo.languages.length 
-        ? `\\resumeFlexContent{Languages:}{${data.additionalInfo.languages.map(escapeLatex).join(', ')}}` 
+      ${Array.isArray(data.additionalInfo.languages) && data.additionalInfo.languages.length
+        ? `\\resumeFlexContent{Languages:}{${data.additionalInfo.languages.map(escapeLatex).join(', ')}}`
         : ''}
-      ${Array.isArray(data.additionalInfo.references) && data.additionalInfo.references.length 
-        ? `\\resumeFlexContent{References:}{${data.additionalInfo.references.map(escapeLatex).join(', ')}}` 
+      ${Array.isArray(data.additionalInfo.references) && data.additionalInfo.references.length
+        ? `\\resumeFlexContent{References:}{${data.additionalInfo.references.map(escapeLatex).join(', ')}}`
         : ''}`
-    : '';
+      : '';
 
     // Replace placeholders with formatted content, ensuring empty strings for missing sections
     latexTemplate = latexTemplate
@@ -166,7 +166,7 @@ const projectsContent = Array.isArray(data.projects) && data.projects.length > 0
     const pdfBuffer = fs.readFileSync(path.join(tempDir, `resume-${uniqueId}.pdf`));
     const texContent = fs.readFileSync(tempFile, 'utf-8');
 
-// SECTION   ------------------------------------------- ADD RESUME TO DB --- I WILL PAYWALL THIS EVENTUALLY
+    // SECTION   ------------------------------------------- ADD RESUME TO DB --- I WILL PAYWALL THIS EVENTUALLY
 
     // Create a FormData-like object for the PDF
     const resumeData = new FormData();
@@ -177,13 +177,12 @@ const projectsContent = Array.isArray(data.projects) && data.projects.length > 0
     resumeData.append('fileInfo', JSON.stringify({ name: fileName }));
 
     // Save to database
-    const saveResult = await addResumeToDb(resumeData, user);
-    if (saveResult.status === 'error') {
-      console.error('Failed to save resume to database:', saveResult.message);
-      // Continue with response even if save fails
-    }
+    // const saveResult = await addResumeToDb(resumeData, user);
+    // if (saveResult.status === 'error') {
+    //   console.error('Failed to save resume to database:', saveResult.message);
+    // }
 
-// SECTION   ------------------------------------------- CLEAN UP TEMP FILES
+    // SECTION   ------------------------------------------- CLEAN UP TEMP FILES
 
     // Clean up temp files except tex
     ['aux', 'log', 'out'].forEach(ext => {

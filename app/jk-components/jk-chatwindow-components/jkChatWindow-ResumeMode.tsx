@@ -1,8 +1,9 @@
 'use client'
 
 import { useJobKompassTheme } from "@/providers/jkThemeProvider";
-import JkConsoleContentHeader from "./jkConsole-Content-Header";
+import JkConsoleContentHeader from "../jkConsole-Content-Header";
 import JkCW_ResumeForm from "./jkChatWindow-ResumeForm";
+
 
 export default function JkCW_ResumeMode() {
 
@@ -38,8 +39,8 @@ export default function JkCW_ResumeMode() {
         <>
         <div style={resumePageStyles.container}>
             <JkCW_ResumeForm/>
-            <ResumeChat/>
-            </div>
+            {/* <ResumeChat/> */}
+        </div>
         </>
     )
 }
