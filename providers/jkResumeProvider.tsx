@@ -288,7 +288,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
 
   const [currentResumeId, setCurrentResumeId] = useState<string | null>(null);
 
-  const resumes = useQuery(api.documents.listResumes, {userId: 'k9783nn9ajh5fwtm20vb5kvgfx7fyzze' as any  })
+  const resumes = [{}]
 
 
   // STUB -------- CALLBACKS

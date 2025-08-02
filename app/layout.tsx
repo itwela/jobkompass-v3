@@ -4,6 +4,8 @@ import "./globals.css";
 import { JobKompassChatWindowProvider } from "@/providers/jkChatWindowProvider";
 import JobKompassResumeProvider from "@/providers/jkResumeProvider";
 import { JkConvexProviders } from "@/providers/jkConvexProvider";
+import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
+
 
 export const metadata: Metadata = {
   title: "Jobkompass - A Kompass Product",
@@ -16,6 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <ConvexAuthNextjsServerProvider>
     <JkConvexProviders>
         <JobKompassThemeProvider>
           <JobKompassResumeProvider>
@@ -31,5 +34,6 @@ export default function RootLayout({
           </JobKompassResumeProvider>
         </JobKompassThemeProvider>
     </JkConvexProviders>
+    </ConvexAuthNextjsServerProvider>
     );
 }

@@ -1,15 +1,10 @@
 import { defineSchema, defineTable } from "convex/server";
+import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
-const applicationTables = {
-  users: defineTable({
-    name: v.optional(v.string()),
-    email: v.optional(v.string()),
-    tokenIdentifier: v.string(),
-  }).index("by_token", ["tokenIdentifier"]),
-
+const documentsTables = {
   resumes: defineTable({
-    userId: v.id("users"),
+    userId: v.string(),
     name: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -96,7 +91,7 @@ const applicationTables = {
   }).index("by_user", ["userId"]),
 
   coverLetters: defineTable({
-    userId: v.id("users"),
+    userId: v.string(),
     name: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -112,7 +107,7 @@ const applicationTables = {
   }).index("by_user", ["userId"]),
 
   emailTemplates: defineTable({
-    userId: v.id("users"),
+    userId: v.string(),
     name: v.string(),
     type: v.string(),
     createdAt: v.number(),
@@ -125,4 +120,10 @@ const applicationTables = {
   }).index("by_user_and_type", ["userId", "type"]),
 };
 
-export default defineSchema(applicationTables);
+const schema =  defineSchema({
+  ...authTables,
+  ...documentsTables,
+})
+
+
+export default schema;

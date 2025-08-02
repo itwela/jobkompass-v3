@@ -11,16 +11,11 @@ import { useJobKompassResume } from "@/providers/jkResumeProvider";
 export default function JkCW_ResumeForm() {
 
     const {theme, styles, utilStyles} = useJobKompassTheme()
-
-    
-    const users = useQuery(api.documents.listUsers)
     const {currentResumeId, setCurrentResumeId, resumes} = useJobKompassResume()
     const createTestResumes = useMutation(api.documents.createTestResumes)
-    const createTestUser = useMutation(api.documents.createTestUser)
 
     const [hoveredResumeId, setHoveredResumeId] = React.useState<string | null>(null)
     const [isCreating, setIsCreating] = React.useState(false)
-    const [isCreatingUser, setIsCreatingUser] = React.useState(false)
 
     const handleResumeMouseEnter = (id: string) => {
         setHoveredResumeId(id)
@@ -42,17 +37,6 @@ export default function JkCW_ResumeForm() {
             console.error('Error creating test resumes:', error)
         } finally {
             setIsCreating(false)
-        }
-    }
-
-    const handleCreateTestUser = async () => {
-        setIsCreatingUser(true)
-        try {
-            await createTestUser()
-        } catch (error) {
-            console.error('Error creating test user:', error)
-        } finally {
-            setIsCreatingUser(false)
         }
     }
 
@@ -127,84 +111,24 @@ export default function JkCW_ResumeForm() {
                         No resumes found
                     </h2>
                     <p style={{ fontSize: utilStyles.typography.fontSize.lg, color: jkColors.kindOfDark }}>
-                        Create a test user first, then add some test resumes to get started
+                        Create some test resumes to get started
                     </p>
-                    {users && users.length > 0 && (
-                        <div style={{ marginTop: '1em', textAlign: 'left' as const }}>
-                            <h3 style={{ fontSize: utilStyles.typography.fontSize.lg, marginBottom: '0.5em', color: jkColors.dark }}>
-                                Current Users ({users.length}):
-                            </h3>
-                            <div style={{ 
-                                display: 'flex', 
-                                flexDirection: 'column' as const, 
-                                gap: '0.5em',
-                                maxHeight: '200px',
-                                overflowY: 'auto' as const,
-                                padding: '0.5em',
-                                backgroundColor: jkColors.light,
-                                borderRadius: '0.5em',
-                                border: `1px solid ${jkColors.kindOfLight}`
-                            }}>
-                                {users.map((user) => (
-                                    <div key={user._id} style={{
-                                        padding: '0.5em',
-                                        backgroundColor: 'white',
-                                        borderRadius: '0.25em',
-                                        border: `1px solid ${jkColors.kindOfLight}`,
-                                        fontSize: utilStyles.typography.fontSize.sm
-                                    }}>
-                                        <strong>ID:</strong> {user._id}<br/>
-                                        <strong>Name:</strong> {user.name || 'N/A'}<br/>
-                                        <strong>Email:</strong> {user.email || 'N/A'}<br/>
-                                        <strong>Token:</strong> {user.tokenIdentifier ? `${user.tokenIdentifier.substring(0, 10)}...` : 'Empty'}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {(!users || users.length === 0) && (
-                        <p style={{ fontSize: utilStyles.typography.fontSize.base, color: jkColors.kindOfDark, fontStyle: 'italic' }}>
-                            No users found in database
-                        </p>
-                    )}
                     <div style={resumeFormStyles.buttonContainer}>
                         <button
-                            onClick={handleCreateTestUser}
-                            disabled={isCreatingUser}
-                            style={{
-                                ...resumeFormStyles.button,
-                                ...(isCreatingUser ? resumeFormStyles.buttonDisabled : {}),
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!isCreatingUser) {
-                                    e.currentTarget.style.backgroundColor = jkColors.dark
-                                    e.currentTarget.style.transform = 'translateY(-2px)'
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!isCreatingUser) {
-                                    e.currentTarget.style.backgroundColor = jkColors.primary
-                                    e.currentTarget.style.transform = 'translateY(0)'
-                                }
-                            }}
-                        >
-                            {isCreatingUser ? 'Creating...' : 'Create Test User'}
-                        </button>
-                        <button
                             onClick={() => handleCreateTestResumes(3)}
-                            disabled={isCreating || isCreatingUser}
+                            disabled={isCreating}
                             style={{
                                 ...resumeFormStyles.button,
-                                ...(isCreating || isCreatingUser ? resumeFormStyles.buttonDisabled : {}),
+                                ...(isCreating ? resumeFormStyles.buttonDisabled : {}),
                             }}
                             onMouseEnter={(e) => {
-                                if (!isCreating && !isCreatingUser) {
+                                if (!isCreating) {
                                     e.currentTarget.style.backgroundColor = jkColors.dark
                                     e.currentTarget.style.transform = 'translateY(-2px)'
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!isCreating && !isCreatingUser) {
+                                if (!isCreating) {
                                     e.currentTarget.style.backgroundColor = jkColors.primary
                                     e.currentTarget.style.transform = 'translateY(0)'
                                 }
@@ -214,19 +138,19 @@ export default function JkCW_ResumeForm() {
                         </button>
                         <button
                             onClick={() => handleCreateTestResumes(5)}
-                            disabled={isCreating || isCreatingUser}
+                            disabled={isCreating}
                             style={{
                                 ...resumeFormStyles.button,
-                                ...(isCreating || isCreatingUser ? resumeFormStyles.buttonDisabled : {}),
+                                ...(isCreating ? resumeFormStyles.buttonDisabled : {}),
                             }}
                             onMouseEnter={(e) => {
-                                if (!isCreating && !isCreatingUser) {
+                                if (!isCreating) {
                                     e.currentTarget.style.backgroundColor = jkColors.dark
                                     e.currentTarget.style.transform = 'translateY(-2px)'
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!isCreating && !isCreatingUser) {
+                                if (!isCreating) {
                                     e.currentTarget.style.backgroundColor = jkColors.primary
                                     e.currentTarget.style.transform = 'translateY(0)'
                                 }
@@ -236,19 +160,19 @@ export default function JkCW_ResumeForm() {
                         </button>
                         <button
                             onClick={() => handleCreateTestResumes(10)}
-                            disabled={isCreating || isCreatingUser}
+                            disabled={isCreating}
                             style={{
                                 ...resumeFormStyles.button,
-                                ...(isCreating || isCreatingUser ? resumeFormStyles.buttonDisabled : {}),
+                                ...(isCreating ? resumeFormStyles.buttonDisabled : {}),
                             }}
                             onMouseEnter={(e) => {
-                                if (!isCreating && !isCreatingUser) {
+                                if (!isCreating) {
                                     e.currentTarget.style.backgroundColor = jkColors.dark
                                     e.currentTarget.style.transform = 'translateY(-2px)'
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!isCreating && !isCreatingUser) {
+                                if (!isCreating) {
                                     e.currentTarget.style.backgroundColor = jkColors.primary
                                     e.currentTarget.style.transform = 'translateY(0)'
                                 }
@@ -272,7 +196,7 @@ export default function JkCW_ResumeForm() {
                     onMouseLeave={handleResumeMouseLeave} 
                     onClick={() => handleResumeClick(resume._id)}
                     style={resumeFormStyles.resumeBox(resume._id)} 
-                    key={resume._id}
+                    key={resume._id || 'test-resume'}
                 >
                     <h2>{resume.name}</h2>
                 </div>

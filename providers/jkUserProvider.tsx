@@ -19,10 +19,11 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
 
-    const user = useQuery(api.userAuth.getCurrentUser) as User | null;
 
     return (
-        <UserContext.Provider value={{ user }}>
+        <UserContext.Provider value={{ 
+            user: null
+         }}>
             {children}
         </UserContext.Provider>
     );

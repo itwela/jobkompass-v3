@@ -82,18 +82,10 @@ export const saveResume = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table based on the tokenIdentifier
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     const now = Date.now();
     
     return await ctx.db.insert("resumes", {
-      userId: user._id,
+      userId: identity.tokenIdentifier,
       name: args.name,
       createdAt: now,
       updatedAt: now,
@@ -183,17 +175,9 @@ export const updateResume = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     // Get the resume to ensure it belongs to the user
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== user._id) {
+    if (!resume || resume.userId !== identity.tokenIdentifier) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -217,17 +201,9 @@ export const deleteResume = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     // Get the resume to ensure it belongs to the user
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== user._id) {
+    if (!resume || resume.userId !== identity.tokenIdentifier) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -236,31 +212,15 @@ export const deleteResume = mutation({
 });
 
 export const listResumes = query({
-  args: {
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    // const identity = await ctx.auth.getUserIdentity();
-    // console.log("identity", identity);
-    // if (!identity) return [];
-    
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      // .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      // .withIndex("by_token", (q) => q.eq("tokenIdentifier", 'k574b2c1mn5r6ytz0scg4qnnk97fzqny'))
-      .withIndex("by_id", (q) => q.eq("_id", args.userId))
-      .unique();
-    
-    // if (!user) return [];
-    console.log("user", user);
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
 
     return await ctx.db
       .query("resumes")
-      .withIndex("by_user", (q) => q.eq("userId", 'k9783nn9ajh5fwtm20vb5kvgfx7fyzze' as any))
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
       .collect();
   },
-
 });
 
 export const getResume = query({
@@ -271,16 +231,8 @@ export const getResume = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== user._id) {
+    if (!resume || resume.userId !== identity.tokenIdentifier) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -306,18 +258,10 @@ export const saveCoverLetter = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     const now = Date.now();
     
     return await ctx.db.insert("coverLetters", {
-      userId: user._id,
+      userId: identity.tokenIdentifier,
       name: args.name,
       createdAt: now,
       updatedAt: now,
@@ -344,17 +288,9 @@ export const updateCoverLetter = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     // Get the cover letter to ensure it belongs to the user
     const coverLetter = await ctx.db.get(args.coverLetterId);
-    if (!coverLetter || coverLetter.userId !== user._id) {
+    if (!coverLetter || coverLetter.userId !== identity.tokenIdentifier) {
       throw new Error("Cover letter not found or access denied");
     }
     
@@ -377,17 +313,9 @@ export const deleteCoverLetter = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     // Get the cover letter to ensure it belongs to the user
     const coverLetter = await ctx.db.get(args.coverLetterId);
-    if (!coverLetter || coverLetter.userId !== user._id) {
+    if (!coverLetter || coverLetter.userId !== identity.tokenIdentifier) {
       throw new Error("Cover letter not found or access denied");
     }
     
@@ -400,17 +328,9 @@ export const listCoverLetters = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) return [];
-    
     return await ctx.db
       .query("coverLetters")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
       .collect();
   },
 });
@@ -430,18 +350,10 @@ export const saveEmailTemplate = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     const now = Date.now();
     
     return await ctx.db.insert("emailTemplates", {
-      userId: user._id,
+      userId: identity.tokenIdentifier,
       name: args.name,
       type: args.type,
       createdAt: now,
@@ -466,17 +378,9 @@ export const updateEmailTemplate = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     // Get the template to ensure it belongs to the user
     const template = await ctx.db.get(args.templateId);
-    if (!template || template.userId !== user._id) {
+    if (!template || template.userId !== identity.tokenIdentifier) {
       throw new Error("Email template not found or access denied");
     }
     
@@ -500,17 +404,9 @@ export const deleteEmailTemplate = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) throw new Error("User not found");
-    
     // Get the template to ensure it belongs to the user
     const template = await ctx.db.get(args.templateId);
-    if (!template || template.userId !== user._id) {
+    if (!template || template.userId !== identity.tokenIdentifier) {
       throw new Error("Email template not found or access denied");
     }
     
@@ -526,17 +422,9 @@ export const listEmailTemplates = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
     
-    // Get the user ID from the users table
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .unique();
-    
-    if (!user) return [];
-    
     const query = ctx.db
       .query("emailTemplates")
-      .withIndex("by_user_and_type", (q) => q.eq("userId", user._id));
+      .withIndex("by_user_and_type", (q) => q.eq("userId", identity.tokenIdentifier));
     
     const results = await query.collect();
     if (args.type !== undefined) {
@@ -546,40 +434,21 @@ export const listEmailTemplates = query({
   },
 });
 
-export const createTestUser = mutation({
-  handler: async (ctx) => {
-    // Create a test user for development
-    const testUserId = await ctx.db.insert("users", {
-      name: "Test User",
-      email: "test@example.com",
-      tokenIdentifier: "",
-    });
-    
-    console.log("Created test user:", testUserId);
-    return testUserId;
-  },
-});
-
-export const listUsers = query({
-  handler: async (ctx) => {
-    return await ctx.db.query("users").collect();
-  },
-});
-
+// Test functions for development
 export const createTestResumes = mutation({
   args: {
     count: v.number(),
   },
   handler: async (ctx, args) => {
-    // Use the hardcoded user ID that matches listResumes
-    const userId = 'k9783nn9ajh5fwtm20vb5kvgfx7fyzze' as any;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
     
     const now = Date.now();
     const testResumes = [];
     
     for (let i = 1; i <= args.count; i++) {
       const testResume = {
-        userId: userId,
+        userId: identity.tokenIdentifier,
         name: `Test Resume ${i}`,
         createdAt: now,
         updatedAt: now,
