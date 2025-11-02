@@ -24,13 +24,13 @@ export default function JkConsoleHeader() {
 
   return (
   <>
-    <div className="w-full h-full max-h-[5dvh]">
+    <div className="w-full h-full max-h-[5dvh] flex items-center">
     <Breadcrumb>
       <BreadcrumbList>
 
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <h2 className="cursor-pointer select-none">{currentModeName}</h2>
+            <h2 className="cursor-pointer select-none text-base sm:text-lg">{currentModeName}</h2>
           </BreadcrumbLink>
         </BreadcrumbItem>
 

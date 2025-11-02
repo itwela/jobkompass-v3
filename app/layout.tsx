@@ -5,6 +5,7 @@ import { JobKompassChatWindowProvider } from "@/providers/jkChatWindowProvider";
 import JobKompassResumeProvider from "@/providers/jkResumeProvider";
 import { JkConvexProviders } from "@/providers/jkConvexProvider";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
+import { JkAuthProvider } from "@/providers/jkAuthProvider";
 
 
 export const metadata: Metadata = {
@@ -20,19 +21,19 @@ export default function RootLayout({
   return (
     <ConvexAuthNextjsServerProvider>
     <JkConvexProviders>
+      <JkAuthProvider>
         <JobKompassThemeProvider>
           <JobKompassResumeProvider>
             <JobKompassChatWindowProvider>
               <html lang="en">
-                <body
-                  className={`antialiased`}
-                >
+                <body className={`antialiased min-h-screen bg-background text-foreground`}>
                   {children}
                 </body>
               </html>
             </JobKompassChatWindowProvider>
           </JobKompassResumeProvider>
         </JobKompassThemeProvider>
+      </JkAuthProvider>
     </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>
     );

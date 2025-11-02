@@ -118,6 +118,20 @@ const documentsTables = {
       defaultValues: v.optional(v.record(v.string(), v.string())),
     }),
   }).index("by_user_and_type", ["userId", "type"]),
+
+  resources: defineTable({
+    userId: v.string(),
+    type: v.string(), // 'job_board', 'resource', etc.
+    category: v.string(), // 'applied', 'considering', 'networking', etc.
+    title: v.string(),
+    url: v.string(),
+    description: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_user_and_category", ["userId", "category"]),
 };
 
 const schema =  defineSchema({

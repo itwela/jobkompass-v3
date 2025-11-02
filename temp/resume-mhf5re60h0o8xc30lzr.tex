@@ -1,0 +1,235 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}  % Latin Modern fonts for better coverage
+\usepackage[T1]{fontenc}  % Use T1 encoding for better font support
+\usepackage{latexsym}
+\usepackage{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{babel}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage[pdftex]{bookmark}
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting - REDUCED SPACING
+\titleformat{\section}{
+  \vspace{-8pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-2pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{\item\small{{#1 \vspace{-2pt}}}}
+
+\newcommand{\resumeFlexContent}[2]{
+  \noindent\begin{minipage}[t]{0.2\textwidth}
+    \textbf{#1}
+  \end{minipage}%
+  \hfill % This creates the space-between effect
+  \begin{minipage}[t]{0.75\textwidth}
+    \raggedright #2
+  \end{minipage}\\[4pt]
+}
+
+% REDUCED SPACING in resumeSubheading
+\newcommand{\resumeSubheading}[4]{\vspace{-4pt}\item
+  \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+    \textbf{#1} & #2 \\
+    \textit{\small#3} & \textit{\small #4} \\
+  \end{tabular*}\vspace{-5pt}}
+
+% Modified to handle long technology lists with a comma-separated inline format
+\newcommand{\resumeProjectHeading}[2]{\item
+  \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+    \small#1 & \small#2 \\
+  \end{tabular*}\vspace{-5pt}}
+
+\newcommand{\resumeProjectHeader}[2]{
+  \vspace{-2pt}
+  \item[]
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectDetails}[1]{
+  \vspace{3pt}
+  \begin{minipage}[t]{0.97\textwidth}
+    \small #1
+  \end{minipage}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+% Set global paragraph spacing to minimum
+\setlength{\parskip}{0pt}
+
+% Set global paragraph spacing to minimum
+\setlength{\parskip}{0pt}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setlength{\parskip}{0pt}
+\begin{document}
+
+\begin{center}
+  \textbf{\Huge \scshape Itwela Ibomu} \\ \vspace{1pt}
+  \small \href{mailto:iibomu@wgu.edu}{\underline{iibomu@wgu.edu}} $|$
+  
+  
+  \href{https://linkedin.com/in/itwela}{\underline{linkedin.com/in/itwela}} $|$
+  \href{https://github.com/itwela}{\underline{github.com/itwela}} $|$
+  \href{https://itwela.dev}{\underline{itwela.dev}}
+\end{center}
+%-----------EDUCATION-----------
+\section{Education}
+\resumeSubHeadingListStart
+           
+             \resumeSubheading
+               {Western Governors University (WGU)}{Salt Lake City, UT}
+               {B.S. in Software Engineering (Expected Dec 2025) in Software Engineering}{Estimated Graduation: Expected Dec 2025}
+               \resumeItemListStart
+                 \resumeItem{Relevant Coursework: Data Structures \& Algorithms, Python, Front-End Web Development, JavaScript}
+               \resumeItemListEnd
+           
+           \resumeSubHeadingListEnd
+%-----------EXPERIENCE-----------
+\section{Experience}
+\resumeSubHeadingListStart
+           
+             \resumeSubheading
+               {Software Engineer}{}
+               {Dope Marketing}{Jul 2025–Present}
+               \resumeItemListStart
+                 \resumeItem{Built internal AI platform used by 3 managers to automate account research and data analysis.}
+          \resumeItem{Created APIs granting agents instant access to millions of housing and client records, cutting manual lookup time from hours to minutes.}
+          \resumeItem{Enabled instant employee insights via CliftonStrengths API integration, improving decision speed for leadership teams.}
+          \resumeItem{Delivered 3 production tools adopted by management, enhancing research efficiency across departments.}
+               \resumeItemListEnd
+           
+
+             \resumeSubheading
+               {Software Engineering Fellow}{}
+               {Headstarter}{Jul 2024–Sep 2024}
+               \resumeItemListStart
+                 \resumeItem{Led a team of 3 to build CitySwipe, an AI vacation planner with 200 users and 50K+ impressions.}
+          \resumeItem{Won 1st place out of 300+ teams in a nationwide hackathon for innovation and product execution.}
+          \resumeItem{Shipped 5 AI web apps using Next.js, LangChain, and Supabase; scaled multiple to 200+ users.}
+               \resumeItemListEnd
+           
+
+             \resumeSubheading
+               {AI Engineer}{}
+               {Dataforce}{Apr 2024–Jun 2024}
+               \resumeItemListStart
+                 \resumeItem{Reduced captioning error rates by 20\% across ~200 videos/day through workflow optimization.}
+          \resumeItem{Improved data processing consistency and automated recurring QA checks for higher reliability.}
+               \resumeItemListEnd
+           
+
+             \resumeSubheading
+               {Software Intern}{}
+               {J.P. Morgan (Forage)}{Dec 2023–Jan 2024}
+               \resumeItemListStart
+                 \resumeItem{Built real-time data visualization tool (<200ms updates) using the Perspective library.}
+          \resumeItem{Gained exposure to enterprise-scale data systems and visualization workflows.}
+               \resumeItemListEnd
+           
+           \resumeSubHeadingListEnd
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+     
+       \resumeProjectHeader
+         {Lotus – AI Wellness App}{Sep 2025}
+       
+       \resumeProjectDetails{AI-powered React Native app generating articles, images, and audio for wellness content.}
+       \resumeItem{Technologies Used: React Native, Replicate, OpenAI, Convex}
+       \resumeItemListStart
+           \resumeItem{Built multi-step AI pipeline with Convex workflow; reduced generation errors by 40\%.}
+          \resumeItem{Achieved 40+ signups and 2 paying users with no active marketing.}
+         \resumeItemListEnd
+     
+
+       \resumeProjectHeader
+         {CitySwipe – AI Travel Planner}{Jul 2024–Present}
+       
+       \resumeProjectDetails{Personalized travel recommendations via LLM + vector search.}
+       \resumeItem{Technologies Used: Next.js, LangChain, Pinecone, Supabase}
+       \resumeItemListStart
+           \resumeItem{50K impressions and 200 users; secured early investor interest.}
+         \resumeItemListEnd
+     
+
+       \resumeProjectHeader
+         {Job Tracker \& Analytics Dashboard}{Jan–Apr 2024}
+       
+       \resumeProjectDetails{Automated job tracking workflow, cutting completion time by 50\%.}
+       \resumeItem{Technologies Used: Next.js, PostgreSQL, Supabase}
+       
+     
+
+       \resumeProjectHeader
+         {Jelly Up! – AI Caption Generator}{Aug 2024}
+       
+       \resumeProjectDetails{Automated subtitles with Whisper + OpenCV; judged 2nd place at Headstarter Hiring Hackathon.}
+       \resumeItem{Technologies Used: Next.js, Whisper, Docker}
+       
+     
+
+       \resumeProjectHeader
+         {Globetrotter AI – Voice Travel Assistant}{Aug 2024}
+       
+       \resumeProjectDetails{Voice-activated travel planner integrating speech recognition and travel APIs.}
+       \resumeItem{Technologies Used: Flask, Python, OpenAI}
+       \resumeItemListStart
+           \resumeItem{Won 1st place at Headstarter Hiring Hackathon.}
+         \resumeItemListEnd
+     
+     \resumeSubHeadingListEnd
+%-----------TECHNICAL SKILLS-----------
+\section{Skills}
+\resumeFlexContent{Technical:}{Python, JavaScript, TypeScript, React, Next.js, React Native, Node.js, Ruby on Rails, PostgreSQL, Supabase, Firebase, Docker, Pinecone, LangChain, OpenAI, Convex}
+        \resumeFlexContent{Additional:}{UI/UX Design, Product Development, Agile, Leadership}
+%-----------ADDITIONAL INFO-----------
+\section{Additional Information}
+
+        
+        \resumeFlexContent{Languages:}{English (Native)}
+        \resumeFlexContent{References:}{Available upon request}
+\end{document}

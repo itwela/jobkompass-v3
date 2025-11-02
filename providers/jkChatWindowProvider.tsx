@@ -29,6 +29,13 @@ interface ChatInteractionStateContextType {
   setShowHelperContainer: (value: boolean) => void;
   allCommandsAndActions: string[];
   onClickAutoFill: (commandOrAction: string) => void;
+  // File mode state
+  isFileMode: boolean;
+  setIsFileMode: (value: boolean) => void;
+  droppedFile: File | null;
+  setDroppedFile: (file: File | null) => void;
+  fileName: string | null;
+  setFileName: (name: string | null) => void;
 }
 
 interface InputControlContextType {
@@ -62,6 +69,8 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     { id: '/chat', name: 'Chat Mode' },
     { id: '/jobs', name: 'Jobs Mode' },
     { id: '/resume', name: 'Resume Mode' },
+    { id: '/file', name: 'File Mode' },
+    { id: '/resources', name: 'Links & Resources' },
   ]);
   // STUB -----
 
@@ -73,13 +82,18 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   const [wantsToDownloadResume, setWantsToDownloadResume] = useState<boolean>(false);
   const [chatHistory, setChatHistory] = useState<string[]>([]);
   const [showHelperContainer, setShowHelperContainer] = useState<boolean>(false);
+  
+  // File mode state
+  const [isFileMode, setIsFileMode] = useState<boolean>(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   // NOTE - TEXT AREA STUFF
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const [textValue, setTextValue] = React.useState('')
   const [dynamicTextAreaHeight, setDynamicTextAreaHeight] = React.useState(0)
   // STUB - STEP 2 OF ADDING A NEW MODE/ACTION
-  const commands = ['/home', '/chat', '/resume', '/jobs', '/tutorial']
+  const commands = ['/home', '/chat', '/resume', '/jobs', '/tutorial', '/file', '/resources']
   const commandActions = ['/add', '/download-resume', '/start']
   const allCommandsAndActions = [...commands, ...commandActions]
   // STUB -----
@@ -106,6 +120,13 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
         setWantsToAddJob(false);
         setWantsToDownloadResume(false);
         setShowHelperContainer(false);
+        
+        // Handle file mode specifically
+        if (modeId === '/file') {
+          setIsFileMode(true);
+        } else {
+          setIsFileMode(false);
+        }
       }
     }
 
@@ -162,7 +183,7 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
       const actions = commandActions.find(cmd => textValue.startsWith(cmd));
       setHighlightedText(actions || null);
 
-      // NOTE - IF HOME, CHAT, RESUME, JOBS
+      // NOTE - IF HOME, CHAT, RESUME, JOBS, FILE
       if (command) {
         const modeId = command;
         const targetMode = allModes.find(mode => mode.id === modeId);
@@ -172,6 +193,13 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
           setWantsToAddJob(false);
           setWantsToDownloadResume(false);
           setShowHelperContainer(false);
+          
+          // Handle file mode specifically
+          if (modeId === '/file') {
+            setIsFileMode(true);
+          } else {
+            setIsFileMode(false);
+          }
         }
       }
 
@@ -248,6 +276,13 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     homeHeaderText,
     allCommandsAndActions,
     onClickAutoFill,
+    // File mode state
+    isFileMode,
+    setIsFileMode,
+    droppedFile,
+    setDroppedFile,
+    fileName,
+    setFileName,
   };
 
   return (
