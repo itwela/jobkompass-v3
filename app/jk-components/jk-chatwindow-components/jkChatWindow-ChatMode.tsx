@@ -1,8 +1,14 @@
 'use client'
 
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
+import { useAuth } from "@/providers/jkAuthProvider";
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { motion } from "framer-motion";
+import JkGap from "../jkGap";
 
 interface ChatMessage {
   id: string;
@@ -16,13 +22,77 @@ interface ChatMessage {
   }>;
 }
 
+const easeOutCurve = [0.16, 1, 0.3, 1] as const;
+
+const introWrapperVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.35,
+      ease: easeOutCurve,
+      when: "beforeChildren",
+      staggerChildren: 0.12,
+    },
+  },
+};
+
+const introChildVariants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: easeOutCurve,
+    },
+  },
+};
+
+const suggestionGridVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      delayChildren: 0.25,
+      staggerChildren: 0.08,
+    },
+  },
+};
+
 export default function JkCW_ChatMode() {
-    const { textValue, setTextValue, textareaRef } = useJobKompassChatWindow()
+    const { textValue, setTextValue, textareaRef, currentThreadId, setCurrentThreadId } = useJobKompassChatWindow()
+    const { user, isAuthenticated } = useAuth()
     
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    // Convex mutations
+    const createThread = useMutation(api.threads.create)
+    const addMessage = useMutation(api.threads.addMessage)
+
+    // Load thread if one is selected
+    const threadData = useQuery(
+      api.threads.get,
+      currentThreadId ? { threadId: currentThreadId } : "skip"
+    )
+
+    // Load messages when thread changes
+    useEffect(() => {
+        if (threadData?.messages) {
+            const loadedMessages: ChatMessage[] = threadData.messages.map((msg: any) => ({
+                id: msg._id,
+                type: msg.role as 'user' | 'assistant',
+                content: msg.content,
+                timestamp: new Date(msg.createdAt),
+                toolCalls: msg.toolCalls,
+            }))
+            setMessages(loadedMessages)
+        }
+    }, [threadData])
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
@@ -31,10 +101,27 @@ export default function JkCW_ChatMode() {
 
     // Send message function
     const sendMessage = async () => {
-        if (!textValue.trim() || isLoading) return
+        if (!textValue.trim() || isLoading || !isAuthenticated) return
 
         const currentTextValue = textValue.trim() // Capture the current value
         
+        // Create or use existing thread
+        let activeThreadId = currentThreadId
+        if (!activeThreadId) {
+            try {
+                // Generate title from first message (truncate if too long)
+                const title = currentTextValue.length > 50 
+                    ? currentTextValue.slice(0, 50) + '...' 
+                    : currentTextValue
+                activeThreadId = await createThread({ title })
+                setCurrentThreadId(activeThreadId)
+            } catch (err) {
+                console.error('Failed to create thread:', err)
+                setError('Failed to create conversation')
+                return
+            }
+        }
+
         const userMessage: ChatMessage = {
             id: Date.now().toString(),
             type: 'user',
@@ -47,6 +134,17 @@ export default function JkCW_ChatMode() {
         setIsLoading(true)
         setError(null)
 
+        // Save user message to database
+        try {
+            await addMessage({
+                threadId: activeThreadId,
+                role: 'user',
+                content: currentTextValue,
+            })
+        } catch (err) {
+            console.error('Failed to save user message:', err)
+        }
+
         // Create a placeholder assistant message that we'll update as we stream
         const tempMessageId = (Date.now() + 1).toString()
         const tempAssistantMessage: ChatMessage = {
@@ -56,6 +154,9 @@ export default function JkCW_ChatMode() {
             timestamp: new Date()
         }
         setMessages(prev => [...prev, tempAssistantMessage])
+
+        console.log('user', user)
+        console.log('user._id', user?._id)
 
         try {
             const response = await fetch('/api/chat', {
@@ -69,7 +170,9 @@ export default function JkCW_ChatMode() {
                         role: msg.type === 'user' ? 'user' : 'assistant',
                         content: msg.content
                     })),
-                    agentId: 'jobkompass'
+                    agentId: 'jobkompass',
+                    userId: user?._id,
+                    username: user?.username || user?.email || undefined,
                 })
             })
 
@@ -82,6 +185,7 @@ export default function JkCW_ChatMode() {
             const decoder = new TextDecoder()
             let buffer = ''
             let fullContent = ''
+            let toolCallsData: any[] | undefined = undefined
 
             if (!reader) {
                 throw new Error('No reader available')
@@ -101,6 +205,7 @@ export default function JkCW_ChatMode() {
                         
                         if (data.type === 'start') {
                             // Update the message with metadata
+                            toolCallsData = data.toolCalls
                             setMessages(prev => prev.map(msg => 
                                 msg.id === tempMessageId 
                                     ? { ...msg, toolCalls: data.toolCalls }
@@ -115,8 +220,22 @@ export default function JkCW_ChatMode() {
                                     : msg
                             ))
                         } else if (data.type === 'done') {
-                            // Stream complete
+                            // Stream complete - save assistant message to database
                             setIsLoading(false)
+                            
+                            // Save assistant message to database
+                            if (activeThreadId && fullContent) {
+                                try {
+                                    await addMessage({
+                                        threadId: activeThreadId,
+                                        role: 'assistant',
+                                        content: fullContent,
+                                        toolCalls: toolCallsData,
+                                    })
+                                } catch (err) {
+                                    console.error('Failed to save assistant message:', err)
+                                }
+                            }
                         }
                     }
                 }
@@ -126,7 +245,7 @@ export default function JkCW_ChatMode() {
             setError(err instanceof Error ? err.message : 'An error occurred')
             setIsLoading(false)
             // Remove the temp message on error
-            setMessages(prev => prev.filter(msg => msg.id !== tempMessageId))
+            setMessages(prev => prev.filter(msg => msg.id === tempMessageId))
         }
     }
 
@@ -139,10 +258,11 @@ export default function JkCW_ChatMode() {
         return () => window.removeEventListener('jk:sendChat', handler as EventListener);
     }, [textValue, messages]);
 
-    // Clear chat
+    // Clear chat - start a new thread
     const clearChat = () => {
         setMessages([])
         setError(null)
+        setCurrentThreadId(null) // This will start a new thread on next message
     }
 
     // Handle suggestion click
@@ -161,7 +281,7 @@ export default function JkCW_ChatMode() {
         "What skills should I add to my resume?",
         "How can I improve my job search?",
         "Create a cover letter for a software engineer position",
-        "What are the latest job market trends?"
+        "Research eight recent roles I'm a strong fit for and add them to Interested in My Jobs"
     ]
 
     return (
@@ -170,14 +290,24 @@ export default function JkCW_ChatMode() {
             <div className="flex-1 overflow-y-auto chat-scroll">
                 <div className="max-w-3xl mx-auto px-6 py-6 w-full">
                 {messages.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-                        <div className="text-3xl font-semibold mb-3">
+                    <motion.div
+                        className="flex flex-col items-center justify-center min-h-[60vh] text-center"
+                        initial="hidden"
+                        animate="visible"
+                        variants={introWrapperVariants}
+                    >
+                        <motion.div className="text-3xl font-semibold mb-3" variants={introChildVariants}>
                             👋 Hi! I'm JobKompass, your AI career assistant
-                        </div>
-                        <div className="text-muted-foreground mb-8">
+                        </motion.div>
+                        <motion.div className="text-muted-foreground mb-8" variants={introChildVariants}>
                             I can help you create resumes, analyze your career, and provide job search guidance.
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl w-full">
+                        </motion.div>
+                        <motion.div
+                            className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl w-full"
+                            initial="hidden"
+                            animate="visible"
+                            variants={suggestionGridVariants}
+                        >
                             {suggestions.map((suggestion, index) => (
                                 <button
                                     key={index}
@@ -187,8 +317,8 @@ export default function JkCW_ChatMode() {
                                     {suggestion}
                                 </button>
                             ))}
-                        </div>
-                    </div>
+                        </motion.div>
+                    </motion.div>
                 ) : (
                     <div className="space-y-6 w-full">
                         {messages.map((message) => (
@@ -200,10 +330,10 @@ export default function JkCW_ChatMode() {
                                 `}
                             >
                                 <div className={`
-                                    max-w-[85%] rounded-2xl px-4 py-3
+                                    max-w-[85%]
                                     ${message.type === 'user' 
-                                        ? 'bg-primary text-primary-foreground' 
-                                        : 'bg-muted text-foreground border border-border'
+                                        ? 'bg-blue-100 text-blue-800 border border-blue-200 rounded-2xl px-4 py-3' 
+                                        : 'bg-card border border-border rounded-lg px-6 py-4'
                                     }
                                 `}>
                                     <div className={message.type === 'assistant' ? 'markdown-content' : ''}>
@@ -277,7 +407,7 @@ export default function JkCW_ChatMode() {
                                             <>
                                                 {/* Prominent File Downloads Section */}
                                                 {pdfResults.length > 0 && (
-                                                    <div className="bg-background border-2 border-primary rounded-xl p-4 my-2">
+                                                    <div className="bg-background border-2 border-blue-200 rounded-xl p-4 my-2">
                                                         <div className="font-bold text-foreground mb-2 flex items-center gap-2">
                                                             📁 Generated Files - Ready to Download
                                                         </div>
@@ -297,7 +427,7 @@ export default function JkCW_ChatMode() {
                                                                 <a
                                                                     href={`data:application/pdf;base64,${result.pdfBase64}`}
                                                                     download={result.fileName}
-                                                                    className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
+                                                                    className="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
                                                                 >
                                                                     Download PDF
                                                                 </a>
@@ -343,7 +473,10 @@ export default function JkCW_ChatMode() {
                         </div>
                     )}
                     
+                    <JkGap />
+
                     <div ref={messagesEndRef} />
+
                 </div>
             </div>
         </div>

@@ -170,7 +170,10 @@ export async function POST(req: Request) {
 
     // Create a FormData-like object for the PDF
     const resumeData = new FormData();
-    const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+    const pdfArrayBuffer = new ArrayBuffer(pdfBuffer.length);
+    const pdfUint8Array = new Uint8Array(pdfArrayBuffer);
+    pdfUint8Array.set(pdfBuffer);
+    const pdfBlob = new Blob([pdfUint8Array], { type: 'application/pdf' });
     const fileName = `resume-${Date.now()}.pdf`;
     const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
     resumeData.append('resume', file);
@@ -191,7 +194,7 @@ export async function POST(req: Request) {
     });
 
     // Create response with both PDF and TEX content
-    const response = new NextResponse(pdfBuffer, {
+    const response = new NextResponse(pdfUint8Array, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'attachment; filename="resume.pdf"',

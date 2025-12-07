@@ -240,6 +240,96 @@ export const getResume = query({
   },
 });
 
+// Resume IR (Intermediate Representation) functions
+export const saveResumeIR = mutation({
+  args: {
+    name: v.string(),
+    ir: v.any(),
+    meta: v.optional(v.object({
+      template: v.optional(v.string()),
+      lastEditedISO: v.optional(v.string()),
+      version: v.optional(v.number()),
+    })),
+    isActive: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const now = Date.now();
+    return await ctx.db.insert("resumeIRs", {
+      userId: identity.tokenIdentifier,
+      name: args.name,
+      createdAt: now,
+      updatedAt: now,
+      ir: args.ir,
+      meta: args.meta,
+      isActive: args.isActive ?? true,
+    });
+  },
+});
+
+export const updateResumeIR = mutation({
+  args: {
+    resumeIrId: v.id("resumeIRs"),
+    name: v.optional(v.string()),
+    ir: v.optional(v.any()),
+    meta: v.optional(v.object({
+      template: v.optional(v.string()),
+      lastEditedISO: v.optional(v.string()),
+      version: v.optional(v.number()),
+    })),
+    isActive: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const doc = await ctx.db.get(args.resumeIrId);
+    if (!doc || doc.userId !== identity.tokenIdentifier) {
+      throw new Error("Resume IR not found or access denied");
+    }
+    const updateData: any = { updatedAt: Date.now() };
+    if (args.name !== undefined) updateData.name = args.name;
+    if (args.ir !== undefined) updateData.ir = args.ir;
+    if (args.meta !== undefined) updateData.meta = args.meta;
+    if (args.isActive !== undefined) updateData.isActive = args.isActive;
+    return await ctx.db.patch(args.resumeIrId, updateData);
+  },
+});
+
+export const deleteResumeIR = mutation({
+  args: { resumeIrId: v.id("resumeIRs") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const doc = await ctx.db.get(args.resumeIrId);
+    if (!doc || doc.userId !== identity.tokenIdentifier) {
+      throw new Error("Resume IR not found or access denied");
+    }
+    return await ctx.db.delete(args.resumeIrId);
+  },
+});
+
+export const listResumeIRs = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    return await ctx.db.query("resumeIRs").withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier)).collect();
+  },
+});
+
+export const getResumeIR = query({
+  args: { resumeIrId: v.id("resumeIRs") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const doc = await ctx.db.get(args.resumeIrId);
+    if (!doc || doc.userId !== identity.tokenIdentifier) {
+      throw new Error("Resume IR not found or access denied");
+    }
+    return doc;
+  },
+});
+
 // Cover Letter functions
 export const saveCoverLetter = mutation({
   args: {

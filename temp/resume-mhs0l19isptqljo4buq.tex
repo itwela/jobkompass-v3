@@ -1,0 +1,203 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}  % Latin Modern fonts for better coverage
+\usepackage[T1]{fontenc}  % Use T1 encoding for better font support
+\usepackage{latexsym}
+\usepackage{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{babel}
+\usepackage{tabularx}
+\usepackage{graphicx}
+\usepackage[pdftex]{bookmark}
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting - REDUCED SPACING
+\titleformat{\section}{
+  \vspace{-8pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-2pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{\item\small{{#1 \vspace{-2pt}}}}
+
+\newcommand{\resumeFlexContent}[2]{
+  \noindent\begin{minipage}[t]{0.2\textwidth}
+    \textbf{#1}
+  \end{minipage}%
+  \hfill % This creates the space-between effect
+  \begin{minipage}[t]{0.75\textwidth}
+    \raggedright #2
+  \end{minipage}\\[4pt]
+}
+
+% REDUCED SPACING in resumeSubheading
+\newcommand{\resumeSubheading}[4]{\vspace{-4pt}\item
+  \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+    \textbf{#1} & #2 \\
+    \textit{\small#3} & \textit{\small #4} \\
+  \end{tabular*}\vspace{-5pt}}
+
+% Modified to handle long technology lists with a comma-separated inline format
+\newcommand{\resumeProjectHeading}[2]{\item
+  \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+    \small#1 & \small#2 \\
+  \end{tabular*}\vspace{-5pt}}
+
+\newcommand{\resumeProjectHeader}[2]{
+  \vspace{-2pt}
+  \item[]
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectDetails}[1]{
+  \vspace{3pt}
+  \begin{minipage}[t]{0.97\textwidth}
+    \small #1
+  \end{minipage}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+% Set global paragraph spacing to minimum
+\setlength{\parskip}{0pt}
+
+% Set global paragraph spacing to minimum
+\setlength{\parskip}{0pt}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setlength{\parskip}{0pt}
+\begin{document}
+
+\begin{center}
+    \textbf{\Huge \scshape Cita Wela} \\ \vspace{1pt}
+    \small \href{mailto:cita.wela@example.com}{\underline{cita.wela@example.com}} $|$
+    555-123-4567 $|$
+    San Francisco, CA $|$
+    \href{https://www.linkedin.com/in/citawela}{\underline{www.linkedin.com/in/citawela}} $|$
+    \href{https://github.com/citawela}{\underline{github.com/citawela}} $|$
+    \href{https://citawela.dev}{\underline{citawela.dev}}
+  \end{center}
+%-----------EDUCATION-----------
+\section{Education}
+\resumeSubHeadingListStart
+             
+               \resumeSubheading
+                 {University of California, Berkeley}{Berkeley, CA}
+                 {Bachelor of Science in Computer Science}{Sep 2012 -- Jun 2016}
+                 \resumeItemListStart
+                   \resumeItem{GPA: 3.7/4.0}
+          \resumeItem{Relevant coursework: Algorithms, Databases, Operating Systems, Machine Learning}
+                 \resumeItemListEnd
+             
+             \resumeSubHeadingListEnd
+%-----------EXPERIENCE-----------
+\section{Experience}
+\resumeSubHeadingListStart
+             
+               \resumeSubheading
+                 {NovaTech Solutions}{San Francisco, CA}
+                 {Senior Software Engineer}{Jun 2021 - Present}
+                 \resumeItemListStart
+                   \resumeItem{Led a team of 5 engineers to design and deliver a microservices-based payments platform, increasing transaction throughput by 45\%.}
+          \resumeItem{Architected and implemented RESTful APIs using Python and Flask, reducing average response time from 340ms to 120ms.}
+          \resumeItem{Implemented CI/CD pipelines with GitHub Actions and Docker, cutting release time from days to hours.}
+          \resumeItem{Mentored junior engineers and ran bi-weekly code reviews, improving code quality and reducing production incidents by 30\%.}
+                 \resumeItemListEnd
+             
+
+               \resumeSubheading
+                 {BrightPath Labs}{Remote}
+                 {Software Engineer}{Jan 2018 - May 2021}
+                 \resumeItemListStart
+                   \resumeItem{Developed backend services in Node.js and Express for a B2B analytics product used by 200+ customers.}
+          \resumeItem{Designed and optimized PostgreSQL queries and schema changes, improving query performance by 60\%.}
+          \resumeItem{Built data pipelines with Apache Airflow to automate ETL processes, lowering manual data handling by 80\%.}
+          \resumeItem{Collaborated with product and design teams to ship features that increased customer retention by 12\%.}
+                 \resumeItemListEnd
+             
+
+               \resumeSubheading
+                 {Edgeware Inc.}{Oakland, CA}
+                 {Junior Developer}{Jun 2016 - Dec 2017}
+                 \resumeItemListStart
+                   \resumeItem{Contributed to front-end development using React and Redux, improving load times and UI responsiveness.}
+          \resumeItem{Wrote unit and integration tests using Jest and Enzyme, increasing test coverage from 48\% to 78\%.}
+          \resumeItem{Assisted in migration from monolithic app to modular services, enabling faster feature development cycles.}
+                 \resumeItemListEnd
+             
+             \resumeSubHeadingListEnd
+%-----------PROJECTS-----------
+\section{Projects}
+\resumeSubHeadingListStart
+       
+         \resumeProjectHeader
+           {SmartInvoice}{Mar 2022}
+         
+         \resumeProjectDetails{A serverless invoicing app that generates and emails invoices, integrates with Stripe for payments.}
+         \resumeItem{Technologies Used: Python, AWS Lambda, Stripe, DynamoDB}
+         \resumeItemListStart
+             \resumeItem{Reduced manual billing time by 90\% for small-business users.}
+          \resumeItem{Implemented automated retries and webhook handling to ensure payment reliability.}
+           \resumeItemListEnd
+       
+
+         \resumeProjectHeader
+           {Realtime Dashboard}{Dec 2019}
+         
+         \resumeProjectDetails{Dashboard for monitoring application metrics with low-latency updates and alerting.}
+         \resumeItem{Technologies Used: Node.js, WebSockets, PostgreSQL, Grafana}
+         \resumeItemListStart
+             \resumeItem{Enabled real-time monitoring for operations team, reducing mean time to detect (MTTD) by 40\%.}
+           \resumeItemListEnd
+       
+       \resumeSubHeadingListEnd
+%-----------TECHNICAL SKILLS-----------
+\section{Skills}
+\resumeFlexContent{Technical:}{Python, Node.js, REST APIs, Docker, Kubernetes, PostgreSQL, AWS, Git, CI/CD, React}
+          \resumeFlexContent{Additional:}{Agile/Scrum, Mentoring, Product collaboration, Technical documentation}
+%-----------ADDITIONAL INFO-----------
+\section{Additional Information}
+\resumeFlexContent{Interests:}{Open-source contributor, Machine learning, Cycling}
+          \resumeFlexContent{Hobbies:}{Hiking, Photography}
+          \resumeFlexContent{Languages:}{English (native), Spanish (conversational)}
+          \resumeFlexContent{References:}{Available upon request}
+\end{document}

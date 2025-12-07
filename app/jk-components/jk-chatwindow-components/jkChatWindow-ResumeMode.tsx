@@ -1,46 +1,34 @@
 'use client'
 
-import { useJobKompassTheme } from "@/providers/jkThemeProvider";
-import JkConsoleContentHeader from "../jkConsole-Content-Header";
 import JkCW_ResumeForm from "./jkChatWindow-ResumeForm";
-
+import { Button } from "@/components/ui/button";
+import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 
 export default function JkCW_ResumeMode() {
+  const { allModes, setCurrentMode } = useJobKompassChatWindow();
+  const editorMode = allModes.find(m => m.id === '/resume-editor');
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto flex h-full max-w-5xl flex-col gap-6 px-6 py-8 sm:px-8">
+        <header className="space-y-2 border-b border-border pb-6">
+          <div className="flex items-end justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight">My Resumes</h1>
+              <p className="text-sm text-muted-foreground">
+                Keep polished versions ready for different roles. Select a resume to preview, edit, or export.
+              </p>
+            </div>
+            {editorMode && (
+              <Button onClick={() => setCurrentMode(editorMode)} variant="default">
+                Open Resume Editor
+              </Button>
+            )}
+          </div>
+        </header>
 
-    const {theme, styles, utilStyles} = useJobKompassTheme()
+        <JkCW_ResumeForm />
 
-    const resumePageStyles = {
-        container: {
-            // TODO This will be flixible the same way my trading software is.
-            // there will be a button from aprovider that iwll basically adjust the width of the components in it.
-            width: '100%',height: '100%',
-            display: 'flex',flexDirection: 'row' as const,
-            // alignItems: 'center', 
-            // justifyContent: 'center',
-        },
-        content: {
-
-        },
-        heading: {
-            fontSize: utilStyles.typography.fontSize["4xl"],
-            fontWeight: utilStyles.typography.fontWeight.bold,
-        },
-    }
-
-    function ResumeChat() {
-        return (
-            <>
-                <div>Chat</div>
-            </>
-        )
-    }
-
-    return (
-        <>
-        <div style={resumePageStyles.container}>
-            <JkCW_ResumeForm/>
-            {/* <ResumeChat/> */}
-        </div>
-        </>
-    )
+      </div>
+    </div>
+  );
 }

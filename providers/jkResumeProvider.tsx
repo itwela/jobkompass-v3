@@ -1,8 +1,9 @@
 'use client';
 
 import { api } from '@/convex/_generated/api';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react';
+import { Id } from "@/convex/_generated/dataModel";
 
 interface userFieldData {
   personalInfo: {
@@ -91,6 +92,13 @@ interface JobKompassResumeContextType {
   setCurrentResumeId: (id: string) => void;
 
   resumes: any[] | undefined;
+  selectionMode: boolean;
+  setSelectionMode: (enabled: boolean) => void;
+  selectedResumeIds: string[];
+  toggleResumeSelection: (id: string) => void;
+  selectAllResumes: (ids?: string[]) => void;
+  clearResumeSelection: () => void;
+  bulkDeleteResumes: (ids?: string[]) => Promise<void>;
 
 
 }
@@ -288,7 +296,64 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
 
   const [currentResumeId, setCurrentResumeId] = useState<string | null>(null);
 
-  const resumes = [{}]
+  const resumes = useQuery(api.documents.listResumes);
+  const deleteResumeMutation = useMutation(api.documents.deleteResume);
+  const [selectionMode, setSelectionModeState] = useState(false);
+  const [selectedResumeIds, setSelectedResumeIds] = useState<string[]>([]);
+  const toggleResumeSelection = useCallback((id: string) => {
+    setSelectedResumeIds((prev) =>
+      prev.includes(id) ? prev.filter((resumeId) => resumeId !== id) : [...prev, id]
+    );
+  }, []);
+
+  const selectAllResumes = useCallback((ids?: string[]) => {
+    if (ids && ids.length > 0) {
+      setSelectedResumeIds(ids);
+      return;
+    }
+    if (!Array.isArray(resumes)) return;
+    setSelectedResumeIds(resumes.map((resume: any) => String(resume._id ?? resume.id)));
+  }, [resumes]);
+
+  const clearResumeSelection = useCallback(() => {
+    setSelectedResumeIds([]);
+  }, []);
+
+  const setSelectionMode = useCallback((enabled: boolean) => {
+    setSelectionModeState(enabled);
+    if (!enabled) {
+      setSelectedResumeIds([]);
+    }
+  }, []);
+
+  const bulkDeleteResumes = useCallback(
+    async (ids?: string[]) => {
+      const targetIds = (ids ?? selectedResumeIds).filter((resumeId): resumeId is string => Boolean(resumeId));
+      if (targetIds.length === 0) return;
+
+      try {
+        await Promise.all(
+          targetIds.map((resumeId) =>
+            deleteResumeMutation({ resumeId: resumeId as Id<"resumes"> })
+          )
+        );
+        if (currentResumeId && targetIds.includes(currentResumeId)) {
+          setCurrentResumeId(null);
+        }
+        if (ids === undefined) {
+          setSelectedResumeIds([]);
+          setSelectionModeState(false);
+        } else {
+          setSelectedResumeIds((prev) =>
+            prev.filter((resumeId) => !targetIds.includes(resumeId))
+          );
+        }
+      } catch (error) {
+        console.error("Failed to delete selected resumes:", error);
+      }
+    },
+    [currentResumeId, deleteResumeMutation, selectedResumeIds]
+  );
 
 
   // STUB -------- CALLBACKS
@@ -571,6 +636,13 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
     setCurrentResumeId,
 
     resumes,
+    selectionMode,
+    setSelectionMode,
+    selectedResumeIds,
+    toggleResumeSelection,
+    selectAllResumes,
+    clearResumeSelection,
+    bulkDeleteResumes,
     
   };
 

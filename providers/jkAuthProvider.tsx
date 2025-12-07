@@ -1,15 +1,17 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useEffect } from 'react';
+import { useConvexAuth } from 'convex/react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { useConvexAuth } from 'convex/react';
 
 interface User {
   _id: string;
   email?: string;
   name?: string;
+  username?: string;
   tokenIdentifier: string;
+  subject?: string;
 }
 
 interface AuthContextType {
@@ -20,11 +22,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AI_ID_STORAGE_KEY = 'jk_ai_identity';
+
 export function JkAuthProvider({ children }: { children: ReactNode }) {
   const { isLoading: convexAuthLoading, isAuthenticated } = useConvexAuth();
-  const user = useQuery(api.users.currentUser, isAuthenticated ? {} : "skip");
+  const user = useQuery(api.auth.currentUser, isAuthenticated ? {} : "skip");
 
   const isLoading = convexAuthLoading || (isAuthenticated && user === undefined);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (user && user._id) {
+      window.localStorage.setItem(AI_ID_STORAGE_KEY, user._id);
+    } else if (!isAuthenticated || user === null) {
+      window.localStorage.removeItem(AI_ID_STORAGE_KEY);
+    }
+  }, [user, isAuthenticated]);
 
   return (
     <AuthContext.Provider value={{ 

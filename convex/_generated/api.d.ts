@@ -12,7 +12,9 @@ import type * as auth from "../auth.js";
 import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
 import type * as http from "../http.js";
+import type * as jobs from "../jobs.js";
 import type * as resources from "../resources.js";
+import type * as threads from "../threads.js";
 
 import type {
   ApiFromModules,
@@ -33,7 +35,9 @@ declare const fullApi: ApiFromModules<{
   documents: typeof documents;
   dopeAgents: typeof dopeAgents;
   http: typeof http;
+  jobs: typeof jobs;
   resources: typeof resources;
+  threads: typeof threads;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

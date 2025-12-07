@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Id } from "@/convex/_generated/dataModel";
 
 export interface ModeType {
   id: string;
@@ -25,8 +26,6 @@ interface ChatInteractionStateContextType {
   setWantsToDownloadResume: (value: boolean) => void;
   wantsTutorial: boolean;
   setWantsTutorial: (value: boolean) => void;
-  showHelperContainer: boolean;
-  setShowHelperContainer: (value: boolean) => void;
   allCommandsAndActions: string[];
   onClickAutoFill: (commandOrAction: string) => void;
   // File mode state
@@ -44,10 +43,8 @@ interface InputControlContextType {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   dynamicTextAreaHeight: number;
   setDynamicTextAreaHeight: (height: number) => void;
-  commands: string[];
-  commandActions: string[];
-  highlightedText: string | null;
-  setHighlightedText: (text: string | null) => void;
+  currentThreadId: Id<"threads"> | null;
+  setCurrentThreadId: (id: Id<"threads"> | null) => void;
 }
 
 interface DynamicTextContextType {
@@ -68,20 +65,21 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     { id: '/tutorial', name: 'Tutorial Mode' },
     { id: '/chat', name: 'Chat Mode' },
     { id: '/jobs', name: 'Jobs Mode' },
+    { id: '/my-jobs', name: 'My Jobs' },
     { id: '/resume', name: 'Resume Mode' },
+    { id: '/resume-editor', name: 'Resume Editor' },
     { id: '/file', name: 'File Mode' },
     { id: '/resources', name: 'Links & Resources' },
   ]);
   // STUB -----
 
   // NOTE - MODE STUFF
-  const [startingMode, setStartingMode] = useState<ModeType>(allModes[0]);
+  const [startingMode, setStartingMode] = useState<ModeType>(allModes[2]); // Chat Mode is default
   const [currentMode, setCurrentMode] = useState<ModeType>(startingMode);
   const [wantsTutorial, setWantsTutorial] = useState<boolean>(false);
   const [wantsToAddJob, setWantsToAddJob] = useState<boolean>(false);
   const [wantsToDownloadResume, setWantsToDownloadResume] = useState<boolean>(false);
   const [chatHistory, setChatHistory] = useState<string[]>([]);
-  const [showHelperContainer, setShowHelperContainer] = useState<boolean>(false);
   
   // File mode state
   const [isFileMode, setIsFileMode] = useState<boolean>(false);
@@ -93,11 +91,13 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   const [textValue, setTextValue] = React.useState('')
   const [dynamicTextAreaHeight, setDynamicTextAreaHeight] = React.useState(0)
   // STUB - STEP 2 OF ADDING A NEW MODE/ACTION
-  const commands = ['/home', '/chat', '/resume', '/jobs', '/tutorial', '/file', '/resources']
+  const commands = ['/home', '/chat', '/resume', '/resume-editor', '/jobs', '/my-jobs', '/tutorial', '/file', '/resources']
   const commandActions = ['/add', '/download-resume', '/start']
   const allCommandsAndActions = [...commands, ...commandActions]
   // STUB -----
-  const [highlightedText, setHighlightedText] = React.useState<string | null>(null)
+  
+  // Thread management
+  const [currentThreadId, setCurrentThreadId] = React.useState<Id<"threads"> | null>(null)
 
 
 
@@ -119,7 +119,6 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
         setWantsTutorial(false);
         setWantsToAddJob(false);
         setWantsToDownloadResume(false);
-        setShowHelperContainer(false);
         
         // Handle file mode specifically
         if (modeId === '/file') {
@@ -136,21 +135,18 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
         setWantsToAddJob(true);
         setWantsTutorial(false);
         setWantsToDownloadResume(false);
-        setShowHelperContainer(false);
       }
 
       if (actionsOnPress === '/download-resume') {
         setWantsToDownloadResume(true);
         setWantsTutorial(false);
         setWantsToAddJob(false);
-        setShowHelperContainer(false);
       }
 
       if (actionsOnPress === '/start') {
         setWantsTutorial(true);
         setWantsToAddJob(false);
         setWantsToDownloadResume(false);
-        setShowHelperContainer(false);
       }
     }
   }
@@ -167,85 +163,7 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
       textarea.style.height = `${newHeight}px`;
       setDynamicTextAreaHeight(newHeight);
     }
-
-    // NOTE - Check for commands in text and switch modes
-    if (!textValue) {
-      // const homeMode = allModes.find(mode => mode.id === '/home')
-      // if (homeMode) {
-      //   setCurrentMode(homeMode)
-      //   setWantsTutorial(false)
-      // }
-      // setHighlightedText(null)
-    } else {
-      const command = commands.find(cmd => textValue.startsWith(cmd));
-      setHighlightedText(command || null);
-
-      const actions = commandActions.find(cmd => textValue.startsWith(cmd));
-      setHighlightedText(actions || null);
-
-      // NOTE - IF HOME, CHAT, RESUME, JOBS, FILE
-      if (command) {
-        const modeId = command;
-        const targetMode = allModes.find(mode => mode.id === modeId);
-        if (targetMode) {
-          setCurrentMode(targetMode);
-          setWantsTutorial(false);
-          setWantsToAddJob(false);
-          setWantsToDownloadResume(false);
-          setShowHelperContainer(false);
-          
-          // Handle file mode specifically
-          if (modeId === '/file') {
-            setIsFileMode(true);
-          } else {
-            setIsFileMode(false);
-          }
-        }
-      }
-
-      // NOTE -IF ADD, DOWNLOAD-RESUME, START
-      // STUB - STEP 2.5 OF ADDING A NEW MODE/ACTION
-      if (actions) {
-        if (actions === '/add') {
-          // set the mode to home first
-          setCurrentMode(allModes[0]);
-
-          setWantsToAddJob(true);
-
-          setWantsTutorial(false);
-          setWantsToDownloadResume(false);
-          setShowHelperContainer(false);
-
-        }
-
-        if (actions === '/download-resume') {
-          setWantsToDownloadResume(true);
-
-          setWantsTutorial(false);
-          setWantsToAddJob(false);
-          setShowHelperContainer(false);
-        }
-
-        if (actions === '/start') {
-          setWantsTutorial(true);
-
-          setWantsToAddJob(false);
-          setWantsToDownloadResume(false);
-          setShowHelperContainer(false);
-        }
-      }
-      // STUB -----
-
-      if (textValue.startsWith('/')) {
-        setShowHelperContainer(true)
-      }
-      if (textValue.startsWith('')) {
-        setShowHelperContainer(true)
-      }
-
-    }
-
-  }, [textValue, allModes, setCurrentMode])
+  }, [textValue])
   
   const value = {
     allModes,
@@ -262,17 +180,11 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     setWantsToDownloadResume,
     wantsTutorial,
     setWantsTutorial,
-    showHelperContainer,
-    setShowHelperContainer,
     textValue,
     setTextValue,
     textareaRef,
     dynamicTextAreaHeight,
     setDynamicTextAreaHeight,
-    commands,
-    commandActions,
-    highlightedText,
-    setHighlightedText,
     homeHeaderText,
     allCommandsAndActions,
     onClickAutoFill,
@@ -283,6 +195,9 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     setDroppedFile,
     fileName,
     setFileName,
+    // Thread management
+    currentThreadId,
+    setCurrentThreadId,
   };
 
   return (

@@ -3,7 +3,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
-import Jk_AutoFill from "./jk-AutoFill";
+import JkContextPanel from "./jkContextPanel";
 import { useCallback, useState } from "react";
 import { Send, Plus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -71,13 +71,9 @@ export default function JkInputSection() {
 
   return (
     <div className="relative w-full">
-      {/* AUTOFILL CONTAINER HELPER */}
-      {textValue.includes('/') && (
-        <div className="absolute bottom-full left-0 w-full flex justify-center mb-2 z-50">
-          <Jk_AutoFill />
-        </div>
-      )}
-
+      {/* CONTEXT PANEL - Shows user's resumes and jobs */}
+      <JkContextPanel />
+      
       {/* Main Input Container */}
       <div 
         className={`
