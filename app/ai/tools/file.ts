@@ -34,6 +34,7 @@ const createResumeJakeTemplateTool = tool({
         personalInfo: z.object({
             firstName: z.string().describe('First name of the person'),
             lastName: z.string().describe('Last name of the person'),
+            citizenship: z.string().describe('Citizenship of the person'),
             email: z.string().email().describe('Email address'),
             phone: z.string().optional().nullable().describe('Phone number'),
             location: z.string().optional().nullable().describe('City, State or City, Country'),
@@ -104,6 +105,7 @@ const createResumeJakeTemplateTool = tool({
             const headerContent = `\\begin{center}
     \\textbf{\\Huge \\scshape ${escapeLatex(input.personalInfo.firstName)} ${escapeLatex(input.personalInfo.lastName)}} \\\\ \\vspace{1pt}
     \\small \\href{mailto:${escapeLatex(input.personalInfo.email)}}{\\underline{${escapeLatex(input.personalInfo.email)}}} $|$
+    ${input.personalInfo.citizenship ? `${escapeLatex(input.personalInfo.citizenship)} $|$` : ''}
     ${input.personalInfo.phone ? `${escapeLatex(input.personalInfo.phone)} $|$` : ''}
     ${input.personalInfo.location ? `${escapeLatex(input.personalInfo.location)} $|$` : ''}
     ${input.personalInfo.linkedin ? `\\href{${escapeLatex(formatUrl(input.personalInfo.linkedin))}}{\\underline{${escapeLatex(input.personalInfo.linkedin.replace(/^https?:\/\//, ''))}}} $|$` : ''}

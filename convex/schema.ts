@@ -9,7 +9,15 @@ const documentsTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
     isActive: v.optional(v.boolean()),
-    content: v.object({
+    // File storage fields for uploaded resumes
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
+    fileType: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    // Labels and tags for organization
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    content: v.optional(v.object({
 
       personalInfo: v.object({
         name: v.string(),
@@ -87,7 +95,7 @@ const documentsTables = {
         })
       )),
       
-    }),
+    })),
   }).index("by_user", ["userId"]),
   resumeIRs: defineTable({
     userId: v.string(),

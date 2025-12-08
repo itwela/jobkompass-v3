@@ -1,6 +1,7 @@
 'use client'
 
 import { useJobs } from "@/providers/jkJobsProvider";
+import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useRef, useEffect, useMemo } from "react";
 import JkConfirmDelete from "../jkConfirmDelete";
 
@@ -30,6 +32,7 @@ export default function JkJobExpanded() {
     handleUpdateJob,
     statusOptions,
   } = useJobs();
+  const { resumes } = useJobKompassResume();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
@@ -40,6 +43,14 @@ export default function JkJobExpanded() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [skillInput, setSkillInput] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
+
+  // Get unique resume names from saved resumes
+  const resumeNames = useMemo(() => {
+    if (!resumes || !Array.isArray(resumes)) return [];
+    return resumes
+      .map((r: any) => r.name || r.title || "Untitled Resume")
+      .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index);
+  }, [resumes]);
 
   const job = selectedJobId ? allJobs.find((j) => j._id === selectedJobId) : null;
 
@@ -421,11 +432,30 @@ export default function JkJobExpanded() {
                   <FileText className="h-4 w-4" />
                   Resume used
                 </label>
-                <Input
-                  value={formState.resumeUsed}
-                  onChange={(event) => handleFieldChange("resumeUsed")(event.target.value)}
-                  placeholder="Resume version"
-                />
+                {resumeNames.length > 0 ? (
+                  <Select
+                    value={formState.resumeUsed}
+                    onValueChange={(value) => handleFieldChange("resumeUsed")(value)}
+                  >
+                    <SelectTrigger className="w-full border border-input">
+                      <SelectValue placeholder="Select a resume..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {resumeNames.map((name: string) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={formState.resumeUsed}
+                    onChange={(event) => handleFieldChange("resumeUsed")(event.target.value)}
+                    placeholder="Resume version"
+                    autoComplete="off"
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-2 md:col-span-2">
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">

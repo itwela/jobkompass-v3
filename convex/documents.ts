@@ -240,6 +240,124 @@ export const getResume = query({
   },
 });
 
+// Generate upload URL for resume file
+export const generateUploadUrl = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Upload resume file
+export const uploadResumeFile = mutation({
+  args: {
+    name: v.string(),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileType: v.string(),
+    fileSize: v.optional(v.number()),
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    const now = Date.now();
+    
+    return await ctx.db.insert("resumes", {
+      userId: identity.tokenIdentifier,
+      name: args.name,
+      fileId: args.fileId,
+      fileName: args.fileName,
+      fileType: args.fileType,
+      fileSize: args.fileSize,
+      label: args.label,
+      tags: args.tags,
+      createdAt: now,
+      updatedAt: now,
+      isActive: true,
+    });
+  },
+});
+
+// Update resume file metadata (label, tags)
+export const updateResumeFileMetadata = mutation({
+  args: {
+    resumeId: v.id("resumes"),
+    name: v.optional(v.string()),
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || resume.userId !== identity.tokenIdentifier) {
+      throw new Error("Resume not found or access denied");
+    }
+    
+    const updateData: any = {
+      updatedAt: Date.now(),
+    };
+    
+    if (args.name !== undefined) updateData.name = args.name;
+    if (args.label !== undefined) updateData.label = args.label;
+    if (args.tags !== undefined) updateData.tags = args.tags;
+    
+    return await ctx.db.patch(args.resumeId, updateData);
+  },
+});
+
+// Get file download URL by resume ID
+export const getFileUrl = query({
+  args: {
+    resumeId: v.id("resumes"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || resume.userId !== identity.tokenIdentifier) {
+      throw new Error("Resume not found or access denied");
+    }
+    
+    if (!resume.fileId) {
+      throw new Error("Resume has no file attached");
+    }
+    
+    return await ctx.storage.getUrl(resume.fileId);
+  },
+});
+
+// Get file download URL by file ID (for direct file access)
+export const getFileUrlById = query({
+  args: {
+    fileId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    // Verify the file belongs to a resume owned by the user
+    const resume = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .filter((q) => q.eq(q.field("fileId"), args.fileId))
+      .first();
+    
+    if (!resume) {
+      throw new Error("File not found or access denied");
+    }
+    
+    return await ctx.storage.getUrl(args.fileId);
+  },
+});
+
 // Resume IR (Intermediate Representation) functions
 export const saveResumeIR = mutation({
   args: {

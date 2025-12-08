@@ -130,6 +130,7 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
     { value: "Interviewing", label: "Interviewing", colorClass: "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100" },
     { value: "Offered", label: "Offered", colorClass: "bg-green-100 text-green-800 border-green-200 hover:bg-green-100" },
     { value: "Rejected", label: "Rejected", colorClass: "bg-red-100 text-red-800 border-red-200 hover:bg-red-100" },
+    { value: "Ghosted", label: "Ghosted", colorClass: "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100" },
   ];
 
   const availableStatuses = useMemo(

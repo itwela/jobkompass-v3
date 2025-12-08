@@ -21,25 +21,25 @@ export default function RootLayout({
 }>) {
   return (
     <ConvexAuthNextjsServerProvider>
-    <JkConvexProviders>
-      <JkAuthProvider>
-        <JobKompassThemeProvider>
-          <JobKompassResumeProvider>
+      <JkConvexProviders>
+        <JkAuthProvider>
+          <JobKompassThemeProvider>
             <JkResourcesProvider>
               <JkJobsProvider>
-                <JobKompassChatWindowProvider>
-                <html lang="en">
-                  <body className={`antialiased min-h-screen bg-background text-foreground`}>
-                    {children}
-                  </body>
-                </html>
-              </JobKompassChatWindowProvider>
+                <JobKompassResumeProvider>
+                  <JobKompassChatWindowProvider>
+                    <html lang="en">
+                      <body className={`antialiased min-h-screen bg-background text-foreground`}>
+                        {children}
+                      </body>
+                    </html>
+                  </JobKompassChatWindowProvider>
+                </JobKompassResumeProvider>
               </JkJobsProvider>
             </JkResourcesProvider>
-          </JobKompassResumeProvider>
-        </JobKompassThemeProvider>
-      </JkAuthProvider>
-    </JkConvexProviders>
+          </JobKompassThemeProvider>
+        </JkAuthProvider>
+      </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>
-    );
+  );
 }
