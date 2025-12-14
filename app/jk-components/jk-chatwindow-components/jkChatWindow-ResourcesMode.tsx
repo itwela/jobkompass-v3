@@ -1,7 +1,8 @@
 'use client'
 
 import { Button } from "@/components/ui/button";
-import { Plus, ExternalLink, Trash2, X, LogIn, Filter, Tag, CheckCircle2, Circle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, ExternalLink, Trash2, X, LogIn, Filter, Tag, CheckCircle2, Circle, Search } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Id } from "@/convex/_generated/dataModel";
@@ -419,6 +420,8 @@ export default function JkCW_ResourcesMode() {
     isAuthenticated,
     authLoading,
     user,
+    searchQuery,
+    setSearchQuery,
   } = useResources();
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
@@ -475,8 +478,7 @@ export default function JkCW_ResourcesMode() {
             </p>
             <Button 
               onClick={() => {
-                const trigger = document.querySelector('button[aria-haspopup]') as HTMLButtonElement;
-                trigger?.click();
+                window.dispatchEvent(new CustomEvent('jk:openSignIn'));
               }} 
               className="gap-2"
             >
@@ -543,6 +545,29 @@ export default function JkCW_ResourcesMode() {
                   Cancel
                 </Button>
               </>
+            )}
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search notes by title, URL, description, tags..."
+              className="pl-9 pr-9"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
           </div>
         </div>
@@ -653,12 +678,12 @@ export default function JkCW_ResourcesMode() {
             className="flex flex-col items-center justify-center min-h-[40vh] text-center"
           >
             <div className="text-6xl mb-4">🔍</div>
-            <h2 className="text-2xl font-semibold mb-2">No notes in this category</h2>
+            <h2 className="text-2xl font-semibold mb-2">No notes match these filters</h2>
             <p className="text-muted-foreground mb-6">
-              Try selecting a different category or create a new note
+              Try selecting a different category, clearing search, or create a new note
             </p>
             <Button onClick={() => setSelectedCategory(null)} variant="outline">
-              Show All Notes
+              Reset Filters
             </Button>
           </motion.div>
         )}
@@ -680,7 +705,7 @@ export default function JkCW_ResourcesMode() {
           </motion.div>
         )}
 
-        <JkGap />
+        <JkGap  />
       </div>
     </div>
   );

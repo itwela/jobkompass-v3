@@ -6,6 +6,7 @@ import { Id } from "@/convex/_generated/dataModel";
 export interface ModeType {
   id: string;
   name: string;
+  command: string;
 }
 
 interface ModeContextType {
@@ -24,8 +25,8 @@ interface ChatInteractionStateContextType {
   setWantsToAddJob: (value: boolean) => void;
   wantsToDownloadResume: boolean;
   setWantsToDownloadResume: (value: boolean) => void;
-  wantsTutorial: boolean;
-  setWantsTutorial: (value: boolean) => void;
+  wantsHelp: boolean;
+  setWantsHelp: (value: boolean) => void;
   allCommandsAndActions: string[];
   onClickAutoFill: (commandOrAction: string) => void;
   // File mode state
@@ -35,6 +36,19 @@ interface ChatInteractionStateContextType {
   setDroppedFile: (file: File | null) => void;
   fileName: string | null;
   setFileName: (name: string | null) => void;
+  // Context attachments
+  attachedResumeIds: Id<"documents">[];
+  setAttachedResumeIds: (ids: Id<"documents">[]) => void;
+  attachedJobIds: Id<"jobs">[];
+  setAttachedJobIds: (ids: Id<"jobs">[]) => void;
+  addResumeAttachment: (id: Id<"documents">) => void;
+  removeResumeAttachment: (id: Id<"documents">) => void;
+  addJobAttachment: (id: Id<"jobs">) => void;
+  removeJobAttachment: (id: Id<"jobs">) => void;
+  clearAllAttachments: () => void;
+  // File upload modal
+  isFileModalOpen: boolean;
+  setIsFileModalOpen: (open: boolean) => void;
 }
 
 interface InputControlContextType {
@@ -61,22 +75,20 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
 
   // STUB - STEP 1 OF ADDING A NEW MODE
   const [allModes, setAllModes] = useState<ModeType[]>([
-    { id: '/home', name: 'Home Mode' },
-    { id: '/tutorial', name: 'Tutorial Mode' },
-    { id: '/chat', name: 'Chat Mode' },
-    { id: '/jobs', name: 'Jobs Mode' },
-    { id: '/my-jobs', name: 'My Jobs' },
-    { id: '/resume', name: 'Resume Mode' },
-    { id: '/resume-editor', name: 'Resume Editor' },
-    { id: '/file', name: 'File Mode' },
-    { id: '/resources', name: 'Links & Resources' },
+    { id: '/home', name: 'Home', command: 'Home' },
+    { id: '/help', name: 'Help', command: 'Help' },
+    { id: '/chat', name: 'Chat', command: 'Chat' },
+    { id: '/my-jobs', name: 'Jobs', command: 'Jobs' },
+    { id: '/documents', name: 'Documents', command: 'Documents' },
+    { id: '/resources', name: 'Links & Resources', command: 'Links & Resources' },
+    { id: '/settings', name: 'Settings', command: 'Settings' },
   ]);
   // STUB -----
 
   // NOTE - MODE STUFF
   const [startingMode, setStartingMode] = useState<ModeType>(allModes[2]); // Chat Mode is default
   const [currentMode, setCurrentMode] = useState<ModeType>(startingMode);
-  const [wantsTutorial, setWantsTutorial] = useState<boolean>(false);
+  const [wantsHelp, setWantsHelp] = useState<boolean>(false);
   const [wantsToAddJob, setWantsToAddJob] = useState<boolean>(false);
   const [wantsToDownloadResume, setWantsToDownloadResume] = useState<boolean>(false);
   const [chatHistory, setChatHistory] = useState<string[]>([]);
@@ -86,13 +98,46 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
+  // Context attachments state
+  const [attachedResumeIds, setAttachedResumeIds] = useState<Id<"documents">[]>([]);
+  const [attachedJobIds, setAttachedJobIds] = useState<Id<"jobs">[]>([]);
+  
+  // File upload modal state
+  const [isFileModalOpen, setIsFileModalOpen] = useState<boolean>(false);
+
+  // Helper functions for managing attachments
+  const addResumeAttachment = (id: Id<"documents">) => {
+    if (!attachedResumeIds.includes(id)) {
+      setAttachedResumeIds([...attachedResumeIds, id]);
+    }
+  };
+
+  const removeResumeAttachment = (id: Id<"documents">) => {
+    setAttachedResumeIds(attachedResumeIds.filter(resumeId => resumeId !== id));
+  };
+
+  const addJobAttachment = (id: Id<"jobs">) => {
+    if (!attachedJobIds.includes(id)) {
+      setAttachedJobIds([...attachedJobIds, id]);
+    }
+  };
+
+  const removeJobAttachment = (id: Id<"jobs">) => {
+    setAttachedJobIds(attachedJobIds.filter(jobId => jobId !== id));
+  };
+
+  const clearAllAttachments = () => {
+    setAttachedResumeIds([]);
+    setAttachedJobIds([]);
+  };
+
   // NOTE - TEXT AREA STUFF
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const [textValue, setTextValue] = React.useState('')
   const [dynamicTextAreaHeight, setDynamicTextAreaHeight] = React.useState(0)
   // STUB - STEP 2 OF ADDING A NEW MODE/ACTION
-  const commands = ['/home', '/chat', '/resume', '/resume-editor', '/jobs', '/my-jobs', '/tutorial', '/file', '/resources']
-  const commandActions = ['/add', '/download-resume', '/start']
+  const commands = ['/home', '/chat', '/documents', '/my-jobs', '/help', '/resources', '/settings']
+  const commandActions: string[] = []
   const allCommandsAndActions = [...commands, ...commandActions]
   // STUB -----
   
@@ -109,14 +154,15 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
 
   const onClickAutoFill = (commandOrAction: string) => {
     const commandOnPress = commands.find(cmd => commandOrAction.startsWith(cmd));
-    const actionsOnPress = commandActions.find(cmd => commandOrAction.startsWith(cmd));
+    // TODO: COMMENT OUT FOR NOW
+    // const actionsOnPress = commandActions.find(cmd => commandOrAction.startsWith(cmd));
 
     if (commandOnPress) {
       const modeId = commandOnPress;
       const targetMode = allModes.find(mode => mode.id === modeId);
       if (targetMode) {
         setCurrentMode(targetMode);
-        setWantsTutorial(false);
+        setWantsHelp(false);
         setWantsToAddJob(false);
         setWantsToDownloadResume(false);
         
@@ -129,26 +175,27 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
       }
     }
 
-    if (actionsOnPress) {
-      if (actionsOnPress === '/add') {
-        setCurrentMode(allModes[0]);
-        setWantsToAddJob(true);
-        setWantsTutorial(false);
-        setWantsToDownloadResume(false);
-      }
+    // TODO: COMMENT OUT FOR NOW
+    // if (actionsOnPress) {
+    //   if (actionsOnPress === '/add') {
+    //     setCurrentMode(allModes[0]);
+    //     setWantsToAddJob(true);
+    //     setWantsHelp(false);
+    //     setWantsToDownloadResume(false);
+    //   }
 
-      if (actionsOnPress === '/download-resume') {
-        setWantsToDownloadResume(true);
-        setWantsTutorial(false);
-        setWantsToAddJob(false);
-      }
+    //   if (actionsOnPress === '/download-resume') {
+    //     setWantsToDownloadResume(true);
+    //     setWantsHelp(false);
+    //     setWantsToAddJob(false);
+    //   }
 
-      if (actionsOnPress === '/start') {
-        setWantsTutorial(true);
-        setWantsToAddJob(false);
-        setWantsToDownloadResume(false);
-      }
-    }
+    //   if (actionsOnPress === '/start') {
+    //     setWantsHelp(true);
+    //     setWantsToAddJob(false);
+    //     setWantsToDownloadResume(false);
+    //   }
+    // }
   }
 
 
@@ -178,8 +225,8 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     setWantsToAddJob,
     wantsToDownloadResume,
     setWantsToDownloadResume,
-    wantsTutorial,
-    setWantsTutorial,
+    wantsHelp,
+    setWantsHelp,
     textValue,
     setTextValue,
     textareaRef,
@@ -195,9 +242,22 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     setDroppedFile,
     fileName,
     setFileName,
+    // Context attachments
+    attachedResumeIds,
+    setAttachedResumeIds,
+    attachedJobIds,
+    setAttachedJobIds,
+    addResumeAttachment,
+    removeResumeAttachment,
+    addJobAttachment,
+    removeJobAttachment,
+    clearAllAttachments,
     // Thread management
     currentThreadId,
     setCurrentThreadId,
+    // File upload modal
+    isFileModalOpen,
+    setIsFileModalOpen,
   };
 
   return (

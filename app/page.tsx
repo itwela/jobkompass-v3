@@ -1,7 +1,7 @@
 'use client'
 
-import JkConsole from "./jk-components/jkConsole";
+import JkLandingPage from "./jk-components/jkLandingPage";
 
 export default function Home() {
-  return <JkConsole />;
+  return <JkLandingPage />;
 }

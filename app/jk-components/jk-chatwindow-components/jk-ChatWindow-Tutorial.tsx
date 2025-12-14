@@ -9,7 +9,7 @@ import JkCW_TabBar from "./jkChatWindow-TabBarComponent";
 export default function JkCW_Tutorial () {
 
     const { theme, styles, utilStyles } = useJobKompassTheme()
-    const { wantsToAddJob, wantsToDownloadResume, wantsTutorial } = useJobKompassChatWindow()
+    const { wantsToAddJob, wantsToDownloadResume } = useJobKompassChatWindow()
 
     const messegeForContentHeader = () => {
         if (wantsToAddJob) {

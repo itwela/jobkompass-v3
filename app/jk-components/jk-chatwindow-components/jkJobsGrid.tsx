@@ -5,7 +5,7 @@ import { BlurFade } from "@/components/ui/blur-fade";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { Id } from "@/convex/_generated/dataModel";
 import { motion } from "framer-motion";
-import { ExternalLink, Calendar, Briefcase, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { ExternalLink, Calendar, Briefcase, Trash2, CheckCircle2, Circle, Sparkles } from "lucide-react";
 import JkConfirmDelete from "../jkConfirmDelete";
 
 interface JobCardProps {
@@ -25,6 +25,7 @@ interface JobCardProps {
   selectionMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
+  onGenerateDocument: (jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
 }
 
 function JobCard({
@@ -36,6 +37,7 @@ function JobCard({
   selectionMode,
   selected,
   onToggleSelect,
+  onGenerateDocument,
 }: JobCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [localDeleting, setLocalDeleting] = useState(false);
@@ -83,11 +85,14 @@ function JobCard({
   };
 
   const statusColor = statusColors[job.status] || 'bg-gray-100 text-gray-800 border-gray-200';
+
+  const handleGenerateClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onGenerateDocument(job._id, job.title, job.company);
+  };
+
   const cardDetails = (
     <div className="mt-auto space-y-2">
-      <div className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
-        {job.status}
-      </div>
 
       {job.dateApplied && (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -96,15 +101,24 @@ function JobCard({
         </div>
       )}
 
-      <a
-        href={job.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="flex items-center gap-1 text-xs text-blue-800 hover:text-blue-900 hover:underline"
-      >
-        View Job <ExternalLink className="h-3 w-3" />
-      </a>
+      <div className="flex items-center gap-2 justify-between w-full">
+        <a
+          href={job.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1 text-xs text-blue-800 hover:text-blue-900 hover:underline"
+        >
+          View Job <ExternalLink className="h-3 w-3" />
+        </a>
+        <button
+          onClick={handleGenerateClick}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          <Sparkles className="h-3 w-3" />
+          Generate
+        </button>
+      </div>
     </div>
   );
 
@@ -116,17 +130,12 @@ function JobCard({
         onClick={handleCardClick}
       >
         <div
-          className={`bg-card border rounded-lg p-6 h-full min-h-[230px] flex flex-col hover:shadow-lg transition-shadow ${
-            selectionMode && selected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-border'
-          }`}
+          className={`bg-card border rounded-lg p-6 h-full min-h-[230px] flex flex-col hover:shadow-lg transition-shadow ${selectionMode && selected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-border'
+            }`}
         >
-          <div className="flex items-start justify-between mb-3">
+          <div className="flex items-start justify-between">
             <div className="flex-1">
               <h3 className="font-semibold text-lg mb-1 line-clamp-2">{job.title}</h3>
-              <p className="text-muted-foreground text-sm mb-2 flex items-center gap-1">
-                <Briefcase className="h-3 w-3" />
-                {job.company}
-              </p>
             </div>
             {selectionMode ? (
               <button
@@ -154,6 +163,18 @@ function JobCard({
             )}
           </div>
 
+          <div className="flex items-center gap-2  mb-3 justify-between w-full">
+                
+                <p className="text-muted-foreground text-sm mb-2 flex items-center gap-1">
+                  <Briefcase className="h-3 w-3" />
+                  {job.company}
+                </p>
+                <div className={` px-2.5 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                  {job.status}
+                </div>
+
+          </div>
+
           {!selectionMode && showDeleteConfirm ? (
             <div
               className="mt-3"
@@ -176,7 +197,11 @@ function JobCard({
   );
 }
 
-export default function JkJobsGrid() {
+interface JkJobsGridProps {
+  onGenerateDocument?: (jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
+}
+
+export default function JkJobsGrid({ onGenerateDocument }: JkJobsGridProps = {}) {
   const {
     allJobs,
     filteredJobs,
@@ -238,7 +263,9 @@ export default function JkJobsGrid() {
         <div className="text-6xl mb-4">🔍</div>
         <h2 className="text-2xl font-semibold mb-2">No jobs match this filter</h2>
         <p className="text-muted-foreground mb-4">
-          {selectedStatus ? `Try choosing a different status or clear the filter.` : `Try adjusting your filters.`}
+          {selectedStatus
+            ? `Try choosing a different status, clearing search, or reset filters.`
+            : `Try adjusting your filters or clearing the search.`}
         </p>
       </div>
     );
@@ -257,6 +284,7 @@ export default function JkJobsGrid() {
           selectionMode={selectionMode}
           selected={selectedJobIds.includes(job._id)}
           onToggleSelect={() => toggleJobSelection(job._id)}
+          onGenerateDocument={onGenerateDocument || (() => { })}
         />
       ))}
     </div>

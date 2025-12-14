@@ -9,6 +9,9 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { motion } from "framer-motion";
 import JkGap from "../jkGap";
+import { Check, Wrench, LogIn, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Hand } from "lucide-react";
 
 interface ChatMessage {
   id: string;
@@ -20,6 +23,11 @@ interface ChatMessage {
     arguments: any;
     result: any;
   }>;
+  file?: {
+    name: string;
+    type: string;
+    isImage: boolean;
+  };
 }
 
 const easeOutCurve = [0.16, 1, 0.3, 1] as const;
@@ -62,12 +70,17 @@ const suggestionGridVariants = {
 };
 
 export default function JkCW_ChatMode() {
-    const { textValue, setTextValue, textareaRef, currentThreadId, setCurrentThreadId } = useJobKompassChatWindow()
-    const { user, isAuthenticated } = useAuth()
+    const { 
+        textValue, setTextValue, textareaRef, currentThreadId, setCurrentThreadId,
+        attachedResumeIds, attachedJobIds, clearAllAttachments,
+        droppedFile, setDroppedFile, fileName, setFileName, setIsFileMode
+    } = useJobKompassChatWindow()
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth()
     
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     // Convex mutations
@@ -82,7 +95,7 @@ export default function JkCW_ChatMode() {
 
     // Load messages when thread changes
     useEffect(() => {
-        if (threadData?.messages) {
+        if (currentThreadId && threadData?.messages) {
             const loadedMessages: ChatMessage[] = threadData.messages.map((msg: any) => ({
                 id: msg._id,
                 type: msg.role as 'user' | 'assistant',
@@ -91,8 +104,11 @@ export default function JkCW_ChatMode() {
                 toolCalls: msg.toolCalls,
             }))
             setMessages(loadedMessages)
+        } else if (!currentThreadId) {
+            // Clear messages when no thread is selected (shows new chat interface)
+            setMessages([])
         }
-    }, [threadData])
+    }, [threadData, currentThreadId])
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
@@ -101,9 +117,11 @@ export default function JkCW_ChatMode() {
 
     // Send message function
     const sendMessage = async () => {
-        if (!textValue.trim() || isLoading || !isAuthenticated) return
+        if ((!textValue.trim() && !droppedFile) || isLoading || !isAuthenticated) return
 
         const currentTextValue = textValue.trim() // Capture the current value
+        const currentFile = droppedFile // Capture current file
+        const currentFileName = fileName // Capture current file name
         
         // Create or use existing thread
         let activeThreadId = currentThreadId
@@ -126,7 +144,12 @@ export default function JkCW_ChatMode() {
             id: Date.now().toString(),
             type: 'user',
             content: currentTextValue,
-            timestamp: new Date()
+            timestamp: new Date(),
+            file: currentFile ? {
+                name: currentFile.name,
+                type: currentFile.type,
+                isImage: currentFile.type.startsWith('image/'),
+            } : undefined,
         }
 
         setMessages(prev => [...prev, userMessage])
@@ -158,6 +181,36 @@ export default function JkCW_ChatMode() {
         console.log('user', user)
         console.log('user._id', user?._id)
 
+        // Convert file to base64 if present
+        let fileData = null;
+        if (currentFile) {
+            try {
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result as string;
+                        // Remove data URL prefix to get just the base64 data
+                        const base64Data = result.split(',')[1];
+                        resolve(base64Data);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(currentFile);
+                });
+
+                fileData = {
+                    name: currentFile.name,
+                    type: currentFile.type,
+                    size: currentFile.size,
+                    base64: base64,
+                };
+            } catch (err) {
+                console.error('Failed to read file:', err);
+                setError('Failed to read file');
+                setIsLoading(false);
+                return;
+            }
+        }
+
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -166,6 +219,7 @@ export default function JkCW_ChatMode() {
                 },
                 body: JSON.stringify({
                     message: currentTextValue,
+                    file: fileData,
                     history: messages.map(msg => ({
                         role: msg.type === 'user' ? 'user' : 'assistant',
                         content: msg.content
@@ -173,8 +227,13 @@ export default function JkCW_ChatMode() {
                     agentId: 'jobkompass',
                     userId: user?._id,
                     username: user?.username || user?.email || undefined,
+                    contextResumeIds: attachedResumeIds.length > 0 ? attachedResumeIds : undefined,
+                    contextJobIds: attachedJobIds.length > 0 ? attachedJobIds : undefined,
                 })
             })
+            
+            // Clear attachments immediately after sending
+            clearAllAttachments()
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`)
@@ -240,12 +299,26 @@ export default function JkCW_ChatMode() {
                     }
                 }
             }
+            
+            // Clear file from input after response is complete
+            if (currentFile) {
+                setDroppedFile(null)
+                setFileName(null)
+                setIsFileMode(false)
+            }
         } catch (err) {
             console.error('Chat error:', err)
             setError(err instanceof Error ? err.message : 'An error occurred')
             setIsLoading(false)
             // Remove the temp message on error
             setMessages(prev => prev.filter(msg => msg.id === tempMessageId))
+            
+            // Clear file on error too
+            if (currentFile) {
+                setDroppedFile(null)
+                setFileName(null)
+                setIsFileMode(false)
+            }
         }
     }
 
@@ -276,13 +349,51 @@ export default function JkCW_ChatMode() {
 
     // Chat suggestions
     const suggestions = [
-        "Help me create a professional resume",
-        "Analyze my career path",
-        "What skills should I add to my resume?",
-        "How can I improve my job search?",
-        "Create a cover letter for a software engineer position",
-        "Research eight recent roles I'm a strong fit for and add them to Interested in My Jobs"
+        "Help me find jobs I'm actually qualified for",
+        "Improve my resume for a specific job posting",
+        "Write a cover letter that doesn't sound generic",
+        "Draft a follow-up message to the recruiter or hiring manager",
+        "Prepare me for an interview for this role",
+        "Tell me what I should be doing next in my job search"
     ]
+
+    if (authLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                <p className="text-muted-foreground">Loading...</p>
+            </div>
+        );
+    }
+
+    // Not authenticated state
+    if (!isAuthenticated) {
+        return (
+            <div className="flex flex-col h-full overflow-y-auto chat-scroll bg-gradient-to-br from-background via-background to-muted/20">
+                <div className="max-w-7xl mx-auto w-full px-6 py-8">
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-col items-center justify-center min-h-[60vh] text-center"
+                    >
+                        <div className="text-6xl mb-4">🔒</div>
+                        <h2 className="text-2xl font-semibold mb-2">Sign in required</h2>
+                        <p className="text-muted-foreground mb-6 max-w-md">
+                            Please sign in to use the chat feature. Click the JobKompass icon in the sidebar to sign in.
+                        </p>
+                        <Button 
+                            onClick={() => {
+                                window.dispatchEvent(new CustomEvent('jk:openSignIn'));
+                            }} 
+                            className="gap-2"
+                        >
+                            <LogIn className="h-4 w-4" />
+                            Open Sign In
+                        </Button>
+                    </motion.div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-full">
@@ -296,8 +407,8 @@ export default function JkCW_ChatMode() {
                         animate="visible"
                         variants={introWrapperVariants}
                     >
-                        <motion.div className="text-3xl font-semibold mb-3" variants={introChildVariants}>
-                            👋 Hi! I'm JobKompass, your AI career assistant
+                        <motion.div className="text-3xl font-semibold mb-3 flex items-start gap-1 justify-center" variants={introChildVariants}>
+                            <Hand className="h-8 w-8 inline-block mr-2" /> Hi! I'm JobKompass, your AI career assistant
                         </motion.div>
                         <motion.div className="text-muted-foreground mb-8" variants={introChildVariants}>
                             I can help you create resumes, analyze your career, and provide job search guidance.
@@ -332,10 +443,29 @@ export default function JkCW_ChatMode() {
                                 <div className={`
                                     max-w-[85%]
                                     ${message.type === 'user' 
-                                        ? 'bg-blue-100 text-blue-800 border border-blue-200 rounded-2xl px-4 py-3' 
-                                        : 'bg-card border border-border rounded-lg px-6 py-4'
+                                        ? 'bg-primary text-primary-foreground border border-primary rounded-2xl px-4 py-3' 
+                                        : 'bg-card px-6 py-4'
                                     }
                                 `}>
+                                    {/* File Indicator for User Messages */}
+                                    {message.type === 'user' && message.file && (
+                                        <div className="mb-2 pb-2 border-b border-primary-foreground/20">
+                                            <div className="flex items-center gap-2 text-xs opacity-90">
+                                                {message.file.isImage ? (
+                                                    <>
+                                                        <FileText className="h-3 w-3" />
+                                                        <span>🖼️ Image: {message.file.name}</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <FileText className="h-3 w-3" />
+                                                        <span>📄 File: {message.file.name}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <div className={message.type === 'assistant' ? 'markdown-content' : ''}>
                                         {message.type === 'assistant' ? (
                                             <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -427,7 +557,7 @@ export default function JkCW_ChatMode() {
                                                                 <a
                                                                     href={`data:application/pdf;base64,${result.pdfBase64}`}
                                                                     download={result.fileName}
-                                                                    className="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
+                                                                    className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
                                                                 >
                                                                     Download PDF
                                                                 </a>
@@ -436,19 +566,61 @@ export default function JkCW_ChatMode() {
                                                     </div>
                                                 )}
                                                 
-                                                {/* Tool Calls Details */}
-                                                <div className="bg-muted/50 p-2 rounded-lg mt-1 text-sm">
-                                                    <div className="font-medium text-foreground mb-0.5">
-                                                        🔧 Tools Used:
+                                                {/* Tool Calls Details - Collapsible */}
+                                                <div 
+                                                    className="bg-muted/30 rounded-lg mt-1 text-sm transition-all duration-200 overflow-hidden group"
+                                                    onMouseEnter={() => {
+                                                        if (window.innerWidth >= 768) {
+                                                            setExpandedTools(prev => new Set(prev).add(message.id))
+                                                        }
+                                                    }}
+                                                    onMouseLeave={() => {
+                                                        if (window.innerWidth >= 768) {
+                                                            setExpandedTools(prev => {
+                                                                const next = new Set(prev)
+                                                                next.delete(message.id)
+                                                                return next
+                                                            })
+                                                        }
+                                                    }}
+                                                    onClick={() => {
+                                                        if (window.innerWidth < 768) {
+                                                            setExpandedTools(prev => {
+                                                                const next = new Set(prev)
+                                                                if (next.has(message.id)) {
+                                                                    next.delete(message.id)
+                                                                } else {
+                                                                    next.add(message.id)
+                                                                }
+                                                                return next
+                                                            })
+                                                        }
+                                                    }}
+                                                >
+                                                    {/* Collapsed State - Sleek Header */}
+                                                    <div className="px-2 py-1.5 flex items-center gap-1.5 cursor-pointer">
+                                                        <Wrench className="size-3.5 text-muted-foreground" />
+                                                        <span className="text-xs font-medium text-muted-foreground">Tools Used</span>
+                                                        <div className="flex-1 h-px bg-border/50 ml-1.5"></div>
                                                     </div>
-                                                    {message.toolCalls.map((tool, index) => (
-                                                        <div key={index}>
-                                                            <strong>{tool.name}</strong>
-                                                            <div className="text-xs mt-0.5">
-                                                                ✅ Completed successfully
+                                                    
+                                                    {/* Expanded Content */}
+                                                    <div 
+                                                        className={`px-2 pb-2 pt-0 space-y-1.5 transition-all duration-200 ease-in-out ${
+                                                            expandedTools.has(message.id) 
+                                                                ? 'opacity-100 max-h-[500px]' 
+                                                                : 'opacity-0 max-h-0 overflow-hidden'
+                                                        }`}
+                                                    >
+                                                        {message.toolCalls.map((tool, index) => (
+                                                            <div key={index} className="pt-1.5 border-t border-border/30 first:border-t-0 first:pt-0">
+                                                                <strong className="text-xs font-semibold text-foreground">{tool.name}</strong>
+                                                                <div className="text-xs mt-0.5 flex items-center gap-1 text-muted-foreground">
+                                                                    <Check className="size-3 text-green-500" /> Completed successfully
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </>
                                         );

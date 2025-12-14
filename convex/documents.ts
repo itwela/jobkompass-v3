@@ -1,96 +1,34 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Auth } from "convex/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 // Resume functions
 export const saveResume = mutation({
   args: {
     name: v.string(),
-    content: v.object({
-      personalInfo: v.object({
-        name: v.string(),
-        email: v.string(),
-        phone: v.optional(v.string()),
-        location: v.optional(v.string()),
-        linkedin: v.optional(v.string()),
-        github: v.optional(v.string()),
-        portfolio: v.optional(v.string()),
-        summary: v.optional(v.string()),
-      }),
-      experience: v.array(
-        v.object({
-          company: v.string(),
-          position: v.string(),
-          startDate: v.string(),
-          endDate: v.optional(v.string()),
-          description: v.string(),
-          achievements: v.optional(v.array(v.string())),
-          technologies: v.optional(v.array(v.string())),
-          location: v.optional(v.string()),
-        })
-      ),
-      education: v.array(
-        v.object({
-          school: v.string(),
-          degree: v.string(),
-          graduationDate: v.string(),
-          gpa: v.optional(v.string()),
-          relevantCoursework: v.optional(v.array(v.string())),
-          location: v.optional(v.string()),
-        })
-      ),
-      skills: v.array(v.string()),
-      certifications: v.optional(v.array(
-        v.object({
-          name: v.string(),
-          issuer: v.string(),
-          dateObtained: v.string(),
-          expiryDate: v.optional(v.string()),
-          credentialId: v.optional(v.string()),
-        })
-      )),
-      projects: v.optional(v.array(
-        v.object({
-          name: v.string(),
-          description: v.string(),
-          technologies: v.array(v.string()),
-          githubUrl: v.optional(v.string()),
-          liveUrl: v.optional(v.string()),
-          startDate: v.optional(v.string()),
-          endDate: v.optional(v.string()),
-        })
-      )),
-      languages: v.optional(v.array(
-        v.object({
-          language: v.string(),
-          proficiency: v.string(),
-        })
-      )),
-      volunteerWork: v.optional(v.array(
-        v.object({
-          organization: v.string(),
-          role: v.string(),
-          startDate: v.string(),
-          endDate: v.optional(v.string()),
-          description: v.string(),
-        })
-      )),
-    }),
+    content: v.any(), // Flexible content - can be any JSON structure
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    template: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     const now = Date.now();
     
     return await ctx.db.insert("resumes", {
-      userId: identity.tokenIdentifier,
+      userId: userId,
       name: args.name,
       createdAt: now,
       updatedAt: now,
       isActive: args.isActive ?? true,
       content: args.content,
+      label: args.label,
+      tags: args.tags,
+      template: args.template,
     });
   },
 });
@@ -99,85 +37,23 @@ export const updateResume = mutation({
   args: {
     resumeId: v.id("resumes"),
     name: v.optional(v.string()),
-    content: v.optional(v.object({
-      personalInfo: v.object({
-        name: v.string(),
-        email: v.string(),
-        phone: v.optional(v.string()),
-        location: v.optional(v.string()),
-        linkedin: v.optional(v.string()),
-        github: v.optional(v.string()),
-        portfolio: v.optional(v.string()),
-        summary: v.optional(v.string()),
-      }),
-      experience: v.array(
-        v.object({
-          company: v.string(),
-          position: v.string(),
-          startDate: v.string(),
-          endDate: v.optional(v.string()),
-          description: v.string(),
-          achievements: v.optional(v.array(v.string())),
-          technologies: v.optional(v.array(v.string())),
-          location: v.optional(v.string()),
-        })
-      ),
-      education: v.array(
-        v.object({
-          school: v.string(),
-          degree: v.string(),
-          graduationDate: v.string(),
-          gpa: v.optional(v.string()),
-          relevantCoursework: v.optional(v.array(v.string())),
-          location: v.optional(v.string()),
-        })
-      ),
-      skills: v.array(v.string()),
-      certifications: v.optional(v.array(
-        v.object({
-          name: v.string(),
-          issuer: v.string(),
-          dateObtained: v.string(),
-          expiryDate: v.optional(v.string()),
-          credentialId: v.optional(v.string()),
-        })
-      )),
-      projects: v.optional(v.array(
-        v.object({
-          name: v.string(),
-          description: v.string(),
-          technologies: v.array(v.string()),
-          githubUrl: v.optional(v.string()),
-          liveUrl: v.optional(v.string()),
-          startDate: v.optional(v.string()),
-          endDate: v.optional(v.string()),
-        })
-      )),
-      languages: v.optional(v.array(
-        v.object({
-          language: v.string(),
-          proficiency: v.string(),
-        })
-      )),
-      volunteerWork: v.optional(v.array(
-        v.object({
-          organization: v.string(),
-          role: v.string(),
-          startDate: v.string(),
-          endDate: v.optional(v.string()),
-          description: v.string(),
-        })
-      )),
-    })),
+    content: v.optional(v.any()), // Flexible content - can be any JSON structure
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    template: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
     // Get the resume to ensure it belongs to the user
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== identity.tokenIdentifier) {
+    // Check both new userId format and old tokenIdentifier format for backward compatibility
+    if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -187,6 +63,9 @@ export const updateResume = mutation({
     
     if (args.name !== undefined) updateData.name = args.name;
     if (args.content !== undefined) updateData.content = args.content;
+    if (args.label !== undefined) updateData.label = args.label;
+    if (args.tags !== undefined) updateData.tags = args.tags;
+    if (args.template !== undefined) updateData.template = args.template;
     if (args.isActive !== undefined) updateData.isActive = args.isActive;
     
     return await ctx.db.patch(args.resumeId, updateData);
@@ -198,12 +77,16 @@ export const deleteResume = mutation({
     resumeId: v.id("resumes"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
     // Get the resume to ensure it belongs to the user
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== identity.tokenIdentifier) {
+    // Check both new userId format and old tokenIdentifier format for backward compatibility
+    if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -211,15 +94,105 @@ export const deleteResume = mutation({
   },
 });
 
-export const listResumes = query({
+// Migration function - run once to update existing documents from tokenIdentifier to userId
+export const migrateUserIds = mutation({
   handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    return await ctx.db
+    if (!identity) throw new Error("Not authenticated");
+    
+    let totalUpdated = 0;
+    
+    // Migrate resumes
+    const oldResumes = await ctx.db
       .query("resumes")
       .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
       .collect();
+    
+    for (const resume of oldResumes) {
+      await ctx.db.patch(resume._id, { userId: userId });
+      totalUpdated++;
+    }
+    
+    // Migrate resumeIRs
+    const oldResumeIRs = await ctx.db
+      .query("resumeIRs")
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+    
+    for (const resumeIR of oldResumeIRs) {
+      await ctx.db.patch(resumeIR._id, { userId: userId });
+      totalUpdated++;
+    }
+    
+    // Migrate coverLetters
+    const oldCoverLetters = await ctx.db
+      .query("coverLetters")
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+    
+    for (const coverLetter of oldCoverLetters) {
+      await ctx.db.patch(coverLetter._id, { userId: userId });
+      totalUpdated++;
+    }
+    
+    // Migrate emailTemplates
+    const oldEmailTemplates = await ctx.db
+      .query("emailTemplates")
+      .withIndex("by_user_and_type", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+    
+    for (const emailTemplate of oldEmailTemplates) {
+      await ctx.db.patch(emailTemplate._id, { userId: userId });
+      totalUpdated++;
+    }
+    
+    return { 
+      success: true, 
+      updated: totalUpdated, 
+      message: `Successfully migrated ${totalUpdated} document(s) to new userId format`,
+      breakdown: {
+        resumes: oldResumes.length,
+        resumeIRs: oldResumeIRs.length,
+        coverLetters: oldCoverLetters.length,
+        emailTemplates: oldEmailTemplates.length,
+      }
+    };
+  },
+});
+
+export const listResumes = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    // Get resumes with both new and old userId formats for backward compatibility
+    const newFormatResumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    
+    const oldFormatResumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+
+    // Combine and deduplicate
+    const allResumes = [...newFormatResumes];
+    const existingIds = new Set(newFormatResumes.map(r => r._id));
+    
+    for (const resume of oldFormatResumes) {
+      if (!existingIds.has(resume._id)) {
+        allResumes.push(resume);
+      }
+    }
+
+    return allResumes;
   },
 });
 
@@ -228,11 +201,15 @@ export const getResume = query({
     resumeId: v.id("resumes"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== identity.tokenIdentifier) {
+    // Check both new userId format and old tokenIdentifier format for backward compatibility
+    if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -260,15 +237,16 @@ export const uploadResumeFile = mutation({
     fileSize: v.optional(v.number()),
     label: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    template: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     const now = Date.now();
     
     return await ctx.db.insert("resumes", {
-      userId: identity.tokenIdentifier,
+      userId: userId,
       name: args.name,
       fileId: args.fileId,
       fileName: args.fileName,
@@ -276,6 +254,7 @@ export const uploadResumeFile = mutation({
       fileSize: args.fileSize,
       label: args.label,
       tags: args.tags,
+      template: args.template,
       createdAt: now,
       updatedAt: now,
       isActive: true,
@@ -283,20 +262,25 @@ export const uploadResumeFile = mutation({
   },
 });
 
-// Update resume file metadata (label, tags)
+// Update resume file metadata (label, tags, template)
 export const updateResumeFileMetadata = mutation({
   args: {
     resumeId: v.id("resumes"),
     name: v.optional(v.string()),
     label: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    template: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     
     const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== identity.tokenIdentifier) {
+    // Check both new userId format and old tokenIdentifier format for backward compatibility
+    if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
       throw new Error("Resume not found or access denied");
     }
     
@@ -307,30 +291,41 @@ export const updateResumeFileMetadata = mutation({
     if (args.name !== undefined) updateData.name = args.name;
     if (args.label !== undefined) updateData.label = args.label;
     if (args.tags !== undefined) updateData.tags = args.tags;
+    if (args.template !== undefined) updateData.template = args.template;
     
     return await ctx.db.patch(args.resumeId, updateData);
   },
 });
 
-// Get file download URL by resume ID
-export const getFileUrl = query({
+// Get file download URL by resume ID (legacy; prefer fileId-based downloads)
+export const getFileUrlByResumeId = query({
   args: {
-    resumeId: v.id("resumes"),
+    fileId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    
-    const resume = await ctx.db.get(args.resumeId);
-    if (!resume || resume.userId !== identity.tokenIdentifier) {
-      throw new Error("Resume not found or access denied");
-    }
-    
-    if (!resume.fileId) {
-      throw new Error("Resume has no file attached");
-    }
-    
-    return await ctx.storage.getUrl(resume.fileId);
+
+    return await ctx.storage.getUrl(args.fileId);
+  },
+});
+
+// Get file download URL by file ID (preferred)
+export const getFileUrl = query({
+  args: {
+    fileId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    return await ctx.storage.getUrl(args.fileId);
   },
 });
 
@@ -340,20 +335,16 @@ export const getFileUrlById = query({
     fileId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-    
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+  
     // Verify the file belongs to a resume owned by the user
     const resume = await ctx.db
       .query("resumes")
-      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("fileId"), args.fileId))
       .first();
-    
-    if (!resume) {
-      throw new Error("File not found or access denied");
-    }
-    
+
     return await ctx.storage.getUrl(args.fileId);
   },
 });
@@ -371,11 +362,11 @@ export const saveResumeIR = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     const now = Date.now();
     return await ctx.db.insert("resumeIRs", {
-      userId: identity.tokenIdentifier,
+      userId: userId,
       name: args.name,
       createdAt: now,
       updatedAt: now,
@@ -399,10 +390,10 @@ export const updateResumeIR = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     const doc = await ctx.db.get(args.resumeIrId);
-    if (!doc || doc.userId !== identity.tokenIdentifier) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Resume IR not found or access denied");
     }
     const updateData: any = { updatedAt: Date.now() };
@@ -417,10 +408,10 @@ export const updateResumeIR = mutation({
 export const deleteResumeIR = mutation({
   args: { resumeIrId: v.id("resumeIRs") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     const doc = await ctx.db.get(args.resumeIrId);
-    if (!doc || doc.userId !== identity.tokenIdentifier) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Resume IR not found or access denied");
     }
     return await ctx.db.delete(args.resumeIrId);
@@ -429,19 +420,19 @@ export const deleteResumeIR = mutation({
 
 export const listResumeIRs = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-    return await ctx.db.query("resumeIRs").withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier)).collect();
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return await ctx.db.query("resumeIRs").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
   },
 });
 
 export const getResumeIR = query({
   args: { resumeIrId: v.id("resumeIRs") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     const doc = await ctx.db.get(args.resumeIrId);
-    if (!doc || doc.userId !== identity.tokenIdentifier) {
+    if (!doc || doc.userId !== userId) {
       throw new Error("Resume IR not found or access denied");
     }
     return doc;
@@ -463,13 +454,13 @@ export const saveCoverLetter = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     const now = Date.now();
     
     return await ctx.db.insert("coverLetters", {
-      userId: identity.tokenIdentifier,
+      userId: userId,
       name: args.name,
       createdAt: now,
       updatedAt: now,
@@ -493,12 +484,12 @@ export const updateCoverLetter = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     // Get the cover letter to ensure it belongs to the user
     const coverLetter = await ctx.db.get(args.coverLetterId);
-    if (!coverLetter || coverLetter.userId !== identity.tokenIdentifier) {
+    if (!coverLetter || coverLetter.userId !== userId) {
       throw new Error("Cover letter not found or access denied");
     }
     
@@ -518,12 +509,12 @@ export const deleteCoverLetter = mutation({
     coverLetterId: v.id("coverLetters"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     // Get the cover letter to ensure it belongs to the user
     const coverLetter = await ctx.db.get(args.coverLetterId);
-    if (!coverLetter || coverLetter.userId !== identity.tokenIdentifier) {
+    if (!coverLetter || coverLetter.userId !== userId) {
       throw new Error("Cover letter not found or access denied");
     }
     
@@ -533,12 +524,12 @@ export const deleteCoverLetter = mutation({
 
 export const listCoverLetters = query({
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
     
     return await ctx.db
       .query("coverLetters")
-      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
   },
 });
@@ -555,13 +546,13 @@ export const saveEmailTemplate = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     const now = Date.now();
     
     return await ctx.db.insert("emailTemplates", {
-      userId: identity.tokenIdentifier,
+      userId: userId,
       name: args.name,
       type: args.type,
       createdAt: now,
@@ -583,12 +574,12 @@ export const updateEmailTemplate = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     // Get the template to ensure it belongs to the user
     const template = await ctx.db.get(args.templateId);
-    if (!template || template.userId !== identity.tokenIdentifier) {
+    if (!template || template.userId !== userId) {
       throw new Error("Email template not found or access denied");
     }
     
@@ -609,12 +600,12 @@ export const deleteEmailTemplate = mutation({
     templateId: v.id("emailTemplates"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     // Get the template to ensure it belongs to the user
     const template = await ctx.db.get(args.templateId);
-    if (!template || template.userId !== identity.tokenIdentifier) {
+    if (!template || template.userId !== userId) {
       throw new Error("Email template not found or access denied");
     }
     
@@ -627,12 +618,12 @@ export const listEmailTemplates = query({
     type: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
     
     const query = ctx.db
       .query("emailTemplates")
-      .withIndex("by_user_and_type", (q) => q.eq("userId", identity.tokenIdentifier));
+      .withIndex("by_user_and_type", (q) => q.eq("userId", userId));
     
     const results = await query.collect();
     if (args.type !== undefined) {
@@ -648,15 +639,15 @@ export const createTestResumes = mutation({
     count: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
     
     const now = Date.now();
     const testResumes = [];
     
     for (let i = 1; i <= args.count; i++) {
       const testResume = {
-        userId: identity.tokenIdentifier,
+        userId: userId,
         name: `Test Resume ${i}`,
         createdAt: now,
         updatedAt: now,

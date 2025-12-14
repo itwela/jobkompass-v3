@@ -4,15 +4,36 @@ import JkInputSection from "./jkInputSection";
 import JkChatWindow from "./jkChatWindow";
 import JkSidebar from "./jkSIdebar";
 import JkConsoleHeader from "./jkConsole-Header";
-import { useState } from "react";
+import JkFileUploadModal from "./jkFileUploadModal";
+import { useState, useCallback } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 
 export default function JkConsole() {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const { currentMode } = useJobKompassChatWindow()
+    const { 
+        currentMode, 
+        isFileModalOpen, 
+        setIsFileModalOpen,
+        setDroppedFile,
+        setFileName,
+        setIsFileMode,
+        setCurrentMode,
+        allModes
+    } = useJobKompassChatWindow()
     
     // Only show input in home and chat modes
     const shouldShowInput = currentMode.id === '/home' || currentMode.id === '/chat'
+
+    const handleFileSelect = useCallback((file: File) => {
+        setDroppedFile(file);
+        setFileName(file.name);
+        setIsFileMode(true);
+        // Switch to file mode
+        const fileMode = allModes.find(mode => mode.id === '/file');
+        if (fileMode) {
+            setCurrentMode(fileMode);
+        }
+    }, [setDroppedFile, setFileName, setIsFileMode, setCurrentMode, allModes]);
 
     return (
         <div className="flex h-screen w-full bg-background">
@@ -28,6 +49,12 @@ export default function JkConsole() {
 
                 {/* Chat Window */}
                 <div className="flex-1 overflow-hidden flex flex-col relative">
+                    {/* File Upload Modal - Positioned relative to this container */}
+                    <JkFileUploadModal
+                        isOpen={isFileModalOpen}
+                        onClose={() => setIsFileModalOpen(false)}
+                        onFileSelect={handleFileSelect}
+                    />
                     <JkChatWindow />
               
                     {/* Input Section - Only show in home and chat modes */}

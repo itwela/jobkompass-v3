@@ -24,6 +24,8 @@ interface ResourcesContextType {
   resources: Resource[] | null | undefined;
   allResources: Resource[];
   filteredResources: Resource[];
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
   existingCategories: string[];
   
   // State
@@ -71,6 +73,7 @@ export function JkResourcesProvider({ children }: { children: ReactNode }) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectionMode, setSelectionModeState] = useState(false);
   const [selectedResourceIds, setSelectedResourceIds] = useState<Id<"resources">[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
 
   // Handle the resources safely - it will be undefined when loading or an array when loaded
@@ -81,11 +84,30 @@ export function JkResourcesProvider({ children }: { children: ReactNode }) {
       : [];
   }, [resources]);
   
-  // Filter resources by selected category
+  // Filter resources by selected category + search
   const filteredResources = useMemo(() => {
-    if (!selectedCategory) return allResources;
-    return allResources.filter(resource => resource.category === selectedCategory);
-  }, [allResources, selectedCategory]);
+    const query = searchQuery.trim().toLowerCase();
+
+    return allResources.filter((resource) => {
+      const matchesCategory = selectedCategory ? resource.category === selectedCategory : true;
+      if (!matchesCategory) return false;
+
+      if (!query) return true;
+
+      const haystacks = [
+        resource.title,
+        resource.url,
+        resource.description,
+        resource.notes,
+        resource.category,
+        ...(resource.tags ?? []),
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+
+      return haystacks.some((value) => value.includes(query));
+    });
+  }, [allResources, selectedCategory, searchQuery]);
 
   // Get unique categories from existing resources
   const existingCategories = useMemo(() => {
@@ -199,6 +221,8 @@ export function JkResourcesProvider({ children }: { children: ReactNode }) {
     resources,
     allResources,
     filteredResources,
+    searchQuery,
+    setSearchQuery,
     existingCategories,
     
     // State

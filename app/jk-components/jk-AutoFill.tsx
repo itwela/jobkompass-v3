@@ -8,23 +8,23 @@ type AutoFillProps = {
 };
 
 export default function Jk_AutoFill({ onSelect }: AutoFillProps = {}) {
-    const { allCommandsAndActions, onClickAutoFill } = useJobKompassChatWindow();
+    const { allCommandsAndActions, onClickAutoFill, allModes } = useJobKompassChatWindow();
 
     return (
         <div className="transition-all duration-200 ease-out w-full max-w-md bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
-            {allCommandsAndActions.map((item, index) => (
+            {allModes.map((mode, index) => (
                 <motion.div
                     key={index}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.03 }}
                     onClick={() => {
-                        onClickAutoFill(item);
+                        onClickAutoFill(mode.id);
                         onSelect?.();
                     }}
                     className="flex items-center justify-between px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border last:border-b-0"
                 >
-                    <span className="text-sm font-medium text-foreground">{item}</span>
+                    <span className="text-sm font-medium text-foreground">{mode.name}</span>
                 </motion.div>
             ))}
         </div>

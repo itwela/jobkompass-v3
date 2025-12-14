@@ -3,12 +3,18 @@
 import { useEffect, useState } from "react";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { Button } from "@/components/ui/button";
-import { LogIn, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { LogIn, Filter, Search, X } from "lucide-react";
 import { motion } from "framer-motion";
 import JkJobsGrid from "./jkJobsGrid";
 import JkJobExpanded from "./jkJobExpanded";
 import JkConfirmDelete from "../jkConfirmDelete";
 import JkGap from "../jkGap";
+import JkTemplateSelectionModal, { DocumentType } from "../jkTemplateSelectionModal";
+import { Id } from "@/convex/_generated/dataModel";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useConvexAuth } from "convex/react";
 
 export default function JkCW_MyJobsMode() {
   const {
@@ -23,6 +29,8 @@ export default function JkCW_MyJobsMode() {
     allJobs,
     setSelectedJobId,
     filteredJobs,
+    searchQuery,
+    setSearchQuery,
     statusOptions,
     statusCounts,
     selectedStatus,
@@ -31,6 +39,17 @@ export default function JkCW_MyJobsMode() {
   } = useJobs();
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [selectedJobForGeneration, setSelectedJobForGeneration] = useState<{
+    id: Id<"jobs">;
+    title: string;
+    company: string;
+  } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { isAuthenticated: isAuth } = useConvexAuth();
+  const user = useQuery(api.auth.currentUser, isAuth ? {} : "skip");
+  const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
+  const uploadResumeFile = useMutation(api.documents.uploadResumeFile);
 
   useEffect(() => {
     if (!selectionMode) {
@@ -63,6 +82,100 @@ export default function JkCW_MyJobsMode() {
     }
   };
 
+  const handleGenerateDocument = (jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => {
+    setSelectedJobForGeneration({ id: jobId, title: jobTitle, company: jobCompany });
+    setIsTemplateModalOpen(true);
+  };
+
+  // TODO: THE ACTUAL DOCUMENT GENERATION LOGIC IS HERE
+  const handleTemplateSelect = async (documentType: DocumentType, templateId: string) => {
+    if (!selectedJobForGeneration || !user) return;
+
+    setIsGenerating(true);
+    try {
+      // Construct the message based on document type and template
+      let message = '';
+      if (documentType === 'resume') {
+        message = `Generate a professional resume using the ${templateId} template for the position "${selectedJobForGeneration.title}" at "${selectedJobForGeneration.company}". Please create a tailored resume that highlights relevant skills and experience for this role.`;
+      } else if (documentType === 'cover-letter') {
+        message = `Generate a professional cover letter using the ${templateId} template for the position "${selectedJobForGeneration.title}" at "${selectedJobForGeneration.company}". Please create a personalized cover letter that demonstrates my interest and fit for this role.`;
+      }
+
+      // Call the chat API to generate the document
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          history: [],
+          agentId: 'jobkompass',
+          userId: user._id,
+          username: user.username || user.email || undefined,
+          contextJobIds: [selectedJobForGeneration.id],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Read the streaming response and extract tool results
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let toolCallsData: any[] = [];
+      let pdfBase64: string | null = null;
+      let fileName: string | null = null;
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'start' && data.toolCalls) {
+                  toolCallsData = data.toolCalls;
+                }
+                if (data.type === 'done') {
+                  break;
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      }
+
+      // Extract PDF from tool results if available
+      // Note: The actual PDF data comes from the tool execution result
+      // For now, we'll let the chat handle displaying it, and the user can download it
+      // In a future enhancement, we could parse the full response to extract and save the PDF
+
+      // Close modal after successful generation
+      setIsTemplateModalOpen(false);
+      setSelectedJobForGeneration(null);
+      
+      // Show success message
+      // The generated document will appear in the chat, and the user can download it
+      // TODO: In future, automatically save the PDF to documents section
+    } catch (error) {
+      console.error('Error generating document:', error);
+      alert('Failed to generate document. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-6">
@@ -88,8 +201,7 @@ export default function JkCW_MyJobsMode() {
             </p>
             <Button 
               onClick={() => {
-                const trigger = document.querySelector('button[aria-haspopup]') as HTMLButtonElement;
-                trigger?.click();
+                window.dispatchEvent(new CustomEvent('jk:openSignIn'));
               }} 
               className="gap-2"
             >
@@ -153,6 +265,29 @@ export default function JkCW_MyJobsMode() {
             </div>
           </div>
 
+          {/* Search */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search jobs by title, company, notes, skills..."
+                className="pl-9 pr-9"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {selectionMode && showBulkDeleteConfirm && (
             <div className="mb-4 max-w-xl">
               <JkConfirmDelete
@@ -201,12 +336,26 @@ export default function JkCW_MyJobsMode() {
           )}
 
           {/* Jobs Grid */}
-          <JkJobsGrid />
+          <JkJobsGrid onGenerateDocument={handleGenerateDocument} />
 
           <JkGap />
         </div>
       </div>
       <JkJobExpanded />
+      
+      {/* Template Selection Modal */}
+      <JkTemplateSelectionModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => {
+          setIsTemplateModalOpen(false);
+          setSelectedJobForGeneration(null);
+        }}
+        // REVIEW: Template Selection
+        onSelect={handleTemplateSelect}
+        jobId={selectedJobForGeneration?.id}
+        jobTitle={selectedJobForGeneration?.title}
+        jobCompany={selectedJobForGeneration?.company}
+      />
     </>
   );
 }

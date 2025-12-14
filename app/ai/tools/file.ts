@@ -617,11 +617,123 @@ const createAddToJobsTool = (getConvexClient: ConvexClientFactory) =>
     },
   });
 
+// Get Specific Resume by ID Tool
+const createGetResumeByIdTool = (getConvexClient: ConvexClientFactory) =>
+  tool({
+    name: "getResumeById",
+    description:
+      "Fetch a specific resume by its ID to get detailed information about it. Use this when the user references a specific resume or when a resume ID is provided in context.",
+    parameters: z.object({
+      resumeId: z.string().describe("The Convex ID of the resume document to fetch."),
+    }),
+    execute: async (input) => {
+      const { resumeId } = input;
+
+      let convexClient: ConvexHttpClient;
+      try {
+        const maybeClient = getConvexClient();
+        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
+      } catch (error) {
+        console.error("Failed to initialise Convex client for getResumeById:", error);
+        return {
+          success: false,
+          message: "Unable to fetch resume because authentication could not be established.",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+
+      try {
+        const resume = await convexClient.query(api.documents.getResume, {
+          resumeId: resumeId as any,
+        });
+        
+        if (!resume) {
+          return {
+            success: false,
+            message: `Resume with ID "${resumeId}" not found.`,
+            error: "Resume not found",
+          };
+        }
+        
+        return {
+          success: true,
+          message: `Successfully fetched resume: ${resume.name || 'Untitled'}`,
+          resume: resume,
+        };
+      } catch (error) {
+        console.error("Failed to fetch resume by ID via tool:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          message: "Failed to fetch the resume. Please check the ID and try again.",
+          error: errorMessage,
+        };
+      }
+    },
+  });
+
+// Get Specific Job by ID Tool
+const createGetJobByIdTool = (getConvexClient: ConvexClientFactory) =>
+  tool({
+    name: "getJobById",
+    description:
+      "Fetch a specific job by its ID to get detailed information about it. Use this when the user references a specific job or when a job ID is provided in context.",
+    parameters: z.object({
+      jobId: z.string().describe("The Convex ID of the job to fetch."),
+    }),
+    execute: async (input) => {
+      const { jobId } = input;
+
+      let convexClient: ConvexHttpClient;
+      try {
+        const maybeClient = getConvexClient();
+        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
+      } catch (error) {
+        console.error("Failed to initialise Convex client for getJobById:", error);
+        return {
+          success: false,
+          message: "Unable to fetch job because authentication could not be established.",
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+
+      try {
+        const job = await convexClient.query(api.jobs.get, {
+          id: jobId as any,
+        });
+        
+        if (!job) {
+          return {
+            success: false,
+            message: `Job with ID "${jobId}" not found.`,
+            error: "Job not found",
+          };
+        }
+        
+        return {
+          success: true,
+          message: `Successfully fetched job: ${job.title} at ${job.company}`,
+          job: job,
+        };
+      } catch (error) {
+        console.error("Failed to fetch job by ID via tool:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          message: "Failed to fetch the job. Please check the ID and try again.",
+          error: errorMessage,
+        };
+      }
+    },
+  });
+
 export {
   createResumeJakeTemplateTool,
   createAddToResourcesTool,
   createAddToJobsTool,
   createGetUserResumesTool,
   createGetUserJobsTool,
+  createGetResumeByIdTool,
+  createGetJobByIdTool,
   escapeLatex,
 };

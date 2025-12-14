@@ -62,6 +62,8 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
   const { allJobs } = useJobs();
   
   const resumes = useQuery(api.documents.listResumes);
+
+  console.log('resumes:', resumes);
   const deleteResumeMutation = useMutation(api.documents.deleteResume);
   
   // Calculate resume stats locally using jobs from Jobs Provider

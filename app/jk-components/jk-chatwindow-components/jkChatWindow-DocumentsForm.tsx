@@ -2,22 +2,29 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
+import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
 
-export default function JkCW_ResumeForm() {
+type DocumentTypeFilter = "all" | "resume" | "cover-letter";
+
+interface JkCW_DocumentsFormProps {
+    typeFilter?: DocumentTypeFilter;
+}
+
+export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_DocumentsFormProps) {
 
     const {
-        currentResumeId,
-        setCurrentResumeId,
         resumes,
         resumeStats,
         selectionMode,
@@ -29,11 +36,21 @@ export default function JkCW_ResumeForm() {
         bulkDeleteResumes,
     } = useJobKompassResume();
 
+    const {
+        documents: allDocuments,
+        resumeList,
+        isLoading,
+        selectedDocument,
+        selectDocument,
+        downloadFirstVersionResume,
+    } = useJobKompassDocuments();
+
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [confirmingId, setConfirmingId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+    const [editingContentResumeId, setEditingContentResumeId] = useState<Id<"resumes"> | null>(null);
     
     // File upload state
     const [isUploading, setIsUploading] = useState(false);
@@ -42,6 +59,7 @@ export default function JkCW_ResumeForm() {
     const [editingResumeId, setEditingResumeId] = useState<string | null>(null);
     const [editingLabel, setEditingLabel] = useState("");
     const [editingTags, setEditingTags] = useState<string[]>([]);
+    const [editingTemplate, setEditingTemplate] = useState("");
     const [newTagInput, setNewTagInput] = useState("");
     
     // Pre-upload dialog state
@@ -56,16 +74,7 @@ export default function JkCW_ResumeForm() {
     const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
     const uploadResumeFile = useMutation(api.documents.uploadResumeFile);
     const updateResumeFileMetadata = useMutation(api.documents.updateResumeFileMetadata);
-    const currentResumeFileUrl = useQuery(
-        api.documents.getFileUrl,
-        currentResumeId ? { resumeId: currentResumeId as Id<"resumes"> } : "skip"
-    );
-    
-    const [downloadingFileId, setDownloadingFileId] = useState<Id<"_storage"> | null>(null);
-    const downloadFileUrl = useQuery(
-        api.documents.getFileUrlById,
-        downloadingFileId ? { fileId: downloadingFileId } : "skip"
-    );
+    const deleteCoverLetterMutation = useMutation(api.documents.deleteCoverLetter);
 
     useEffect(() => {
         if (!selectionMode) {
@@ -100,28 +109,25 @@ export default function JkCW_ResumeForm() {
         }
     };
 
-    const handleResumeClick = (id: string) => {
+    const handleDocumentClick = (id: string, documentType: "resume" | "cover-letter") => {
         if (selectionMode) {
-            toggleResumeSelection(id);
+            // Selection mode only applies to resumes
+            if (documentType === "resume") toggleResumeSelection(id);
             return;
         }
-        // For file-based resumes, clicking just selects them
-        // Users can download or edit metadata via the action buttons
-        setCurrentResumeId(id);
+        selectDocument(id, documentType);
     };
 
-    const handleResumeDelete = async (resumeId: string) => {
-        setIsDeleting(resumeId);
+    const handleDocumentDelete = async (documentId: string, documentType: "resume" | "cover-letter") => {
+        setIsDeleting(documentId);
         try {
-            await bulkDeleteResumes([resumeId]);
-
-            if (currentResumeId === resumeId) {
-                const remaining = resumeList.filter((resume: any) => String(resume._id) !== resumeId);
-                const next = remaining[0]?._id ?? null;
-                setCurrentResumeId(next ?? null);
+            if (documentType === "resume") {
+                await bulkDeleteResumes([documentId]);
+            } else {
+                await deleteCoverLetterMutation({ coverLetterId: documentId as Id<"coverLetters"> });
             }
         } catch (error) {
-            console.error("Error deleting resume:", error);
+            console.error("Error deleting document:", error);
         } finally {
             setIsDeleting(null);
         }
@@ -284,6 +290,7 @@ export default function JkCW_ResumeForm() {
         setEditingResumeId(String(resume._id));
         setEditingLabel(resume.label || "");
         setEditingTags(resume.tags || []);
+        setEditingTemplate(resume.template || "");
         setNewTagInput("");
     };
 
@@ -293,6 +300,7 @@ export default function JkCW_ResumeForm() {
                 resumeId: resumeId as Id<"resumes">,
                 label: editingLabel || undefined,
                 tags: editingTags.length > 0 ? editingTags : undefined,
+                template: editingTemplate || undefined,
             });
             setEditingResumeId(null);
         } catch (error) {
@@ -311,55 +319,27 @@ export default function JkCW_ResumeForm() {
         setEditingTags(editingTags.filter(tag => tag !== tagToRemove));
     };
 
-    // Effect to handle file download when URL is ready
-    useEffect(() => {
-        if (downloadFileUrl && downloadingFileId) {
-            window.open(downloadFileUrl, '_blank');
-            setDownloadingFileId(null);
+    const hasDocuments = allDocuments.length > 0;
+
+    // Filter documents by type and search term
+    const filteredDocuments = allDocuments.filter((doc: any) => {
+        // Filter by type
+        if (typeFilter !== "all" && doc.documentType !== typeFilter) {
+            return false;
         }
-    }, [downloadFileUrl, downloadingFileId]);
-
-    const handleDownloadFile = (resumeId: string, fileId: Id<"_storage"> | undefined) => {
-        if (!fileId) {
-            alert("No file attached to this resume");
-            return;
-        }
-
-        // If it's the current resume, use the cached URL
-        if (currentResumeId === resumeId && currentResumeFileUrl) {
-            window.open(currentResumeFileUrl, '_blank');
-            return;
-        }
-
-        // Otherwise, trigger the query to get the URL
-        setDownloadingFileId(fileId);
-    };
-
-    const resumesLoading = resumes === undefined;
-    const resumeList = Array.isArray(resumes) ? resumes : [];
-    const hasResumes = resumeList.length > 0;
-
-    useEffect(() => {
-        if (!resumesLoading && hasResumes && !currentResumeId) {
-            const firstResume = resumeList[0];
-            if (firstResume?._id) {
-                setCurrentResumeId(firstResume._id);
-            }
-        }
-    }, [resumesLoading, hasResumes, currentResumeId, resumeList, setCurrentResumeId]);
-
-    const filteredResumes = resumeList.filter((resume: any) => {
-        const title = (resume?.name || resume?.jobTitle || "").toString().toLowerCase();
-        const role = (resume?.targetRole || "").toString().toLowerCase();
-        const label = (resume?.label || "").toString().toLowerCase();
-        const tags = (resume?.tags || []).join(" ").toLowerCase();
+        
+        // Filter by search term
+        const title = (doc?.name || doc?.jobTitle || "").toString().toLowerCase();
+        const role = (doc?.targetRole || "").toString().toLowerCase();
+        const label = (doc?.label || "").toString().toLowerCase();
+        const tags = (doc?.tags || []).join(" ").toLowerCase();
         const search = searchTerm.toLowerCase().trim();
         if (!search) return true;
         return title.includes(search) || role.includes(search) || label.includes(search) || tags.includes(search);
     });
 
 
-    if (resumesLoading) {
+    if (isLoading) {
         return (
             <div className="space-y-4">
                 <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-muted/40" />
@@ -379,7 +359,7 @@ export default function JkCW_ResumeForm() {
         );
     }
 
-    if (!hasResumes) {
+    if (!hasDocuments) {
         return (
             <div className="space-y-6">
                 <section className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-8 py-14 text-center">
@@ -388,9 +368,9 @@ export default function JkCW_ResumeForm() {
                             <FileText className="h-5 w-5" />
                         </div>
                         <div className="space-y-3">
-                            <h2 className="text-xl font-semibold">No resumes yet</h2>
+                            <h2 className="text-xl font-semibold">No documents yet</h2>
                             <p className="text-sm text-muted-foreground">
-                                Upload your first resume to get started. Supported formats: PDF, DOC, DOCX
+                                Upload your first document to get started. Supported formats: PDF, DOC, DOCX
                             </p>
                         </div>
                         <Button
@@ -400,7 +380,7 @@ export default function JkCW_ResumeForm() {
                             size="lg"
                         >
                             <Upload className="h-4 w-4" />
-                            {isUploading ? "Uploading..." : "Upload Resume"}
+                            {isUploading ? "Uploading..." : "Upload Document"}
                         </Button>
                         <input
                             ref={fileInputRef}
@@ -565,7 +545,7 @@ export default function JkCW_ResumeForm() {
                         <div className="flex items-center gap-2">
                             <CalendarClock className="h-4 w-4 text-foreground/70" />
                             <span>
-                                <span className="font-semibold text-foreground">{resumeList.length}</span> resume{resumeList.length !== 1 ? 's' : ''}
+                                <span className="font-semibold text-foreground">{allDocuments.length}</span> document{allDocuments.length !== 1 ? 's' : ''}
                             </span>
                         </div>
                     </div>
@@ -586,7 +566,7 @@ export default function JkCW_ResumeForm() {
                                 className="gap-2"
                             >
                                 <Upload className="h-4 w-4" />
-                                {isUploading ? "Uploading..." : "Upload Resume"}
+                                {isUploading ? "Uploading..." : "Upload Document"}
                             </Button>
                             <input
                                 ref={fileInputRef}
@@ -630,8 +610,8 @@ export default function JkCW_ResumeForm() {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => selectAllResumes(filteredResumes.map((resume: any) => String(resume?._id ?? resume?.id)))}
-                        disabled={filteredResumes.length === 0 || selectedResumeIds.length === filteredResumes.length}
+                        onClick={() => selectAllResumes(filteredDocuments.filter((doc: any) => doc.documentType === "resume").map((doc: any) => String(doc?._id ?? doc?.id)))}
+                        disabled={filteredDocuments.filter((doc: any) => doc.documentType === "resume").length === 0 || selectedResumeIds.length === filteredDocuments.filter((doc: any) => doc.documentType === "resume").length}
                     >
                         Select All
                     </Button>
@@ -668,20 +648,26 @@ export default function JkCW_ResumeForm() {
             )}
 
             {/* Upload progress */}
-            {/* Resumes grid */}
-            {filteredResumes.length === 0 ? (
+            {/* Documents grid */}
+            {filteredDocuments.length === 0 ? (
                 <div className="rounded-xl border border-border/60 bg-muted/10 px-6 py-12 text-center text-sm text-muted-foreground">
                     {searchTerm ? (
-                        <>No resumes match "{searchTerm}". Try a different keyword.</>
+                        <>No documents match "{searchTerm}". Try a different keyword.</>
                     ) : (
-                        <>No resumes found. Upload your first resume to get started.</>
+                        <>No documents found. Upload your first document to get started.</>
                     )}
                 </div>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredResumes.map((resume: any, index: number) => {
+                    {filteredDocuments.map((doc: any, index: number) => {
+                        const resume = doc;
+                        const documentType = doc.documentType || "resume";
                         const resumeId = String(resume?._id ?? resume?.id ?? `resume-${index}`);
-                        const isActive = currentResumeId === resumeId;
+                        const isActive = Boolean(
+                            selectedDocument &&
+                            selectedDocument.type === documentType &&
+                            String(selectedDocument.id) === String(resumeId)
+                        );
                         const isSelectedForBulk = selectedResumeIds.includes(resumeId);
                         const title =
                             resume?.name ||
@@ -707,11 +693,11 @@ export default function JkCW_ResumeForm() {
                                 key={resumeId}
                                 role="button"
                                 tabIndex={0}
-                                onClick={() => handleResumeClick(resumeId)}
+                                onClick={() => handleDocumentClick(resumeId, documentType)}
                                 onKeyDown={(event) => {
                                     if (event.key === "Enter" || event.key === " ") {
                                         event.preventDefault();
-                                        handleResumeClick(resumeId);
+                                        handleDocumentClick(resumeId, documentType);
                                     }
                                 }}
                                 className={cn(
@@ -719,10 +705,24 @@ export default function JkCW_ResumeForm() {
                                     selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200"
                                 )}
                             >
-                                {/* File icon/thumbnail with job count badge */}
+                                {/* File icon/thumbnail with job count badge and type indicator */}
                                 <div className="relative flex h-32 items-center justify-center rounded-lg border border-border/70 bg-muted/30">
+                                    {/* Document type badge - top right */}
+                                    <div className="absolute top-2 right-2 z-10">
+                                        {documentType === "resume" ? (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm">
+                                                <FileText className="h-3 w-3" />
+                                                Resume
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm">
+                                                <FileCheck className="h-3 w-3" />
+                                                Cover Letter
+                                            </span>
+                                        )}
+                                    </div>
                                     {/* Job count badge - top left */}
-                                    {totalJobs > 0 && (
+                                    {totalJobs > 0 && documentType === "resume" && (
                                         <div className="absolute top-2 left-2 flex flex-col gap-1">
                                             <div className="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                                                 <Briefcase className="h-3 w-3" />
@@ -731,9 +731,17 @@ export default function JkCW_ResumeForm() {
                                         </div>
                                     )}
                                     {resume?.fileId ? (
-                                        <FileText className="h-12 w-12 text-muted-foreground/60" />
+                                        documentType === "resume" ? (
+                                            <FileText className="h-12 w-12 text-muted-foreground/60" />
+                                        ) : (
+                                            <FileCheck className="h-12 w-12 text-purple-500/60" />
+                                        )
                                     ) : (
-                                        <FileText className="h-12 w-12 text-muted-foreground/40" />
+                                        documentType === "resume" ? (
+                                            <FileText className="h-12 w-12 text-muted-foreground/40" />
+                                        ) : (
+                                            <FileCheck className="h-12 w-12 text-purple-500/40" />
+                                        )
                                     )}
                                 </div>
 
@@ -749,26 +757,33 @@ export default function JkCW_ResumeForm() {
                                             {resume?.label && (
                                                 <p className="text-xs font-medium text-blue-600">{resume.label}</p>
                                             )}
-                                            {resume?.tags && resume.tags.length > 0 && (
-                                                <div className="flex flex-wrap gap-1">
-                                                    {resume.tags.slice(0, 3).map((tag: string, tagIdx: number) => (
-                                                        <span
-                                                            key={tagIdx}
-                                                            className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700"
-                                                        >
-                                                            <Tag className="h-2.5 w-2.5" />
-                                                            {tag}
-                                                        </span>
-                                                    ))}
-                                                    {resume.tags.length > 3 && (
-                                                        <span className="text-[10px] text-muted-foreground self-center">
-                                                            +{resume.tags.length - 3}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {/* Status badges - matching My Jobs status colors */}
-                                            {(offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0) && (
+                                            <div className="flex flex-wrap gap-1 items-center">
+                                                {resume?.template && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700 border border-purple-200">
+                                                        {resume.template}
+                                                    </span>
+                                                )}
+                                                {resume?.tags && resume.tags.length > 0 && (
+                                                    <>
+                                                        {resume.tags.slice(0, 3).map((tag: string, tagIdx: number) => (
+                                                            <span
+                                                                key={tagIdx}
+                                                                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700"
+                                                            >
+                                                                <Tag className="h-2.5 w-2.5" />
+                                                                {tag}
+                                                            </span>
+                                                        ))}
+                                                        {resume.tags.length > 3 && (
+                                                            <span className="text-[10px] text-muted-foreground self-center">
+                                                                +{resume.tags.length - 3}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                            {/* Status badges - matching My Jobs status colors (only for resumes) */}
+                                            {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0) && (
                                                 <div className="flex flex-wrap gap-1.5 pt-1">
                                                     {offered > 0 && (
                                                         <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
@@ -799,74 +814,106 @@ export default function JkCW_ResumeForm() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {selectionMode ? (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className={cn(
-                                                        "h-8 w-8 text-muted-foreground hover:text-blue-600",
-                                                        "transition-colors",
-                                                        isSelectedForBulk && "text-blue-600"
-                                                    )}
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        toggleResumeSelection(resumeId);
-                                                    }}
-                                                >
-                                                    {isSelectedForBulk ? (
-                                                        <CheckCircle2 className="h-4 w-4" />
-                                                    ) : (
-                                                        <Circle className="h-4 w-4" />
-                                                    )}
-                                                </Button>
-                                            ) : (
-                                                <>
-                                                    {resume?.fileId && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                                handleDownloadFile(resumeId, resume.fileId);
-                                                            }}
-                                                            title="Download"
-                                                        >
-                                                            <Download className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
+                                                documentType === "resume" ? (
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                                                        className={cn(
+                                                            "h-8 w-8 text-muted-foreground hover:text-blue-600",
+                                                            "transition-colors",
+                                                            isSelectedForBulk && "text-blue-600"
+                                                        )}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
-                                                            handleEditMetadata(resume);
+                                                            toggleResumeSelection(resumeId);
                                                         }}
-                                                        title="Edit labels and tags"
                                                     >
-                                                        <Edit2 className="h-4 w-4" />
+                                                        {isSelectedForBulk ? (
+                                                            <CheckCircle2 className="h-4 w-4" />
+                                                        ) : (
+                                                            <Circle className="h-4 w-4" />
+                                                        )}
                                                     </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className={cn(
-                                                        "h-8 w-8 text-muted-foreground hover:text-destructive",
-                                                        "transition-colors",
-                                                        (isDeleting === resumeId || confirmingId === resumeId) && "opacity-50"
-                                                    )}
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        setConfirmingId(resumeId);
-                                                    }}
-                                                    disabled={isDeleting === resumeId}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                                </>
+                                                ) : null
+                                            ) : (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                            }}
+                                                        >
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                                        {documentType === "resume" && (
+                                                            <DropdownMenuItem
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    selectDocument(resumeId, "resume");
+                                                                    setEditingContentResumeId(resume._id);
+                                                                }}
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                                <span>Edit content</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {documentType === "resume" && (
+                                                            <DropdownMenuItem
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    handleEditMetadata(resume);
+                                                                }}
+                                                            >
+                                                                <Settings className="h-4 w-4" />
+                                                                <span>Edit labels & tags</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {resume?.fileId && (
+                                                            <DropdownMenuItem
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    downloadFirstVersionResume(resume.fileId);
+                                                                }}
+                                                            >
+                                                                <Download className="h-4 w-4" />
+                                                                <span>Download first version</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {resume?.fileId && (
+                                                            <DropdownMenuItem
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    console.log("Download current version (TODO):", {
+                                                                        resumeId,
+                                                                        fileId: resume.fileId,
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <Download className="h-4 w-4" />
+                                                                <span>Download current version</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            variant="destructive"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                setConfirmingId(resumeId);
+                                                            }}
+                                                            disabled={isDeleting === resumeId}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span>Delete</span>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             )}
                                         </div>
                                     </div>
@@ -878,7 +925,7 @@ export default function JkCW_ResumeForm() {
                                             <JkConfirmDelete
                                                 onConfirm={() => {
                                                     if (isDeleting === resumeId) return;
-                                                    void handleResumeDelete(resumeId).finally(() => {
+                                                    void handleDocumentDelete(resumeId, documentType).finally(() => {
                                                         setConfirmingId(null);
                                                     });
                                                 }}
@@ -887,7 +934,7 @@ export default function JkCW_ResumeForm() {
                                             />
                                         </div>
                                     )}
-                                    {!selectionMode && editingResumeId === resumeId && (
+                                    {!selectionMode && editingResumeId === resumeId && documentType === "resume" && (
                                         <div
                                             className="mt-3 space-y-3 rounded-lg border border-border bg-muted/20 p-4"
                                             onClick={(event) => event.stopPropagation()}
@@ -942,6 +989,15 @@ export default function JkCW_ResumeForm() {
                                                         Add
                                                     </Button>
                                                 </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-foreground">Template</label>
+                                                <Input
+                                                    value={editingTemplate}
+                                                    onChange={(e) => setEditingTemplate(e.target.value)}
+                                                    placeholder="e.g., modern, classic, minimalist"
+                                                    className="h-8"
+                                                />
                                             </div>
                                             <div className="flex gap-2 pt-2">
                                                 <Button
@@ -1128,6 +1184,18 @@ export default function JkCW_ResumeForm() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Content Editor - Inline */}
+            {editingContentResumeId && (
+                <div className="mt-6 rounded-xl border border-border bg-card overflow-hidden">
+                    <JkCW_DynamicJSONEditor
+                        resumeId={editingContentResumeId}
+                        onClose={() => setEditingContentResumeId(null)}
+                    />
+                </div>
+            )}
+
+            <JkGap size="small" />
         </div>
     );
 }

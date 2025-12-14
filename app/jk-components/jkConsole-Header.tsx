@@ -13,6 +13,7 @@ import { useAuth } from "@/providers/jkAuthProvider";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Jk_AutoFill from "./jk-AutoFill";
+import { nooutline } from "@/lib/utils";
 
 interface JkConsoleHeaderProps {
     sidebarOpen: boolean;
@@ -82,7 +83,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
         }
     };
 
-    return (
+    return ( 
         <>
             {/* Desktop Header with Breadcrumb */}
             <header className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-border bg-background">
@@ -90,7 +91,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                     {/* Mode Switcher */}
                     <DropdownMenu open={isModeMenuOpen} onOpenChange={setIsModeMenuOpen}>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 text-base font-semibold hover:text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/60 rounded-md px-2 py-1">
+                            <button className={`flex items-center gap-2 text-base font-semibold hover:text-primary transition-colors rounded-md px-2 py-1 ${nooutline}`}>
                                 {currentMode.name}
                                 <ChevronDown className="h-4 w-4 opacity-50" />
                             </button>
@@ -115,7 +116,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                 onClick={handleRetitle}
                                 disabled={retitling}
                             >
-                                <Type className="h-4 w-4" />
+                                <Type className="h-4 w-4 mr-2" />
                                 {retitling ? 'Retitling...' : 'Retitle'}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -142,10 +143,23 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                 <Plus className="h-4 w-4" />
                                 <span className="sr-only">New chat</span>
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
-                                <Settings className="h-4 w-4" />
-                                <span className="sr-only">Settings</span>
-                            </Button>
+                            {isAuthenticated && (
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-9 w-9 rounded-lg"
+                                    onClick={() => {
+                                        const settingsMode = allModes.find(m => m.id === '/settings')
+                                        if (settingsMode) {
+                                            setCurrentMode(settingsMode)
+                                            setSidebarOpen(false)
+                                        }
+                                    }}
+                                >
+                                    <Settings className="h-4 w-4" />
+                                    <span className="sr-only">Settings</span>
+                                </Button>
+                            )}
                         </div>
                         <div className="flex-1 overflow-y-auto chat-scroll p-2">
                             <div className="space-y-1">
@@ -166,6 +180,25 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                     <Link2 className="h-4 w-4" />
                                     <span>Links & Resources</span>
                                 </button>
+                                {isAuthenticated && (
+                                    <button
+                                        onClick={() => {
+                                            const settingsMode = allModes.find(m => m.id === '/settings')
+                                            if (settingsMode) {
+                                                setCurrentMode(settingsMode)
+                                                setSidebarOpen(false)
+                                            }
+                                        }}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                            currentMode.id === '/settings'
+                                                ? 'bg-accent text-accent-foreground'
+                                                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                        }`}
+                                    >
+                                        <Settings className="h-4 w-4" />
+                                        <span>Settings</span>
+                                    </button>
+                                )}
                                 <div className="px-3 py-2 rounded-lg text-sm text-muted-foreground">
                                     No conversations yet
                                 </div>
@@ -289,10 +322,21 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                 
                 <h1 className="text-lg font-semibold">JobKompass</h1>
                 
-                <Button variant="ghost" size="icon">
-                    <Settings className="h-5 w-5" />
-                    <span className="sr-only">Settings</span>
-                </Button>
+                {isAuthenticated && (
+                    <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => {
+                            const settingsMode = allModes.find(m => m.id === '/settings')
+                            if (settingsMode) {
+                                setCurrentMode(settingsMode)
+                            }
+                        }}
+                    >
+                        <Settings className="h-5 w-5" />
+                        <span className="sr-only">Settings</span>
+                    </Button>
+                )}
             </header>
         </>
     )

@@ -8,6 +8,7 @@ import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { JkAuthProvider } from "@/providers/jkAuthProvider";
 import { JkResourcesProvider } from "@/providers/jkResourcesProvider";
 import { JkJobsProvider } from "@/providers/jkJobsProvider";
+import { JkToastProvider } from "@/providers/jkToastProvider";
 
 export const metadata: Metadata = {
   title: "Jobkompass - A Kompass Product",
@@ -28,11 +29,13 @@ export default function RootLayout({
               <JkJobsProvider>
                 <JobKompassResumeProvider>
                   <JobKompassChatWindowProvider>
-                    <html lang="en">
-                      <body className={`antialiased min-h-screen bg-background text-foreground`}>
-                        {children}
-                      </body>
-                    </html>
+                    <JkToastProvider>
+                      <html lang="en">
+                        <body className={`antialiased min-h-screen bg-background text-foreground`}>
+                          {children}
+                        </body>
+                      </html>
+                    </JkToastProvider>
                   </JobKompassChatWindowProvider>
                 </JobKompassResumeProvider>
               </JkJobsProvider>

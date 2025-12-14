@@ -30,6 +30,8 @@ interface JobsContextType {
   jobs: Job[] | null | undefined;
   allJobs: Job[];
   filteredJobs: Job[];
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
   availableStatuses: string[];
   statusCounts: Record<string, number>;
   selectedStatus: string | null;
@@ -109,6 +111,7 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
   const [selectionMode, setSelectionModeState] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<Id<"jobs">[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Handle the jobs safely - it will be undefined when loading or an array when loaded
   // Sort by updatedAt in descending order (most recently updated first)
@@ -149,9 +152,30 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
   }, [allJobs]);
 
   const filteredJobs = useMemo(() => {
-    if (!selectedStatus) return allJobs;
-    return allJobs.filter((job) => job.status === selectedStatus);
-  }, [allJobs, selectedStatus]);
+    const query = searchQuery.trim().toLowerCase();
+
+    return allJobs.filter((job) => {
+      const matchesStatus = selectedStatus ? job.status === selectedStatus : true;
+      if (!matchesStatus) return false;
+
+      if (!query) return true;
+
+      const haystacks = [
+        job.company,
+        job.title,
+        job.status,
+        job.description,
+        job.notes,
+        job.link,
+        ...(job.keywords ?? []),
+        ...(job.skills ?? []),
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+
+      return haystacks.some((value) => value.includes(query));
+    });
+  }, [allJobs, selectedStatus, searchQuery]);
 
   const selectAllJobs = useCallback((jobIds?: Id<"jobs">[]) => {
     if (jobIds && jobIds.length > 0) {
@@ -267,6 +291,8 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
     jobs,
     allJobs,
     filteredJobs,
+    searchQuery,
+    setSearchQuery,
     availableStatuses,
     statusCounts,
     selectedStatus,

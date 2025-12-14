@@ -3,7 +3,7 @@
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 
 export default function JkCW_HomeScreen() {
-    const { wantsToAddJob, wantsToDownloadResume, wantsTutorial } = useJobKompassChatWindow()
+    const { wantsToAddJob, wantsToDownloadResume } = useJobKompassChatWindow()
 
     const messegeForContentHeader = () => {
         if (wantsToAddJob) {

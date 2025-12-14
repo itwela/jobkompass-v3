@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { jobKompassDescription, resumeBestPractices, jobKompassInstructions } from '@/app/ai/constants/file';
-import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool } from '@/app/ai/tools/file';
+import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool } from '@/app/ai/tools/file';
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
@@ -22,10 +22,18 @@ setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENA
 // Request/Response schemas
 const ChatRequestSchema = z.object({
   message: z.string(),
+  file: z.object({
+    name: z.string(),
+    type: z.string(),
+    size: z.number(),
+    base64: z.string(),
+  }).nullable().optional(),
   history: z.array(z.any()).optional().default([]),
   agentId: z.string().optional(),
   userId: z.string().optional(),
   username: z.string().optional(),
+  contextResumeIds: z.array(z.string()).optional(),
+  contextJobIds: z.array(z.string()).optional(),
 });
 
 const ChatResponseSchema = z.object({
@@ -44,7 +52,7 @@ const ChatResponseSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, history = [], agentId, userId, username } = ChatRequestSchema.parse(body);
+    const { message, file, history = [], agentId, userId, username, contextResumeIds, contextJobIds } = ChatRequestSchema.parse(body);
 
     const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
     if (!convexUrl) {
@@ -63,13 +71,34 @@ export async function POST(request: NextRequest) {
     const addToJobsTool = createAddToJobsTool(() => convexClient);
     const getUserResumesTool = createGetUserResumesTool(() => convexClient);
     const getUserJobsTool = createGetUserJobsTool(() => convexClient);
+    const getResumeByIdTool = createGetResumeByIdTool(() => convexClient);
+    const getJobByIdTool = createGetJobByIdTool(() => convexClient);
+
+    // Build context-aware instructions
+    let contextInstructions = jobKompassInstructions;
+    
+    if (contextResumeIds?.length || contextJobIds?.length) {
+      contextInstructions += "\n\n[[CONTEXT_ATTACHMENTS]]";
+      
+      if (contextResumeIds?.length) {
+        contextInstructions += `\nThe user has attached the following resume(s) to this message: ${contextResumeIds.join(', ')}`;
+        contextInstructions += "\nIf relevant to the user's request, use the 'getResumeById' tool to fetch detailed information about these resumes. If you already searched for this, do not search again unless the user asks you to do so.";
+      }
+      
+      if (contextJobIds?.length) {
+        contextInstructions += `\nThe user has attached the following job(s) to this message: ${contextJobIds.join(', ')}`;
+        contextInstructions += "\nIf relevant to the user's request, use the 'getJobById' tool to fetch detailed information about these jobs. If you already searched for this, do not search again unless the user asks you to do so.";
+      }
+      
+      contextInstructions += "\n\nImportant: Only fetch context details if they're relevant to the user's current request. Don't fetch context unnecessarily if it was already discussed in the conversation history.";
+    }
 
     // Create the JobKompass agent for this request
     const jobKompassAgent = new Agent({
       name: 'JobKompass',
-      instructions: jobKompassInstructions,
+      instructions: contextInstructions,
       handoffDescription: 'JobKompass - Career Assistant - Specializes in resume creation, job search optimization, and career guidance.',
-      tools: [createResumeJakeTemplateTool, addToResourcesTool, addToJobsTool, getUserResumesTool, getUserJobsTool, webSearchTool()],
+      tools: [createResumeJakeTemplateTool, addToResourcesTool, addToJobsTool, getUserResumesTool, getUserJobsTool, getResumeByIdTool, getJobByIdTool, webSearchTool()],
       model: "gpt-5-mini",
     });
 
@@ -107,7 +136,51 @@ export async function POST(request: NextRequest) {
       conversationalHistory.unshift(userContextMessage);
     }
 
-    const updatedHistory: AgentInputItem[] = [...conversationalHistory, user(message)];
+    // Build the user message with image support only
+    let userMessage: AgentInputItem;
+    
+    console.log('file', file);
+    console.log('message', message);
+
+    if (file) {
+      // Only support images for now
+      const isImage = file.type.startsWith('image/');
+
+      if (isImage) {
+        const contentParts: any[] = [];
+        
+        // Add text content if present
+        if (message.trim()) {
+          contentParts.push({
+            type: 'input_text',
+            text: message,
+          });
+        }
+        
+        // Add image content
+        // NOTE: this works. do not change this
+        contentParts.push({
+          type: 'input_image',
+          image: `data:${file.type};base64,${file.base64}`,
+        });
+
+        console.log('contentParts', contentParts);
+        
+        userMessage = {
+          role: 'user',
+          content: contentParts,
+        } as AgentInputItem;
+      } else {
+        // Non-image files are not supported yet - treat as text-only message
+        console.log('Non-image file type not supported:', file.type);
+        userMessage = user(message);
+      }
+    } else {
+      // Just text message
+      userMessage = user(message);
+    }
+
+    const updatedHistory: AgentInputItem[] = [...conversationalHistory, userMessage];
 
     // Run the agent within a trace
     const result = await withTrace('JobKompass Chat Session', async () => {

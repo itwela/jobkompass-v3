@@ -1,70 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
-import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Briefcase, Bell, Check, Clock, X } from "lucide-react"
+import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuthActions } from "@convex-dev/auth/react"
-
-type NotificationStatus = "awaiting-response" | "responded" | "no-response"
-
-type JobNotification = {
-  id: string
-  company: string
-  role: string
-  lastTouchpoint: string
-  status: NotificationStatus
-  read: boolean
-}
-
-const notificationStatusConfig: Record<NotificationStatus, { label: string; className: string }> = {
-  "awaiting-response": {
-    label: "Awaiting reply",
-    className: "bg-amber-100 text-amber-900 border border-amber-200"
-  },
-  responded: {
-    label: "Responded",
-    className: "bg-emerald-100 text-emerald-800 border border-emerald-200"
-  },
-  "no-response": {
-    label: "No response yet",
-    className: "bg-rose-100 text-rose-800 border border-rose-200"
-  }
-}
-
-const seedNotifications: JobNotification[] = [
-  {
-    id: "app-1234",
-    company: "Acme Labs",
-    role: "Product Manager",
-    lastTouchpoint: "Followed up 2 days ago",
-    status: "awaiting-response",
-    read: false
-  },
-  {
-    id: "app-5678",
-    company: "Northwind Partners",
-    role: "Growth Marketing Lead",
-    lastTouchpoint: "Recruiter replied this morning",
-    status: "responded",
-    read: false
-  },
-  {
-    id: "app-9101",
-    company: "Blue Horizon",
-    role: "Senior UX Designer",
-    lastTouchpoint: "Initial outreach 1 week ago",
-    status: "no-response",
-    read: false
-  }
-]
+import { mainAssets } from "@/app/constants"
+import Image from "next/image"
+import JkGap from './jkGap'
 
 export default function JkSidebar() {
   const { user, isAuthenticated } = useAuth()
@@ -76,44 +26,22 @@ export default function JkSidebar() {
   const [authLoading, setAuthLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [threadToDelete, setThreadToDelete] = useState<any>(null)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [notifications, setNotifications] = useState<JobNotification[]>(() => seedNotifications)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
   const deleteThread = useMutation(api.threads.remove)
   const { signIn, signOut } = useAuthActions()
 
-  const unreadNotifications = notifications.filter(notification => !notification.read).length
-
-  const handleNotificationsOpenChange = (open: boolean) => {
-    setNotificationsOpen(open)
-    if (open) {
-      setNotifications(prev =>
-        prev.map(notification => ({
-          ...notification,
-          read: true
-        }))
-      )
+  // Listen for custom event to open sign-in modal
+  useEffect(() => {
+    const handleOpenSignIn = () => {
+      setShowSignIn(true)
     }
-  }
-
-  const handleNotificationStatusChange = (id: string, status: NotificationStatus) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id
-          ? {
-            ...notification,
-            status,
-            read: true
-          }
-          : notification
-      )
-    )
-  }
-
-  const handleNotificationDismiss = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id))
-  }
+    window.addEventListener('jk:openSignIn', handleOpenSignIn)
+    return () => {
+      window.removeEventListener('jk:openSignIn', handleOpenSignIn)
+    }
+  }, [])
 
   const handleThreadClick = (threadId: any) => {
     setCurrentThreadId(threadId)
@@ -125,7 +53,9 @@ export default function JkSidebar() {
   }
 
   const handleNewChat = () => {
+    // Clear current thread to show new chat interface
     setCurrentThreadId(null)
+    // Always switch to chat mode to show the new chat interface
     const chatMode = allModes.find(mode => mode.id === '/chat')
     if (chatMode) {
       setCurrentMode(chatMode)
@@ -143,7 +73,12 @@ export default function JkSidebar() {
 
     await deleteThread({ threadId: threadToDelete })
     if (currentThreadId === threadToDelete) {
+      // Clear current thread and switch to chat mode to show intro screen
       setCurrentThreadId(null)
+      const chatMode = allModes.find(mode => mode.id === '/chat')
+      if (chatMode) {
+        setCurrentMode(chatMode)
+      }
     }
     setDeleteDialogOpen(false)
     setThreadToDelete(null)
@@ -177,10 +112,10 @@ export default function JkSidebar() {
     }
   }
 
-  const handleMyResumesClick = () => {
-    const myResumesMode = allModes.find(mode => mode.id === '/resume')
-    if (myResumesMode) {
-      setCurrentMode(myResumesMode)
+  const handleMyDocumentsClick = () => {
+    const myDocumentsMode = allModes.find(mode => mode.id === '/documents')
+    if (myDocumentsMode) {
+      setCurrentMode(myDocumentsMode)
     }
   }
 
@@ -202,249 +137,212 @@ export default function JkSidebar() {
     setCurrentThreadId(null) // Clear current thread on sign out
   }
 
+  const handleSettingsClick = () => {
+    const settingsMode = allModes.find(mode => mode.id === '/settings')
+    if (settingsMode) {
+      setCurrentMode(settingsMode)
+    }
+  }
+
   return (
-    <div className="w-[25dvw] h-full bg-background border-r border-border flex flex-col">
+    <div className="w-[25dvw] !relative h-full bg-background border-r border-border flex flex-col overflow-hidden">
+      
+<div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+     
       {/* Header */}
-      <div className="px-6 py-4 flex items-center justify-between">
-        <div className="text-base font-semibold">JobKompass</div>
+      <div className="pl-5 pr-2 py-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Image src={mainAssets.logo} alt="JobKompass Logo" width={26} height={26} className="object-contain" />
+          <span className="text-base font-semibold">JobKompass</span>
+        </div>
         <div className="flex h-max gap-2">
-          <Popover open={notificationsOpen} onOpenChange={handleNotificationsOpenChange}>
-            <PopoverTrigger className='!p-0 !m-0' asChild>
-              <button
-                className="!p-0 !m-0 relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                title="Application follow-ups"
-              >
-                <Bell className="h-5 w-5 !p-0 !m-0" />
-                {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground leading-none">
-                    {unreadNotifications}
-                  </span>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-[340px] p-3">
-              <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                <div>
-                  <p className="text-sm font-semibold">Application updates</p>
-                  <p className="text-xs text-muted-foreground">
-                    Track follow-ups and note who you heard back from.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-muted-foreground">{notifications.length} total</span>
-                </div>
-              </div>
-              <div className="mt-3 space-y-3 max-h-[320px] overflow-y-auto pr-1">
-                {notifications.length === 0 ? (
-                  <div className="text-sm text-muted-foreground text-center py-6">
-                    All caught up! Add applications to see them here.
-                  </div>
-                ) : (
-                  notifications.map(notification => {
-                    const status = notificationStatusConfig[notification.status]
-                    return (
-                      <div
-                        key={notification.id}
-                        className="rounded-lg border border-border/60 bg-background p-3 shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold leading-tight">
-                              {notification.company}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{notification.role}</p>
-                          </div>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium leading-none ${status.className}`}>
-                            {status.label}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {notification.lastTouchpoint}
-                        </p>
-                        <div className="mt-3 flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant={notification.status === "responded" ? "default" : "secondary"}
-                            className="h-7 px-2 text-xs"
-                            onClick={() => handleNotificationStatusChange(notification.id, "responded")}
-                          >
-                            <Check className="mr-1 h-3 w-3" />
-                            Heard back
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={notification.status === "awaiting-response" ? "default" : "outline"}
-                            className="h-7 px-2 text-xs"
-                            onClick={() => handleNotificationStatusChange(notification.id, "awaiting-response")}
-                          >
-                            <Clock className="mr-1 h-3 w-3" />
-                            Still waiting
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleNotificationDismiss(notification.id)}
-                            title="Remove reminder"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
           <button
             onClick={handleNewChat}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             title="New Chat"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Navigation Sections */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-2 space-y-1">
-          {/* Links & Resources Section */}
-          <button
-            onClick={handleResourcesClick}
-            className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resources'
-                ? 'bg-accent text-accent-foreground'
-                : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-              }`}
-          >
-            <span>Links & Resources</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      
+        {/* Navigation Sections - Everything else */}
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          <div className="p-2 pb-0.5 space-y-1">
+            {/* Links & Resources Section */}
+            <button
+              onClick={handleResourcesClick}
+              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resources'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                }`}
+            >
+              <span>Links & Resources</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
 
-          {/* My Resumes Section */}
-          <button
-            onClick={handleMyResumesClick}
-            className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resume'
-                ? 'bg-accent text-accent-foreground'
-                : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <span>My Resumes</span>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+            {/* My Documents Section */}
+            <button
+              onClick={handleMyDocumentsClick}
+              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resume'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>My Documents</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
 
-          {/* My Jobs Section */}
-          <button
-            onClick={handleMyJobsClick}
-            className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/my-jobs'
-                ? 'bg-accent text-accent-foreground'
-                : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <span>My Jobs</span>
-            </div>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+            {/* My Jobs Section */}
+            <button
+              onClick={handleMyJobsClick}
+              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/my-jobs'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                }`}
+            >
+              <div className="flex items-center gap-2">
+                <span>My Jobs</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
 
-          {/* Chat Section with expandable threads */}
-          <button
-            onClick={handleChatToggle}
-            className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-          >
-            <span>Chat</span>
-            <ChevronRight
-              className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
-            />
-          </button>
+        {/* Navigation Sections - Chat */}
+        <div className="flex-1 min-h-0 !overflow-y-scroll no-scrollbar">
+          <div className="p-2 pt-0.5 space-y-1">
+            {/* Chat Section with expandable threads */}
+            <button
+              onClick={handleChatToggle}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+            >
+              <span>Chat</span>
+              <ChevronRight
+                className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
+              />
+            </button>
 
-          <AnimatePresence>
-            {isThreadsExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-1 space-y-1">
-                  {!isAuthenticated ? (
-                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                      Sign in to view chat history
-                    </div>
-                  ) : threads === undefined ? (
-                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                      Loading...
-                    </div>
-                  ) : threads.length === 0 ? (
-                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                      No conversations yet
-                    </div>
-                  ) : (
-                    <AnimatePresence>
-                      {threads.map((thread, index) => (
-                        <motion.div
-                          key={thread._id}
-                          initial={{ opacity: 0, y: 12 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -12 }}
-                          transition={{ duration: 0.25, delay: index * 0.05 }}
-                          className={`w-full group flex items-start gap-2 px-3 py-2.5 text-sm rounded-lg transition-colors ${currentThreadId === thread._id
-                              ? 'bg-accent text-accent-foreground'
-                              : 'hover:bg-accent/50'
-                            }`}
-                        >
-                          <button
-                            onClick={() => handleThreadClick(thread._id)}
-                            className="flex-1 flex w-[70%] items-start gap-2.5 text-left"
+            <AnimatePresence>
+              {isThreadsExpanded && (
+                <>
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-1 space-y-1">
+                    {!isAuthenticated ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                        Sign in to view chat history
+                      </div>
+                    ) : threads === undefined ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                        Loading...
+                      </div>
+                    ) : threads.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                        No conversations yet
+                      </div>
+                    ) : (
+                      <AnimatePresence>
+                        {threads.map((thread, index) => (
+                          <motion.div
+                            key={thread._id}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -12 }}
+                            transition={{ duration: 0.25, delay: index * 0.05 }}
+                            className={`w-full group flex items-start gap-2 px-3 py-2.5 text-sm rounded-lg transition-colors ${currentThreadId === thread._id
+                                ? 'bg-accent text-accent-foreground'
+                                : 'hover:bg-accent/50'
+                              }`}
                           >
-                            <MessageSquare className="h-4 w-4 mt-1 flex-shrink-0" />
-                            <div className="flex-1 text-left overflow-hidden space-y-1">
-                              <div className="truncate font-medium leading-snug">{thread.title}</div>
-                              <div className="text-xs text-muted-foreground leading-none">
-                                {formatDate(thread.lastMessageAt)}
+                            <button
+                              onClick={() => handleThreadClick(thread._id)}
+                              className="flex-1 flex w-[70%] items-start gap-2.5 text-left"
+                            >
+                              <MessageSquare className="h-4 w-4 mt-1 flex-shrink-0" />
+                              <div className="flex-1 text-left overflow-hidden space-y-1">
+                                <div className="truncate font-medium leading-snug">{thread.title}</div>
+                                <div className="text-xs text-muted-foreground leading-none">
+                                  {formatDate(thread.lastMessageAt)}
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteClick(thread._id, e)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded flex-shrink-0"
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </button>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteClick(thread._id, e)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded flex-shrink-0"
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </button>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    )}
+                  </div>
+                </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+
+          </div>
         </div>
+
       </div>
+
+</div>
+
 
       {/* User info / Sign in at bottom */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border w-full flex-shrink-0">
         {isAuthenticated && user ? (
-          <div className="space-y-2">
-            <div className="px-3 py-2 rounded-lg bg-muted/50">
-              <div className="text-sm font-medium truncate">{user.name || user.email}</div>
-              {user.username && (
-                <div className="text-xs text-muted-foreground">@{user.username}</div>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </div>
+          <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+            <PopoverTrigger asChild>
+              <button className="w-full px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left">
+                <div className="text-sm font-medium truncate">{user.name || user.email}</div>
+                {user.username && (
+                  <div className="text-xs text-muted-foreground">@{user.username}</div>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-85 p-0 border-none shadow-lg" side="top">
+              <div className="bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0 }}
+                  onClick={() => {
+                    handleSettingsClick()
+                    setUserMenuOpen(false)
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border"
+                >
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Settings</span>
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.03 }}
+                  onClick={() => {
+                    handleSignOut()
+                    setUserMenuOpen(false)
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors"
+                >
+                  <LogOut className="h-4 w-4 text-destructive" />
+                  <span className="text-sm font-medium text-destructive">Sign out</span>
+                </motion.div>
+              </div>
+            </PopoverContent>
+          </Popover>
         ) : (
           <Popover open={showSignIn} onOpenChange={setShowSignIn}>
             <PopoverTrigger asChild>

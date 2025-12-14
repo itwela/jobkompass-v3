@@ -1,6 +1,6 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
-import { query } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
@@ -57,5 +57,30 @@ export const getPublicProfileById = query({
       name: (user as any)?.name ?? null,
       email: (user as any)?.email ?? null,
     };
+  },
+});
+
+export const updateUserProfile = mutation({
+  args: {
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const updateData: any = {};
+    if (args.name !== undefined) updateData.name = args.name;
+    if (args.email !== undefined) updateData.email = args.email;
+
+    await ctx.db.patch(userId, updateData);
+    return { success: true };
   },
 });

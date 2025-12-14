@@ -3,18 +3,25 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
+import { useJobKompassResume } from "@/providers/jkResumeProvider";
+import { useJobs } from "@/providers/jkJobsProvider";
 import JkContextPanel from "./jkContextPanel";
 import { useCallback, useState } from "react";
-import { Send, Plus } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Send, Plus, FileText, Briefcase, X } from "lucide-react";
 
 export default function JkInputSection() {
   const { 
     textareaRef, textValue, setTextValue,
     allModes, currentMode, setCurrentMode,
-    isFileMode, setIsFileMode, droppedFile, setDroppedFile, fileName, setFileName } = useJobKompassChatWindow()
+    isFileMode, setIsFileMode, droppedFile, setDroppedFile, fileName, setFileName,
+    attachedResumeIds, attachedJobIds, removeResumeAttachment, removeJobAttachment,
+    setIsFileModalOpen
+  } = useJobKompassChatWindow();
+  
+  const { resumes } = useJobKompassResume();
+  const { allJobs } = useJobs();
 
-  const [isDragOver, setIsDragOver] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // File drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -36,30 +43,18 @@ export default function JkInputSection() {
     
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      const file = files[0]; // Take the first file
-      setDroppedFile(file);
-      setFileName(file.name);
-      setIsFileMode(true);
-      // Switch to file mode
-      const fileMode = allModes.find(mode => mode.id === '/file');
-      if (fileMode) {
-        setCurrentMode(fileMode);
-      }
+      handleFileSelect(files[0]);
     }
   }, [setDroppedFile, setFileName, setIsFileMode, setCurrentMode, allModes]);
 
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      setDroppedFile(file);
-      setFileName(file.name);
-      setIsFileMode(true);
-      // Switch to file mode
-      const fileMode = allModes.find(mode => mode.id === '/file');
-      if (fileMode) {
-        setCurrentMode(fileMode);
-      }
+  const handleFileSelect = useCallback((file: File) => {
+    setDroppedFile(file);
+    setFileName(file.name);
+    setIsFileMode(true);
+    // Switch to file mode
+    const fileMode = allModes.find(mode => mode.id === '/file');
+    if (fileMode) {
+      setCurrentMode(fileMode);
     }
   }, [setDroppedFile, setFileName, setIsFileMode, setCurrentMode, allModes]);
 
@@ -93,9 +88,10 @@ export default function JkInputSection() {
           </div>
         )}
 
-        {/* File Mode Indicator */}
-        {(isFileMode || fileName) && (
-          <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+        {/* File Mode Indicator & Context Attachments */}
+        {((isFileMode || fileName) || attachedResumeIds.length > 0 || attachedJobIds.length > 0) && (
+          <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-2">
+            {/* File attachment */}
             {fileName ? (
               <div className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-accent rounded-md">
                 <span>📄 {fileName}</span>
@@ -104,48 +100,73 @@ export default function JkInputSection() {
                   className="hover:bg-background/20 rounded px-1 transition-colors"
                   aria-label="Remove file"
                 >
-                  ✕
+                  <X className="h-3 w-3" />
                 </button>
               </div>
-            ) : (
+            ) : isFileMode && (
               <div className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-primary text-primary-foreground rounded-md">
                 📁 File Mode
               </div>
             )}
+
+            {/* Resume attachments */}
+            {attachedResumeIds.map((resumeId) => {
+              const resume = resumes?.find((r: any) => r._id === resumeId);
+              if (!resume) return null;
+              return (
+                <div 
+                  key={resumeId}
+                  className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-primary/10 text-primary border border-primary/20 rounded-md"
+                >
+                  <FileText className="h-3 w-3" />
+                  <span>{resume.name || `Resume ${resumeId.slice(-6)}`}</span>
+                  <button 
+                    onClick={() => removeResumeAttachment(resumeId)}
+                    className="hover:bg-primary/20 rounded px-1 transition-colors"
+                    aria-label="Remove resume"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Job attachments */}
+            {attachedJobIds.map((jobId) => {
+              const job = allJobs?.find((j: any) => j._id === jobId);
+              if (!job) return null;
+              return (
+                <div 
+                  key={jobId}
+                  className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-primary/10 text-primary border border-primary/20 rounded-md"
+                >
+                  <Briefcase className="h-3 w-3" />
+                  <span>{job.title} @ {job.company}</span>
+                  <button 
+                    onClick={() => removeJobAttachment(jobId)}
+                    className="hover:bg-primary/20 rounded px-1 transition-colors"
+                    aria-label="Remove job"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {/* Input Area with inline controls */}
-        <div className="flex items-end gap-2 px-4 py-3">
+        <div className="flex items-end gap-2 px-2 py-3">
           <div className="flex items-center gap-4 flex-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
-                  aria-label="Add attachments or options"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-40">
-                <DropdownMenuItem 
-                  className="cursor-pointer"
-                  onClick={() => document.getElementById('file-input')?.click()}
-                >
-                  Add file
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
-            <input
-              type="file"
-              id="file-input"
-              className="hidden"
-              onChange={handleFileInput}
-              accept="*/*"
-            />
+            <Button 
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsFileModalOpen(true)}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+              aria-label="Add file"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
             
             <div className="flex-1 min-w-0">
               <Textarea
