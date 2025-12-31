@@ -24,9 +24,9 @@ export default function RootLayout({
     <JkConvexProviders>
       <JkAuthProvider>
         <JobKompassThemeProvider>
-          <JobKompassResumeProvider>
-            <JkResourcesProvider>
-              <JkJobsProvider>
+          <JkJobsProvider>
+            <JobKompassResumeProvider>
+              <JkResourcesProvider>
                 <JobKompassChatWindowProvider>
                 <html lang="en"
                       className="js-focus-visible"
@@ -36,10 +36,10 @@ export default function RootLayout({
                     {children}
                   </body>
                 </html>
-              </JobKompassChatWindowProvider>
-              </JkJobsProvider>
-            </JkResourcesProvider>
-          </JobKompassResumeProvider>
+                </JobKompassChatWindowProvider>
+              </JkResourcesProvider>
+            </JobKompassResumeProvider>
+          </JkJobsProvider>
         </JobKompassThemeProvider>
       </JkAuthProvider>
     </JkConvexProviders>
