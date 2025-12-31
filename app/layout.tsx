@@ -8,7 +8,6 @@ import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { JkAuthProvider } from "@/providers/jkAuthProvider";
 import { JkResourcesProvider } from "@/providers/jkResourcesProvider";
 import { JkJobsProvider } from "@/providers/jkJobsProvider";
-import { JkToastProvider } from "@/providers/jkToastProvider";
 
 export const metadata: Metadata = {
   title: "Jobkompass - A Kompass Product",
@@ -22,27 +21,28 @@ export default function RootLayout({
 }>) {
   return (
     <ConvexAuthNextjsServerProvider>
-      <JkConvexProviders>
-        <JkAuthProvider>
-          <JobKompassThemeProvider>
+    <JkConvexProviders>
+      <JkAuthProvider>
+        <JobKompassThemeProvider>
+          <JobKompassResumeProvider>
             <JkResourcesProvider>
               <JkJobsProvider>
-                <JobKompassResumeProvider>
-                  <JobKompassChatWindowProvider>
-                    <JkToastProvider>
-                      <html lang="en">
-                        <body className={`antialiased min-h-screen bg-background text-foreground`}>
-                          {children}
-                        </body>
-                      </html>
-                    </JkToastProvider>
-                  </JobKompassChatWindowProvider>
-                </JobKompassResumeProvider>
+                <JobKompassChatWindowProvider>
+                <html lang="en"
+                      className="js-focus-visible"
+                   data-js-focus-visible=""
+                >
+                  <body className={`antialiased min-h-screen bg-background text-foreground`}>
+                    {children}
+                  </body>
+                </html>
+              </JobKompassChatWindowProvider>
               </JkJobsProvider>
             </JkResourcesProvider>
-          </JobKompassThemeProvider>
-        </JkAuthProvider>
-      </JkConvexProviders>
+          </JobKompassResumeProvider>
+        </JobKompassThemeProvider>
+      </JkAuthProvider>
+    </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>
-  );
+    );
 }
