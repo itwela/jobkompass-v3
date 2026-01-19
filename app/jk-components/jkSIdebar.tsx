@@ -146,77 +146,76 @@ export default function JkSidebar() {
 
   return (
     <div className="w-[25dvw] !relative h-full bg-background border-r border-border flex flex-col overflow-hidden">
-      
-<div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-     
-      {/* Header */}
-      <div className="pl-5 pr-2 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Image src={mainAssets.logo} alt="JobKompass Logo" width={26} height={26} className="object-contain" />
-          <span className="text-base font-semibold">JobKompass</span>
-        </div>
-        <div className="flex h-max gap-2">
-          <button
-            onClick={handleNewChat}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            title="New Chat"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      
-        {/* Navigation Sections - Everything else */}
-        <div className="flex flex-col gap-2 flex-shrink-0">
-          <div className="p-2 pb-0.5 space-y-1">
-            {/* Links & Resources Section */}
-            <button
-              onClick={handleResourcesClick}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resources'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-                }`}
-            >
-              <span>Links & Resources</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
 
-            {/* My Documents Section */}
+        {/* Header */}
+        <div className="pl-5 pr-2 py-4 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Image src={mainAssets.logo} alt="JobKompass Logo" width={26} height={26} className="object-contain" />
+            <span className="text-base font-semibold">JobKompass</span>
+          </div>
+          <div className="flex h-max gap-2">
             <button
-              onClick={handleMyDocumentsClick}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resume'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-                }`}
+              onClick={handleNewChat}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title="New Chat"
             >
-              <div className="flex items-center gap-2">
-                <span>My Documents</span>
-              </div>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-
-            {/* My Jobs Section */}
-            <button
-              onClick={handleMyJobsClick}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/my-jobs'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-                }`}
-            >
-              <div className="flex items-center gap-2">
-                <span>My Jobs</span>
-              </div>
-              <ChevronRight className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Navigation Sections - Chat */}
-        <div className="flex-1 min-h-0 !overflow-y-scroll no-scrollbar">
-          <div className="p-2 pt-0.5 space-y-1">
-            {/* Chat Section with expandable threads */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+
+          {/* Navigation Sections - Everything else */}
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            <div className="p-2 pb-0.5 space-y-1">
+              {/* Links & Resources Section */}
+              <button
+                onClick={handleResourcesClick}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resources'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <span>Links & Resources</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+
+              {/* My Documents Section */}
+              <button
+                onClick={handleMyDocumentsClick}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resume'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>My Documents</span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+
+              {/* My Jobs Section */}
+              <button
+                onClick={handleMyJobsClick}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/my-jobs'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>My Jobs</span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Sections - Chat */}
+          <div className="px-2 pt-0.5 space-y-1">
+
             <button
               onClick={handleChatToggle}
               className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent rounded-lg transition-colors"
@@ -226,78 +225,91 @@ export default function JkSidebar() {
                 className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
               />
             </button>
-
-            <AnimatePresence>
-              {isThreadsExpanded && (
-                <>
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="mt-1 space-y-1">
-                    {!isAuthenticated ? (
-                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                        Sign in to view chat history
-                      </div>
-                    ) : threads === undefined ? (
-                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                        Loading...
-                      </div>
-                    ) : threads.length === 0 ? (
-                      <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                        No conversations yet
-                      </div>
-                    ) : (
-                      <AnimatePresence>
-                        {threads.map((thread, index) => (
-                          <motion.div
-                            key={thread._id}
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -12 }}
-                            transition={{ duration: 0.25, delay: index * 0.05 }}
-                            className={`w-full group flex items-start gap-2 px-3 py-2.5 text-sm rounded-lg transition-colors ${currentThreadId === thread._id
-                                ? 'bg-accent text-accent-foreground'
-                                : 'hover:bg-accent/50'
-                              }`}
-                          >
-                            <button
-                              onClick={() => handleThreadClick(thread._id)}
-                              className="flex-1 flex w-[70%] items-start gap-2.5 text-left"
-                            >
-                              <MessageSquare className="h-4 w-4 mt-1 flex-shrink-0" />
-                              <div className="flex-1 text-left overflow-hidden space-y-1">
-                                <div className="truncate font-medium leading-snug">{thread.title}</div>
-                                <div className="text-xs text-muted-foreground leading-none">
-                                  {formatDate(thread.lastMessageAt)}
-                                </div>
-                              </div>
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteClick(thread._id, e)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded flex-shrink-0"
-                            >
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                            </button>
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    )}
-                  </div>
-                </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-
           </div>
+          <div className="overflow-y-auto no-scrollbar">
+            
+          
+            <div className="flex-1 min-h-0 !overflow-y-scroll no-scrollbar">
+              <div className="px-2 pb-8">
+                {/* Chat Section with expandable threads */}
+
+                <AnimatePresence>
+                  {isThreadsExpanded && (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0, maxHeight: 0 }}
+                        animate={{ opacity: 1, maxHeight: '70vh' }}
+                        exit={{ opacity: 0, maxHeight: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-1 space-y-1 max-h-[70vh] overflow-y-auto no-scrollbar">
+                          {!isAuthenticated ? (
+                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                              Sign in to view chat history
+                            </div>
+                          ) : threads === undefined ? (
+                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                              Loading...
+                            </div>
+                          ) : threads.length === 0 ? (
+                            <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                              No conversations yet
+                            </div>
+                          ) : (
+                            <AnimatePresence>
+                              {threads.map((thread, index) => (
+                                <motion.div
+                                  key={thread._id}
+                                  initial={{ opacity: 0, y: 12 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -12 }}
+                                  transition={{ duration: 0.25, delay: index * 0.05 }}
+                                  className={`w-full group flex items-start gap-2 px-3 py-2.5 text-sm rounded-lg transition-colors ${currentThreadId === thread._id
+                                    ? 'bg-accent text-accent-foreground'
+                                    : 'hover:bg-accent/50'
+                                    }`}
+                                >
+                                  <button
+                                    onClick={() => handleThreadClick(thread._id)}
+                                    className="flex-1 flex w-[70%] items-start gap-2.5 text-left"
+                                  >
+                                    <MessageSquare className="h-4 w-4 mt-1 flex-shrink-0" />
+                                    <div className="flex-1 text-left overflow-hidden space-y-1">
+                                      <div className="truncate font-medium leading-snug">{thread.title}</div>
+                                      <div className="text-xs text-muted-foreground leading-none">
+                                        {formatDate(thread.lastMessageAt)}
+                                      </div>
+                                    </div>
+                                  </button>
+                                  <button
+                                    onClick={(e) => handleDeleteClick(thread._id, e)}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded flex-shrink-0"
+                                  >
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </button>
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
+                          )}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+                  <JkGap size="large" />
+
+
+              </div>
+            </div>
+          
+          </div>
+
+          {/* // REVIEW */}
+
         </div>
 
       </div>
-
-</div>
 
 
       {/* User info / Sign in at bottom */}

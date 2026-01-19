@@ -13,9 +13,9 @@ import { toast } from "@/lib/toast";
 
 type ResumeContent = {
     personalInfo: {
-        name: string;
+        firstName: string;
+        lastName: string;
         email: string;
-        phone?: string;
         location?: string;
         linkedin?: string;
         github?: string;
@@ -24,18 +24,19 @@ type ResumeContent = {
     };
     experience: Array<{
         company: string;
-        position: string;
-        startDate: string;
-        endDate?: string;
-        achievements?: string[];
+        title: string;
+        date: string;
+        details?: string[];
         location?: string;
     }>;
     education: Array<{
-        school: string;
+        name: string;
         degree: string;
-        graduationDate: string;
+        field?: string;
+        startDate?: string;
+        endDate: string;
         location?: string;
-        relevantCoursework?: string[];
+        details?: string[];
     }>;
     skills: {
         technical: string[];
@@ -45,7 +46,8 @@ type ResumeContent = {
         name: string;
         description: string;
         technologies: string[];
-        highlights?: string[];
+        details?: string[];
+        date?: string;
     }>;
     additionalInfo?: {
     languages?: Array<{
@@ -58,9 +60,9 @@ type ResumeContent = {
 
 const emptyContent: ResumeContent = {
     personalInfo: {
-        name: "",
+        firstName: "",
+        lastName: "",
         email: "",
-        phone: "",
         location: "",
         linkedin: "",
         github: "",
@@ -133,15 +135,121 @@ export default function JkCW_ResumeContentEditor({
     // Track if we've loaded initial content
     const hasLoadedRef = React.useRef(false);
     
-    // Load initial content only ONCE
+    // Helper to decode escaped/encoded strings
+    const decodeString = (str: string | undefined | null): string => {
+        if (!str) return "";
+        
+        try {
+            // First try to decode URI components (e.g., %2F -> /)
+            let decoded = decodeURIComponent(str);
+            
+            // Then decode HTML entities and Unicode escapes
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = decoded;
+            decoded = textarea.value;
+            
+            // Handle Unicode escape sequences like \u002F
+            decoded = decoded.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+                return String.fromCharCode(parseInt(hex, 16));
+            });
+            
+            return decoded;
+        } catch (e) {
+            // If decoding fails, return original string
+            return str;
+        }
+    };
+    
+    // Helper to decode arrays of strings
+    const decodeStringArray = (arr: string[] | undefined | null): string[] => {
+        if (!arr || !Array.isArray(arr)) return [];
+        return arr.map(s => decodeString(s));
+    };
+    
+    // Helper to ensure all fields have default values (prevents controlled/uncontrolled input errors)
+    const normalizeContent = (loadedContent: any): ResumeContent => {
+        // If content is a JSON string, parse it first
+        let parsedContent = loadedContent;
+        if (typeof loadedContent === 'string') {
+            try {
+                parsedContent = JSON.parse(loadedContent);
+            } catch (e) {
+                console.error('Failed to parse content:', e);
+                parsedContent = {};
+            }
+        }
+        
+        // Normalize and decode experience entries
+        const normalizedExperience = (parsedContent?.experience || []).map((exp: any) => ({
+            company: decodeString(exp?.company),
+            title: decodeString(exp?.title),
+            date: decodeString(exp?.date),
+            details: decodeStringArray(exp?.details),
+            location: decodeString(exp?.location),
+        }));
+        
+        // Normalize and decode education entries
+        const normalizedEducation = (parsedContent?.education || []).map((edu: any) => ({
+            name: decodeString(edu?.name),
+            degree: decodeString(edu?.degree),
+            field: decodeString(edu?.field),
+            startDate: decodeString(edu?.startDate),
+            endDate: decodeString(edu?.endDate),
+            location: decodeString(edu?.location),
+            details: decodeStringArray(edu?.details),
+        }));
+        
+        // Normalize and decode projects
+        const normalizedProjects = (parsedContent?.projects || []).map((proj: any) => ({
+            name: decodeString(proj?.name),
+            description: decodeString(proj?.description),
+            date: decodeString(proj?.date),
+            technologies: decodeStringArray(proj?.technologies),
+            details: decodeStringArray(proj?.details),
+        }));
+        
+        return {
+            personalInfo: {
+                firstName: decodeString(parsedContent?.personalInfo?.firstName),
+                lastName: decodeString(parsedContent?.personalInfo?.lastName),
+                email: decodeString(parsedContent?.personalInfo?.email),
+                location: decodeString(parsedContent?.personalInfo?.location),
+                linkedin: decodeString(parsedContent?.personalInfo?.linkedin),
+                github: decodeString(parsedContent?.personalInfo?.github),
+                portfolio: decodeString(parsedContent?.personalInfo?.portfolio),
+                citizenship: decodeString(parsedContent?.personalInfo?.citizenship),
+            },
+            experience: normalizedExperience,
+            education: normalizedEducation,
+            skills: {
+                technical: decodeStringArray(parsedContent?.skills?.technical),
+                additional: decodeStringArray(parsedContent?.skills?.additional),
+            },
+            projects: normalizedProjects,
+            additionalInfo: {
+                languages: (parsedContent?.additionalInfo?.languages || []).map((lang: any) => ({
+                    language: decodeString(lang?.language),
+                    proficiency: decodeString(lang?.proficiency),
+                })),
+                references: decodeString(parsedContent?.additionalInfo?.references),
+            },
+        };
+    };
+    
+    // Reset hasLoadedRef when resumeId changes
+    useEffect(() => {
+        hasLoadedRef.current = false;
+    }, [resumeId]);
+    
+    // Load initial content only ONCE per resume
     useEffect(() => {
         if (hasLoadedRef.current) return;
         
         if (initialContent) {
-            setContent(initialContent as ResumeContent);
+            setContent(normalizeContent(initialContent));
             hasLoadedRef.current = true;
         } else if (resume?.content) {
-            setContent(resume.content as ResumeContent);
+            setContent(normalizeContent(resume.content));
             hasLoadedRef.current = true;
         }
     }, [resume, initialContent]);
@@ -231,10 +339,9 @@ export default function JkCW_ResumeContentEditor({
             ...prev,
             experience: [...prev.experience, {
                 company: "",
-                position: "",
-                startDate: "",
-                endDate: "",
-                achievements: [],
+                title: "",
+                date: "",
+                details: [],
                 location: "",
             }]
         }));
@@ -263,11 +370,13 @@ export default function JkCW_ResumeContentEditor({
         setContent(prev => ({
             ...prev,
             education: [...prev.education, {
-                school: "",
+                name: "",
                 degree: "",
-                graduationDate: "",
+                field: "",
+                startDate: "",
+                endDate: "",
                 location: "",
-                relevantCoursework: [],
+                details: [],
             }]
         }));
         setHasChanges(true);
@@ -320,7 +429,8 @@ export default function JkCW_ResumeContentEditor({
                 name: "",
                 description: "",
                 technologies: [],
-                highlights: [],
+                details: [],
+                date: "",
             }]
         }));
         setHasChanges(true);
@@ -384,8 +494,8 @@ export default function JkCW_ResumeContentEditor({
 
     return (
         <div className="flex flex-col bg-background max-h-[85vh]">
-            {/* Search and Save bar */}
-            <div className="flex items-center gap-4 p-4 border-b bg-muted/20">
+            {/* Search and Template bar */}
+            <div className="flex items-center gap-4 p-4 border-b bg-muted/20 justify-between">
                 <div className="flex-1 max-w-md relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -395,6 +505,14 @@ export default function JkCW_ResumeContentEditor({
                         className="pl-9"
                     />
                 </div>
+                {resume?.template && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Template:</span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 capitalize">
+                            {resume.template}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Content - Centered and Contained */}
@@ -415,16 +533,27 @@ export default function JkCW_ResumeContentEditor({
                     </button>
                     {expandedSections.has("personalInfo") && (
                         <div className="p-4 space-y-3 border-t">
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                <label className="text-sm font-medium">Full Name</label>
-                                    <AiButton />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-sm font-medium">First Name</label>
+                                    </div>
+                                    <Input
+                                        value={content.personalInfo.firstName}
+                                        onChange={(e) => updatePersonalInfo("firstName", e.target.value)}
+                                        placeholder="John"
+                                    />
                                 </div>
-                                <Input
-                                    value={content.personalInfo.name}
-                                    onChange={(e) => updatePersonalInfo("name", e.target.value)}
-                                    placeholder="John Doe"
-                                />
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <label className="text-sm font-medium">Last Name</label>
+                                    </div>
+                                    <Input
+                                        value={content.personalInfo.lastName}
+                                        onChange={(e) => updatePersonalInfo("lastName", e.target.value)}
+                                        placeholder="Doe"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="text-sm font-medium">Email</label>
@@ -433,14 +562,6 @@ export default function JkCW_ResumeContentEditor({
                                     value={content.personalInfo.email}
                                     onChange={(e) => updatePersonalInfo("email", e.target.value)}
                                     placeholder="john@example.com"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">Phone</label>
-                                <Input
-                                    value={content.personalInfo.phone || ""}
-                                    onChange={(e) => updatePersonalInfo("phone", e.target.value)}
-                                    placeholder="+1 (555) 123-4567"
                                 />
                             </div>
                             <div>
@@ -530,32 +651,22 @@ export default function JkCW_ResumeContentEditor({
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                        <label className="text-sm font-medium">Position</label>
+                                        <label className="text-sm font-medium">Title</label>
                                             <AiButton />
                                         </div>
                                         <Input
-                                            value={exp.position}
-                                            onChange={(e) => updateExperience(index, "position", e.target.value)}
+                                            value={exp.title}
+                                            onChange={(e) => updateExperience(index, "title", e.target.value)}
                                             placeholder="Senior Software Engineer"
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-sm font-medium">Start Date</label>
-                                            <Input
-                                                value={exp.startDate}
-                                                onChange={(e) => updateExperience(index, "startDate", e.target.value)}
-                                                placeholder="Jan 2020"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-sm font-medium">End Date</label>
-                                            <Input
-                                                value={exp.endDate || ""}
-                                                onChange={(e) => updateExperience(index, "endDate", e.target.value)}
-                                                placeholder="Present"
-                                            />
-                                        </div>
+                                    <div>
+                                        <label className="text-sm font-medium">Date</label>
+                                        <Input
+                                            value={exp.date}
+                                            onChange={(e) => updateExperience(index, "date", e.target.value)}
+                                            placeholder="Jan 2020 - Present"
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium">Location</label>
@@ -567,12 +678,12 @@ export default function JkCW_ResumeContentEditor({
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="text-sm font-medium">Achievements (one per line)</label>
+                                            <label className="text-sm font-medium">Details (one per line)</label>
                                             <AiButton />
                                     </div>
                                         <Textarea
-                                            value={exp.achievements?.join("\n") || ""}
-                                            onChange={(e) => updateExperience(index, "achievements", 
+                                            value={exp.details?.join("\n") || ""}
+                                            onChange={(e) => updateExperience(index, "details", 
                                                 e.target.value.split('\n').filter(Boolean)
                                             )}
                                             placeholder="Built internal AI platform used by 3 managers...&#10;Created APIs granting agents instant access..."
@@ -626,50 +737,72 @@ export default function JkCW_ResumeContentEditor({
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                        <label className="text-sm font-medium">School</label>
+                                            <label className="text-sm font-medium">School Name</label>
                                             <AiButton />
                                         </div>
                                         <Input
-                                            value={edu.school}
-                                            onChange={(e) => updateEducation(index, "school", e.target.value)}
-                                            placeholder="University of California, Berkeley"
+                                            value={edu.name}
+                                            onChange={(e) => updateEducation(index, "name", e.target.value)}
+                                            placeholder="Western Governors University (WGU)"
                                         />
                                     </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                        <label className="text-sm font-medium">Degree</label>
-                                            <AiButton />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-sm font-medium">Degree</label>
+                                                <AiButton />
+                                            </div>
+                                            <Input
+                                                value={edu.degree}
+                                                onChange={(e) => updateEducation(index, "degree", e.target.value)}
+                                                placeholder="B.S. in Software Engineering"
+                                            />
                                         </div>
-                                        <Input
-                                            value={edu.degree}
-                                            onChange={(e) => updateEducation(index, "degree", e.target.value)}
-                                            placeholder="B.S. in Computer Science"
-                                        />
+                                        <div>
+                                            <label className="text-sm font-medium">Field (optional)</label>
+                                            <Input
+                                                value={edu.field || ""}
+                                                onChange={(e) => updateEducation(index, "field", e.target.value)}
+                                                placeholder="Computer Science"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-sm font-medium">Graduation Date</label>
-                                        <Input
-                                            value={edu.graduationDate}
-                                            onChange={(e) => updateEducation(index, "graduationDate", e.target.value)}
-                                            placeholder="May 2020"
-                                        />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-sm font-medium">Start Date (optional)</label>
+                                            <Input
+                                                value={edu.startDate || ""}
+                                                onChange={(e) => updateEducation(index, "startDate", e.target.value)}
+                                                placeholder="August 2022"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">End Date</label>
+                                            <Input
+                                                value={edu.endDate}
+                                                onChange={(e) => updateEducation(index, "endDate", e.target.value)}
+                                                placeholder="December 2026 (Estimated)"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium">Location</label>
                                         <Input
                                             value={edu.location || ""}
                                             onChange={(e) => updateEducation(index, "location", e.target.value)}
-                                            placeholder="Berkeley, CA"
+                                            placeholder="Salt Lake City, UT"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-sm font-medium">Relevant Coursework (comma-separated)</label>
-                                        <Input
-                                            value={edu.relevantCoursework?.join(", ") || ""}
-                                            onChange={(e) => updateEducation(index, "relevantCoursework", 
-                                                e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                                        <label className="text-sm font-medium">Details (one per line)</label>
+                                        <Textarea
+                                            value={edu.details?.join("\n") || ""}
+                                            onChange={(e) => updateEducation(index, "details", 
+                                                e.target.value.split('\n').filter(Boolean)
                                             )}
-                                            placeholder="Data Structures, Algorithms, Machine Learning"
+                                            placeholder="Relevant coursework: Data Structures & Algorithms; Python...&#10;Dean's List, GPA: 3.8"
+                                            rows={3}
+                                            showBorder
                                         />
                                     </div>
                                 </div>
@@ -761,54 +894,64 @@ export default function JkCW_ResumeContentEditor({
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                        <label className="text-sm font-medium">Project Name</label>
-                                            <AiButton />
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="col-span-2">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-sm font-medium">Project Name</label>
+                                                <AiButton />
+                                            </div>
+                                            <Input
+                                                value={proj.name}
+                                                onChange={(e) => updateProject(index, "name", e.target.value)}
+                                                placeholder="Lotus — AI Wellness App"
+                                            />
                                         </div>
-                                        <Input
-                                            value={proj.name}
-                                            onChange={(e) => updateProject(index, "name", e.target.value)}
-                                            placeholder="E-commerce Platform"
-                                        />
+                                        <div>
+                                            <label className="text-sm font-medium">Date (optional)</label>
+                                            <Input
+                                                value={proj.date || ""}
+                                                onChange={(e) => updateProject(index, "date", e.target.value)}
+                                                placeholder="2024"
+                                            />
+                                        </div>
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                        <label className="text-sm font-medium">Description</label>
+                                            <label className="text-sm font-medium">Description</label>
                                             <AiButton />
                                         </div>
                                         <Textarea
                                             value={proj.description}
                                             onChange={(e) => updateProject(index, "description", e.target.value)}
-                                            placeholder="Built a full-stack e-commerce platform..."
-                                            rows={3}
+                                            placeholder="Built an iOS wellness app currently available on the App Store..."
+                                            rows={2}
                                             showBorder
                                         />
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                        <label className="text-sm font-medium">Technologies (comma-separated)</label>
+                                            <label className="text-sm font-medium">Technologies (comma-separated)</label>
                                             <AiButton />
                                         </div>
                                         <Input
-                                            value={proj.technologies.join(", ")}
+                                            value={proj.technologies?.join(", ") || ""}
                                             onChange={(e) => updateProject(index, "technologies", 
                                                 e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                                             )}
-                                            placeholder="React, Express, MongoDB"
+                                            placeholder="React Native, Replicate, OpenAI, Convex"
                                         />
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="text-sm font-medium">Highlights (one per line)</label>
+                                            <label className="text-sm font-medium">Details (one per line)</label>
                                             <AiButton />
                                         </div>
                                         <Textarea
-                                            value={proj.highlights?.join("\n") || ""}
-                                            onChange={(e) => updateProject(index, "highlights", 
+                                            value={proj.details?.join("\n") || ""}
+                                            onChange={(e) => updateProject(index, "details", 
                                                 e.target.value.split('\n').filter(Boolean)
                                             )}
-                                            placeholder="Built a multi-step AI content pipeline...&#10;Achieved 40+ signups and 2 paying users..."
+                                            placeholder="Built an API-driven agent pipeline to orchestrate LLMs...&#10;Developed a monetization and pricing strategy..."
                                             rows={4}
                                             showBorder
                                         />

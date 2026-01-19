@@ -7,6 +7,7 @@ import JkCW_DocumentsMode from "./jk-chatwindow-components/jkChatWindow-Document
 import JkCW_MyJobsMode from "./jk-chatwindow-components/jkChatWindow-MyJobsMode";
 import JkCW_Tutorial from "./jk-chatwindow-components/jk-ChatWindow-Tutorial";
 import JkCW_ResourcesMode from "./jk-chatwindow-components/jkChatWindow-ResourcesMode";
+import JkCW_HelpMode from "./jk-chatwindow-components/jkChatWindow-HelpMode";
 import JkCW_SettingsMode from "./jk-chatwindow-components/jkChatWindow-SettingsMode";
 
 export default function JkChatWindow() {
@@ -29,7 +30,7 @@ export default function JkChatWindow() {
   return (
     <div className="flex flex-col h-full">
       {conditionalStyles.showIntroScreen && <JkCW_IntroScreen />}
-      {conditionalStyles.showHelpMode && <JkCW_Tutorial />}
+      {conditionalStyles.showHelpMode && <JkCW_HelpMode />}
       {/* NOTE */}
       {conditionalStyles.showTutorialMode && <JkCW_Tutorial />}
       {conditionalStyles.showChatMode && <JkCW_ChatMode />}

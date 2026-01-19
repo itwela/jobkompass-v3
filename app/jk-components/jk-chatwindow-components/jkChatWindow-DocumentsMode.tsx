@@ -58,10 +58,10 @@ export default function JkCW_DocumentsMode() {
         <div className="max-w-7xl mx-auto w-full px-6 py-8">
         <header className="space-y-4 border-b border-border pb-6">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">My Documents</h1>
-            <p className="text-sm text-muted-foreground">
-              Upload and manage your documents such as resumes and cover letters. Add labels and tags to organize them.
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight">My Documents</h1>
+            <p className="text-muted-foreground mt-1">
+                Upload and manage your documents such as resumes and cover letters. Add labels and tags to organize them.
+              </p>
           </div>
           
           {/* Document Type Filter */}

@@ -1,11 +1,16 @@
-import * as React from "react"
+'use client'
 
+import * as React from "react"
+import { useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { sanitizeByType, type InputType as SanitizerInputType } from "@/lib/inputSanitizer"
 
 type InputSize = "sm" | "md" | "lg"
 
 interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   size?: InputSize | undefined
+  sanitize?: boolean | SanitizerInputType // If true, uses 'text' type. If string, uses that type
+  sanitizeOnChange?: boolean // If true, sanitizes on every change. If false, only on blur
 }
 
 const sizeClasses: Record<InputSize, string> = {
@@ -14,9 +19,74 @@ const sizeClasses: Record<InputSize, string> = {
   lg: "h-11 text-base px-4 py-2"
 }
 
-function Input({ className, type, size = "md", ...props }: InputProps) {
+function Input({ 
+  className, 
+  type, 
+  size = "md", 
+  sanitize = true, // Default to true for security
+  sanitizeOnChange = false, // Default to false to avoid interrupting typing
+  onChange,
+  onBlur,
+  value,
+  ...props 
+}: InputProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const sanitizeType: SanitizerInputType = typeof sanitize === 'string' 
+    ? sanitize 
+    : sanitize 
+      ? (type === 'email' ? 'email' : type === 'url' ? 'url' : 'text')
+      : 'text'
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (sanitize && sanitizeOnChange) {
+      const sanitized = sanitizeByType(e.target.value, sanitizeType)
+      // Create a synthetic event with sanitized value
+      const syntheticEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          value: sanitized,
+        },
+      } as React.ChangeEvent<HTMLInputElement>
+      onChange?.(syntheticEvent)
+    } else {
+      onChange?.(e)
+    }
+  }, [sanitize, sanitizeOnChange, sanitizeType, onChange])
+
+  const handleBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    if (sanitize && inputRef.current) {
+      const currentValue = inputRef.current.value
+      const sanitized = sanitizeByType(currentValue, sanitizeType)
+      if (currentValue !== sanitized) {
+        inputRef.current.value = sanitized
+        // Trigger change event with sanitized value
+        const syntheticEvent = {
+          ...e,
+          target: {
+            ...e.target,
+            value: sanitized,
+          },
+        } as React.ChangeEvent<HTMLInputElement>
+        onChange?.(syntheticEvent)
+      }
+    }
+    onBlur?.(e)
+  }, [sanitize, sanitizeType, onChange, onBlur])
+
+  // Sync external value changes
+  useEffect(() => {
+    if (inputRef.current && value !== undefined && sanitize) {
+      const sanitized = sanitizeByType(String(value), sanitizeType)
+      if (inputRef.current.value !== sanitized) {
+        inputRef.current.value = sanitized
+      }
+    }
+  }, [value, sanitize, sanitizeType])
+
   return (
     <input
+      ref={inputRef}
       type={type}
       data-slot="input"
       data-size={size}
@@ -27,6 +97,9 @@ function Input({ className, type, size = "md", ...props }: InputProps) {
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
         className
       )}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      value={value}
       {...props}
     />
   )

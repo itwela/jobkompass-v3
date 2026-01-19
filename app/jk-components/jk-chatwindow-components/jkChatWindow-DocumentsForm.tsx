@@ -15,6 +15,7 @@ import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
+import JkComingSoonTooltip from "../jkComingSoonTooltip";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -57,6 +58,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const [uploadProgress, setUploadProgress] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [editingResumeId, setEditingResumeId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState("");
     const [editingLabel, setEditingLabel] = useState("");
     const [editingTags, setEditingTags] = useState<string[]>([]);
     const [editingTemplate, setEditingTemplate] = useState("");
@@ -74,7 +76,11 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
     const uploadResumeFile = useMutation(api.documents.uploadResumeFile);
     const updateResumeFileMetadata = useMutation(api.documents.updateResumeFileMetadata);
+    const updateCoverLetterMetadata = useMutation(api.documents.updateCoverLetterMetadata);
     const deleteCoverLetterMutation = useMutation(api.documents.deleteCoverLetter);
+
+    // Track which document type is being edited for metadata
+    const [editingDocType, setEditingDocType] = useState<"resume" | "cover-letter" | null>(null);
 
     useEffect(() => {
         if (!selectionMode) {
@@ -82,6 +88,12 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
             setIsBulkDeleting(false);
         }
     }, [selectionMode]);
+
+    // Close edit resume panels when filter changes
+    useEffect(() => {
+        setEditingResumeId(null);
+        setEditingContentResumeId(null);
+    }, [typeFilter]);
 
     // Debug effect for upload dialog
     useEffect(() => {
@@ -286,23 +298,37 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         }
     };
 
-    const handleEditMetadata = (resume: any) => {
-        setEditingResumeId(String(resume._id));
-        setEditingLabel(resume.label || "");
-        setEditingTags(resume.tags || []);
-        setEditingTemplate(resume.template || "");
+    const handleEditMetadata = (doc: any, docType: "resume" | "cover-letter") => {
+        setEditingResumeId(String(doc._id));
+        setEditingDocType(docType);
+        setEditingName(doc.name || "");
+        setEditingLabel(doc.label || "");
+        setEditingTags(doc.tags || []);
+        setEditingTemplate(doc.template || "");
         setNewTagInput("");
     };
 
-    const handleSaveMetadata = async (resumeId: string) => {
+    const handleSaveMetadata = async (docId: string, docType: "resume" | "cover-letter") => {
         try {
-            await updateResumeFileMetadata({
-                resumeId: resumeId as Id<"resumes">,
-                label: editingLabel || undefined,
-                tags: editingTags.length > 0 ? editingTags : undefined,
-                template: editingTemplate || undefined,
-            });
+            if (docType === "resume") {
+                await updateResumeFileMetadata({
+                    resumeId: docId as Id<"resumes">,
+                    name: editingName || undefined,
+                    label: editingLabel || undefined,
+                    tags: editingTags.length > 0 ? editingTags : undefined,
+                    template: editingTemplate || undefined,
+                });
+            } else {
+                await updateCoverLetterMetadata({
+                    coverLetterId: docId as Id<"coverLetters">,
+                    name: editingName || undefined,
+                    label: editingLabel || undefined,
+                    tags: editingTags.length > 0 ? editingTags : undefined,
+                    template: editingTemplate || undefined,
+                });
+            }
             setEditingResumeId(null);
+            setEditingDocType(null);
         } catch (error) {
             console.error("Error updating metadata:", error);
         }
@@ -370,18 +396,20 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         <div className="space-y-3">
                             <h2 className="text-xl font-semibold">No documents yet</h2>
                             <p className="text-sm text-muted-foreground">
-                                Upload your first document to get started. Supported formats: PDF, DOC, DOCX
+                                Document upload feature coming soon! For now, you can generate resumes using the AI chat.
                             </p>
                         </div>
-                        <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploading}
-                            className="gap-2"
-                            size="lg"
-                        >
-                            <Upload className="h-4 w-4" />
-                            {isUploading ? "Uploading..." : "Upload Document"}
-                        </Button>
+                        <JkComingSoonTooltip>
+                            <Button
+                                onClick={() => {}}
+                                disabled={true}
+                                className="gap-2 pointer-events-none"
+                                size="lg"
+                            >
+                                <Upload className="h-4 w-4" />
+                                Upload Document
+                            </Button>
+                        </JkComingSoonTooltip>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -537,7 +565,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 py-2">
             {/* Header with stats and upload */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
@@ -558,16 +586,18 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         >
                             Multi-select
                         </Button>
-                            <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploading}
-                                className="gap-2"
-                            >
-                                <Upload className="h-4 w-4" />
-                                {isUploading ? "Uploading..." : "Upload Document"}
-                            </Button>
+                            <JkComingSoonTooltip>
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => {}}
+                                    disabled={true}
+                                    className="gap-2 pointer-events-none"
+                                >
+                                    <Upload className="h-4 w-4" />
+                                    Upload Document
+                                </Button>
+                            </JkComingSoonTooltip>
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -852,6 +882,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                                        {/* Edit content - only for resumes (cover letter editor coming soon) */}
                                                         {documentType === "resume" && (
                                                             <DropdownMenuItem
                                                                 onClick={(event) => {
@@ -864,17 +895,17 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                                 <span>Edit content</span>
                                                             </DropdownMenuItem>
                                                         )}
-                                                        {documentType === "resume" && (
-                                                            <DropdownMenuItem
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    handleEditMetadata(resume);
-                                                                }}
-                                                            >
-                                                                <Settings className="h-4 w-4" />
-                                                                <span>Edit labels & tags</span>
-                                                            </DropdownMenuItem>
-                                                        )}
+                                                        {/* Edit labels & tags - works for both resumes and cover letters */}
+                                                        <DropdownMenuItem
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                handleEditMetadata(resume, documentType);
+                                                            }}
+                                                        >
+                                                            <Settings className="h-4 w-4" />
+                                                            <span>Edit labels & tags</span>
+                                                        </DropdownMenuItem>
+                                                        {/* Download - works for both if they have a fileId */}
                                                         {resume?.fileId && (
                                                             <DropdownMenuItem
                                                                 onClick={(event) => {
@@ -883,21 +914,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                                 }}
                                                             >
                                                                 <Download className="h-4 w-4" />
-                                                                <span>Download first version</span>
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        {resume?.fileId && (
-                                                            <DropdownMenuItem
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
-                                                                    console.log("Download current version (TODO):", {
-                                                                        resumeId,
-                                                                        fileId: resume.fileId,
-                                                                    });
-                                                                }}
-                                                            >
-                                                                <Download className="h-4 w-4" />
-                                                                <span>Download current version</span>
+                                                                <span>Download PDF</span>
                                                             </DropdownMenuItem>
                                                         )}
                                                         <DropdownMenuSeparator />
@@ -934,11 +951,21 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             />
                                         </div>
                                     )}
-                                    {!selectionMode && editingResumeId === resumeId && documentType === "resume" && (
+                                    {/* Metadata editor - works for both resumes and cover letters */}
+                                    {!selectionMode && editingResumeId === resumeId && editingDocType === documentType && (
                                         <div
                                             className="mt-3 space-y-3 rounded-lg border border-border bg-muted/20 p-4"
                                             onClick={(event) => event.stopPropagation()}
                                         >
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-foreground">Name</label>
+                                                <Input
+                                                    value={editingName}
+                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                    placeholder="e.g., John Doe Resume (Jan 2026)"
+                                                    className="h-8"
+                                                />
+                                            </div>
                                             <div className="space-y-2">
                                                 <label className="text-xs font-medium text-foreground">Label</label>
                                                 <Input
@@ -1003,7 +1030,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                 <Button
                                                     type="button"
                                                     size="sm"
-                                                    onClick={() => void handleSaveMetadata(resumeId)}
+                                                    onClick={() => void handleSaveMetadata(resumeId, documentType)}
                                                     className="flex-1"
                                                 >
                                                     Save
@@ -1012,7 +1039,10 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => setEditingResumeId(null)}
+                                                    onClick={() => {
+                                                        setEditingResumeId(null);
+                                                        setEditingDocType(null);
+                                                    }}
                                                     className="flex-1"
                                                 >
                                                     Cancel

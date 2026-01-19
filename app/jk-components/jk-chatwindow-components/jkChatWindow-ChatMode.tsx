@@ -9,9 +9,12 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { motion } from "framer-motion";
 import JkGap from "../jkGap";
-import { Check, Wrench, LogIn, FileText } from "lucide-react";
+import { Check, Wrench, LogIn, FileText, AlertTriangle, MessageSquarePlus } from "lucide-react";
+import JkSlideModalGlass from "../jkSlideModalGlass";
 import { Button } from "@/components/ui/button";
 import { Hand } from "lucide-react";
+import { mainAssets } from "@/app/constants";
+import Image from "next/image";
 
 interface ChatMessage {
   id: string;
@@ -81,11 +84,13 @@ export default function JkCW_ChatMode() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
+    const [contextExceeded, setContextExceeded] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     // Convex mutations
     const createThread = useMutation(api.threads.create)
     const addMessage = useMutation(api.threads.addMessage)
+    const markContextWindowExceeded = useMutation(api.threads.markContextWindowExceeded)
 
     // Load thread if one is selected
     const threadData = useQuery(
@@ -104,9 +109,12 @@ export default function JkCW_ChatMode() {
                 toolCalls: msg.toolCalls,
             }))
             setMessages(loadedMessages)
+            // Set context exceeded state from thread data
+            setContextExceeded(threadData.thread?.contextWindowExceeded ?? false)
         } else if (!currentThreadId) {
             // Clear messages when no thread is selected (shows new chat interface)
             setMessages([])
+            setContextExceeded(false)
         }
     }, [threadData, currentThreadId])
 
@@ -117,7 +125,7 @@ export default function JkCW_ChatMode() {
 
     // Send message function
     const sendMessage = async () => {
-        if ((!textValue.trim() && !droppedFile) || isLoading || !isAuthenticated) return
+        if ((!textValue.trim() && !droppedFile) || isLoading || !isAuthenticated || contextExceeded) return
 
         const currentTextValue = textValue.trim() // Capture the current value
         const currentFile = droppedFile // Capture current file
@@ -178,9 +186,6 @@ export default function JkCW_ChatMode() {
         }
         setMessages(prev => [...prev, tempAssistantMessage])
 
-        console.log('user', user)
-        console.log('user._id', user?._id)
-
         // Convert file to base64 if present
         let fileData = null;
         if (currentFile) {
@@ -236,6 +241,26 @@ export default function JkCW_ChatMode() {
             clearAllAttachments()
 
             if (!response.ok) {
+                // Check if it's a context length exceeded error
+                try {
+                    const errorData = await response.json()
+                    if (errorData.errorCode === 'CONTEXT_LENGTH_EXCEEDED') {
+                        setContextExceeded(true)
+                        setIsLoading(false)
+                        // Remove the temp message
+                        setMessages(prev => prev.filter(msg => msg.id !== tempMessageId))
+                        // Persist the context exceeded state to the database
+                        if (activeThreadId) {
+                            await markContextWindowExceeded({ 
+                                threadId: activeThreadId, 
+                                exceeded: true 
+                            })
+                        }
+                        return
+                    }
+                } catch {
+                    // If we can't parse the JSON, fall through to generic error
+                }
                 throw new Error(`HTTP error! status: ${response.status}`)
             }
 
@@ -335,6 +360,7 @@ export default function JkCW_ChatMode() {
     const clearChat = () => {
         setMessages([])
         setError(null)
+        setContextExceeded(false)
         setCurrentThreadId(null) // This will start a new thread on next message
     }
 
@@ -396,7 +422,20 @@ export default function JkCW_ChatMode() {
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative">
+            {/* Context Length Exceeded Floating Notification */}
+            <JkSlideModalGlass
+                isOpen={contextExceeded}
+                title="Conversation Limit Reached"
+                minimizedText="Context limit reached"
+                description="This conversation has grown too long for the AI to process. You can still view the chat history, but you'll need to start a new conversation to continue chatting."
+                icon={AlertTriangle}
+                variant="amber"
+                actionText="Start New Conversation"
+                actionIcon={MessageSquarePlus}
+                onAction={clearChat}
+            />
+
             {/* Messages Container */}
             <div className="flex-1 overflow-y-auto chat-scroll">
                 <div className="max-w-3xl mx-auto px-6 py-6 w-full">
@@ -468,7 +507,34 @@ export default function JkCW_ChatMode() {
                                     
                                     <div className={message.type === 'assistant' ? 'markdown-content' : ''}>
                                         {message.type === 'assistant' ? (
-                                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                                            <ReactMarkdown
+                                                components={{
+                                                    h1: ({...props}: any) => <h1 className="text-2xl font-semibold mt-6 mb-3 pb-2 border-b border-border" {...props} />,
+                                                    h2: ({...props}: any) => <h2 className="text-xl font-semibold mt-5 mb-2" {...props} />,
+                                                    h3: ({...props}: any) => <h3 className="text-lg font-semibold mt-4 mb-2" {...props} />,
+                                                    h4: ({...props}: any) => <h4 className="text-base font-semibold mt-3 mb-1" {...props} />,
+                                                    p: ({...props}: any) => <p className="mb-3 leading-relaxed" {...props} />,
+                                                    ul: ({...props}: any) => <ul className="list-disc list-inside mb-3 space-y-1" {...props} />,
+                                                    ol: ({...props}: any) => <ol className="list-decimal list-inside mb-3 space-y-1" {...props} />,
+                                                    li: ({...props}: any) => <li className="ml-4" {...props} />,
+                                                    code: ({inline, ...props}: any) => 
+                                                        inline ? (
+                                                            <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
+                                                        ) : (
+                                                            <code className="block bg-muted p-3 rounded-lg overflow-x-auto text-sm font-mono" {...props} />
+                                                        ),
+                                                    pre: ({...props}: any) => <pre className="bg-muted p-3 rounded-lg overflow-x-auto mb-3 border border-border" {...props} />,
+                                                    blockquote: ({...props}: any) => <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-3" {...props} />,
+                                                    a: ({...props}: any) => <a className="text-primary underline underline-offset-2 hover:text-primary/80" target="_blank" rel="noopener noreferrer" {...props} />,
+                                                    table: ({...props}: any) => <div className="overflow-x-auto my-4"><table className="min-w-full border-collapse" {...props} /></div>,
+                                                    th: ({...props}: any) => <th className="border border-border px-3 py-2 bg-muted font-semibold text-left" {...props} />,
+                                                    td: ({...props}: any) => <td className="border border-border px-3 py-2" {...props} />,
+                                                    strong: ({...props}: any) => <strong className="font-semibold" {...props} />,
+                                                    em: ({...props}: any) => <em className="italic" {...props} />,
+                                                }}
+                                            >
+                                                {message.content}
+                                            </ReactMarkdown>
                                         ) : (
                                             <p className="leading-relaxed">{message.content}</p>
                                         )}
@@ -483,21 +549,29 @@ export default function JkCW_ChatMode() {
                                             // Check multiple possible paths for the PDF data
                                             let pdfBase64: string | undefined;
                                             let fileName: string | undefined;
+                                            let textContent: string | undefined;
+                                            let texFileName: string | undefined;
                                             
                                             // Direct properties
                                             if (resultObj?.pdfBase64) {
                                                 pdfBase64 = resultObj.pdfBase64;
                                                 fileName = resultObj.fileName;
+                                                textContent = resultObj.textContent;
+                                                texFileName = resultObj.texFileName;
                                             }
                                             // Nested in output
                                             else if (resultObj?.output?.pdfBase64) {
                                                 pdfBase64 = resultObj.output.pdfBase64;
                                                 fileName = resultObj.output.fileName;
+                                                textContent = resultObj.output.textContent;
+                                                texFileName = resultObj.output.texFileName;
                                             }
                                             // Nested in data
                                             else if (resultObj?.data?.pdfBase64) {
                                                 pdfBase64 = resultObj.data.pdfBase64;
                                                 fileName = resultObj.data.fileName;
+                                                textContent = resultObj.data.textContent;
+                                                texFileName = resultObj.data.texFileName;
                                             }
                                             // Check if result is a string that might contain JSON
                                             else if (typeof resultObj === 'string') {
@@ -506,6 +580,8 @@ export default function JkCW_ChatMode() {
                                                     if (parsed?.pdfBase64) {
                                                         pdfBase64 = parsed.pdfBase64;
                                                         fileName = parsed.fileName;
+                                                        textContent = parsed.textContent;
+                                                        texFileName = parsed.texFileName;
                                                     }
                                                 } catch (e) {
                                                     // Not JSON, ignore
@@ -518,6 +594,8 @@ export default function JkCW_ChatMode() {
                                                     if (parsed?.pdfBase64) {
                                                         pdfBase64 = parsed.pdfBase64;
                                                         fileName = parsed.fileName;
+                                                        textContent = parsed.textContent;
+                                                        texFileName = parsed.texFileName;
                                                     }
                                                 } catch (e) {
                                                     // Not JSON, ignore
@@ -529,7 +607,9 @@ export default function JkCW_ChatMode() {
                                                 index,
                                                 pdfBase64,
                                                 fileName: fileName || 'resume.pdf',
-                                                hasPdf: Boolean(pdfBase64)
+                                                hasPdf: Boolean(pdfBase64),
+                                                textContent,
+                                                texFileName: texFileName || 'resume.tex'
                                             };
                                         }).filter(result => result.hasPdf);
 
@@ -539,28 +619,57 @@ export default function JkCW_ChatMode() {
                                                 {pdfResults.length > 0 && (
                                                     <div className="bg-background border-2 border-blue-200 rounded-xl p-4 my-2">
                                                         <div className="font-bold text-foreground mb-2 flex items-center gap-2">
-                                                            📁 Generated Files - Ready to Download
+                                                             <Image src={mainAssets.logo} alt="JobKompass Logo" width={20} height={20} /> Generated Files - Ready to Download
                                                         </div>
                                                         {pdfResults.map((result, idx) => (
-                                                            <div key={idx} className="bg-card border border-border rounded-lg p-2 mb-1 last:mb-0 flex items-center justify-between">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-xl">📄</span>
-                                                                    <div>
-                                                                        <div className="font-medium text-foreground text-sm">
-                                                                            {result.fileName}
-                                                                        </div>
-                                                                        <div className="text-muted-foreground text-xs">
-                                                                            Generated by {result.toolName}
+                                                            <div key={idx} className="bg-card border border-border rounded-lg p-2 mb-1 last:mb-0">
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                            <FileText className="h-5 w-5" />
+                                                                            <div>
+                                                                            <div className="font-medium text-foreground text-sm">
+                                                                                {result.fileName}
+                                                                            </div>
+                                                                            <div className="text-muted-foreground text-xs">
+                                                                                Generated by {result.toolName}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                                <a
-                                                                    href={`data:application/pdf;base64,${result.pdfBase64}`}
-                                                                    download={result.fileName}
-                                                                    className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
-                                                                >
-                                                                    Download PDF
-                                                                </a>
+                                                                <div className="w-max flex gap-2">
+                                                                    <a
+                                                                        href={`data:application/pdf;base64,${result.pdfBase64}`}
+                                                                        download={result.fileName}
+                                                                        className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
+                                                                    >
+                                                                        Download PDF
+                                                                    </a>
+                                                                    {/* {result.textContent && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    await navigator.clipboard.writeText(result.textContent || '');
+                                                                                    // Show copied feedback
+                                                                                    const btn = document.getElementById(`copy-latex-${message.id}-${idx}`);
+                                                                                    if (btn) {
+                                                                                        const originalText = btn.textContent;
+                                                                                        btn.textContent = 'Copied!';
+                                                                                        setTimeout(() => {
+                                                                                            btn.textContent = originalText;
+                                                                                        }, 2000);
+                                                                                    }
+                                                                                } catch (err) {
+                                                                                    console.error('Failed to copy:', err);
+                                                                                    alert('Failed to copy to clipboard');
+                                                                                }
+                                                                            }}
+                                                                            id={`copy-latex-${message.id}-${idx}`}
+                                                                            className="bg-secondary text-black px-4 py-2 rounded-lg text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                                                                        >
+                                                                            Copy LaTeX
+                                                                        </button>
+                                                                    )} */}
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>

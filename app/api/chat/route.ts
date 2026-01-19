@@ -5,16 +5,18 @@ import {
   run,
   user,
   webSearchTool,
-  withTrace
+  withTrace,
+  Tool
 } from '@openai/agents';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { jobKompassDescription, resumeBestPractices, jobKompassInstructions } from '@/app/ai/constants/file';
-import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool } from '@/app/ai/tools/file';
+import { jobKompassDescription, resumeBestPractices, jobKompassInstructions, jobKompassInstructionsMinimal } from '@/app/ai/constants/file';
+import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool, createGetUserResumePreferencesTool } from '@/app/ai/tools/file';
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
+import { mcpTools } from '@/app/lib/mcp-tools';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -67,17 +69,37 @@ export async function POST(request: NextRequest) {
       convexClient.clearAuth();
     }
 
-    const addToResourcesTool = createAddToResourcesTool(() => convexClient);
-    const addToJobsTool = createAddToJobsTool(() => convexClient);
-    const getUserResumesTool = createGetUserResumesTool(() => convexClient);
-    const getUserJobsTool = createGetUserJobsTool(() => convexClient);
-    const getResumeByIdTool = createGetResumeByIdTool(() => convexClient);
-    const getJobByIdTool = createGetJobByIdTool(() => convexClient);
+    // Create tool *instances* for client-dependent tools
+    // Pass the convexClient directly since it's already instantiated
+    const toolInstancesWithConvexClient = [
+      createResumeJakeTemplateTool(convexClient),
+      createCoverLetterJakeTemplateTool(convexClient),
+      createAddToResourcesTool(convexClient),
+      createAddToJobsTool(convexClient),
+      createGetUserResumesTool(convexClient),
+      createGetUserJobsTool(convexClient),
+      createGetResumeByIdTool(convexClient),
+      createGetJobByIdTool(convexClient),
+      createGetUserResumePreferencesTool(convexClient),
+    ];
 
-    // Build context-aware instructions
-    let contextInstructions = jobKompassInstructions;
+    const normalTools = [
+      webSearchTool(),
+      mcpTools.get_introduction,
+    ];
+
+    // The "tools" array should only contain actual tool instances
+    const tools = [...toolInstancesWithConvexClient, ...normalTools];
+
+    // Use minimal instructions for subsequent turns to save tokens
+    // Full instructions on first turn (history length <= 2) or when context is attached
+    const isFirstTurn = history.length <= 2;
+    const hasContextAttachments = contextResumeIds?.length || contextJobIds?.length;
     
-    if (contextResumeIds?.length || contextJobIds?.length) {
+    // Build context-aware instructions
+    let contextInstructions = isFirstTurn ? jobKompassInstructions : jobKompassInstructionsMinimal;
+    
+    if (hasContextAttachments) {
       contextInstructions += "\n\n[[CONTEXT_ATTACHMENTS]]";
       
       if (contextResumeIds?.length) {
@@ -98,9 +120,13 @@ export async function POST(request: NextRequest) {
       name: 'JobKompass',
       instructions: contextInstructions,
       handoffDescription: 'JobKompass - Career Assistant - Specializes in resume creation, job search optimization, and career guidance.',
-      tools: [createResumeJakeTemplateTool, addToResourcesTool, addToJobsTool, getUserResumesTool, getUserJobsTool, getResumeByIdTool, getJobByIdTool, webSearchTool()],
+      tools: tools as Tool<unknown>[],
       model: "gpt-5-mini",
+      // model: "gpt-4.1",
+      // model: "gpt-4.1-mini",
     });
+
+    // TODO Make a new agent that can handle bigger context windows
 
     // Use JobKompass agent
     const currentAgent = jobKompassAgent;
@@ -273,8 +299,28 @@ export async function POST(request: NextRequest) {
       },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('JobKompass Chat API error:', error);
+    
+    // Check for context length exceeded error
+    const isContextLengthExceeded = 
+      error?.code === 'context_length_exceeded' || 
+      error?.message?.includes('context window') ||
+      error?.message?.includes('context_length_exceeded');
+    
+    if (isContextLengthExceeded) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'context_length_exceeded',
+          errorCode: 'CONTEXT_LENGTH_EXCEEDED',
+          message: 'This conversation has exceeded the maximum context length. Please start a new conversation to continue.',
+          agentName: 'JobKompass',
+          history: [],
+        },
+        { status: 400 }
+      );
+    }
     
     return NextResponse.json(
       {
@@ -295,13 +341,18 @@ export async function GET() {
     const agent = {
       id: 'jobkompass',
       name: 'JobKompass',
-      description: 'AI Career Assistant - Specializes in resume creation, job search optimization, and career guidance',
-      capabilities: ['resume-creation', 'resume-analysis', 'career-guidance', 'ats-optimization', 'web-search'],
+      description: 'AI Career Assistant - Specializes in resume creation, cover letter writing, job search optimization, and career guidance',
+      capabilities: ['resume-creation', 'cover-letter-creation', 'resume-analysis', 'career-guidance', 'ats-optimization', 'web-search'],
       tools: [
         {
           name: 'createResumeJakeTemplate',
           description: 'Generate a professional resume using the Jake LaTeX template',
           parameters: ['personalInfo', 'experience', 'education', 'projects', 'skills', 'additionalInfo']
+        },
+        {
+          name: 'createCoverLetterJakeTemplate',
+          description: 'Generate a professional cover letter using the Jake template style',
+          parameters: ['personalInfo', 'jobInfo', 'letterContent']
         },
         {
           name: 'analyzeResume',

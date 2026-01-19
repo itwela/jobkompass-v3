@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { motion } from "framer-motion";
 import { ExternalLink, Calendar, Briefcase, Trash2, CheckCircle2, Circle, Sparkles } from "lucide-react";
 import JkConfirmDelete from "../jkConfirmDelete";
+import JkCompensationBadge from "../jkCompensationBadge";
 
 interface JobCardProps {
   job: {
@@ -15,6 +16,7 @@ interface JobCardProps {
     title: string;
     link: string;
     status: string;
+    compensation?: string;
     dateApplied?: string;
     createdAt: number;
   };
@@ -100,6 +102,9 @@ function JobCard({
           Applied {job.dateApplied}
         </div>
       )}
+
+      {/* Compensation Badge */}
+      <JkCompensationBadge compensation={job.compensation} />
 
       <div className="flex items-center gap-2 justify-between w-full">
         <a

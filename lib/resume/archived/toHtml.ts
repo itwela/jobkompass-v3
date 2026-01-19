@@ -33,7 +33,6 @@ function renderHeader(ir: ResumeIR): string {
 		ir.personal.links?.map(l => `${escHtml(l.label)}: ${escHtml(l.url)}`).filter(Boolean) ?? [];
 	const metaParts = [
 		escHtml(ir.personal.email),
-		ir.personal.phone ? escHtml(ir.personal.phone) : '',
 		ir.personal.location ? escHtml(ir.personal.location) : '',
 		...links,
 	].filter(Boolean);

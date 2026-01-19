@@ -27,18 +27,27 @@ export async function POST(req: Request) {
         fs.writeFileSync(tempFile, jakeResume, 'utf-8');
 
         // Compile LaTeX to PDF
+        const pdfPath = path.join(tempDir, `resume-${uniqueId}.pdf`);
+        
         try {
             await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
             await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
         } catch (latexError: unknown) {
-            const logPath = path.join(tempDir, `resume-${uniqueId}.log`);
-            const logContent = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf-8') : String(latexError);
-            console.error('LaTeX compilation error:', logContent);
-            return NextResponse.json({ error: 'LaTeX compilation failed', log: logContent }, { status: 500 });
+            // pdflatex may exit with non-zero even if PDF is generated (warnings, etc.)
+            // Check if PDF was actually generated before failing
+            if (!fs.existsSync(pdfPath)) {
+                const logPath = path.join(tempDir, `resume-${uniqueId}.log`);
+                const logContent = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf-8') : String(latexError);
+                console.error('LaTeX compilation error:', logContent);
+                return NextResponse.json({ error: 'LaTeX compilation failed', log: logContent }, { status: 500 });
+            }
+            // PDF exists despite error, continue
         }
 
-        // Read the generated PDF
-        const pdfPath = path.join(tempDir, `resume-${uniqueId}.pdf`);
+        // Verify PDF exists
+        if (!fs.existsSync(pdfPath)) {
+            return NextResponse.json({ error: 'PDF generation failed - no output file' }, { status: 500 });
+        }
         const pdfBuffer = fs.readFileSync(pdfPath);
 
         // Clean up temp files
@@ -47,10 +56,17 @@ export async function POST(req: Request) {
             if (fs.existsSync(file)) fs.unlinkSync(file);
         });
 
-        // Create filename from user's name
-        const nameParts = content.personalInfo.name.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join('-') || '';
+        // Create filename from user's name - support both firstName/lastName and combined name
+        let firstName = content.personalInfo.firstName || '';
+        let lastName = content.personalInfo.lastName || '';
+        
+        // Fallback to splitting name if firstName/lastName not provided
+        if (!firstName && !lastName && content.personalInfo.name) {
+            const nameParts = content.personalInfo.name.split(' ');
+            firstName = nameParts[0] || '';
+            lastName = nameParts.slice(1).join('-') || '';
+        }
+        
         const safeFileName = `${firstName}-${lastName}`.replace(/[^a-zA-Z0-9-]/g, '') || 'resume';
 
         return new NextResponse(new Uint8Array(pdfBuffer), {

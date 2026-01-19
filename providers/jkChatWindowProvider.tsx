@@ -37,12 +37,16 @@ interface ChatInteractionStateContextType {
   fileName: string | null;
   setFileName: (name: string | null) => void;
   // Context attachments
-  attachedResumeIds: Id<"documents">[];
-  setAttachedResumeIds: (ids: Id<"documents">[]) => void;
+  attachedResumeIds: Id<"resumes">[];
+  setAttachedResumeIds: (ids: Id<"resumes">[]) => void;
+  attachedCoverLetterIds: Id<"coverLetters">[];
+  setAttachedCoverLetterIds: (ids: Id<"coverLetters">[]) => void;
   attachedJobIds: Id<"jobs">[];
   setAttachedJobIds: (ids: Id<"jobs">[]) => void;
-  addResumeAttachment: (id: Id<"documents">) => void;
-  removeResumeAttachment: (id: Id<"documents">) => void;
+  addResumeAttachment: (id: Id<"resumes">) => void;
+  removeResumeAttachment: (id: Id<"resumes">) => void;
+  addCoverLetterAttachment: (id: Id<"coverLetters">) => void;
+  removeCoverLetterAttachment: (id: Id<"coverLetters">) => void;
   addJobAttachment: (id: Id<"jobs">) => void;
   removeJobAttachment: (id: Id<"jobs">) => void;
   clearAllAttachments: () => void;
@@ -99,21 +103,32 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   const [fileName, setFileName] = useState<string | null>(null);
 
   // Context attachments state
-  const [attachedResumeIds, setAttachedResumeIds] = useState<Id<"documents">[]>([]);
+  const [attachedResumeIds, setAttachedResumeIds] = useState<Id<"resumes">[]>([]);
+  const [attachedCoverLetterIds, setAttachedCoverLetterIds] = useState<Id<"coverLetters">[]>([]);
   const [attachedJobIds, setAttachedJobIds] = useState<Id<"jobs">[]>([]);
   
   // File upload modal state
   const [isFileModalOpen, setIsFileModalOpen] = useState<boolean>(false);
 
   // Helper functions for managing attachments
-  const addResumeAttachment = (id: Id<"documents">) => {
+  const addResumeAttachment = (id: Id<"resumes">) => {
     if (!attachedResumeIds.includes(id)) {
       setAttachedResumeIds([...attachedResumeIds, id]);
     }
   };
 
-  const removeResumeAttachment = (id: Id<"documents">) => {
+  const removeResumeAttachment = (id: Id<"resumes">) => {
     setAttachedResumeIds(attachedResumeIds.filter(resumeId => resumeId !== id));
+  };
+
+  const addCoverLetterAttachment = (id: Id<"coverLetters">) => {
+    if (!attachedCoverLetterIds.includes(id)) {
+      setAttachedCoverLetterIds([...attachedCoverLetterIds, id]);
+    }
+  };
+
+  const removeCoverLetterAttachment = (id: Id<"coverLetters">) => {
+    setAttachedCoverLetterIds(attachedCoverLetterIds.filter(clId => clId !== id));
   };
 
   const addJobAttachment = (id: Id<"jobs">) => {
@@ -128,6 +143,7 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
 
   const clearAllAttachments = () => {
     setAttachedResumeIds([]);
+    setAttachedCoverLetterIds([]);
     setAttachedJobIds([]);
   };
 
@@ -245,10 +261,14 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     // Context attachments
     attachedResumeIds,
     setAttachedResumeIds,
+    attachedCoverLetterIds,
+    setAttachedCoverLetterIds,
     attachedJobIds,
     setAttachedJobIds,
     addResumeAttachment,
     removeResumeAttachment,
+    addCoverLetterAttachment,
+    removeCoverLetterAttachment,
     addJobAttachment,
     removeJobAttachment,
     clearAllAttachments,

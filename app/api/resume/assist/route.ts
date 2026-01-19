@@ -38,7 +38,7 @@ Inside that block, provide a JSON array of update objects. Follow the schema exa
 \`\`\`
 
 Allowed types:
-- "personal": field must be one of firstName, lastName, email, phone, location.
+- "personal": field must be one of firstName, lastName, email, location.
 - "experience": field must be one of company, title, start, end, location; include the experience item's id.
 - "experience_bullet": include experienceId. Provide bulletId to update an existing bullet; omit bulletId to add a new one.
 

@@ -40,15 +40,18 @@ const documentsTables = {
     name: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
-    content: v.object({
-      template: v.string(),
-      company: v.optional(v.string()),
-      position: v.optional(v.string()),
-      customizations: v.optional(v.object({
-        keyPoints: v.array(v.string()),
-        tone: v.string(),
-      })),
-    }),
+    isActive: v.optional(v.boolean()),
+    // File storage fields for generated cover letters
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
+    fileType: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    // Labels and tags for organization
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    template: v.optional(v.string()),
+    // Flexible content field - stores the input used to generate the cover letter
+    content: v.optional(v.any()),
   }).index("by_user", ["userId"]),
 
   emailTemplates: defineTable({
@@ -85,6 +88,7 @@ const documentsTables = {
     title: v.string(),
     link: v.string(),
     status: v.string(), // e.g., "Interested", "Applied", "Interviewing", "Rejected", "Offered"
+    compensation: v.optional(v.string()), // e.g., "$100k-$150k", "€60k", "Competitive"
     keywords: v.optional(v.array(v.string())),
     skills: v.optional(v.array(v.string())),
     description: v.optional(v.string()),
@@ -106,6 +110,7 @@ const documentsTables = {
     updatedAt: v.number(),
     lastMessageAt: v.number(),
     messageCount: v.number(),
+    contextWindowExceeded: v.optional(v.boolean()), // True if this thread exceeded the AI context window
   }).index("by_username", ["username"])
     .index("by_username_and_updated", ["username", "updatedAt"]),
 
@@ -138,6 +143,7 @@ const schema = defineSchema({
     image: v.optional(v.string()),
     isAnonymous: v.optional(v.boolean()),
     username: v.optional(v.string()), // Username field (optional for backward compatibility)
+    resumePreferences: v.optional(v.array(v.string())), // User's resume generation preferences
   })
     .index("email", ["email"]),
 

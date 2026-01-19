@@ -1,21 +1,36 @@
+%-------------------------
+% Resume in Latex (JOBKOMPASS JAKE TEMPLATE)
+% Author : JobKompass
+% Based off of: https://github.com/sb2nov/resume
+%------------------------
+
 \documentclass[letterpaper,11pt]{article}
 
-\usepackage[utf8]{inputenc}
-\usepackage{lmodern}  % Latin Modern fonts for better coverage
-\usepackage[T1]{fontenc}  % Use T1 encoding for better font support
 \usepackage{latexsym}
-\usepackage{fullpage}
+\usepackage[empty]{fullpage}
 \usepackage{titlesec}
 \usepackage{marvosym}
-\usepackage{color}
+\usepackage[usenames,dvipsnames]{color}
 \usepackage{verbatim}
 \usepackage{enumitem}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 \usepackage{fancyhdr}
-\usepackage{babel}
+\usepackage[english]{babel}
 \usepackage{tabularx}
-\usepackage{graphicx}
-\usepackage[pdftex]{bookmark}
+\input{glyphtounicode}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
 
 \pagestyle{fancy}
 \fancyhf{} % clear all header and footer fields
@@ -36,54 +51,42 @@
 \raggedright
 \setlength{\tabcolsep}{0in}
 
-% Sections formatting - REDUCED SPACING
+% Sections formatting
 \titleformat{\section}{
-  \vspace{-8pt}\scshape\raggedright\large
-}{}{0em}{}[\color{black}\titlerule \vspace{-2pt}]
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
 
 % Ensure that generate pdf is machine readable/ATS parsable
 \pdfgentounicode=1
 
 %-------------------------
 % Custom commands
-\newcommand{\resumeItem}[1]{\item\small{{#1 \vspace{-2pt}}}}
-
-\newcommand{\resumeFlexContent}[2]{
-  \noindent\begin{minipage}[t]{0.2\textwidth}
-    \textbf{#1}
-  \end{minipage}%
-  \hfill % This creates the space-between effect
-  \begin{minipage}[t]{0.75\textwidth}
-    \raggedright #2
-  \end{minipage}\\[4pt]
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
 }
 
-% REDUCED SPACING in resumeSubheading
-\newcommand{\resumeSubheading}[4]{\vspace{-4pt}\item
-  \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
-    \textbf{#1} & #2 \\
-    \textit{\small#3} & \textit{\small #4} \\
-  \end{tabular*}\vspace{-5pt}}
-
-% Modified to handle long technology lists with a comma-separated inline format
-\newcommand{\resumeProjectHeading}[2]{\item
-  \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
-    \small#1 & \small#2 \\
-  \end{tabular*}\vspace{-5pt}}
-
-\newcommand{\resumeProjectHeader}[2]{
-  \vspace{-2pt}
-  \item[]
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
     \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
       \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
     \end{tabular*}\vspace{-7pt}
 }
 
-\newcommand{\resumeProjectDetails}[1]{
-  \vspace{3pt}
-  \begin{minipage}[t]{0.97\textwidth}
-    \small #1
-  \end{minipage}
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
 }
 
 \newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
@@ -95,37 +98,101 @@
 \newcommand{\resumeItemListStart}{\begin{itemize}}
 \newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
 
-% Set global paragraph spacing to minimum
-\setlength{\parskip}{0pt}
-
-% Set global paragraph spacing to minimum
-\setlength{\parskip}{0pt}
-
 %-------------------------------------------
 %%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 \begin{document}
 
-% HEADER_PLACEHOLDER
+%----------HEADING----------
+% \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+%   \textbf{\href{http://YOUR-PORTFOLIO.com/}{\Large YOUR NAME}} & Email : \href{mailto:your.email@example.com}{your.email@example.com}\\
+%   \href{http://YOUR-PORTFOLIO.com/}{http://YOUR-PORTFOLIO.com} & Mobile : YOUR-PHONE-NUMBER \\
+% \end{tabular*}
+
+\begin{center}
+    \textbf{\Huge \scshape {{YOUR NAME}}} \\ \vspace{1pt}
+    \small {{YOUR-PHONE-NUMBER}} $|$ \href{mailto:{{YOUR-EMAIL}}}{\underline{{YOUR-EMAIL}}} $|$
+    \href{https://linkedin.com/in/{{YOUR-LINKEDIN}}}{\underline{linkedin.com/in/{{YOUR-LINKEDIN}}}} $|$
+    \href{https://github.com/{{YOUR-GITHUB}}}{\underline{github.com/{{YOUR-GITHUB}}}}
+    % Uncomment below if you have a portfolio or website
+    % $|$ \href{https://your-portfolio.com}{\underline{your-portfolio.com}}
+\end{center}
+
 
 %-----------EDUCATION-----------
 \section{Education}
-% EDUCATION_PLACEHOLDER
+  \resumeSubHeadingListStart
+    % Example:
+    % \resumeSubheading
+    %  {University Name}{City, State/Country}
+    %  {Degree, Major}{Start Date -- End Date}
+    % Copy and customize below for each education entry
+    % \resumeSubheading
+    %   {UNIVERSITY or COLLEGE}{LOCATION}
+    %   {YOUR DEGREE AND MAJOR}{START DATE -- END DATE}
+
+    % Example placeholder entry:
+    % \resumeSubheading
+    %   {Example University}{Example City, Country}
+    %   {Bachelor of Science in Example Major}{Month YYYY -- Month YYYY}
+  \resumeSubHeadingListEnd
+
 
 %-----------EXPERIENCE-----------
 \section{Experience}
-% EXPERIENCE_PLACEHOLDER
+  \resumeSubHeadingListStart
+
+    % Example work experience entry:
+    % \resumeSubheading
+    %   {JOB TITLE}{Employment Dates}
+    %   {COMPANY}{LOCATION}
+    %   \resumeItemListStart
+    %     \resumeItem{Responsibility or achievement 1}
+    %     \resumeItem{Responsibility or achievement 2}
+    %     \resumeItem{Responsibility or achievement 3}
+    %   \resumeItemListEnd
+
+    % Example for multiple roles at one company:
+    % -----------Multiple Positions Heading-----------
+    % \resumeSubSubheading
+    %     {Job Title}{Dates for Sub-role}
+    %   \resumeItemListStart
+    %      \resumeItem{...}
+    %   \resumeItemListEnd
+    % \resumeSubHeadingListEnd
+    %-------------------------------------------
+
+  \resumeSubHeadingListEnd
+
 
 %-----------PROJECTS-----------
 \section{Projects}
-% PROJECTS_PLACEHOLDER
+    \resumeSubHeadingListStart
+      % Example project entry:
+      % \resumeProjectHeading
+      %     {\textbf{Project Name} $|$ \emph{Technologies, Libraries}}{Date or Duration}
+      %     \resumeItemListStart
+      %       \resumeItem{Short summary of project or achievement}
+      %       \resumeItem{Technologies or techniques used}
+      %     \resumeItemListEnd
 
-%-----------TECHNICAL SKILLS-----------
-\section{Skills}
-% SKILLS_PLACEHOLDER
+    \resumeSubHeadingListEnd
 
-%-----------ADDITIONAL INFO-----------
-\section{Additional Information}
-% ADDITIONAL_INFO_PLACEHOLDER
 
+
+%
+%-----------PROGRAMMING SKILLS-----------
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+        % \textbf{Languages}{: List your programming languages} \\
+        % \textbf{Frameworks}{: List major frameworks/libraries} \\
+        % \textbf{Developer Tools}{: List tools, IDEs, platforms} \\
+        % \textbf{Libraries}{: List major libraries used}
+    }}
+ \end{itemize}
+
+
+%-------------------------------------------
 \end{document}

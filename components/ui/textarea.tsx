@@ -1,12 +1,17 @@
-import * as React from "react"
+'use client'
 
+import * as React from "react"
+import { useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { sanitizeByType, type InputType as SanitizerInputType } from "@/lib/inputSanitizer"
 
 type TextareaSize = "sm" | "md" | "lg"
 
 interface TextareaProps extends React.ComponentProps<"textarea"> {
   size?: TextareaSize
   showBorder?: boolean
+  sanitize?: boolean | SanitizerInputType // If true, uses 'textarea' type. If string, uses that type
+  sanitizeOnChange?: boolean // If true, sanitizes on every change. If false, only on blur
 }
 
 const sizeClasses: Record<TextareaSize, string> = {
@@ -15,9 +20,74 @@ const sizeClasses: Record<TextareaSize, string> = {
   lg: "text-base px-4 py-3 min-h-24"
 }
 
-function Textarea({ className, size = "md", showBorder = false, ...props }: TextareaProps) {
+function Textarea({ 
+  className, 
+  size = "md", 
+  showBorder = false,
+  sanitize = true, // Default to true for security
+  sanitizeOnChange = false, // Default to false to avoid interrupting typing
+  onChange,
+  onBlur,
+  value,
+  ...props 
+}: TextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sanitizeType: SanitizerInputType = typeof sanitize === 'string' 
+    ? sanitize 
+    : sanitize 
+      ? 'textarea'
+      : 'text'
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (sanitize && sanitizeOnChange) {
+      const sanitized = sanitizeByType(e.target.value, sanitizeType)
+      // Create a synthetic event with sanitized value
+      const syntheticEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          value: sanitized,
+        },
+      } as React.ChangeEvent<HTMLTextAreaElement>
+      onChange?.(syntheticEvent)
+    } else {
+      onChange?.(e)
+    }
+  }, [sanitize, sanitizeOnChange, sanitizeType, onChange])
+
+  const handleBlur = useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    if (sanitize && textareaRef.current) {
+      const currentValue = textareaRef.current.value
+      const sanitized = sanitizeByType(currentValue, sanitizeType)
+      if (currentValue !== sanitized) {
+        textareaRef.current.value = sanitized
+        // Trigger change event with sanitized value
+        const syntheticEvent = {
+          ...e,
+          target: {
+            ...e.target,
+            value: sanitized,
+          },
+        } as React.ChangeEvent<HTMLTextAreaElement>
+        onChange?.(syntheticEvent)
+      }
+    }
+    onBlur?.(e)
+  }, [sanitize, sanitizeType, onChange, onBlur])
+
+  // Sync external value changes
+  useEffect(() => {
+    if (textareaRef.current && value !== undefined && sanitize) {
+      const sanitized = sanitizeByType(String(value), sanitizeType)
+      if (textareaRef.current.value !== sanitized) {
+        textareaRef.current.value = sanitized
+      }
+    }
+  }, [value, sanitize, sanitizeType])
+
   return (
     <textarea
+      ref={textareaRef}
       data-slot="textarea"
       data-size={size}
       className={cn(
@@ -27,6 +97,9 @@ function Textarea({ className, size = "md", showBorder = false, ...props }: Text
         // Removed focus-visible:ring and focus-visible:border
         className
       )}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      value={value}
       {...props}
     />
   )

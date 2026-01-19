@@ -17,260 +17,525 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 
 const execAsync = promisify(exec);
-type ConvexClientFactory = () => ConvexHttpClient | Promise<ConvexHttpClient>;
 
 
 // Helper function to escape LaTeX special characters
 function escapeLatex(str: string | null | undefined) {
     if (!str) return '';
-    return str.replace(/([\\{}&$%#_^])/g, '\\$1');
+    // Escape all special LaTeX characters including braces (needed for literal braces in text)
+    return str.replace(/([\\{}&$%#_^~])/g, '\\$1');
 }
 
-// Create Resume Jake Template Tool
-const createResumeJakeTemplateTool = tool({
-    name: 'createResumeJakeTemplate',
-    description: 'Generate a professional resume using the Jake LaTeX template. This tool creates an ATS-optimized resume with proper formatting and structure.',
-    parameters: z.object({
-        personalInfo: z.object({
-            firstName: z.string().describe('First name of the person'),
-            lastName: z.string().describe('Last name of the person'),
-            citizenship: z.string().describe('Citizenship of the person'),
-            email: z.string().email().describe('Email address'),
-            phone: z.string().optional().nullable().describe('Phone number'),
-            location: z.string().optional().nullable().describe('City, State or City, Country'),
-            linkedin: z.string().optional().nullable().describe('LinkedIn profile URL'),
-            github: z.string().optional().nullable().describe('GitHub profile URL'),
-            portfolio: z.string().optional().nullable().describe('Portfolio website URL'),
-        }),
-        experience: z.array(z.object({
-            company: z.string().describe('Company name'),
-            title: z.string().describe('Job title'),
-            location: z.string().optional().nullable().describe('Job location'),
-            date: z.string().describe('Employment dates (e.g., "Jan 2020 - Present")'),
-            details: z.array(z.string()).describe('List of job responsibilities and achievements'),
-        })).optional().nullable().default([]),
-        education: z.array(z.object({
-            name: z.string().describe('School/University name'),
-            degree: z.string().describe('Degree type and field'),
-            field: z.string().optional().nullable().describe('Field of study'),
-            location: z.string().optional().nullable().describe('School location'),
-            startDate: z.string().optional().nullable().describe('Start date'),
-            endDate: z.string().describe('Graduation date or "Present"'),
-            details: z.array(z.string()).optional().nullable().describe('Additional details like GPA, honors, etc.'),
-        })).optional().nullable().default([]),
-        projects: z.array(z.object({
-            name: z.string().describe('Project name'),
-            description: z.string().describe('Project description'),
-            date: z.string().optional().nullable().describe('Project completion date'),
-            technologies: z.array(z.string()).optional().nullable().describe('Technologies used'),
-            details: z.array(z.string()).optional().nullable().describe('Additional project details'),
-        })).optional().nullable().default([]),
-        skills: z.object({
-            technical: z.array(z.string()).optional().nullable().describe('Technical skills'),
-            additional: z.array(z.string()).optional().nullable().describe('Additional skills'),
-        }).optional().nullable(),
-        additionalInfo: z.object({
-            interests: z.array(z.string()).optional().nullable().describe('Professional interests'),
-            hobbies: z.array(z.string()).optional().nullable().describe('Relevant hobbies'),
-            languages: z.array(z.string()).optional().nullable().describe('Languages spoken'),
-            references: z.array(z.string()).optional().nullable().describe('References'),
-        }).optional().nullable(),
+// Helper function to format URLs
+function formatUrl(url: string | null | undefined) {
+    if (!url) return '';
+    // Add https:// if no protocol is specified
+    const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
+    return formattedUrl;
+};
+
+// Helper function to get the current time in a human readable format
+function getFormattedTime() {
+  const now = new Date();
+  const date = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
+}
+
+const jakeResumeTemplatePath = path.join(process.cwd(), 'templates/resume/jakeLatex.tex');
+const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLetter/jakeCoverLetter.tex');
+
+ const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
+   name: 'createResumeJakeTemplate',
+   description: 'Generate a professional resume using the Jake LaTeX template. This tool creates an ATS-optimized resume with proper formatting and structure. Automatically saves the resume to the user\'s documents.',
+   parameters: z.object({
+    personalInfo: z.object({
+      firstName: z.string().describe('First name of the person'),
+      lastName: z.string().describe('Last name of the person'),
+      email: z.string().email("Must be a valid email").describe('Email address'),
+      citizenship: z.string().optional().nullable().describe('Citizenship or work authorization'),
+      location: z.string().optional().nullable().describe('Current location (city, state, country)'),
+      linkedin: z.string().optional().nullable().describe('LinkedIn profile URL'),
+      github: z.string().optional().nullable().describe('GitHub profile URL'),
+      portfolio: z.string().optional().nullable().describe('Portfolio website URL'),
     }),
-    execute: async (input) => {
-        try {
-            const templatePath = path.join(process.cwd(), 'templates/resume/jakeLatex.tex');
-            if (!fs.existsSync(templatePath)) {
-                throw new Error(`LaTeX template not found at ${templatePath}`);
-            }
+    experience: z.array(z.object({
+      company: z.string().describe('Company name'),
+      title: z.string().describe('Job title'),
+      location: z.string().optional().nullable().describe('Job location'),
+      date: z.string().describe('Employment dates (e.g., "Jan 2020 - Present")'),
+      details: z.array(z.string()).describe('List of job responsibilities and achievements'),
+    })).optional().nullable().default([]),
+    education: z.array(z.object({
+      name: z.string().describe('School/University name'),
+      degree: z.string().describe('Degree type and field'),
+      field: z.string().optional().nullable().describe('Field of study'),
+      location: z.string().optional().nullable().describe('School location'),
+      startDate: z.string().optional().nullable().describe('Start date'),
+      endDate: z.string().describe('Graduation date or "Present"'),
+      details: z.array(z.string()).optional().nullable().describe('Additional details like GPA, honors, etc.'),
+    })).optional().nullable().default([]),
+    projects: z.array(z.object({
+      name: z.string().describe('Project name'),
+      description: z.string().describe('Project description'),
+      date: z.string().optional().nullable().describe('Project completion date'),
+      technologies: z.array(z.string()).optional().nullable().describe('Technologies used'),
+      details: z.array(z.string()).optional().nullable().describe('Additional project details'),
+    })).optional().nullable().default([]),
+    skills: z.object({
+      technical: z.array(z.string()).optional().nullable().describe('Technical skills'),
+      additional: z.array(z.string()).optional().nullable().describe('Additional skills'),
+    }).optional().nullable(),
+    additionalInfo: z.object({
+      interests: z.array(z.string()).optional().nullable().describe('Professional interests'),
+      hobbies: z.array(z.string()).optional().nullable().describe('Relevant hobbies'),
+      languages: z.array(z.string()).optional().nullable().describe('Languages spoken'),
+      references: z.array(z.string()).optional().nullable().describe('References'),
+    }).optional().nullable(), 
+  }),
+  execute: async (input) => {
+    try {
 
-            let latexTemplate = fs.readFileSync(templatePath, 'utf-8');
 
-            // Clear any existing content by removing everything between placeholders
-            latexTemplate = latexTemplate.replace(/% HEADER_PLACEHOLDER[\s\S]*?%-----------EDUCATION-----------/, '% HEADER_PLACEHOLDER\n%-----------EDUCATION-----------');
-            latexTemplate = latexTemplate.replace(/% EDUCATION_PLACEHOLDER[\s\S]*?%-----------EXPERIENCE-----------/, '% EDUCATION_PLACEHOLDER\n%-----------EXPERIENCE-----------');
-            latexTemplate = latexTemplate.replace(/% EXPERIENCE_PLACEHOLDER[\s\S]*?%-----------PROJECTS-----------/, '% EXPERIENCE_PLACEHOLDER\n%-----------PROJECTS-----------');
-            latexTemplate = latexTemplate.replace(/% PROJECTS_PLACEHOLDER[\s\S]*?%-----------TECHNICAL SKILLS-----------/, '% PROJECTS_PLACEHOLDER\n%-----------TECHNICAL SKILLS-----------');
-            latexTemplate = latexTemplate.replace(/% SKILLS_PLACEHOLDER[\s\S]*?%-----------ADDITIONAL INFO-----------/, '% SKILLS_PLACEHOLDER\n%-----------ADDITIONAL INFO-----------');
-            latexTemplate = latexTemplate.replace(/% ADDITIONAL_INFO_PLACEHOLDER[\s\S]*?\\end{document}/, '% ADDITIONAL_INFO_PLACEHOLDER\n\\end{document}');
+      /// SECTION FILE SETUP
+      // get the time in a human readable format
+      const formattedTime = getFormattedTime();
 
-            // Helper function to format URLs
-            const formatUrl = (url: string | null | undefined) => {
-                if (!url) return '';
-                // Add https:// if no protocol is specified
-                const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
-                return formattedUrl;
-            };
+      const templatePath = jakeResumeTemplatePath;
+      if (!fs.existsSync(templatePath)) {
+        throw new Error(`LaTeX template not found at ${templatePath}`);
+      }
 
-            // Generate header content
-            const headerContent = `\\begin{center}
-    \\textbf{\\Huge \\scshape ${escapeLatex(input.personalInfo.firstName)} ${escapeLatex(input.personalInfo.lastName)}} \\\\ \\vspace{1pt}
-    \\small \\href{mailto:${escapeLatex(input.personalInfo.email)}}{\\underline{${escapeLatex(input.personalInfo.email)}}} $|$
-    ${input.personalInfo.citizenship ? `${escapeLatex(input.personalInfo.citizenship)} $|$` : ''}
-    ${input.personalInfo.phone ? `${escapeLatex(input.personalInfo.phone)} $|$` : ''}
-    ${input.personalInfo.location ? `${escapeLatex(input.personalInfo.location)} $|$` : ''}
-    ${input.personalInfo.linkedin ? `\\href{${escapeLatex(formatUrl(input.personalInfo.linkedin))}}{\\underline{${escapeLatex(input.personalInfo.linkedin.replace(/^https?:\/\//, ''))}}} $|$` : ''}
-    ${input.personalInfo.github ? `\\href{${escapeLatex(formatUrl(input.personalInfo.github))}}{\\underline{${escapeLatex(input.personalInfo.github.replace(/^https?:\/\//, ''))}}} $|$` : ''}
-    ${input.personalInfo.portfolio ? `\\href{${escapeLatex(formatUrl(input.personalInfo.portfolio))}}{\\underline{${escapeLatex(input.personalInfo.portfolio.replace(/^https?:\/\//, ''))}}}` : ''}
-  \\end{center}`;
+      let latexTemplate = fs.readFileSync(templatePath, 'utf-8');
 
-            // Generate education content
-            const educationContent = Array.isArray(input.education) && input.education.length > 0
-                ? `\\resumeSubHeadingListStart
-             ${input.education.map((edu) => `
-               \\resumeSubheading
-                 {${escapeLatex(edu.name)}}{${escapeLatex(edu.location || '')}}
-                 {${escapeLatex(edu.degree)} ${edu.field ? `in ${escapeLatex(edu.field)}` : ''}}{${edu.startDate ? `${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}` : `Estimated Graduation: ${escapeLatex(edu.endDate)}`}}
-                 ${Array.isArray(edu.details) && edu.details.length ? `\\resumeItemListStart
-                   ${edu.details.map((detail) => `\\resumeItem{${escapeLatex(detail)}}`).join('\n          ')}
-                 \\resumeItemListEnd` : ''}
-             `).join('\n')}
-             \\resumeSubHeadingListEnd`
-                : '';
 
-            // Generate experience content
-            const experienceContent = Array.isArray(input.experience) && input.experience.length > 0
-                ? `\\resumeSubHeadingListStart
-             ${input.experience.map((exp) => `
-               \\resumeSubheading
-                 {${escapeLatex(exp.company)}}{${escapeLatex(exp.location || '')}}
-                 {${escapeLatex(exp.title)}}{${escapeLatex(exp.date)}}
-                 ${Array.isArray(exp.details) && exp.details.length ? `\\resumeItemListStart
-                   ${exp.details.map((detail) => `\\resumeItem{${escapeLatex(detail)}}`).join('\n          ')}
-                 \\resumeItemListEnd` : ''}
-             `).join('\n')}
-             \\resumeSubHeadingListEnd`
-                : '';
+      /// SECTION RESUME CONTENT GENERATION
 
-            // Generate projects content
-            const projectsContent = Array.isArray(input.projects) && input.projects.length > 0
-                ? `\\resumeSubHeadingListStart
-       ${input.projects.map((proj) => `
-         \\resumeProjectHeader
-           {${escapeLatex(proj.name)}}{${escapeLatex(proj.date || '')}}
-         
-         \\resumeProjectDetails{${escapeLatex(proj.description)}}
-         ${Array.isArray(proj.technologies) && proj.technologies.length
-                        ? `\\resumeItem{Technologies Used: ${proj.technologies.map(escapeLatex).join(', ')}}`
-                        : ''}
-         ${Array.isArray(proj.details) && proj.details.length
-                        ? `\\resumeItemListStart
-             ${proj.details.map((detail) => `\\resumeItem{${escapeLatex(detail)}}`).join('\n          ')}
-           \\resumeItemListEnd`
-                        : ''}
-       `).join('\n')}
-       \\resumeSubHeadingListEnd`
-                : '';
+      // Replace header section - match the template format exactly
+      const fullName = `${escapeLatex(input.personalInfo.firstName)} ${escapeLatex(input.personalInfo.lastName)}`;
+      const contactParts = [];
+      
+      // Add citizenship if provided
+      if (input.personalInfo.citizenship) {
+        contactParts.push(`\\underline{${escapeLatex(input.personalInfo.citizenship)}}`);
+      }
 
-            // Generate skills content
-            const skillsContent = input.skills && (Array.isArray(input.skills.technical) || Array.isArray(input.skills.additional))
-                ? `${Array.isArray(input.skills.technical) && input.skills.technical.length
-                    ? `\\resumeFlexContent{Technical:}{${input.skills.technical.map(escapeLatex).join(', ')}}`
-                    : ''}
-          ${Array.isArray(input.skills.additional) && input.skills.additional.length
-                    ? `\\resumeFlexContent{Additional:}{${input.skills.additional.map(escapeLatex).join(', ')}}`
-                    : ''}`
-                : '';
 
-            // Generate additional info content
-            const additionalInfoContent = input.additionalInfo && (Array.isArray(input.additionalInfo.interests) || Array.isArray(input.additionalInfo.hobbies) || Array.isArray(input.additionalInfo.languages) || Array.isArray(input.additionalInfo.references))
-                ? `${Array.isArray(input.additionalInfo.interests) && input.additionalInfo.interests.length
-                    ? `\\resumeFlexContent{Interests:}{${input.additionalInfo.interests.map(escapeLatex).join(', ')}}`
-                    : ''}
-          ${Array.isArray(input.additionalInfo.hobbies) && input.additionalInfo.hobbies.length
-                    ? `\\resumeFlexContent{Hobbies:}{${input.additionalInfo.hobbies.map(escapeLatex).join(', ')}}`
-                    : ''}
-          ${Array.isArray(input.additionalInfo.languages) && input.additionalInfo.languages.length
-                    ? `\\resumeFlexContent{Languages:}{${input.additionalInfo.languages.map(escapeLatex).join(', ')}}`
-                    : ''}
-          ${Array.isArray(input.additionalInfo.references) && input.additionalInfo.references.length
-                    ? `\\resumeFlexContent{References:}{${input.additionalInfo.references.map(escapeLatex).join(', ')}}`
-                    : ''}`
-                : '';
+      contactParts.push(`\\href{mailto:${escapeLatex(input.personalInfo.email)}}{\\underline{${escapeLatex(input.personalInfo.email)}}}`);
+      
+      // // Add location if provided
+      // if (input.personalInfo.location) {
+      //   contactParts.push(escapeLatex(input.personalInfo.location));
+      // }
+      
+      if (input.personalInfo.linkedin) {
+        const linkedinHandle = input.personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '').replace(/\/$/, '');
+        contactParts.push(`\\href{https://linkedin.com/in/${escapeLatex(linkedinHandle)}}{\\underline{linkedin.com/in/${escapeLatex(linkedinHandle)}}}`);
+      }
+      
+      if (input.personalInfo.github) {
+        const githubHandle = input.personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\/$/, '');
+        contactParts.push(`\\href{https://github.com/${escapeLatex(githubHandle)}}{\\underline{github.com/${escapeLatex(githubHandle)}}}`);
+      }
+      
+      const headerContent = `\\begin{center}\n    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{1pt}\n    \\small ${contactParts.join(' $|$ ')}\n\\end{center}`;
+      
+      // Replace the header block in template (everything between \begin{center} and \end{center})
+      latexTemplate = latexTemplate.replace(
+        /\\begin{center}[\s\S]*?\\end{center}/,
+        headerContent
+      );
 
-            // Replace placeholders with formatted content
-            latexTemplate = latexTemplate
-                .replace('% HEADER_PLACEHOLDER', headerContent)
-                .replace('% EDUCATION_PLACEHOLDER', educationContent || '')
-                .replace('% EXPERIENCE_PLACEHOLDER', experienceContent || '')
-                .replace('% PROJECTS_PLACEHOLDER', projectsContent || '')
-                .replace('% SKILLS_PLACEHOLDER', skillsContent || '')
-                .replace('% ADDITIONAL_INFO_PLACEHOLDER', additionalInfoContent || '');
+      // Generate education content - template uses \resumeSubheading{School}{Location}{Degree}{Dates}
+      const educationContent = Array.isArray(input.education) && input.education.length > 0
+        ? input.education.map((edu) => {
+            const degreeText = `${escapeLatex(edu.degree)}${edu.field ? ` in ${escapeLatex(edu.field)}` : ''}`;
+            const dates = edu.startDate ? `${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}` : escapeLatex(edu.endDate);
+            const items = Array.isArray(edu.details) && edu.details.length
+              ? `\n    \\resumeItemListStart\n${edu.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
+              : '';
+            // Format: \resumeSubheading{Arg1}{Arg2}{Arg3}{Arg4} - all on same line or properly separated
+            return `    \\resumeSubheading\n      {${escapeLatex(edu.name)}}{${escapeLatex(edu.location || '')}}\n      {${degreeText}}{${dates}}${items}`;
+          }).join('\n')
+        : '';
+      
+      // Replace education section - match from \section to \resumeSubHeadingListEnd
+      latexTemplate = latexTemplate.replace(
+        /\\section{Education}[\s\S]*?\\resumeSubHeadingListEnd/,
+        `\\section{Education}\n  \\resumeSubHeadingListStart\n${educationContent || '    % No education entries'}\n  \\resumeSubHeadingListEnd`
+      );
 
-            // Remove sections with no content
-            if (!educationContent) {
-                latexTemplate = latexTemplate.replace(/\\section{Education}[\s\S]*?(?=\\section|\\end{document})/g, '');
-            }
-            if (!experienceContent) {
-                latexTemplate = latexTemplate.replace(/\\section{Experience}[\s\S]*?(?=\\section|\\end{document})/g, '');
-            }
-            if (!projectsContent) {
-                latexTemplate = latexTemplate.replace(/\\section{Projects}[\s\S]*?(?=\\section|\\end{document})/g, '');
-            }
-            if (!skillsContent) {
-                latexTemplate = latexTemplate.replace(/\\section{Skills}[\s\S]*?(?=\\section|\\end{document})/g, '');
-            }
-            if (!additionalInfoContent) {
-                latexTemplate = latexTemplate.replace(/\\section{Additional Information}[\s\S]*?(?=\\\\section|\\end{document})/g, '');
-            }
+      // Generate experience content - template uses \resumeSubheading{Title}{Dates}{Company}{Location}
+      const experienceContent = Array.isArray(input.experience) && input.experience.length > 0
+        ? input.experience.map((exp) => {
+            const items = Array.isArray(exp.details) && exp.details.length
+              ? `\n    \\resumeItemListStart\n${exp.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
+              : '';
+            // Note: jakeLatex_2.tex uses {Title}{Dates}{Company}{Location} format
+            return `    \\resumeSubheading\n      {${escapeLatex(exp.title)}}{${escapeLatex(exp.date)}}\n      {${escapeLatex(exp.company)}}{${escapeLatex(exp.location || '')}}${items}`;
+          }).join('\n')
+        : '';
+      
+      // Replace experience section
+      latexTemplate = latexTemplate.replace(
+        /\\section{Experience}[\s\S]*?\\resumeSubHeadingListEnd/,
+        `\\section{Experience}\n  \\resumeSubHeadingListStart\n${experienceContent || '    % No experience entries'}\n  \\resumeSubHeadingListEnd`
+      );
 
-            // Ensure proper document structure
-            latexTemplate = latexTemplate.replace('\\begin{document}', '\\setlength{\\parskip}{0pt}\n\\begin{document}');
+      // Generate projects content - template uses \resumeProjectHeading{Project Name | Technologies}{Date}
+      const projectsContent = Array.isArray(input.projects) && input.projects.length > 0
+        ? input.projects.map((proj) => {
+            const projectName = proj.technologies && proj.technologies.length
+              ? `\\textbf{${escapeLatex(proj.name)}} $|$ \\emph{${escapeLatex(proj.technologies.join(', '))}}`
+              : `\\textbf{${escapeLatex(proj.name)}}`;
+            const items = Array.isArray(proj.details) && proj.details.length
+              ? `\n    \\resumeItemListStart\n      \\resumeItem{${escapeLatex(proj.description)}}\n${proj.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
+              : `\n    \\resumeItemListStart\n      \\resumeItem{${escapeLatex(proj.description)}}\n    \\resumeItemListEnd`;
+            return `    \\resumeProjectHeading\n      {${projectName}}{${escapeLatex(proj.date || '')}}${items}`;
+          }).join('\n')
+        : '';
+      
+      // Replace projects section
+      latexTemplate = latexTemplate.replace(
+        /\\section{Projects}[\s\S]*?\\resumeSubHeadingListEnd/,
+        `\\section{Projects}\n    \\resumeSubHeadingListStart\n${projectsContent || '      % No projects'}\n    \\resumeSubHeadingListEnd`
+      );
 
-            // Create temporary directory and file
-            const tempDir = path.join(process.cwd(), 'temp');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-            const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
-            const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
-            fs.writeFileSync(tempFile, latexTemplate);
+      // Generate skills content - template uses simple \textbf{Category}{: Skills} format
+      const skillsParts = [];
+      if (input.skills?.technical && input.skills.technical.length) {
+        skillsParts.push(`        \\textbf{Languages}{: ${escapeLatex(input.skills.technical.join(', '))}} \\\\`);
+      }
+      if (input.skills?.additional && input.skills.additional.length) {
+        skillsParts.push(`        \\textbf{Additional Skills}{: ${escapeLatex(input.skills.additional.join(', '))}}`);
+      }
+      const skillsContent = skillsParts.length > 0 ? skillsParts.join('\n') : '';
+      
+      // Replace skills section - template has a specific structure with \small{\item{...}}
+      const skillsSectionContent = skillsContent || '        % No skills listed';
+      latexTemplate = latexTemplate.replace(
+        /\\section{Technical Skills}[\s\S]*?\\end{itemize}/,
+        `\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n    \\small{\\item{\n${skillsSectionContent}\n    }}\n \\end{itemize}`
+      );
 
-            // Compile LaTeX to PDF
-            try {
-                await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
-                await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
-            } catch (latexError: unknown) {
-                console.error('LaTeX compilation error:', latexError);
-                const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
-                throw new Error(`LaTeX compilation failed: ${errorMessage}`);
-            }
+      // Note: jakeLatex_2.tex template doesn't have an "Additional Information" section
+      // If needed, it would need to be added to the template first
 
-            // Read the generated PDF
-            const pdfBuffer = fs.readFileSync(path.join(tempDir, `resume-${uniqueId}.pdf`));
-            const pdfBase64 = pdfBuffer.toString('base64');
+      /// SECTION PDF GENERATION
+    
+      // Create temporary directory and file
+      const tempDir = path.join(process.cwd(), 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+      const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
+      fs.writeFileSync(tempFile, latexTemplate);
 
-            // Clean up temp files
-            ['aux', 'log', 'out'].forEach(ext => {
-                const file = path.join(tempDir, `resume-${uniqueId}.${ext}`);
-                if (fs.existsSync(file)) fs.unlinkSync(file);
-            });
+      // Compile LaTeX to PDF - capture log for debugging
+      // Note: pdflatex may exit with non-zero even if PDF is generated (warnings, etc.)
+      const pdfPath = path.join(tempDir, `resume-${uniqueId}.pdf`);
+      const logPath = path.join(tempDir, `resume-${uniqueId}.log`);
+      
+      try {
+          await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+          await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+      } catch (latexError: unknown) {
+          // Even if pdflatex throws an error, check if PDF was generated
+          // Sometimes compilation succeeds but returns non-zero exit code
+          if (fs.existsSync(pdfPath)) {
+              // PDF was generated successfully, continue
+          } else {
+              // PDF doesn't exist, so compilation actually failed
+              const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
+              return {
+                  success: false,
+                  error: `LaTeX compilation failed: ${errorMessage}`,
+                  message: 'LaTeX compilation failed. The PDF could not be generated.'
+              };
+          }
+      }
 
-            return {
-                success: true,
-                message: 'Resume generated successfully using Jake LaTeX template',
-                pdfBase64: pdfBase64,
-                texContent: latexTemplate,
-                fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${uniqueId}.pdf`,
-                sections: {
-                    hasEducation: !!educationContent,
-                    hasExperience: !!experienceContent,
-                    hasProjects: !!projectsContent,
-                    hasSkills: !!skillsContent,
-                    hasAdditionalInfo: !!additionalInfoContent,
-                }
-            };
+      // Verify PDF exists before trying to read it
+      if (!fs.existsSync(pdfPath)) {
+          return {
+              success: false,
+              error: 'PDF file was not generated after LaTeX compilation',
+              message: 'LaTeX compilation completed but PDF file is missing.',
+              debugTexPath: tempFile,
+              logPath: logPath
+          };
+      }
 
-        } catch (error) {
-            console.error('Resume generation error:', error);
-            return {
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error occurred',
-                message: 'Failed to generate resume'
-            };
+      // Read the generated PDF
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      const pdfBase64 = pdfBuffer.toString('base64');
+
+      // Clean up temp files (but keep .tex and .log for debugging if there was an error)
+      ['aux', 'out'].forEach(ext => {
+          const file = path.join(tempDir, `resume-${uniqueId}.${ext}`);
+          if (fs.existsSync(file)) fs.unlinkSync(file);
+      });  
+
+      /// SECTION AUTO-SAVE TO CONVEX
+      
+      try {
+        // Get upload URL from Convex
+        const uploadUrl = await convexClient.mutation(api.documents.generateUploadUrl);
+        
+        // Convert Buffer to Blob for upload
+        const pdfBlob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
+        
+        // Upload PDF to Convex storage
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/pdf' },
+          body: pdfBlob,
+        });
+        
+        if (uploadResponse.ok) {
+          const { storageId } = await uploadResponse.json();
+          
+          // Save resume to database
+          const now = new Date();
+          const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); // e.g. "Jun 10, 24"
+          
+          const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume (${formattedTime})`;
+          await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
+            name: resumeName,
+            fileId: storageId,
+            fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`,
+            fileSize: pdfBuffer.length,
+            content: input,
+            template: 'jake',
+          });
         }
-    },
+      } catch (saveError) {
+        // Don't fail the whole operation if save fails, just log it
+        console.error('Failed to auto-save resume:', saveError);
+      }
+
+      /// SECTION RETURN RESULT
+      
+      // Return LaTeX sections, and the full tex
+      return {
+        success: true,
+        message: 'Resume generated and saved successfully',
+        // textContent: latexTemplate,
+        pdfBase64: pdfBase64,
+        fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.pdf`,
+        texFileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.tex`,
+        // sections: {
+        //   headerContent,
+        //   educationContent,
+        //   experienceContent,
+        //   projectsContent,
+        //   skillsContent
+        // },
+        documentType: 'resume',
+      };
+    } catch (error) {
+      console.error('Resume generation error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: 'Failed to generate resume'
+      };
+    }
+  },
+});
+
+// Cover Letter Generation Tool - Jake Template Style
+const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
+  name: 'createCoverLetterJakeTemplate',
+  description: 'Generate a professional cover letter using the Jake LaTeX template style. This tool creates a well-formatted cover letter tailored for the specific job and company. Automatically saves the cover letter to the user\'s documents.',
+  parameters: z.object({
+    personalInfo: z.object({
+      firstName: z.string().describe('First name of the applicant'),
+      lastName: z.string().describe('Last name of the applicant'),
+      email: z.string().email("Must be a valid email").describe('Email address'),
+      phone: z.string().optional().nullable().describe('Phone number'),
+      location: z.string().optional().nullable().describe('City, State or full address'),
+    }),
+    jobInfo: z.object({
+      company: z.string().describe('Name of the company applying to'),
+      position: z.string().describe('Job title/position applying for'),
+      hiringManagerName: z.string().optional().nullable().describe('Name of the hiring manager (if known)'),
+      companyAddress: z.string().optional().nullable().describe('Company address (if known)'),
+    }),
+    letterContent: z.object({
+      openingParagraph: z.string().describe('Opening paragraph introducing yourself and expressing interest in the position. Should mention how you found the job and why you\'re excited about it.'),
+      bodyParagraphs: z.array(z.string()).describe('Body paragraphs highlighting your relevant experience, skills, and achievements. Each paragraph should focus on specific qualifications that match the job requirements.'),
+      closingParagraph: z.string().describe('Closing paragraph summarizing your interest, thanking them for their consideration, and expressing enthusiasm for next steps.'),
+    }),
+  }),
+  execute: async (input) => {
+    try {
+
+
+      // get the time in a human readable format
+      const formattedTime = getFormattedTime();
+
+      /// SECTION FILE SETUP
+      const templatePath = jakeCoverLetterTemplatePath;
+      if (!fs.existsSync(templatePath)) {
+        throw new Error(`LaTeX template not found at ${templatePath}`);
+      }
+
+      let latexTemplate = fs.readFileSync(templatePath, 'utf-8');
+
+      /// SECTION COVER LETTER CONTENT GENERATION
+
+      // Build header
+      const fullName = `${escapeLatex(input.personalInfo.firstName)} ${escapeLatex(input.personalInfo.lastName)}`;
+      const contactParts = [];
+      contactParts.push(escapeLatex(input.personalInfo.email));
+      if (input.personalInfo.phone) {
+        contactParts.push(escapeLatex(input.personalInfo.phone));
+      }
+      if (input.personalInfo.location) {
+        contactParts.push(escapeLatex(input.personalInfo.location));
+      }
+      const contactLine = contactParts.join(' $|$ ');
+
+      // Replace header
+      latexTemplate = latexTemplate.replace(
+        /\\begin{center}[\s\S]*?\\end{center}/,
+        `\\begin{center}\n    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{1pt}\n    \\small ${contactLine}\n\\end{center}`
+      );
+
+      // Replace date
+      const today = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      latexTemplate = latexTemplate.replace('{{DATE}}', escapeLatex(today));
+
+      // Replace recipient info
+      const hiringManagerName = input.jobInfo.hiringManagerName || 'Hiring Manager';
+      latexTemplate = latexTemplate.replace('{{HIRING_MANAGER_NAME}}', escapeLatex(hiringManagerName));
+      latexTemplate = latexTemplate.replace('{{COMPANY_NAME}}', escapeLatex(input.jobInfo.company));
+      latexTemplate = latexTemplate.replace('{{COMPANY_ADDRESS}}', input.jobInfo.companyAddress ? escapeLatex(input.jobInfo.companyAddress) : '');
+
+      // Replace salutation
+      const salutation = input.jobInfo.hiringManagerName 
+        ? `${escapeLatex(input.jobInfo.hiringManagerName)}`
+        : 'Hiring Manager';
+      latexTemplate = latexTemplate.replace('{{SALUTATION}}', salutation);
+
+      // Replace paragraphs
+      latexTemplate = latexTemplate.replace('{{OPENING_PARAGRAPH}}', escapeLatex(input.letterContent.openingParagraph));
+      
+      const bodyContent = input.letterContent.bodyParagraphs
+        .map(para => escapeLatex(para))
+        .join('\n\n');
+      latexTemplate = latexTemplate.replace('{{BODY_PARAGRAPHS}}', bodyContent);
+      
+      latexTemplate = latexTemplate.replace('{{CLOSING_PARAGRAPH}}', escapeLatex(input.letterContent.closingParagraph));
+
+      // Replace signature name
+      latexTemplate = latexTemplate.replace('{{YOUR NAME}}', fullName);
+
+      /// SECTION PDF GENERATION
+      
+      const tempDir = path.join(process.cwd(), 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+      const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const tempFile = path.join(tempDir, `coverletter-${uniqueId}.tex`);
+      fs.writeFileSync(tempFile, latexTemplate);
+
+      const pdfPath = path.join(tempDir, `coverletter-${uniqueId}.pdf`);
+      const logPath = path.join(tempDir, `coverletter-${uniqueId}.log`);
+
+      try {
+        await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+        await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+      } catch (latexError: unknown) {
+        if (!fs.existsSync(pdfPath)) {
+          const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
+          return {
+            success: false,
+            error: `LaTeX compilation failed: ${errorMessage}`,
+            message: 'LaTeX compilation failed. The PDF could not be generated.'
+          };
+        }
+      }
+
+      if (!fs.existsSync(pdfPath)) {
+        return {
+          success: false,
+          error: 'PDF file was not generated after LaTeX compilation',
+          message: 'LaTeX compilation completed but PDF file is missing.',
+          debugTexPath: tempFile,
+          logPath: logPath
+        };
+      }
+
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      const pdfBase64 = pdfBuffer.toString('base64');
+
+      // Clean up temp files
+      ['aux', 'out', 'log'].forEach(ext => {
+        const file = path.join(tempDir, `coverletter-${uniqueId}.${ext}`);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
+      });
+
+      /// SECTION AUTO-SAVE TO CONVEX
+      
+      try {
+        const uploadUrl = await convexClient.mutation(api.documents.generateUploadUrl);
+        const pdfBlob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
+        
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/pdf' },
+          body: pdfBlob,
+        });
+        
+        if (uploadResponse.ok) {
+          const { storageId } = await uploadResponse.json();
+          
+          const coverLetterName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Cover Letter (${formattedTime})`;
+          
+          await convexClient.mutation(api.documents.saveGeneratedCoverLetterWithFile, {
+            name: coverLetterName,
+            fileId: storageId,
+            fileName: `coverletter-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`,
+            fileSize: pdfBuffer.length,
+            content: input,
+            template: 'jake',
+          });
+        }
+      } catch (saveError) {
+        console.error('Failed to auto-save cover letter:', saveError);
+      }
+
+      // Clean up tex file
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+      if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+
+      /// SECTION RETURN RESULT
+      
+      return {
+        success: true,
+        message: 'Cover letter generated and saved successfully',
+        // textContent: latexTemplate,
+        pdfBase64: pdfBase64,
+        fileName: `coverletter-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.pdf`,
+        documentType: 'cover-letter',
+      };
+    } catch (error) {
+      console.error('Cover letter generation error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: 'Failed to generate cover letter'
+      };
+    }
+  },
 });
 
 // Add to Resources Tool
-const createAddToResourcesTool = (getConvexClient: ConvexClientFactory) =>
+const createAddToResourcesTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "addResourceToLibrary",
     description:
@@ -328,19 +593,6 @@ const createAddToResourcesTool = (getConvexClient: ConvexClientFactory) =>
         type,
       } = input;
 
-      let convexClient: ConvexHttpClient;
-      try {
-        const maybeClient = getConvexClient();
-        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
-      } catch (error) {
-        console.error("Failed to initialise Convex client for addResourceToLibrary:", error);
-        return {
-          success: false,
-          message: "Unable to save the resource because authentication could not be established.",
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-
       try {
         const resourceId = await convexClient.mutation(api.resources.add, {
           type: type ?? "resource",
@@ -373,26 +625,13 @@ const createAddToResourcesTool = (getConvexClient: ConvexClientFactory) =>
   });
 
 // Get User's Resumes Tool
-const createGetUserResumesTool = (getConvexClient: ConvexClientFactory) =>
+const createGetUserResumesTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "getUserResumes",
     description:
       "Fetch all resumes from the user's library to understand what resumes they have available. Use this when the user asks about their resumes or wants help with resume selection.",
     parameters: z.object({}),
     execute: async () => {
-      let convexClient: ConvexHttpClient;
-      try {
-        const maybeClient = getConvexClient();
-        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
-      } catch (error) {
-        console.error("Failed to initialise Convex client for getUserResumes:", error);
-        return {
-          success: false,
-          message: "Unable to fetch resumes because authentication could not be established.",
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-
       try {
         const resumes = await convexClient.query(api.documents.listResumes);
         
@@ -418,7 +657,7 @@ const createGetUserResumesTool = (getConvexClient: ConvexClientFactory) =>
   });
 
 // Get User's Jobs Tool
-const createGetUserJobsTool = (getConvexClient: ConvexClientFactory) =>
+const createGetUserJobsTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "getUserJobs",
     description:
@@ -432,19 +671,6 @@ const createGetUserJobsTool = (getConvexClient: ConvexClientFactory) =>
     }),
     execute: async (input) => {
       const { status } = input;
-
-      let convexClient: ConvexHttpClient;
-      try {
-        const maybeClient = getConvexClient();
-        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
-      } catch (error) {
-        console.error("Failed to initialise Convex client for getUserJobs:", error);
-        return {
-          success: false,
-          message: "Unable to fetch jobs because authentication could not be established.",
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
 
       try {
         const jobs = await convexClient.query(api.jobs.list);
@@ -477,7 +703,7 @@ const createGetUserJobsTool = (getConvexClient: ConvexClientFactory) =>
     },
   });
 
-const createAddToJobsTool = (getConvexClient: ConvexClientFactory) =>
+const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "addJobToTracker",
     description:
@@ -494,6 +720,11 @@ const createAddToJobsTool = (getConvexClient: ConvexClientFactory) =>
         .enum(["Interested", "Applied", "Interviewing", "Offered", "Rejected"])
         .default("Interested")
         .describe("Job status (Interested, Applied, Interviewing, Offered, Rejected). Defaults to 'Interested'."),
+      compensation: z
+        .string()
+        .optional()
+        .nullable()
+        .describe("Salary range or compensation details (e.g., '$100k-$150k', '€60k', 'Competitive')."),
       keywords: z
         .array(z.string())
         .optional()
@@ -556,6 +787,7 @@ const createAddToJobsTool = (getConvexClient: ConvexClientFactory) =>
         title,
         link,
         status,
+        compensation,
         keywords,
         skills,
         description,
@@ -567,25 +799,13 @@ const createAddToJobsTool = (getConvexClient: ConvexClientFactory) =>
         notes,
       } = input;
 
-      let convexClient: ConvexHttpClient;
-      try {
-        const maybeClient = getConvexClient();
-        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
-      } catch (error) {
-        console.error("Failed to initialise Convex client for addJobToTracker:", error);
-        return {
-          success: false,
-          message: "Unable to save the job because authentication could not be established.",
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-
       try {
         const jobId = await convexClient.mutation(api.jobs.add, {
           company,
           title,
           link: link ?? "",
           status: status ?? "wishlist",
+          compensation: compensation ?? undefined,
           keywords: keywords ?? undefined,
           skills: skills ?? undefined,
           description: description ?? undefined,
@@ -618,7 +838,7 @@ const createAddToJobsTool = (getConvexClient: ConvexClientFactory) =>
   });
 
 // Get Specific Resume by ID Tool
-const createGetResumeByIdTool = (getConvexClient: ConvexClientFactory) =>
+const createGetResumeByIdTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "getResumeById",
     description:
@@ -628,19 +848,6 @@ const createGetResumeByIdTool = (getConvexClient: ConvexClientFactory) =>
     }),
     execute: async (input) => {
       const { resumeId } = input;
-
-      let convexClient: ConvexHttpClient;
-      try {
-        const maybeClient = getConvexClient();
-        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
-      } catch (error) {
-        console.error("Failed to initialise Convex client for getResumeById:", error);
-        return {
-          success: false,
-          message: "Unable to fetch resume because authentication could not be established.",
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
 
       try {
         const resume = await convexClient.query(api.documents.getResume, {
@@ -673,7 +880,7 @@ const createGetResumeByIdTool = (getConvexClient: ConvexClientFactory) =>
   });
 
 // Get Specific Job by ID Tool
-const createGetJobByIdTool = (getConvexClient: ConvexClientFactory) =>
+const createGetJobByIdTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "getJobById",
     description:
@@ -683,19 +890,6 @@ const createGetJobByIdTool = (getConvexClient: ConvexClientFactory) =>
     }),
     execute: async (input) => {
       const { jobId } = input;
-
-      let convexClient: ConvexHttpClient;
-      try {
-        const maybeClient = getConvexClient();
-        convexClient = maybeClient instanceof Promise ? await maybeClient : maybeClient;
-      } catch (error) {
-        console.error("Failed to initialise Convex client for getJobById:", error);
-        return {
-          success: false,
-          message: "Unable to fetch job because authentication could not be established.",
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
 
       try {
         const job = await convexClient.query(api.jobs.get, {
@@ -727,13 +921,49 @@ const createGetJobByIdTool = (getConvexClient: ConvexClientFactory) =>
     },
   });
 
+// Get User's Resume Preferences Tool
+const createGetUserResumePreferencesTool = (convexClient: ConvexHttpClient) =>
+  tool({
+    name: "getUserResumePreferences",
+    description:
+      "Fetch the user's resume generation preferences. These preferences should ALWAYS be considered when generating resumes. Use this tool at the start of any resume generation task to understand the user's requirements.",
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const preferences = await convexClient.query(api.auth.getResumePreferences);
+        
+        return {
+          success: true,
+          message: preferences && preferences.length > 0 
+            ? `Found ${preferences.length} resume preference(s) that must be applied to all resume generation.`
+            : "No resume preferences found. Generate resume using best practices.",
+          preferences: preferences || [],
+          count: preferences?.length || 0,
+        };
+      } catch (error) {
+        console.error("Failed to fetch resume preferences via tool:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          message:
+            errorMessage.toLowerCase().includes("not authenticated")
+              ? "Please sign in to view your resume preferences."
+              : "Failed to fetch resume preferences. Try again once you're signed in.",
+          error: errorMessage,
+        };
+      }
+    },
+  });
+
 export {
   createResumeJakeTemplateTool,
+  createCoverLetterJakeTemplateTool,
   createAddToResourcesTool,
   createAddToJobsTool,
   createGetUserResumesTool,
   createGetUserJobsTool,
   createGetResumeByIdTool,
   createGetJobByIdTool,
+  createGetUserResumePreferencesTool,
   escapeLatex,
 };

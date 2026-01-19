@@ -90,6 +90,11 @@ export const deleteResume = mutation({
       throw new Error("Resume not found or access denied");
     }
     
+    // Delete the file from storage if it exists
+    if (resume.fileId) {
+      await ctx.storage.delete(resume.fileId);
+    }
+    
     return await ctx.db.delete(args.resumeId);
   },
 });
@@ -258,6 +263,82 @@ export const uploadResumeFile = mutation({
       createdAt: now,
       updatedAt: now,
       isActive: true,
+    });
+  },
+});
+
+// Save generated resume with PDF (called by AI tools during generation)
+export const saveGeneratedResumeWithFile = mutation({
+  args: {
+    name: v.string(),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(), // Structured content (the input used to generate the resume)
+    template: v.optional(v.string()),
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const now = Date.now();
+    
+    // Save resume document with all metadata
+    return await ctx.db.insert("resumes", {
+      userId: userId,
+      name: args.name,
+      fileId: args.fileId,
+      fileName: args.fileName,
+      fileType: 'application/pdf',
+      fileSize: args.fileSize,
+      content: args.content,
+      template: args.template || 'jake',
+      label: args.label,
+      tags: args.tags,
+      createdAt: now,
+      updatedAt: now,
+      isActive: true,
+    });
+  },
+});
+
+// Replace resume file with new PDF and update content
+export const replaceResumeFile = mutation({
+  args: {
+    resumeId: v.id("resumes"),
+    newFileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(), // Updated structured content
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    // Get the resume to ensure it belongs to the user
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
+      throw new Error("Resume not found or access denied");
+    }
+    
+    // Delete the old file from storage if it exists
+    if (resume.fileId) {
+      await ctx.storage.delete(resume.fileId);
+    }
+    
+    // Update the resume record with new file and content
+    return await ctx.db.patch(args.resumeId, {
+      fileId: args.newFileId,
+      fileName: args.fileName,
+      fileType: 'application/pdf',
+      fileSize: args.fileSize,
+      content: args.content,
+      updatedAt: Date.now(),
     });
   },
 });
@@ -518,6 +599,11 @@ export const deleteCoverLetter = mutation({
       throw new Error("Cover letter not found or access denied");
     }
     
+    // Delete the file from storage if it exists
+    if (coverLetter.fileId) {
+      await ctx.storage.delete(coverLetter.fileId);
+    }
+    
     return await ctx.db.delete(args.coverLetterId);
   },
 });
@@ -531,6 +617,105 @@ export const listCoverLetters = query({
       .query("coverLetters")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
+  },
+});
+
+// Save generated cover letter with PDF (called by AI tools during generation)
+export const saveGeneratedCoverLetterWithFile = mutation({
+  args: {
+    name: v.string(),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(), // Structured content (the input used to generate the cover letter)
+    template: v.optional(v.string()),
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const now = Date.now();
+    
+    // Save cover letter document with all metadata
+    return await ctx.db.insert("coverLetters", {
+      userId: userId,
+      name: args.name,
+      fileId: args.fileId,
+      fileName: args.fileName,
+      fileType: 'application/pdf',
+      fileSize: args.fileSize,
+      content: args.content,
+      template: args.template,
+      label: args.label,
+      tags: args.tags,
+      createdAt: now,
+      updatedAt: now,
+      isActive: true,
+    });
+  },
+});
+
+// Get a cover letter with optional file URL
+export const getCoverLetter = query({
+  args: { coverLetterId: v.id("coverLetters") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    
+    const coverLetter = await ctx.db.get(args.coverLetterId);
+    if (!coverLetter || coverLetter.userId !== userId) {
+      return null;
+    }
+    
+    // Get the file URL if there's a fileId
+    let fileUrl = null;
+    if (coverLetter.fileId) {
+      fileUrl = await ctx.storage.getUrl(coverLetter.fileId);
+    }
+    
+    return {
+      ...coverLetter,
+      fileUrl,
+    };
+  },
+});
+
+// Update cover letter metadata (label, tags, template)
+export const updateCoverLetterMetadata = mutation({
+  args: {
+    coverLetterId: v.id("coverLetters"),
+    name: v.optional(v.string()),
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    template: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const coverLetter = await ctx.db.get(args.coverLetterId);
+    if (!coverLetter || coverLetter.userId !== userId) {
+      throw new Error("Cover letter not found or access denied");
+    }
+
+    const updateData: {
+      name?: string;
+      label?: string;
+      tags?: string[];
+      template?: string;
+      updatedAt: number;
+    } = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.name !== undefined) updateData.name = args.name;
+    if (args.label !== undefined) updateData.label = args.label;
+    if (args.tags !== undefined) updateData.tags = args.tags;
+    if (args.template !== undefined) updateData.template = args.template;
+
+    return await ctx.db.patch(args.coverLetterId, updateData);
   },
 });
 
@@ -656,7 +841,6 @@ export const createTestResumes = mutation({
           personalInfo: {
             name: `Test User ${i}`,
             email: `test${i}@example.com`,
-            phone: `+1-555-${String(i).padStart(3, '0')}-0000`,
             location: `Test City ${i}, TS`,
             linkedin: `https://linkedin.com/in/testuser${i}`,
             github: `https://github.com/testuser${i}`,

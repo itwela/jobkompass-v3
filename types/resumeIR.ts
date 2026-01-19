@@ -3,7 +3,6 @@ export type ResumeIR = {
 		firstName: string;
 		lastName: string;
 		email: string;
-		phone?: string;
 		location?: string;
 		links?: { label: 'LinkedIn' | 'GitHub' | 'Portfolio'; url: string }[];
 	};

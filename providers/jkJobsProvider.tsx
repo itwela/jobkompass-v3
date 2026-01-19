@@ -12,6 +12,7 @@ interface Job {
   title: string;
   link: string;
   status: string;
+  compensation?: string;
   keywords?: string[];
   skills?: string[];
   description?: string;

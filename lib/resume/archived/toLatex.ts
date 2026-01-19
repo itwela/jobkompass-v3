@@ -22,7 +22,6 @@ function renderHeader(ir: ResumeIR): string {
 	parts.push(`\\centerline{\\Huge \\textbf{${fullName}}}`);
 	const lines: string[] = [];
 	lines.push(esc(ir.personal.email));
-	if (ir.personal.phone) lines.push(esc(ir.personal.phone));
 	if (ir.personal.location) lines.push(esc(ir.personal.location));
 	if (ir.personal.links && ir.personal.links.length > 0) {
 		for (const l of ir.personal.links) {

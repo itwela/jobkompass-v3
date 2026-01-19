@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, Save, Download, Loader2 } from "lucide-react";
+import { X, Save, Download, Loader2, CheckCircle } from "lucide-react";
 import JkCW_ResumeContentEditor from "./jkChatWindow-ResumeContentEditor";
+import JkSlideModalGlass from "../jkSlideModalGlass";
 
 interface DynamicJSONEditorProps {
     resumeId: Id<"resumes">;
@@ -15,11 +16,13 @@ interface DynamicJSONEditorProps {
 
 export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSONEditorProps) {
     const resume = useQuery(api.documents.getResume, { resumeId });
-    const updateResume = useMutation(api.documents.updateResume);
+    const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
+    const replaceResumeFile = useMutation(api.documents.replaceResumeFile);
     
     const [isSaving, setIsSaving] = useState(false);
     const [initialFormContent, setInitialFormContent] = useState<any>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [showSaveSuccess, setShowSaveSuccess] = useState(false);
     
     // Ref to hold current form content
     const formContentRef = React.useRef<any>(null);
@@ -46,15 +49,73 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                 return;
             }
             
-            await updateResume({
+            // Step 1: Generate PDF from the edited content
+            const apiRoute = template === "jake" 
+                ? "/api/resume/export/jake"
+                : "/api/resume/export/jake"; // Default to jake for now
+            
+            const pdfResponse = await fetch(apiRoute, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ content: contentToSave }),
+            });
+
+            if (!pdfResponse.ok) {
+                const errorData = await pdfResponse.json();
+                console.error("PDF generation failed:", errorData);
+                alert(`Failed to generate PDF: ${errorData.error || "Unknown error"}`);
+                setIsSaving(false);
+                return;
+            }
+
+            // Step 2: Get the PDF blob
+            const pdfBlob = await pdfResponse.blob();
+            
+            // Step 3: Upload to Convex storage
+            const uploadUrl = await generateUploadUrl();
+            
+            const uploadResponse = await fetch(uploadUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/pdf",
+                },
+                body: pdfBlob,
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error("Failed to upload PDF to storage");
+            }
+
+            const { storageId } = await uploadResponse.json();
+            
+            // Step 4: Replace the old file and update content
+            const firstName = contentToSave.personalInfo?.firstName || "";
+            const lastName = contentToSave.personalInfo?.lastName || "";
+            const fileName = `resume-${firstName}-${lastName}.pdf`.replace(/\s+/g, '-');
+            
+            await replaceResumeFile({
                 resumeId,
+                newFileId: storageId as Id<"_storage">,
+                fileName,
+                fileSize: pdfBlob.size,
                 content: contentToSave,
             });
             
             // Update initial content after save
             setInitialFormContent(contentToSave);
+            
+            // Show success notification
+            setShowSaveSuccess(true);
+            
+            // Auto-hide success after 4 seconds
+            setTimeout(() => {
+                setShowSaveSuccess(false);
+            }, 4000);
         } catch (error) {
             console.error("Failed to save resume:", error);
+            alert("Failed to save resume. Please try again.");
         } finally {
             setIsSaving(false);
         }
@@ -99,10 +160,25 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             const a = document.createElement("a");
             a.href = url;
             
-            // Get filename from Content-Disposition header or use default
-            const contentDisposition = response.headers.get("Content-Disposition");
-            const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-            a.download = filenameMatch ? filenameMatch[1] : "resume.pdf";
+            // Generate filename with same date convention as AI-generated resumes
+            const firstName = content.personalInfo?.firstName || "";
+            const lastName = content.personalInfo?.lastName || "";
+            const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+            
+            // Get company name or first word of job title for the filename
+            const firstExperience = Array.isArray(content.experience) && content.experience.length > 0 ? content.experience[0] : null;
+            let targetIdentifier = '';
+            if (firstExperience?.company) {
+                targetIdentifier = firstExperience.company;
+            } else if (firstExperience?.title) {
+                // Get first word of the title
+                targetIdentifier = firstExperience.title.split(' ')[0];
+            }
+            
+            const downloadName = targetIdentifier
+                ? `${firstName} ${lastName} - ${targetIdentifier} Resume (${dateStr}).pdf`.trim()
+                : `${firstName} ${lastName} Resume (${dateStr}).pdf`.trim();
+            a.download = downloadName || "resume.pdf";
             
             document.body.appendChild(a);
             a.click();
@@ -117,10 +193,23 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
     };
 
     return (
-        <div className="flex flex-col bg-background">
+        <div className="flex flex-col bg-background relative">
+            {/* Success Notification */}
+            <JkSlideModalGlass
+                isOpen={showSaveSuccess}
+                title="Resume Saved"
+                description={`Your resume "${resume?.name || 'Resume'}" has been updated with the new PDF.`}
+                icon={CheckCircle}
+                variant="green"
+                canMinimize={false}
+                position="top"
+            />
+            
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-xl font-semibold">Edit Resume Content</h2>
+            <div className="flex items-center justify-between p-4 border-b gap-4">
+                <h2 className="text-xl font-semibold truncate min-w-0">
+                    Editing {resume?.name || "Resume"}
+                </h2>
                 <div className="flex items-center gap-2">
                     <Button
                         onClick={handleDownload}

@@ -15,7 +15,7 @@ function newId() {
 }
 
 const emptyIR: ResumeIR = {
-	personal: { firstName: "", lastName: "", email: "", phone: "", location: "", links: [] },
+	personal: { firstName: "", lastName: "", email: "", location: "", links: [] },
 	sections: [
 		{ kind: "experience", items: [] },
 		{ kind: "education", items: [] },
@@ -39,7 +39,7 @@ type GenerateOptions = {
 	postProcess?: (value: string) => string;
 };
 
-type PersonalFieldKey = "firstName" | "lastName" | "email" | "phone" | "location";
+type PersonalFieldKey = "firstName" | "lastName" | "email" | "location";
 type ExperienceFieldKey = "company" | "title" | "start" | "end" | "location";
 
 type AssistantFieldUpdate =
@@ -429,24 +429,6 @@ export default function JkCW_ResumeEditor() {
 									renderInput={props => (
 										<Input
 											{...props}
-											placeholder="Phone"
-											value={ir.personal.phone ?? ""}
-											onChange={e => updatePersonal("phone", e.target.value)}
-										/>
-									)}
-									onGenerate={() =>
-										handleGenerateField("Phone number", value => updatePersonal("phone", value), {
-											guidance: "Provide a professional U.S. phone number using digits and separators.",
-											currentValue: ir.personal.phone ?? "",
-											postProcess: value => sanitizeResponse(value).replace(/[^\d+\-\s().]/g, ""),
-										})
-									}
-									label="Generate phone number"
-								/>
-								<FieldWithGenerate
-									renderInput={props => (
-										<Input
-											{...props}
 											placeholder="Location"
 											value={ir.personal.location ?? ""}
 											onChange={e => updatePersonal("location", e.target.value)}
@@ -707,7 +689,7 @@ function extractUpdatesFromAssistant(message: string): { cleanedMessage: string;
 	const fencedRegex = /```updates\s*([\s\S]*?)```/i;
 	const match = message.match(fencedRegex);
 	let cleaned = message;
-	const allowedPersonalFields: readonly PersonalFieldKey[] = ["firstName", "lastName", "email", "phone", "location"];
+	const allowedPersonalFields: readonly PersonalFieldKey[] = ["firstName", "lastName", "email", "location"];
 	const allowedExperienceFields: readonly ExperienceFieldKey[] = ["company", "title", "start", "end", "location"];
 
 	if (match) {

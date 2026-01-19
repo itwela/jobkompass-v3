@@ -64,6 +64,7 @@ export const updateUserProfile = mutation({
   args: {
     name: v.optional(v.string()),
     email: v.optional(v.string()),
+    resumePreferences: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -79,8 +80,49 @@ export const updateUserProfile = mutation({
     const updateData: any = {};
     if (args.name !== undefined) updateData.name = args.name;
     if (args.email !== undefined) updateData.email = args.email;
+    if (args.resumePreferences !== undefined) updateData.resumePreferences = args.resumePreferences;
 
     await ctx.db.patch(userId, updateData);
+    return { success: true };
+  },
+});
+
+export const getResumePreferences = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return null;
+    }
+
+    return (user as any)?.resumePreferences ?? [];
+  },
+});
+
+export const updateResumePreferences = mutation({
+  args: {
+    preferences: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    await ctx.db.patch(userId, {
+      resumePreferences: args.preferences,
+    });
+
     return { success: true };
   },
 });

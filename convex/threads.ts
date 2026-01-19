@@ -205,3 +205,25 @@ export const remove = mutation({
   },
 });
 
+// Mark a thread as having exceeded the context window
+export const markContextWindowExceeded = mutation({
+  args: {
+    threadId: v.id("threads"),
+    exceeded: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const username = await getOrCreateUsername(ctx);
+    if (!username) throw new Error("Not authenticated");
+
+    const thread = await ctx.db.get(args.threadId);
+    if (!thread || thread.username !== username) {
+      throw new Error("Not authorized");
+    }
+
+    await ctx.db.patch(args.threadId, {
+      contextWindowExceeded: args.exceeded,
+      updatedAt: Date.now(),
+    });
+  },
+});
+

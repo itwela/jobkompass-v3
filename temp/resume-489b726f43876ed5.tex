@@ -1,0 +1,199 @@
+%-------------------------
+% Resume in Latex (JOBKOMPASS JAKE TEMPLATE)
+% Author : JobKompass
+% Based off of: https://github.com/sb2nov/resume
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\setlength{\parskip}{0pt}
+\begin{document}
+
+%----------HEADING----------
+% \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+%   \textbf{\href{http://YOUR-PORTFOLIO.com/}{\Large YOUR NAME}} & Email : \href{mailto:your.email@example.com}{your.email@example.com}\\
+%   \href{http://YOUR-PORTFOLIO.com/}{http://YOUR-PORTFOLIO.com} & Mobile : YOUR-PHONE-NUMBER \\
+% \end{tabular*}
+
+\begin{center}
+    \textbf{\Huge \scshape {{YOUR NAME}}} \\ \vspace{1pt}
+    \small {{YOUR-PHONE-NUMBER}} $|$ \href{mailto:{{YOUR-EMAIL}}}{\underline{{YOUR-EMAIL}}} $|$
+    \href{https://linkedin.com/in/{{YOUR-LINKEDIN}}}{\underline{linkedin.com/in/{{YOUR-LINKEDIN}}}} $|$
+    \href{https://github.com/{{YOUR-GITHUB}}}{\underline{github.com/{{YOUR-GITHUB}}}}
+    % Uncomment below if you have a portfolio or website
+    % $|$ \href{https://your-portfolio.com}{\underline{your-portfolio.com}}
+\end{center}
+
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    % Example:
+    % \resumeSubheading
+    %  {University Name}{City, State/Country}
+    %  {Degree, Major}{Start Date -- End Date}
+    % Copy and customize below for each education entry
+    % \resumeSubheading
+    %   {UNIVERSITY or COLLEGE}{LOCATION}
+    %   {YOUR DEGREE AND MAJOR}{START DATE -- END DATE}
+
+    % Example placeholder entry:
+    % \resumeSubheading
+    %   {Example University}{Example City, Country}
+    %   {Bachelor of Science in Example Major}{Month YYYY -- Month YYYY}
+  \resumeSubHeadingListEnd
+
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+  \resumeSubHeadingListStart
+
+    % Example work experience entry:
+    % \resumeSubheading
+    %   {JOB TITLE}{Employment Dates}
+    %   {COMPANY}{LOCATION}
+    %   \resumeItemListStart
+    %     \resumeItem{Responsibility or achievement 1}
+    %     \resumeItem{Responsibility or achievement 2}
+    %     \resumeItem{Responsibility or achievement 3}
+    %   \resumeItemListEnd
+
+    % Example for multiple roles at one company:
+    % -----------Multiple Positions Heading-----------
+    % \resumeSubSubheading
+    %     {Job Title}{Dates for Sub-role}
+    %   \resumeItemListStart
+    %      \resumeItem{...}
+    %   \resumeItemListEnd
+    % \resumeSubHeadingListEnd
+    %-------------------------------------------
+
+  \resumeSubHeadingListEnd
+
+
+%-----------PROJECTS-----------
+\section{Projects}
+    \resumeSubHeadingListStart
+      % Example project entry:
+      % \resumeProjectHeading
+      %     {\textbf{Project Name} $|$ \emph{Technologies, Libraries}}{Date or Duration}
+      %     \resumeItemListStart
+      %       \resumeItem{Short summary of project or achievement}
+      %       \resumeItem{Technologies or techniques used}
+      %     \resumeItemListEnd
+
+    \resumeSubHeadingListEnd
+
+
+
+%
+%-----------PROGRAMMING SKILLS-----------
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+        % \textbf{Languages}{: List your programming languages} \\
+        % \textbf{Frameworks}{: List major frameworks/libraries} \\
+        % \textbf{Developer Tools}{: List tools, IDEs, platforms} \\
+        % \textbf{Libraries}{: List major libraries used}
+    }}
+ \end{itemize}
+
+
+%-------------------------------------------
+\end{document}

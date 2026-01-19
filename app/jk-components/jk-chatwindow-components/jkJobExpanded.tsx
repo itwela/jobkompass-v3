@@ -60,6 +60,7 @@ export default function JkJobExpanded() {
       title: "",
       link: "",
       status: statusOptions[0]?.value ?? "Interested",
+      compensation: "",
       dateApplied: "",
       interviewed: false,
       easyApply: "",
@@ -83,6 +84,7 @@ export default function JkJobExpanded() {
         statusOptions.find((option) => option.value === job.status)?.value ??
         statusOptions[0]?.value ??
         "Interested",
+      compensation: job.compensation ?? "",
       dateApplied: job.dateApplied ?? "",
       interviewed: job.interviewed ?? false,
       easyApply: job.easyApply ?? "",
@@ -224,6 +226,7 @@ export default function JkJobExpanded() {
         title: formState.title.trim(),
         link: formState.link.trim(),
         status: formState.status,
+        compensation: formState.compensation.trim() || undefined,
         keywords: formState.keywords,
         skills: formState.skills,
         description: formState.description.trim() || undefined,
@@ -378,12 +381,33 @@ export default function JkJobExpanded() {
               </div>
             </div>
 
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Compensation</label>
+              <Input
+                value={formState.compensation}
+                onChange={(event) => handleFieldChange("compensation")(event.target.value)}
+                placeholder="e.g., $100k-$150k, €60k, Competitive"
+              />
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Date applied
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Date applied
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+                      handleFieldChange("dateApplied")(today);
+                    }}
+                    className="text-xs text-primary hover:text-primary/80 hover:underline transition-colors"
+                  >
+                    Today?
+                  </button>
+                </div>
                 <Input
                   value={formState.dateApplied}
                   onChange={(event) => handleFieldChange("dateApplied")(event.target.value)}

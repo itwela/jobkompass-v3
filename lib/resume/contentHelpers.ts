@@ -6,7 +6,6 @@ export type ResumeContent = {
     personalInfo: {
         name: string;
         email: string;
-        phone?: string;
         location?: string;
         linkedin?: string;
         github?: string;
@@ -69,7 +68,6 @@ export function createEmptyResumeContent(): ResumeContent {
         personalInfo: {
             name: "",
             email: "",
-            phone: "",
             location: "",
             linkedin: "",
             github: "",
@@ -138,12 +136,6 @@ export function parseTextToResumeContent(text: string): Partial<ResumeContent> {
         content.personalInfo!.email = emailMatch[0];
     }
 
-    // Basic phone extraction
-    const phoneMatch = text.match(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-    if (phoneMatch) {
-        content.personalInfo!.phone = phoneMatch[0];
-    }
-
     return content;
 }
 
@@ -156,9 +148,6 @@ export function formatResumeContentAsText(content: ResumeContent): string {
     // Personal Info
     text += `${content.personalInfo.name}\n`;
     text += `${content.personalInfo.email}`;
-    if (content.personalInfo.phone) {
-        text += ` | ${content.personalInfo.phone}`;
-    }
     if (content.personalInfo.location) {
         text += ` | ${content.personalInfo.location}`;
     }
