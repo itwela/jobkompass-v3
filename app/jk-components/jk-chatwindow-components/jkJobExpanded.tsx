@@ -2,6 +2,7 @@
 
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
+import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -33,6 +34,7 @@ export default function JkJobExpanded() {
     statusOptions,
   } = useJobs();
   const { resumes } = useJobKompassResume();
+  const { coverLetterList } = useJobKompassDocuments();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
@@ -51,6 +53,14 @@ export default function JkJobExpanded() {
       .map((r: any) => r.name || r.title || "Untitled Resume")
       .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index);
   }, [resumes]);
+
+  // Get unique cover letter names from saved cover letters
+  const coverLetterNames = useMemo(() => {
+    if (!coverLetterList || !Array.isArray(coverLetterList)) return [];
+    return coverLetterList
+      .map((cl: any) => cl.name || "Untitled Cover Letter")
+      .filter((name: string, index: number, arr: string[]) => arr.indexOf(name) === index);
+  }, [coverLetterList]);
 
   const job = selectedJobId ? allJobs.find((j) => j._id === selectedJobId) : null;
 
@@ -486,11 +496,30 @@ export default function JkJobExpanded() {
                   <MessageSquare className="h-4 w-4" />
                   Cover letter used
                 </label>
-                <Input
-                  value={formState.coverLetterUsed}
-                  onChange={(event) => handleFieldChange("coverLetterUsed")(event.target.value)}
-                  placeholder="Optional"
-                />
+                {coverLetterNames.length > 0 ? (
+                  <Select
+                    value={formState.coverLetterUsed}
+                    onValueChange={(value) => handleFieldChange("coverLetterUsed")(value)}
+                  >
+                    <SelectTrigger className="w-full border border-input">
+                      <SelectValue placeholder="Select a cover letter..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {coverLetterNames.map((name: string) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={formState.coverLetterUsed}
+                    onChange={(event) => handleFieldChange("coverLetterUsed")(event.target.value)}
+                    placeholder="Optional"
+                    autoComplete="off"
+                  />
+                )}
               </div>
             </div>
 

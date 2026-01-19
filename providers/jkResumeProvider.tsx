@@ -35,6 +35,14 @@ interface JobKompassResumeContextType {
     applied: number;
     interviewing: number;
   }>;
+  coverLetterStats: Record<string, {
+    totalJobs: number;
+    offered: number;
+    rejected: number;
+    ghosted: number;
+    applied: number;
+    interviewing: number;
+  }>;
   
   selectionMode: boolean;
   setSelectionMode: (enabled: boolean) => void;
@@ -62,6 +70,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
   const { allJobs } = useJobs();
   
   const resumes = useQuery(api.documents.listResumes);
+  const coverLetters = useQuery(api.documents.listCoverLetters);
 
   console.log('resumes:', resumes);
   const deleteResumeMutation = useMutation(api.documents.deleteResume);
@@ -124,6 +133,66 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
     
     return stats;
   }, [resumes, allJobs]);
+
+  // Calculate cover letter stats locally using jobs from Jobs Provider
+  const coverLetterStats = useMemo(() => {
+    if (!coverLetters || !allJobs) return {};
+    
+    const stats: Record<string, {
+      totalJobs: number;
+      offered: number;
+      rejected: number;
+      ghosted: number;
+      applied: number;
+      interviewing: number;
+    }> = {};
+    
+    for (const coverLetter of coverLetters) {
+      const coverLetterTitle = coverLetter.name;
+      if (!coverLetterTitle) continue;
+      
+      // Match jobs by cover letter name
+      const matchingJobs = allJobs.filter((job) => {
+        if (!job.coverLetterUsed) return false;
+        
+        const jobCoverLetterName = job.coverLetterUsed.trim().toLowerCase();
+        const clName = coverLetter.name?.trim().toLowerCase();
+        
+        return jobCoverLetterName === clName;
+      });
+      
+      if (matchingJobs.length > 0) {
+        stats[coverLetterTitle] = {
+          totalJobs: 0,
+          offered: 0,
+          rejected: 0,
+          ghosted: 0,
+          applied: 0,
+          interviewing: 0,
+        };
+        
+        for (const job of matchingJobs) {
+          stats[coverLetterTitle].totalJobs++;
+          
+          const status = job.status?.toLowerCase() || '';
+          if (status === 'offered' || status === 'accepted') {
+            stats[coverLetterTitle].offered++;
+          } else if (status === 'rejected') {
+            stats[coverLetterTitle].rejected++;
+          } else if (status === 'ghosted' || status === 'no response') {
+            stats[coverLetterTitle].ghosted++;
+          } else if (status === 'applied') {
+            stats[coverLetterTitle].applied++;
+          } else if (status === 'interviewing') {
+            stats[coverLetterTitle].interviewing++;
+          }
+        }
+      }
+    }
+    
+    return stats;
+  }, [coverLetters, allJobs]);
+
   const [selectionMode, setSelectionModeState] = useState(false);
   const [selectedResumeIds, setSelectedResumeIds] = useState<string[]>([]);
   const toggleResumeSelection = useCallback((id: string) => {
@@ -217,6 +286,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
 
     resumes,
     resumeStats,
+    coverLetterStats,
     selectionMode,
     setSelectionMode,
     selectedResumeIds,

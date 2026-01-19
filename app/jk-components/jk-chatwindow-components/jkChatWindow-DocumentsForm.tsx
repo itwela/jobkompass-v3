@@ -28,6 +28,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const {
         resumes,
         resumeStats,
+        coverLetterStats,
         selectionMode,
         setSelectionMode,
         selectedResumeIds,
@@ -710,8 +711,10 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                             ? new Date(resume.updatedAt).toLocaleDateString()
                             : "Recently created";
 
-                        // Get stats for this resume by title/name
-                        const stats = resumeStats[title] || resumeStats[resume?.name] || null;
+                        // Get stats for this document by title/name
+                        const stats = documentType === "resume"
+                            ? (resumeStats[title] || resumeStats[resume?.name] || null)
+                            : (coverLetterStats[title] || coverLetterStats[resume?.name] || null);
                         const totalJobs = stats?.totalJobs || 0;
                         const offered = stats?.offered || 0;
                         const rejected = stats?.rejected || 0;
@@ -752,7 +755,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         )}
                                     </div>
                                     {/* Job count badge - top left */}
-                                    {totalJobs > 0 && documentType === "resume" && (
+                                    {totalJobs > 0 && (
                                         <div className="absolute top-2 left-2 flex flex-col gap-1">
                                             <div className="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                                                 <Briefcase className="h-3 w-3" />
