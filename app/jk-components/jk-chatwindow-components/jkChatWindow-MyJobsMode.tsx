@@ -10,7 +10,8 @@ import JkJobsGrid from "./jkJobsGrid";
 import JkJobExpanded from "./jkJobExpanded";
 import JkConfirmDelete from "../jkConfirmDelete";
 import JkGap from "../jkGap";
-import JkTemplateSelectionModal, { DocumentType } from "../jkTemplateSelectionModal";
+import JkTemplateSelector, { TemplateType } from "../jkTemplateSelector";
+import { toast } from "@/lib/toast";
 import { Id } from "@/convex/_generated/dataModel";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -40,6 +41,7 @@ export default function JkCW_MyJobsMode() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateSelectorType, setTemplateSelectorType] = useState<TemplateType>('resume');
   const [selectedJobForGeneration, setSelectedJobForGeneration] = useState<{
     id: Id<"jobs">;
     title: string;
@@ -82,98 +84,35 @@ export default function JkCW_MyJobsMode() {
     }
   };
 
-  const handleGenerateDocument = (jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => {
+  const handleOpenTemplateSelector = (
+    type: TemplateType,
+    jobId: Id<"jobs">,
+    jobTitle: string,
+    jobCompany: string
+  ) => {
+    setTemplateSelectorType(type);
     setSelectedJobForGeneration({ id: jobId, title: jobTitle, company: jobCompany });
     setIsTemplateModalOpen(true);
   };
 
   // TODO: THE ACTUAL DOCUMENT GENERATION LOGIC IS HERE
-  const handleTemplateSelect = async (documentType: DocumentType, templateId: string) => {
-    if (!selectedJobForGeneration || !user) return;
+  const handleTemplateSelect = async (templateId: string) => {
+    if (!selectedJobForGeneration) return;
 
     setIsGenerating(true);
-    try {
-      // Construct the message based on document type and template
-      let message = '';
-      if (documentType === 'resume') {
-        message = `Generate a professional resume using the ${templateId} template for the position "${selectedJobForGeneration.title}" at "${selectedJobForGeneration.company}". Please create a tailored resume that highlights relevant skills and experience for this role.`;
-      } else if (documentType === 'cover-letter') {
-        message = `Generate a professional cover letter using the ${templateId} template for the position "${selectedJobForGeneration.title}" at "${selectedJobForGeneration.company}". Please create a personalized cover letter that demonstrates my interest and fit for this role.`;
-      }
+    const typeLabel = templateSelectorType === 'resume' ? 'resume' : 'cover letter';
+    const toastId = toast.loading(`Generating ${typeLabel} for ${selectedJobForGeneration.company}...`);
 
-      // Call the chat API to generate the document
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: message,
-          history: [],
-          agentId: 'jobkompass',
-          userId: user._id,
-          username: user.username || user.email || undefined,
-          contextJobIds: [selectedJobForGeneration.id],
-        }),
+    // Simulate generation (replace with actual generation later)
+    setTimeout(() => {
+      toast.dismiss(toastId);
+      toast.success(`${templateSelectorType === 'resume' ? 'Resume' : 'Cover letter'} generated!`, {
+        description: `Your ${typeLabel} for ${selectedJobForGeneration.title} at ${selectedJobForGeneration.company} is ready.`
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // Read the streaming response and extract tool results
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let toolCallsData: any[] = [];
-      let pdfBase64: string | null = null;
-      let fileName: string | null = null;
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === 'start' && data.toolCalls) {
-                  toolCallsData = data.toolCalls;
-                }
-                if (data.type === 'done') {
-                  break;
-                }
-              } catch (e) {
-                // Ignore parse errors
-              }
-            }
-          }
-        }
-      }
-
-      // Extract PDF from tool results if available
-      // Note: The actual PDF data comes from the tool execution result
-      // For now, we'll let the chat handle displaying it, and the user can download it
-      // In a future enhancement, we could parse the full response to extract and save the PDF
-
-      // Close modal after successful generation
+      setIsGenerating(false);
       setIsTemplateModalOpen(false);
       setSelectedJobForGeneration(null);
-      
-      // Show success message
-      // The generated document will appear in the chat, and the user can download it
-      // TODO: In future, automatically save the PDF to documents section
-    } catch (error) {
-      console.error('Error generating document:', error);
-      alert('Failed to generate document. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
+    }, 2000);
   };
 
   if (authLoading) {
@@ -215,7 +154,7 @@ export default function JkCW_MyJobsMode() {
   }
 
   return (
-    <>
+    <div className="relative h-full">
       <div className="flex flex-col h-full overflow-y-auto chat-scroll bg-gradient-to-br from-background via-background to-muted/20">
         <div className="max-w-7xl mx-auto w-full px-6 py-8">
           {/* Header */}
@@ -336,7 +275,7 @@ export default function JkCW_MyJobsMode() {
           )}
 
           {/* Jobs Grid */}
-          <JkJobsGrid onGenerateDocument={handleGenerateDocument} />
+          <JkJobsGrid onOpenTemplateSelector={handleOpenTemplateSelector} />
 
           <JkGap />
         </div>
@@ -344,19 +283,19 @@ export default function JkCW_MyJobsMode() {
       <JkJobExpanded />
       
       {/* Template Selection Modal */}
-      <JkTemplateSelectionModal
+      <JkTemplateSelector
         isOpen={isTemplateModalOpen}
         onClose={() => {
           setIsTemplateModalOpen(false);
           setSelectedJobForGeneration(null);
         }}
-        // REVIEW: Template Selection
-        onSelect={handleTemplateSelect}
-        jobId={selectedJobForGeneration?.id}
+        type={templateSelectorType}
+        onSelectTemplate={handleTemplateSelect}
+        isGenerating={isGenerating}
         jobTitle={selectedJobForGeneration?.title}
         jobCompany={selectedJobForGeneration?.company}
       />
-    </>
+    </div>
   );
 }
 

@@ -5,9 +5,16 @@ import { BlurFade } from "@/components/ui/blur-fade";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { Id } from "@/convex/_generated/dataModel";
 import { motion } from "framer-motion";
-import { ExternalLink, Calendar, Briefcase, Trash2, CheckCircle2, Circle, Sparkles } from "lucide-react";
+import { ExternalLink, Calendar, Briefcase, Trash2, CheckCircle2, Circle, Sparkles, FileText, FileCheck } from "lucide-react";
 import JkConfirmDelete from "../jkConfirmDelete";
 import JkCompensationBadge from "../jkCompensationBadge";
+import { TemplateType } from "../jkTemplateSelector";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface JobCardProps {
   job: {
@@ -27,7 +34,7 @@ interface JobCardProps {
   selectionMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
-  onGenerateDocument: (jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
+  onOpenTemplateSelector: (type: TemplateType, jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
 }
 
 function JobCard({
@@ -39,7 +46,7 @@ function JobCard({
   selectionMode,
   selected,
   onToggleSelect,
-  onGenerateDocument,
+  onOpenTemplateSelector,
 }: JobCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [localDeleting, setLocalDeleting] = useState(false);
@@ -88,9 +95,14 @@ function JobCard({
 
   const statusColor = statusColors[job.status] || 'bg-gray-100 text-gray-800 border-gray-200';
 
-  const handleGenerateClick = (event: MouseEvent<HTMLButtonElement>) => {
+  const handleGenerateResume = (event: MouseEvent) => {
     event.stopPropagation();
-    onGenerateDocument(job._id, job.title, job.company);
+    onOpenTemplateSelector('resume', job._id, job.title, job.company);
+  };
+
+  const handleGenerateCoverLetter = (event: MouseEvent) => {
+    event.stopPropagation();
+    onOpenTemplateSelector('cover-letter', job._id, job.title, job.company);
   };
 
   const cardDetails = (
@@ -116,13 +128,27 @@ function JobCard({
         >
           View Job <ExternalLink className="h-3 w-3" />
         </a>
-        <button
-          onClick={handleGenerateClick}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
-          <Sparkles className="h-3 w-3" />
-          Generate
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            >
+              <Sparkles className="h-3 w-3" />
+              Generate
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={handleGenerateResume}>
+              <FileText className="h-4 w-4 mr-2" />
+              Resume
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleGenerateCoverLetter}>
+              <FileCheck className="h-4 w-4 mr-2" />
+              Cover Letter
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -203,10 +229,10 @@ function JobCard({
 }
 
 interface JkJobsGridProps {
-  onGenerateDocument?: (jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
+  onOpenTemplateSelector?: (type: TemplateType, jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
 }
 
-export default function JkJobsGrid({ onGenerateDocument }: JkJobsGridProps = {}) {
+export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps = {}) {
   const {
     allJobs,
     filteredJobs,
@@ -220,6 +246,17 @@ export default function JkJobsGrid({ onGenerateDocument }: JkJobsGridProps = {})
     selectedStatus,
   } = useJobs();
   const [deletingId, setDeletingId] = useState<Id<"jobs"> | null>(null);
+
+  const handleOpenTemplateSelectorInternal = (
+    type: TemplateType,
+    jobId: Id<"jobs">,
+    jobTitle: string,
+    jobCompany: string
+  ) => {
+    if (onOpenTemplateSelector) {
+      onOpenTemplateSelector(type, jobId, jobTitle, jobCompany);
+    }
+  };
 
   const handleDelete = async (id: Id<"jobs">) => {
     setDeletingId(id);
@@ -289,7 +326,7 @@ export default function JkJobsGrid({ onGenerateDocument }: JkJobsGridProps = {})
           selectionMode={selectionMode}
           selected={selectedJobIds.includes(job._id)}
           onToggleSelect={() => toggleJobSelection(job._id)}
-          onGenerateDocument={onGenerateDocument || (() => { })}
+          onOpenTemplateSelector={handleOpenTemplateSelectorInternal}
         />
       ))}
     </div>
