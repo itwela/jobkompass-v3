@@ -35,6 +35,7 @@ interface JobKompassResumeContextType {
     applied: number;
     interviewing: number;
   }>;
+  resumePreferences: string[] | null | undefined;
   coverLetterStats: Record<string, {
     totalJobs: number;
     offered: number;
@@ -71,6 +72,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
   
   const resumes = useQuery(api.documents.listResumes);
   const coverLetters = useQuery(api.documents.listCoverLetters);
+  const resumePreferences = useQuery(api.auth.getResumePreferences);
 
   console.log('resumes:', resumes);
   const deleteResumeMutation = useMutation(api.documents.deleteResume);
@@ -286,6 +288,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
 
     resumes,
     resumeStats,
+    resumePreferences,
     coverLetterStats,
     selectionMode,
     setSelectionMode,

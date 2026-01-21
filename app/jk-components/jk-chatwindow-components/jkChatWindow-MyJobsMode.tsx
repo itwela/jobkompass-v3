@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useJobs } from "@/providers/jkJobsProvider";
+import { useJobKompassResume } from "@/providers/jkResumeProvider";
+import { useAuth } from "@/providers/jkAuthProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogIn, Filter, Search, X } from "lucide-react";
@@ -13,9 +15,6 @@ import JkGap from "../jkGap";
 import JkTemplateSelector, { TemplateType } from "../jkTemplateSelector";
 import { toast } from "@/lib/toast";
 import { Id } from "@/convex/_generated/dataModel";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useConvexAuth } from "convex/react";
 
 export default function JkCW_MyJobsMode() {
   const {
@@ -42,16 +41,11 @@ export default function JkCW_MyJobsMode() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [templateSelectorType, setTemplateSelectorType] = useState<TemplateType>('resume');
-  const [selectedJobForGeneration, setSelectedJobForGeneration] = useState<{
-    id: Id<"jobs">;
-    title: string;
-    company: string;
-  } | null>(null);
+  const [selectedJobForGeneration, setSelectedJobForGeneration] = useState<any | null>(null);
+  const [selectedReferenceResumeId, setSelectedReferenceResumeId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const { isAuthenticated: isAuth } = useConvexAuth();
-  const user = useQuery(api.auth.currentUser, isAuth ? {} : "skip");
-  const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
-  const uploadResumeFile = useMutation(api.documents.uploadResumeFile);
+  const { user } = useAuth();
+  const { resumes, resumePreferences } = useJobKompassResume();
 
   useEffect(() => {
     if (!selectionMode) {
@@ -86,16 +80,14 @@ export default function JkCW_MyJobsMode() {
 
   const handleOpenTemplateSelector = (
     type: TemplateType,
-    jobId: Id<"jobs">,
-    jobTitle: string,
-    jobCompany: string
+    job: any,
   ) => {
     setTemplateSelectorType(type);
-    setSelectedJobForGeneration({ id: jobId, title: jobTitle, company: jobCompany });
+    setSelectedJobForGeneration(job);
+    setSelectedReferenceResumeId(null);
     setIsTemplateModalOpen(true);
   };
 
-  // TODO: THE ACTUAL DOCUMENT GENERATION LOGIC IS HERE
   const handleTemplateSelect = async (templateId: string) => {
     if (!selectedJobForGeneration) return;
 
@@ -103,16 +95,45 @@ export default function JkCW_MyJobsMode() {
     const typeLabel = templateSelectorType === 'resume' ? 'resume' : 'cover letter';
     const toastId = toast.loading(`Generating ${typeLabel} for ${selectedJobForGeneration.company}...`);
 
-    // Simulate generation (replace with actual generation later)
-    setTimeout(() => {
-      toast.dismiss(toastId);
-      toast.success(`${templateSelectorType === 'resume' ? 'Resume' : 'Cover letter'} generated!`, {
-        description: `Your ${typeLabel} for ${selectedJobForGeneration.title} at ${selectedJobForGeneration.company} is ready.`
+    try {
+      const response = await fetch('/api/template/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          templateType: templateSelectorType,
+          templateId: templateId,
+          jobId: selectedJobForGeneration._id?.toString(),
+          jobTitle: selectedJobForGeneration.title,
+          jobCompany: selectedJobForGeneration.company,
+          referenceResumeId: templateSelectorType === 'resume' ? selectedReferenceResumeId : undefined,
+        }),
       });
-      setIsGenerating(false);
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate document');
+      }
+
+      toast.dismiss(toastId);
+      const documentType = templateSelectorType === 'resume' ? 'Resume' : 'Cover letter';
+      toast.success(`${documentType} for ${selectedJobForGeneration.company} generated!`, {
+        description: `Your ${typeLabel} is ready. Check your documents to see your new ${typeLabel} for ${selectedJobForGeneration.title} at ${selectedJobForGeneration.company}.`
+      });
+      
       setIsTemplateModalOpen(false);
       setSelectedJobForGeneration(null);
-    }, 2000);
+    } catch (error) {
+      console.error('Error generating document:', error);
+      toast.dismiss(toastId);
+      toast.error(`Failed to generate ${typeLabel}`, {
+        description: error instanceof Error ? error.message : 'Something went wrong. Please try again.'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (authLoading) {
@@ -154,7 +175,7 @@ export default function JkCW_MyJobsMode() {
   }
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full !no-scrollbar">
       <div className="flex flex-col h-full overflow-y-auto chat-scroll bg-gradient-to-br from-background via-background to-muted/20">
         <div className="max-w-7xl mx-auto w-full px-6 py-8">
           {/* Header */}
@@ -288,12 +309,19 @@ export default function JkCW_MyJobsMode() {
         onClose={() => {
           setIsTemplateModalOpen(false);
           setSelectedJobForGeneration(null);
+          setSelectedReferenceResumeId(null);
         }}
         type={templateSelectorType}
         onSelectTemplate={handleTemplateSelect}
         isGenerating={isGenerating}
         jobTitle={selectedJobForGeneration?.title}
         jobCompany={selectedJobForGeneration?.company}
+        referenceResumes={(resumes || []).map((r: any) => ({
+          id: r._id || r.id,
+          name: r.name || 'Untitled Resume',
+        }))}
+        selectedReferenceResumeId={selectedReferenceResumeId}
+        onSelectReferenceResume={setSelectedReferenceResumeId}
       />
     </div>
   );

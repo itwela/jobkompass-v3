@@ -297,7 +297,7 @@ export default function JkSidebar() {
                     </>
                   )}
                 </AnimatePresence>
-                  <JkGap size="large" />
+                  <JkGap size="small" />
 
 
               </div>

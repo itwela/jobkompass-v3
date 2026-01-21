@@ -28,7 +28,7 @@ export default function JkChatWindow() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full !no-scrollbar">
       {conditionalStyles.showIntroScreen && <JkCW_IntroScreen />}
       {conditionalStyles.showHelpMode && <JkCW_HelpMode />}
       {/* NOTE */}

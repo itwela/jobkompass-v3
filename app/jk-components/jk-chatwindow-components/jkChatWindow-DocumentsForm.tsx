@@ -15,6 +15,7 @@ import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
+import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEditor";
 import JkComingSoonTooltip from "../jkComingSoonTooltip";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
@@ -53,6 +54,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
     const [editingContentResumeId, setEditingContentResumeId] = useState<Id<"resumes"> | null>(null);
+    const [editingContentCoverLetterId, setEditingContentCoverLetterId] = useState<Id<"coverLetters"> | null>(null);
     
     // File upload state
     const [isUploading, setIsUploading] = useState(false);
@@ -885,19 +887,22 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-                                                        {/* Edit content - only for resumes (cover letter editor coming soon) */}
-                                                        {documentType === "resume" && (
-                                                            <DropdownMenuItem
-                                                                onClick={(event) => {
-                                                                    event.stopPropagation();
+                                                        {/* Edit content - for both resumes and cover letters */}
+                                                        <DropdownMenuItem
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                if (documentType === "resume") {
                                                                     selectDocument(resumeId, "resume");
                                                                     setEditingContentResumeId(resume._id);
-                                                                }}
-                                                            >
-                                                                <Pencil className="h-4 w-4" />
-                                                                <span>Edit content</span>
-                                                            </DropdownMenuItem>
-                                                        )}
+                                                                } else if (documentType === "cover-letter") {
+                                                                    selectDocument(resumeId, "cover-letter");
+                                                                    setEditingContentCoverLetterId(resume._id as Id<"coverLetters">);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                            <span>Edit content</span>
+                                                        </DropdownMenuItem>
                                                         {/* Edit labels & tags - works for both resumes and cover letters */}
                                                         <DropdownMenuItem
                                                             onClick={(event) => {
@@ -1224,6 +1229,15 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     <JkCW_DynamicJSONEditor
                         resumeId={editingContentResumeId}
                         onClose={() => setEditingContentResumeId(null)}
+                    />
+                </div>
+            )}
+
+            {editingContentCoverLetterId && (
+                <div className="mt-6 rounded-xl border border-border bg-card overflow-hidden">
+                    <JkCW_CoverLetterContentEditor
+                        coverLetterId={editingContentCoverLetterId}
+                        onClose={() => setEditingContentCoverLetterId(null)}
                     />
                 </div>
             )}

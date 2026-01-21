@@ -95,14 +95,14 @@ function JobCard({
 
   const statusColor = statusColors[job.status] || 'bg-gray-100 text-gray-800 border-gray-200';
 
-  const handleGenerateResume = (event: MouseEvent) => {
+const handleGenerateResume = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('resume', job._id, job.title, job.company);
+    onOpenTemplateSelector('resume', job);
   };
 
   const handleGenerateCoverLetter = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('cover-letter', job._id, job.title, job.company);
+    onOpenTemplateSelector('cover-letter', job);
   };
 
   const cardDetails = (
@@ -229,7 +229,7 @@ function JobCard({
 }
 
 interface JkJobsGridProps {
-  onOpenTemplateSelector?: (type: TemplateType, jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
+  onOpenTemplateSelector?: (type: TemplateType, job: any) => void;
 }
 
 export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps = {}) {
@@ -249,12 +249,10 @@ export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps =
 
   const handleOpenTemplateSelectorInternal = (
     type: TemplateType,
-    jobId: Id<"jobs">,
-    jobTitle: string,
-    jobCompany: string
+    job: any,
   ) => {
     if (onOpenTemplateSelector) {
-      onOpenTemplateSelector(type, jobId, jobTitle, jobCompany);
+      onOpenTemplateSelector(type, job);
     }
   };
 

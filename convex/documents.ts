@@ -554,15 +554,7 @@ export const updateCoverLetter = mutation({
   args: {
     coverLetterId: v.id("coverLetters"),
     name: v.optional(v.string()),
-    content: v.optional(v.object({
-      template: v.string(),
-      company: v.optional(v.string()),
-      position: v.optional(v.string()),
-      customizations: v.optional(v.object({
-        keyPoints: v.array(v.string()),
-        tone: v.string(),
-      })),
-    })),
+    content: v.optional(v.any()), // Flexible content - can be any JSON structure
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -679,6 +671,42 @@ export const getCoverLetter = query({
       ...coverLetter,
       fileUrl,
     };
+  },
+});
+
+// Replace cover letter file with new PDF and update content
+export const replaceCoverLetterFile = mutation({
+  args: {
+    coverLetterId: v.id("coverLetters"),
+    newFileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(), // Updated structured content
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    // Get the cover letter to ensure it belongs to the user
+    const coverLetter = await ctx.db.get(args.coverLetterId);
+    if (!coverLetter || coverLetter.userId !== userId) {
+      throw new Error("Cover letter not found or access denied");
+    }
+    
+    // Delete the old file from storage if it exists
+    if (coverLetter.fileId) {
+      await ctx.storage.delete(coverLetter.fileId);
+    }
+    
+    // Update the cover letter record with new file and content
+    return await ctx.db.patch(args.coverLetterId, {
+      fileId: args.newFileId,
+      fileName: args.fileName,
+      fileType: 'application/pdf',
+      fileSize: args.fileSize,
+      content: args.content,
+      updatedAt: Date.now(),
+    });
   },
 });
 

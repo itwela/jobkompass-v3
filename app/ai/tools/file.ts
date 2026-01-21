@@ -91,7 +91,8 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       hobbies: z.array(z.string()).optional().nullable().describe('Relevant hobbies'),
       languages: z.array(z.string()).optional().nullable().describe('Languages spoken'),
       references: z.array(z.string()).optional().nullable().describe('References'),
-    }).optional().nullable(), 
+    }).optional().nullable(),
+    targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
   }),
   execute: async (input) => {
     try {
@@ -298,7 +299,9 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
           const now = new Date();
           const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); // e.g. "Jun 10, 24"
           
-          const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume (${formattedTime})`;
+          // Include company name in resume title if provided
+          const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
+          const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
           await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
@@ -494,7 +497,9 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
           
-          const coverLetterName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Cover Letter (${formattedTime})`;
+          // Include company name in cover letter title
+          const companySuffix = input.jobInfo?.company ? ` - ${input.jobInfo.company}` : '';
+          const coverLetterName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Cover Letter${companySuffix} (${formattedTime})`;
           
           await convexClient.mutation(api.documents.saveGeneratedCoverLetterWithFile, {
             name: coverLetterName,
