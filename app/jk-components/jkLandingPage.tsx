@@ -7,6 +7,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { mainAssets } from "../constants";
 import { useMutation } from "convex/react";
+import JkPublicHeader from "./jkPublicHeader";
+import JkGetStartedButton from "./jkGetStartedButton";
 import { api } from "@/convex/_generated/api";
 import { toast } from "@/lib/toast";
 import { ChevronDown, ChevronUp, X, CheckCircle2 } from "lucide-react";
@@ -115,34 +117,7 @@ export default function JkLandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Navigation */}
-      <nav className="w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-end gap-3">
-            <Image
-              src={mainAssets.logo}
-              alt="JobKompass Logo"
-              width={30}
-              height={30}
-              className="object-contain"
-              priority
-            />
-            <span className="text-xl font-semibold tracking-tight">JobKompass</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/app">
-              <Button variant="ghost" size="sm">
-                Sign in
-              </Button>
-            </Link>
-            <Link href="/app">
-              <Button size="sm">
-                Get started
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <JkPublicHeader />
 
       {/* Hero Section */}
       <section className="flex-1 flex items-center justify-center px-6 py-20">
@@ -157,11 +132,7 @@ export default function JkLandingPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-            <Link href="/app">
-              <Button size="lg" className="text-base px-8">
-                Get started
-              </Button>
-            </Link>
+            <JkGetStartedButton size="lg" className="text-base px-8" />
             <Link href="#waitlist">
               <Button size="lg" variant="outline" className="text-base px-8">
                 Join waitlist

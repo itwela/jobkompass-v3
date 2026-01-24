@@ -11,6 +11,7 @@ import { JkResourcesProvider } from "@/providers/jkResourcesProvider";
 import { JkJobsProvider } from "@/providers/jkJobsProvider";
 import { JkHelpProvider } from "@/providers/jkHelpProvider";
 import { JkToastProvider } from "@/providers/jkToastProvider";
+import { SubscriptionProvider } from "@/providers/jkSubscriptionProvider";
 
 export const metadata: Metadata = {
   title: "Jobkompass - A Kompass Product",
@@ -26,27 +27,29 @@ export default function RootLayout({
     <ConvexAuthNextjsServerProvider>
       <JkConvexProviders>
         <JkAuthProvider>
-          <JobKompassThemeProvider>
-            <JkResourcesProvider>
-              <JkJobsProvider>
-              <JkHelpProvider>
-                <JobKompassResumeProvider>
-                  <JobKompassDocumentsProvider>
-                    <JobKompassChatWindowProvider>
-                      <JkToastProvider>
+          <SubscriptionProvider>
+            <JobKompassThemeProvider>
+              <JkResourcesProvider>
+                <JkJobsProvider>
+                <JkHelpProvider>
+                  <JobKompassResumeProvider>
+                    <JobKompassDocumentsProvider>
+                      <JobKompassChatWindowProvider>
+                        <JkToastProvider>
                       <html lang="en">
                         <body className={`antialiased min-h-screen bg-background text-foreground`}>
                           {children}
                         </body>
                       </html>
-                      </JkToastProvider>
-                    </JobKompassChatWindowProvider>
-                  </JobKompassDocumentsProvider>
-                </JobKompassResumeProvider>
-              </JkHelpProvider>
-              </JkJobsProvider>
-            </JkResourcesProvider>
-          </JobKompassThemeProvider>
+                        </JkToastProvider>
+                      </JobKompassChatWindowProvider>
+                    </JobKompassDocumentsProvider>
+                  </JobKompassResumeProvider>
+                </JkHelpProvider>
+                </JkJobsProvider>
+              </JkResourcesProvider>
+            </JobKompassThemeProvider>
+          </SubscriptionProvider>
         </JkAuthProvider>
       </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>

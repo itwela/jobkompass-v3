@@ -144,6 +144,7 @@ const schema = defineSchema({
     isAnonymous: v.optional(v.boolean()),
     username: v.optional(v.string()), // Username field (optional for backward compatibility)
     resumePreferences: v.optional(v.array(v.string())), // User's resume generation preferences
+    lastSignInAt: v.optional(v.number()), // Timestamp of last sign-in
   })
     .index("email", ["email"]),
 
@@ -154,6 +155,33 @@ const schema = defineSchema({
     createdAt: v.number(),
   })
     .index("by_email", ["email"]),
+
+  // Subscriptions table
+  subscriptions: defineTable({
+    userId: v.string(),
+    stripeSubscriptionId: v.string(), // Stripe subscription ID
+    stripeCustomerId: v.string(), // Stripe customer ID
+    planId: v.string(), // Your plan identifier (e.g., "free", "pro", "enterprise")
+    status: v.string(), // "active", "trialing", "past_due", "canceled", etc.
+    currentPeriodStart: v.number(),
+    currentPeriodEnd: v.number(),
+    trialEnd: v.optional(v.number()),
+    cancelAtPeriodEnd: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_stripe_subscription", ["stripeSubscriptionId"]),
+
+  // Referrals table
+  referrals: defineTable({
+    referrerUserId: v.string(), // User who referred
+    referredUserId: v.string(), // User who was referred
+    paddleReferralId: v.optional(v.string()),
+    status: v.string(), // "pending", "active", "completed"
+    rewardAmount: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_referrer", ["referrerUserId"])
+    .index("by_referred", ["referredUserId"]),
 });
 
 export default schema;

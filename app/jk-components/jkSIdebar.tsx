@@ -4,38 +4,38 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAuth } from "@/providers/jkAuthProvider"
+import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
-import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings } from "lucide-react"
+import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuthActions } from "@convex-dev/auth/react"
 import { mainAssets } from "@/app/constants"
 import Image from "next/image"
+import Link from "next/link"
 import JkGap from './jkGap'
+import JkSearchModal from './jkSearchModal'
 
 export default function JkSidebar() {
   const { user, isAuthenticated } = useAuth()
+  const { planId } = useSubscription()
   const { currentThreadId, setCurrentThreadId, setCurrentMode, allModes, currentMode } = useJobKompassChatWindow()
   const [isThreadsExpanded, setIsThreadsExpanded] = useState(true)
-  const [showSignIn, setShowSignIn] = useState(false)
-  const [signInStep, setSignInStep] = useState<"signIn" | "signUp">("signIn")
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [authLoading, setAuthLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [threadToDelete, setThreadToDelete] = useState<any>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [searchModalOpen, setSearchModalOpen] = useState(false)
 
   const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
   const deleteThread = useMutation(api.threads.remove)
-  const { signIn, signOut } = useAuthActions()
+  const { signOut } = useAuthActions()
 
-  // Listen for custom event to open sign-in modal
+  // Listen for custom event to navigate to sign-in page
   useEffect(() => {
     const handleOpenSignIn = () => {
-      setShowSignIn(true)
+      window.location.href = '/auth'
     }
     window.addEventListener('jk:openSignIn', handleOpenSignIn)
     return () => {
@@ -156,6 +156,13 @@ export default function JkSidebar() {
             <span className="text-base font-semibold">JobKompass</span>
           </div>
           <div className="flex h-max gap-2">
+            <button
+              onClick={() => setSearchModalOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              title="Search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <button
               onClick={handleNewChat}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
@@ -318,7 +325,22 @@ export default function JkSidebar() {
           <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
             <PopoverTrigger asChild>
               <button className="w-full px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left">
-                <div className="text-sm font-medium truncate">{user.name || user.email}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium truncate">{user.name || user.email}</div>
+                  {planId && planId !== 'free' && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      planId.includes('pro') 
+                        ? 'bg-primary text-primary-foreground' 
+                        : planId.includes('plus')
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-green-500 text-white'
+                    }`}>
+                      {planId === 'starter' ? 'Starter' : 
+                       planId.includes('pro') ? 'Pro' : 
+                       planId.includes('plus') ? 'Plus' : planId}
+                    </span>
+                  )}
+                </div>
                 {user.username && (
                   <div className="text-xs text-muted-foreground">@{user.username}</div>
                 )}
@@ -356,104 +378,12 @@ export default function JkSidebar() {
             </PopoverContent>
           </Popover>
         ) : (
-          <Popover open={showSignIn} onOpenChange={setShowSignIn}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <LogIn className="h-4 w-4" />
-                Sign in
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-80 p-6 space-y-4" side="top">
-              <div className="text-center space-y-1">
-                <h3 className="text-lg font-semibold">
-                  {signInStep === "signIn" ? "Sign in to JobKompass" : "Create an account"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {signInStep === "signIn"
-                    ? "Welcome back!"
-                    : "Get started with your career journey."}
-                </p>
-              </div>
-
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthError(null);
-                setAuthLoading(true);
-
-                try {
-                  const formData = new FormData(e.currentTarget);
-                  await signIn("password", formData);
-                  setShowSignIn(false);
-                } catch (error) {
-                  setAuthError(error instanceof Error ? error.message : "Sign in failed");
-                } finally {
-                  setAuthLoading(false);
-                }
-              }} className="space-y-3">
-                {signInStep === "signUp" && (
-                  <>
-                    <div>
-                      <Input
-                        name="name"
-                        type="text"
-                        placeholder="Full Name (optional)"
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Leave empty to use your email name</p>
-                    </div>
-                    <div>
-                      <Input
-                        name="username"
-                        type="text"
-                        placeholder="Username (optional)"
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Leave empty to auto-generate from email</p>
-                    </div>
-                  </>
-                )}
-                <Input
-                  name="email"
-                  type="email"
-                  placeholder="Email"
-                  required
-                  className="w-full"
-                />
-                <Input
-                  name="password"
-                  type="password"
-                  placeholder="Password"
-                  required
-                  className="w-full"
-                />
-                <input name="flow" type="hidden" value={signInStep} />
-
-                {authError && (
-                  <div className="p-3 text-sm bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
-                    {authError}
-                  </div>
-                )}
-
-                <Button type="submit" className="w-full" disabled={authLoading}>
-                  <LogIn className="mr-2 h-4 w-4" />
-                  {authLoading ? "Please wait..." : signInStep === "signIn" ? "Sign in" : "Sign up"}
-                </Button>
-              </form>
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setSignInStep(signInStep === "signIn" ? "signUp" : "signIn")}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {signInStep === "signIn" ? "Don't have an account? " : "Already have an account? "}
-                  <span className="text-primary font-medium">
-                    {signInStep === "signIn" ? "Sign up" : "Sign in"}
-                  </span>
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <Link href="/auth" className="w-full">
+            <Button variant="outline" className="w-full justify-start gap-2">
+              <LogIn className="h-4 w-4" />
+              Sign in
+            </Button>
+          </Link>
         )}
       </div>
 
@@ -485,6 +415,9 @@ export default function JkSidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Search Modal */}
+      <JkSearchModal isOpen={searchModalOpen} onClose={() => setSearchModalOpen(false)} />
     </div>
   )
 }

@@ -39,6 +39,7 @@ export const currentUser = query({
       email: (user as any)?.email ?? identity.email,
       username: (user as any)?.username ?? null,
       tokenIdentifier: identity.tokenIdentifier,
+      lastSignInAt: (user as any)?.lastSignInAt ?? null,
     };
   },
 });
@@ -124,5 +125,51 @@ export const updateResumePreferences = mutation({
     });
 
     return { success: true };
+  },
+});
+
+export const updateLastSignIn = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    await ctx.db.patch(userId, {
+      lastSignInAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+export const shouldRedirectToPricing = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return false;
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return false;
+    }
+
+    const lastSignInAt = (user as any)?.lastSignInAt;
+    
+    // If never signed in before, don't redirect (first time user)
+    if (!lastSignInAt) {
+      return false;
+    }
+
+    // Import time periods - we'll need to check this on the client side
+    // since we can't import client constants in server code
+    // Return the timestamp and let client decide
+    return {
+      lastSignInAt,
+      currentTime: Date.now(),
+    };
   },
 });

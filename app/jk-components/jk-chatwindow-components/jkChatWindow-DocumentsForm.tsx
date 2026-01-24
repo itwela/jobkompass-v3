@@ -92,6 +92,24 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         }
     }, [selectionMode]);
 
+    // Listen for custom event to open document edit panel from search
+    useEffect(() => {
+        const handleOpenDocumentEdit = (event: CustomEvent) => {
+            const { documentId, documentType } = event.detail;
+            if (documentType === "resume") {
+                selectDocument(documentId, "resume");
+                setEditingContentResumeId(documentId as Id<"resumes">);
+            } else if (documentType === "cover-letter") {
+                selectDocument(documentId, "cover-letter");
+                setEditingContentCoverLetterId(documentId as Id<"coverLetters">);
+            }
+        };
+        window.addEventListener('jk:openDocumentEdit', handleOpenDocumentEdit as EventListener);
+        return () => {
+            window.removeEventListener('jk:openDocumentEdit', handleOpenDocumentEdit as EventListener);
+        };
+    }, [selectDocument]);
+
     // Close edit resume panels when filter changes
     useEffect(() => {
         setEditingResumeId(null);

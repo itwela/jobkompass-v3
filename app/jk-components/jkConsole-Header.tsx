@@ -13,6 +13,7 @@ import { useAuth } from "@/providers/jkAuthProvider";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Jk_AutoFill from "./jk-AutoFill";
+import JkUpgradeButton from "./jkUpgradeButton";
 import { nooutline } from "@/lib/utils";
 
 interface JkConsoleHeaderProps {
@@ -322,21 +323,24 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                 
                 <h1 className="text-lg font-semibold">JobKompass</h1>
                 
-                {isAuthenticated && (
-                    <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => {
-                            const settingsMode = allModes.find(m => m.id === '/settings')
-                            if (settingsMode) {
-                                setCurrentMode(settingsMode)
-                            }
-                        }}
-                    >
-                        <Settings className="h-5 w-5" />
-                        <span className="sr-only">Settings</span>
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    <JkUpgradeButton />
+                    {isAuthenticated && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => {
+                                const settingsMode = allModes.find(m => m.id === '/settings')
+                                if (settingsMode) {
+                                    setCurrentMode(settingsMode)
+                                }
+                            }}
+                        >
+                            <Settings className="h-5 w-5" />
+                            <span className="sr-only">Settings</span>
+                        </Button>
+                    )}
+                </div>
             </header>
         </>
     )

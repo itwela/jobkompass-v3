@@ -15,6 +15,7 @@ import type * as http from "../http.js";
 import type * as inputSanitizer from "../inputSanitizer.js";
 import type * as jobs from "../jobs.js";
 import type * as resources from "../resources.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as threads from "../threads.js";
 import type * as waitlist from "../waitlist.js";
 
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   inputSanitizer: typeof inputSanitizer;
   jobs: typeof jobs;
   resources: typeof resources;
+  subscriptions: typeof subscriptions;
   threads: typeof threads;
   waitlist: typeof waitlist;
 }>;
