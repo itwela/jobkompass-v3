@@ -96,7 +96,16 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
   }),
   execute: async (input) => {
     try {
-
+      // Check if user can generate documents
+      const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+      if (!canGenerate?.allowed) {
+        return {
+          success: false,
+          error: 'Document limit reached',
+          message: `You've reached your limit of ${canGenerate.limit} documents this month. Please upgrade your plan to continue generating documents.`,
+          limitReached: true,
+        };
+      }
 
       /// SECTION FILE SETUP
       // get the time in a human readable format
@@ -130,12 +139,20 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       // }
       
       if (input.personalInfo.linkedin) {
-        const linkedinHandle = input.personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '').replace(/\/$/, '');
+        // Extract handle from URL - handle both full URLs and partial URLs
+        let linkedinHandle = input.personalInfo.linkedin
+          .replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '') // Remove full URL
+          .replace(/^linkedin\.com\/in\//, '') // Remove partial URL
+          .replace(/\/$/, ''); // Remove trailing slash
         contactParts.push(`\\href{https://linkedin.com/in/${escapeLatex(linkedinHandle)}}{\\underline{linkedin.com/in/${escapeLatex(linkedinHandle)}}}`);
       }
       
       if (input.personalInfo.github) {
-        const githubHandle = input.personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\/$/, '');
+        // Extract handle from URL - handle both full URLs and partial URLs
+        let githubHandle = input.personalInfo.github
+          .replace(/^https?:\/\/(www\.)?github\.com\//, '') // Remove full URL
+          .replace(/^github\.com\//, '') // Remove partial URL
+          .replace(/\/$/, ''); // Remove trailing slash
         contactParts.push(`\\href{https://github.com/${escapeLatex(githubHandle)}}{\\underline{github.com/${escapeLatex(githubHandle)}}}`);
       }
       
@@ -372,7 +389,16 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
   }),
   execute: async (input) => {
     try {
-
+      // Check if user can generate documents
+      const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+      if (!canGenerate?.allowed) {
+        return {
+          success: false,
+          error: 'Document limit reached',
+          message: `You've reached your limit of ${canGenerate.limit} documents this month. Please upgrade your plan to continue generating cover letters.`,
+          limitReached: true,
+        };
+      }
 
       // get the time in a human readable format
       const formattedTime = getFormattedTime();
@@ -576,16 +602,6 @@ const createAddToResourcesTool = (convexClient: ConvexHttpClient) =>
         .optional()
         .nullable()
         .describe("Resource type slug. Defaults to 'resource'."),
-      userId: z
-        .string()
-        .optional()
-        .nullable()
-        .describe("Convex user identifier. Optional (unused when the request is authenticated)."),
-      username: z
-        .string()
-        .optional()
-        .nullable()
-        .describe("Username to associate with the resource. Optional (unused when authenticated)."),
     }),
     execute: async (input) => {
       const {
@@ -599,7 +615,20 @@ const createAddToResourcesTool = (convexClient: ConvexHttpClient) =>
       } = input;
 
       try {
-        const resourceId = await convexClient.mutation(api.resources.add, {
+        // Get user's convex_user_id for the agent tool
+        const user = await convexClient.query(api.auth.currentUser);
+        if (!user) {
+          return {
+            success: false,
+            message: "Please sign in to save resources to your library.",
+            error: "Not authenticated",
+          };
+        }
+
+        const convexUserId = user.convex_user_id || user._id;
+
+        const resourceId = await convexClient.mutation(api.resources.addForAgent, {
+          userId: convexUserId,
           type: type ?? "resource",
           title,
           url,
@@ -805,11 +834,35 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
       } = input;
 
       try {
-        const jobId = await convexClient.mutation(api.jobs.add, {
+        // Check if user can add jobs
+        const canAdd = await convexClient.query(api.usage.canAddJob, {});
+        if (!canAdd?.allowed) {
+          return {
+            success: false,
+            message: `You've reached your job tracking limit of ${canAdd.limit} jobs. Please upgrade to Pro plan for unlimited job tracking.`,
+            error: 'Job limit reached',
+            limitReached: true,
+          };
+        }
+
+        // Get user's convex_user_id for the agent tool
+        const user = await convexClient.query(api.auth.currentUser);
+        if (!user) {
+          return {
+            success: false,
+            message: "Please sign in to save jobs to your tracker.",
+            error: "Not authenticated",
+          };
+        }
+
+        const convexUserId = user.convex_user_id || user._id;
+
+        const jobId = await convexClient.mutation(api.jobs.addForAgent, {
+          userId: convexUserId,
           company,
           title,
           link: link ?? "",
-          status: status ?? "wishlist",
+          status: status ?? "Interested",
           compensation: compensation ?? undefined,
           keywords: keywords ?? undefined,
           skills: skills ?? undefined,
@@ -960,6 +1013,64 @@ const createGetUserResumePreferencesTool = (convexClient: ConvexHttpClient) =>
     },
   });
 
+// Get User's Usage Stats Tool (always available)
+const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
+  tool({
+    name: "getUserUsage",
+    description:
+      "Get the user's current usage statistics including documents generated this month and total jobs tracked. Use this to check limits before generating documents or adding jobs. Always available.",
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const usage = await convexClient.query(api.usage.getUserUsage);
+        
+        if (!usage) {
+          return {
+            success: false,
+            message: "Unable to fetch usage statistics. User may not be authenticated.",
+          };
+        }
+
+        // Get subscription to determine limits
+        const subscription = await convexClient.query(api.subscriptions.getUserSubscription);
+        const planId = subscription?.planId || "free";
+
+        const PLAN_LIMITS: Record<string, { documentsPerMonth: number; jobsLimit: number | null }> = {
+          free: { documentsPerMonth: 3, jobsLimit: 10 },
+          starter: { documentsPerMonth: 10, jobsLimit: 100 },
+          plus: { documentsPerMonth: 60, jobsLimit: 100 },
+          "plus-annual": { documentsPerMonth: 60, jobsLimit: 100 },
+          pro: { documentsPerMonth: 180, jobsLimit: null },
+          "pro-annual": { documentsPerMonth: 180, jobsLimit: null },
+        };
+
+        const limits = PLAN_LIMITS[planId] || PLAN_LIMITS.free;
+
+        return {
+          success: true,
+          usage: {
+            documentsGeneratedThisMonth: usage.documentsGeneratedThisMonth || 0,
+            documentsLimit: limits.documentsPerMonth,
+            documentsRemaining: Math.max(0, limits.documentsPerMonth - (usage.documentsGeneratedThisMonth || 0)),
+            jobsCount: usage.jobsCount || 0,
+            jobsLimit: limits.jobsLimit,
+            jobsRemaining: limits.jobsLimit === null ? null : Math.max(0, limits.jobsLimit - (usage.jobsCount || 0)),
+            planId,
+          },
+          message: `Current usage: ${usage.documentsGeneratedThisMonth || 0}/${limits.documentsPerMonth} documents this month, ${usage.jobsCount || 0}${limits.jobsLimit === null ? '' : `/${limits.jobsLimit}`} jobs tracked.`,
+        };
+      } catch (error) {
+        console.error("Failed to fetch usage via tool:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          message: "Failed to fetch usage statistics.",
+          error: errorMessage,
+        };
+      }
+    },
+  });
+
 export {
   createResumeJakeTemplateTool,
   createCoverLetterJakeTemplateTool,
@@ -970,5 +1081,6 @@ export {
   createGetResumeByIdTool,
   createGetJobByIdTool,
   createGetUserResumePreferencesTool,
+  createGetUserUsageTool,
   escapeLatex,
 };

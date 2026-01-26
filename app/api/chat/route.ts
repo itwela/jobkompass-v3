@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { jobKompassDescription, resumeBestPractices, jobKompassInstructions, jobKompassInstructionsMinimal } from '@/app/ai/constants/file';
-import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool, createGetUserResumePreferencesTool } from '@/app/ai/tools/file';
+import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool, createGetUserResumePreferencesTool, createGetUserUsageTool } from '@/app/ai/tools/file';
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
     // Create tool *instances* for client-dependent tools
     // Pass the convexClient directly since it's already instantiated
     const toolInstancesWithConvexClient = [
+      createGetUserUsageTool(convexClient), // Always available - check usage first
       createResumeJakeTemplateTool(convexClient),
       createCoverLetterJakeTemplateTool(convexClient),
       createAddToResourcesTool(convexClient),

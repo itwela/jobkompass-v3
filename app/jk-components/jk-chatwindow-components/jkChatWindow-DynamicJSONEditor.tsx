@@ -160,23 +160,15 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             const a = document.createElement("a");
             a.href = url;
             
-            // Generate filename with same date convention as AI-generated resumes
+            // Generate filename using resume name or just name and date
             const firstName = content.personalInfo?.firstName || "";
             const lastName = content.personalInfo?.lastName || "";
             const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
             
-            // Get company name or first word of job title for the filename
-            const firstExperience = Array.isArray(content.experience) && content.experience.length > 0 ? content.experience[0] : null;
-            let targetIdentifier = '';
-            if (firstExperience?.company) {
-                targetIdentifier = firstExperience.company;
-            } else if (firstExperience?.title) {
-                // Get first word of the title
-                targetIdentifier = firstExperience.title.split(' ')[0];
-            }
-            
-            const downloadName = targetIdentifier
-                ? `${firstName} ${lastName} - ${targetIdentifier} Resume (${dateStr}).pdf`.trim()
+            // Use the resume name if available, otherwise just use name and date
+            const resumeName = resume?.name || "";
+            const downloadName = resumeName
+                ? `${resumeName} (${dateStr}).pdf`.trim()
                 : `${firstName} ${lastName} Resume (${dateStr}).pdf`.trim();
             a.download = downloadName || "resume.pdf";
             

@@ -25,7 +25,7 @@ function renderHeader(ir: ResumeIR): string {
 	if (ir.personal.location) lines.push(esc(ir.personal.location));
 	if (ir.personal.links && ir.personal.links.length > 0) {
 		for (const l of ir.personal.links) {
-			lines.push(`${esc(l.label)}: \\href{${esc(l.url)}}{${esc(l.url)}}`);
+			lines.push(`\\href{${esc(l.url)}}{${esc(l.url)}}`);
 		}
 	}
 	parts.push(`\\centerline{${lines.join(' \\quad \\textbar\\ \\quad ')}}`);

@@ -331,14 +331,15 @@ export default function JkCW_CoverLetterContentEditor({
             const a = document.createElement("a");
             a.href = url;
             
-            // Generate filename with date
+            // Generate filename using cover letter name or just name and date
             const firstName = contentToDownload.personalInfo?.firstName || "";
             const lastName = contentToDownload.personalInfo?.lastName || "";
-            const company = contentToDownload.jobInfo?.company || "";
             const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
             
-            const downloadName = company
-                ? `${firstName} ${lastName} Cover Letter - ${company} (${dateStr}).pdf`.trim()
+            // Use the cover letter name if available, otherwise just use name and date
+            const coverLetterName = coverLetter?.name || "";
+            const downloadName = coverLetterName
+                ? `${coverLetterName} (${dateStr}).pdf`.trim()
                 : `${firstName} ${lastName} Cover Letter (${dateStr}).pdf`.trim();
             a.download = downloadName || "cover-letter.pdf";
             

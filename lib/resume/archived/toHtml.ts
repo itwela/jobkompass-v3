@@ -30,7 +30,7 @@ function dateRange(start?: string, end?: string | 'Present'): string {
 function renderHeader(ir: ResumeIR): string {
 	const fullName = `${escHtml(ir.personal.firstName)} ${escHtml(ir.personal.lastName)}`.trim() || '&nbsp;';
 	const links =
-		ir.personal.links?.map(l => `${escHtml(l.label)}: ${escHtml(l.url)}`).filter(Boolean) ?? [];
+		ir.personal.links?.map(l => escHtml(l.url)).filter(Boolean) ?? [];
 	const metaParts = [
 		escHtml(ir.personal.email),
 		ir.personal.location ? escHtml(ir.personal.location) : '',

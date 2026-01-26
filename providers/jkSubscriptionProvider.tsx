@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
-import { useQuery } from 'convex/react'
+import { createContext, useContext, ReactNode, useEffect } from 'react'
+import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 
 interface SubscriptionContextType {
@@ -30,9 +30,16 @@ const SubscriptionContext = createContext<SubscriptionContextType | null>(null)
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const subscription = useQuery(api.subscriptions.getUserSubscription)
+  const ensureConvexUserId = useMutation(api.auth.ensureConvexUserId)
   
   const planId = subscription?.planId || null
   const status = subscription?.status || null
+  
+  // Ensure convex_user_id is set for the user (runs once on mount)
+  // This ensures new signups and existing users have convex_user_id set
+  useEffect(() => {
+    ensureConvexUserId().catch(console.error)
+  }, [ensureConvexUserId])
   
   const value: SubscriptionContextType = {
     subscription,
@@ -54,6 +61,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       proAnnual: process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID || 'price_pro_annual_default',
     },
   }
+
   
   return (
     <SubscriptionContext.Provider value={value}>

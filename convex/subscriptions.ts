@@ -7,12 +7,26 @@ export const getUserSubscription = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    
-    return await ctx.db
+    if (!userId) {
+      return null;
+    }
+
+    // Get the user record to get convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return null;
+    }
+
+    // Get convex_user_id (should always be set)
+    const convexUserId = (user as any).convex_user_id || userId;
+
+    // Find subscription by convex_user_id
+    const subscription = await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
       .first();
+    
+    return subscription;
   },
 });
 
@@ -20,6 +34,7 @@ export const getUserSubscription = query({
 export const createSubscription = mutation({
   args: {
     userId: v.string(),
+    name: v.optional(v.string()),
     stripeSubscriptionId: v.string(),
     stripeCustomerId: v.string(),
     planId: v.string(),
@@ -80,6 +95,7 @@ export const updateSubscriptionFromWebhook = mutation({
 export const updateSubscriptionWithUserId = mutation({
   args: {
     userId: v.string(),
+    name: v.optional(v.string()),
     stripeSubscriptionId: v.string(),
     stripeCustomerId: v.string(),
     status: v.string(),
@@ -90,6 +106,41 @@ export const updateSubscriptionWithUserId = mutation({
     cancelAtPeriodEnd: v.boolean(),
   },
   handler: async (ctx, args) => {
+    // Try to resolve convex_user_id from the userId passed
+    // userId might be Convex user ID, identity.subject, convex_user_id, or old format like "convexId|tokenIdentifier"
+    let convexUserId = args.userId;
+    
+    // Handle old format: "convexId|tokenIdentifier" - extract the convexId part
+    if (args.userId.includes('|')) {
+      const parts = args.userId.split('|');
+      convexUserId = parts[0]; // Use the first part as potential convex_user_id
+    }
+    
+    // Try to get user by userId as Convex ID
+    try {
+      const user = await ctx.db.get(convexUserId as any);
+      if (user && (user as any).convex_user_id) {
+        convexUserId = (user as any).convex_user_id;
+      } else if (user) {
+        // User exists but no convex_user_id set, use the Convex ID itself
+        convexUserId = user._id;
+      }
+    } catch (e) {
+      // userId is not a valid Convex ID, try to find user by convex_user_id
+      const userByConvexId = await ctx.db
+        .query("users")
+        .withIndex("by_convex_user_id", (q) => q.eq("convex_user_id", convexUserId))
+        .first();
+      
+      if (userByConvexId) {
+        convexUserId = (userByConvexId as any).convex_user_id || userByConvexId._id;
+      } else {
+        // Last resort: try to find by email or other means if userId looks like an email
+        // But for now, we'll use the convexUserId as-is and let the subscription update
+        console.log(`[Subscription] Could not resolve userId ${args.userId} to convex_user_id, using as-is`);
+      }
+    }
+    
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_subscription", (q) => 
@@ -99,6 +150,8 @@ export const updateSubscriptionWithUserId = mutation({
     
     if (subscription) {
       await ctx.db.patch(subscription._id, {
+        userId: convexUserId, // Update to use convex_user_id
+        name: args.name, // Update name if provided
         status: args.status,
         planId: args.planId,
         currentPeriodStart: args.currentPeriodStart,
@@ -111,7 +164,8 @@ export const updateSubscriptionWithUserId = mutation({
       // Create new subscription if it doesn't exist
       const now = Date.now();
       await ctx.db.insert("subscriptions", {
-        userId: args.userId,
+        userId: convexUserId, // Store convex_user_id
+        name: args.name, // Store name for debugging
         stripeSubscriptionId: args.stripeSubscriptionId,
         stripeCustomerId: args.stripeCustomerId,
         planId: args.planId,

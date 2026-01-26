@@ -148,7 +148,7 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           priceId,
-          userId: user._id || user.subject,
+          userId: (user as any).convex_user_id || user._id || user.subject,
           email: user.email,
           customerId: subscription?.stripeCustomerId,
         }),

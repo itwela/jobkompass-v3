@@ -104,14 +104,16 @@ const documentsTables = {
     .index("by_username", ["username"]),
 
   threads: defineTable({
-    username: v.string(), // Use username instead of userId
+    userId: v.optional(v.string()), // Use convex_user_id as the sole identifier
+    username: v.string(), // Keep for backward compatibility
     title: v.string(), // Auto-generated from first message
     createdAt: v.number(),
     updatedAt: v.number(),
     lastMessageAt: v.number(),
     messageCount: v.number(),
     contextWindowExceeded: v.optional(v.boolean()), // True if this thread exceeded the AI context window
-  }).index("by_username", ["username"])
+  }).index("by_user", ["userId"])
+    .index("by_username", ["username"])
     .index("by_username_and_updated", ["username", "updatedAt"]),
 
   messages: defineTable({
@@ -145,8 +147,11 @@ const schema = defineSchema({
     username: v.optional(v.string()), // Username field (optional for backward compatibility)
     resumePreferences: v.optional(v.array(v.string())), // User's resume generation preferences
     lastSignInAt: v.optional(v.number()), // Timestamp of last sign-in
+    convex_user_id: v.optional(v.string()), // Convex user ID stored as string for subscription matching
   })
-    .index("email", ["email"]),
+    .index("email", ["email"])
+    .index("by_username", ["username"])
+    .index("by_convex_user_id", ["convex_user_id"]),
 
   // Waitlist table
   waitlist: defineTable({
@@ -159,6 +164,7 @@ const schema = defineSchema({
   // Subscriptions table
   subscriptions: defineTable({
     userId: v.string(),
+    name: v.optional(v.string()), // User's name for debugging
     stripeSubscriptionId: v.string(), // Stripe subscription ID
     stripeCustomerId: v.string(), // Stripe customer ID
     planId: v.string(), // Your plan identifier (e.g., "free", "pro", "enterprise")

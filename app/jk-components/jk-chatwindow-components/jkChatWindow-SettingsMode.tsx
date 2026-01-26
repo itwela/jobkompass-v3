@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/providers/jkAuthProvider"
+import { useSubscription } from "@/providers/jkSubscriptionProvider"
+import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check } from "lucide-react"
@@ -10,15 +12,20 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/lib/toast"
+import Link from "next/link"
 
 export default function JkCW_SettingsMode() {
   const { user, isAuthenticated } = useAuth()
+  const { subscription, planId, isFree, isStarter, isPlus, isPro, isPlusAnnual, isProAnnual } = useSubscription()
+  const { getUsageStats } = useFeatureAccess()
+  const usage = getUsageStats()
   const updateProfile = useMutation(api.auth.updateUserProfile)
   const updateResumePreferences = useMutation(api.auth.updateResumePreferences)
   const resumePreferences = useQuery(api.auth.getResumePreferences)
   
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
+  const [username, setUsername] = useState(user?.username || "")
   const [preferences, setPreferences] = useState<string[]>([])
   const [newPreference, setNewPreference] = useState("")
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
@@ -31,6 +38,7 @@ export default function JkCW_SettingsMode() {
     if (user) {
       setName(user.name || "")
       setEmail(user.email || "")
+      setUsername(user.username || "")
     }
   }, [user])
 
@@ -51,6 +59,7 @@ export default function JkCW_SettingsMode() {
       await updateProfile({
         name: name.trim() || undefined,
         email: email.trim() || undefined,
+        username: username.trim() || undefined,
       })
       setSaveMessage({ type: 'success', text: 'Profile updated successfully' })
       setTimeout(() => setSaveMessage(null), 3000)
@@ -64,8 +73,52 @@ export default function JkCW_SettingsMode() {
     }
   }
 
-  const handleManageBilling = () => {
-    console.log('Manage billing clicked')
+  const getPlanDisplayName = () => {
+    // Use planId directly to get accurate plan name even if canceled
+    if (planId === 'pro-annual') return 'Pro Annual'
+    if (planId === 'pro') return 'Pro'
+    if (planId === 'plus-annual') return 'Plus Annual'
+    if (planId === 'plus') return 'Plus'
+    if (planId === 'starter') return 'Starter'
+    return 'Free'
+  }
+
+  const handleManageBilling = async () => {
+    if (!subscription?.stripeCustomerId) {
+      toast.error('Billing Error', {
+        description: 'No billing information found. Please contact support.',
+        duration: 3000,
+      })
+      return
+    }
+
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: subscription.stripeCustomerId,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (data.url) {
+        // Redirect to Stripe Customer Portal
+        window.location.href = data.url
+      } else {
+        toast.error('Billing Error', {
+          description: 'Failed to open billing portal. Please try again.',
+          duration: 3000,
+        })
+      }
+    } catch (error) {
+      console.error('Portal error:', error)
+      toast.error('Billing Error', {
+        description: 'Something went wrong. Please try again.',
+        duration: 3000,
+      })
+    }
   }
 
   const handleAddPreference = async () => {
@@ -195,7 +248,73 @@ export default function JkCW_SettingsMode() {
           </p>
         </div>
 
-        <Separator />
+        {/* Thank You Message for Plan Members */}
+        {planId && planId !== 'free' && (
+          <div className="mt-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+            <p className="text-sm font-medium text-foreground">
+              Thank you for being a <span className="font-bold text-primary">{getPlanDisplayName()}</span> member! 🎉
+            </p>
+            {subscription?.status === 'canceled' && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Your subscription is canceled. <Link href="/pricing" className="text-primary hover:underline font-medium">Renew today</Link> to continue enjoying all benefits.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Usage Stats */}
+        {isAuthenticated && planId && (
+          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
+            <h3 className="text-sm font-semibold mb-4">Usage This Month</h3>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">AI-Generated Documents</span>
+                  <span className="font-medium text-foreground">
+                    {usage.documentsUsed} / {usage.documentsLimit}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${Math.min(100, (usage.documentsUsed / usage.documentsLimit) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {usage.documentsLimit - usage.documentsUsed} documents remaining
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Jobs Tracked</span>
+                  <span className="font-medium text-foreground">
+                    {usage.jobsUsed}
+                    {usage.jobsLimit !== null ? ` / ${usage.jobsLimit}` : (planId === 'pro' || planId === 'pro-annual' ? ' / ∞' : ' / Unlimited')}
+                  </span>
+                </div>
+                {usage.jobsLimit !== null && (
+                  <>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all"
+                        style={{
+                          width: `${Math.min(100, (usage.jobsUsed / usage.jobsLimit) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {usage.jobsLimit - usage.jobsUsed} jobs remaining
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Separator className="mt-6" />
 
         {/* User Information Section */}
         <div className="space-y-6">
@@ -240,19 +359,27 @@ export default function JkCW_SettingsMode() {
                 </div>
               </div>
 
-              {/* Username - read only */}
-              {user.username && (
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Username
-                  </label>
-                  <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border border-border">
-                    <AtSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">@{user.username}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Username cannot be changed</p>
+              {/* Username */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Username
+                </label>
+                <div className="flex items-center gap-3">
+                  <AtSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <Input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+                    placeholder="username"
+                    className="flex-1"
+                    minLength={3}
+                    maxLength={30}
+                  />
                 </div>
-              )}
+                <p className="text-xs text-muted-foreground">
+                  Username must be 3-30 characters, lowercase letters, numbers, dots, underscores, and hyphens only.
+                </p>
+              </div>
 
               {/* Save button and message */}
               <div className="space-y-2 pt-2">

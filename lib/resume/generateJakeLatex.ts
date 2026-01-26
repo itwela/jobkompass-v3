@@ -105,12 +105,20 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
     contactParts.push(`\\href{mailto:${escapeLatex(content.personalInfo.email)}}{\\underline{${escapeLatex(content.personalInfo.email)}}}`);
     
     if (content.personalInfo.linkedin) {
-        const linkedinHandle = content.personalInfo.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '').replace(/\/$/, '');
+        // Extract handle from URL - handle both full URLs and partial URLs
+        let linkedinHandle = content.personalInfo.linkedin
+            .replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '') // Remove full URL
+            .replace(/^linkedin\.com\/in\//, '') // Remove partial URL
+            .replace(/\/$/, ''); // Remove trailing slash
         contactParts.push(`\\href{https://linkedin.com/in/${escapeLatex(linkedinHandle)}}{\\underline{linkedin.com/in/${escapeLatex(linkedinHandle)}}}`);
     }
     
     if (content.personalInfo.github) {
-        const githubHandle = content.personalInfo.github.replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\/$/, '');
+        // Extract handle from URL - handle both full URLs and partial URLs
+        let githubHandle = content.personalInfo.github
+            .replace(/^https?:\/\/(www\.)?github\.com\//, '') // Remove full URL
+            .replace(/^github\.com\//, '') // Remove partial URL
+            .replace(/\/$/, ''); // Remove trailing slash
         contactParts.push(`\\href{https://github.com/${escapeLatex(githubHandle)}}{\\underline{github.com/${escapeLatex(githubHandle)}}}`);
     }
     

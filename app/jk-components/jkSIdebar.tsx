@@ -5,8 +5,9 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
+import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
-import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search } from "lucide-react"
+import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -17,10 +18,13 @@ import Image from "next/image"
 import Link from "next/link"
 import JkGap from './jkGap'
 import JkSearchModal from './jkSearchModal'
+import JkUpgradeModal from './jkUpgradeModal'
 
 export default function JkSidebar() {
   const { user, isAuthenticated } = useAuth()
-  const { planId } = useSubscription()
+  const { planId, isPro, isProAnnual, subscription, isFree } = useSubscription()
+  const { getUsageStats, upgradeModal, setUpgradeModal } = useFeatureAccess()
+  const usage = getUsageStats()
   const { currentThreadId, setCurrentThreadId, setCurrentMode, allModes, currentMode } = useJobKompassChatWindow()
   const [isThreadsExpanded, setIsThreadsExpanded] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -157,7 +161,24 @@ export default function JkSidebar() {
           </div>
           <div className="flex h-max gap-2">
             <button
-              onClick={() => setSearchModalOpen(true)}
+              onClick={() => {
+                try {
+                  // Check if user has access to search (paid plans only)
+                  if (isFree && isAuthenticated) {
+                    setUpgradeModal({
+                      isOpen: true,
+                      feature: 'Search functionality',
+                      currentLimit: 'Not available on free plan',
+                      currentPlan: planId || 'free',
+                    })
+                  } else {
+                    setSearchModalOpen(true)
+                  }
+                } catch (error) {
+                  // Silently catch errors to prevent dev console spam
+                  console.error('Error opening search:', error)
+                }
+              }}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               title="Search"
             >
@@ -328,16 +349,31 @@ export default function JkSidebar() {
                 <div className="flex items-center gap-2">
                   <div className="text-sm font-medium truncate">{user.name || user.email}</div>
                   {planId && planId !== 'free' && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      planId.includes('pro') 
-                        ? 'bg-primary text-primary-foreground' 
-                        : planId.includes('plus')
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-green-500 text-white'
-                    }`}>
-                      {planId === 'starter' ? 'Starter' : 
-                       planId.includes('pro') ? 'Pro' : 
-                       planId.includes('plus') ? 'Plus' : planId}
+                    <span 
+                      className="px-2 py-0.5 rounded-full text-xs font-medium"
+                      style={
+                        subscription?.status === 'canceled'
+                          ? { backgroundColor: 'var(--chart-4)', color: 'white' }
+                          : planId === 'pro' || planId === 'pro-annual'
+                          ? { backgroundColor: '#9333ea', color: 'white' } // Purple for Pro
+                          : planId === 'plus' || planId === 'plus-annual'
+                          ? { backgroundColor: '#3b82f6', color: 'white' }
+                          : { backgroundColor: '#22c55e', color: 'white' }
+                      }
+                    >
+                      {subscription?.status === 'canceled' ? (
+                        planId === 'pro' || planId === 'pro-annual' 
+                          ? 'Renew Pro' 
+                          : planId === 'plus' || planId === 'plus-annual'
+                          ? 'Renew Plus'
+                          : 'Renew'
+                      ) : (
+                        planId === 'starter' ? 'Starter' : 
+                        planId === 'pro-annual' ? 'Pro Annual' :
+                        planId === 'plus-annual' ? 'Plus Annual' :
+                        planId === 'pro' ? 'Pro' : 
+                        planId === 'plus' ? 'Plus' : planId
+                      )}
                     </span>
                   )}
                 </div>
@@ -348,10 +384,59 @@ export default function JkSidebar() {
             </PopoverTrigger>
             <PopoverContent align="start" className="w-85 p-0 border-none shadow-lg" side="top">
               <div className="bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                {/* Usage Stats */}
+                {isAuthenticated && planId && planId !== 'free' && (
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Documents</span>
+                        <span className="font-medium text-foreground">
+                          {usage.documentsUsed}/{usage.documentsLimit}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all"
+                          style={{
+                            width: `${Math.min(100, (usage.documentsUsed / usage.documentsLimit) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Jobs</span>
+                        <span className="font-medium text-foreground">
+                          {usage.jobsUsed}
+                          {usage.jobsLimit !== null ? `/${usage.jobsLimit}` : (planId === 'pro' || planId === 'pro-annual' ? ' / ∞' : ' / Unlimited')}
+                        </span>
+                      </div>
+                      {usage.jobsLimit !== null && (
+                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-all"
+                            style={{
+                              width: `${Math.min(100, (usage.jobsUsed / usage.jobsLimit) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <Link href="/" onClick={() => setUserMenuOpen(false)}>
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0 }}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border"
+                  >
+                    <Home className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Landing Page</span>
+                  </motion.div>
+                </Link>
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0 }}
+                  transition={{ delay: 0.005 }}
                   onClick={() => {
                     handleSettingsClick()
                     setUserMenuOpen(false)
@@ -361,6 +446,19 @@ export default function JkSidebar() {
                   <Settings className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium text-foreground">Settings</span>
                 </motion.div>
+                <Link href="/pricing" onClick={() => setUserMenuOpen(false)}>
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.015 }}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border"
+                  >
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">
+                      {isPro || isProAnnual ? 'Manage my plan' : 'Upgrade your plan'}
+                    </span>
+                  </motion.div>
+                </Link>
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -418,6 +516,15 @@ export default function JkSidebar() {
 
       {/* Search Modal */}
       <JkSearchModal isOpen={searchModalOpen} onClose={() => setSearchModalOpen(false)} />
+      
+      {/* Upgrade Modal */}
+      <JkUpgradeModal
+        isOpen={upgradeModal.isOpen}
+        onClose={() => setUpgradeModal((prev) => ({ ...prev, isOpen: false }))}
+        feature={upgradeModal.feature}
+        currentLimit={upgradeModal.currentLimit}
+        currentPlan={upgradeModal.currentPlan}
+      />
     </div>
   )
 }

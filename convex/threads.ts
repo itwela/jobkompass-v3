@@ -2,60 +2,24 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// Helper to get username from authenticated user (for queries - read-only)
-async function getUsername(ctx: any) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) return null;
-  
-  const user = await ctx.db.get(userId);
-  if (!user) return null;
-  
-  // If user doesn't have a username, generate a temporary one
-  // (Note: This won't be saved, just used for this request)
-  if (!user.username) {
-    const email = user.email || '';
-    return email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_') || `user_${userId.slice(0, 8)}`;
-  }
-  
-  return user.username;
-}
-
-// Helper to get or create username from authenticated user (for mutations)
-async function getOrCreateUsername(ctx: any) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) return null;
-  
-  const user = await ctx.db.get(userId);
-  if (!user) return null;
-  
-  // If user doesn't have a username, generate one and save it
-  if (!user.username) {
-    const email = user.email || '';
-    const generatedUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_') || `user_${userId.slice(0, 8)}`;
-    
-    // Update user with generated username
-    await ctx.db.patch(userId, { username: generatedUsername });
-    
-    return generatedUsername;
-  }
-  
-  return user.username;
-}
-
 // List all threads for a user
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const username = await getUsername(ctx);
-    if (!username) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    return await ctx.db
-      .query("threads")
-      .withIndex("by_username_and_updated", (q) => 
-        q.eq("username", username)
-      )
-      .order("desc")
-      .collect();
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) return [];
+
+    const convexUserId = (user as any).convex_user_id || userId;
+
+    // Get threads by userId (convex_user_id) only
+    const allThreads = await ctx.db.query("threads").collect();
+    return allThreads.filter(thread => 
+      (thread as any).userId === convexUserId
+    ).sort((a, b) => b.updatedAt - a.updatedAt);
   },
 });
 
@@ -65,11 +29,18 @@ export const get = query({
     threadId: v.id("threads"),
   },
   handler: async (ctx, args) => {
-    const username = await getUsername(ctx);
-    if (!username) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const convexUserId = (user as any).convex_user_id || userId;
 
     const thread = await ctx.db.get(args.threadId);
-    if (!thread || thread.username !== username) {
+    // Verify ownership by userId (convex_user_id)
+    if (!thread || ((thread as any).userId && (thread as any).userId !== convexUserId)) {
       return null;
     }
 
@@ -94,18 +65,25 @@ export const create = mutation({
     title: v.string(),
   },
   handler: async (ctx, args) => {
-    const username = await getOrCreateUsername(ctx);
-    if (!username) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const convexUserId = (user as any).convex_user_id || userId;
+    const username = (user as any).username || `user_${userId.slice(0, 8)}`; // Keep username for schema compatibility
 
     const now = Date.now();
     return await ctx.db.insert("threads", {
-      username,
+      userId: convexUserId, // Use convex_user_id as the sole identifier
+      username, // Keep for schema compatibility
       title: args.title,
       createdAt: now,
       updatedAt: now,
       lastMessageAt: now,
       messageCount: 0,
-    });
+    } as any);
   },
 });
 
@@ -122,12 +100,18 @@ export const addMessage = mutation({
     }))),
   },
   handler: async (ctx, args) => {
-    const username = await getOrCreateUsername(ctx);
-    if (!username) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
 
-    // Verify thread ownership
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const convexUserId = (user as any).convex_user_id || userId;
+
+    // Verify thread ownership by userId (convex_user_id)
     const thread = await ctx.db.get(args.threadId);
-    if (!thread || thread.username !== username) {
+    if (!thread || ((thread as any).userId && (thread as any).userId !== convexUserId)) {
       throw new Error("Not authorized");
     }
 
@@ -136,12 +120,12 @@ export const addMessage = mutation({
     // Add message
     const messageId = await ctx.db.insert("messages", {
       threadId: args.threadId,
-      username,
+      userId: convexUserId, // Use convex_user_id
       role: args.role,
       content: args.content,
       createdAt: now,
       toolCalls: args.toolCalls,
-    });
+    } as any);
 
     // Update thread metadata
     await ctx.db.patch(args.threadId, {
@@ -161,11 +145,18 @@ export const updateTitle = mutation({
     title: v.string(),
   },
   handler: async (ctx, args) => {
-    const username = await getOrCreateUsername(ctx);
-    if (!username) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const convexUserId = (user as any).convex_user_id || userId;
 
     const thread = await ctx.db.get(args.threadId);
-    if (!thread || thread.username !== username) {
+    // Verify ownership by userId (convex_user_id)
+    if (!thread || ((thread as any).userId && (thread as any).userId !== convexUserId)) {
       throw new Error("Not authorized");
     }
 
@@ -182,11 +173,18 @@ export const remove = mutation({
     threadId: v.id("threads"),
   },
   handler: async (ctx, args) => {
-    const username = await getOrCreateUsername(ctx);
-    if (!username) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const convexUserId = (user as any).convex_user_id || userId;
 
     const thread = await ctx.db.get(args.threadId);
-    if (!thread || thread.username !== username) {
+    // Verify ownership by userId (convex_user_id)
+    if (!thread || ((thread as any).userId && (thread as any).userId !== convexUserId)) {
       throw new Error("Not authorized");
     }
 
@@ -212,11 +210,18 @@ export const markContextWindowExceeded = mutation({
     exceeded: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const username = await getOrCreateUsername(ctx);
-    if (!username) throw new Error("Not authenticated");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const convexUserId = (user as any).convex_user_id || userId;
 
     const thread = await ctx.db.get(args.threadId);
-    if (!thread || thread.username !== username) {
+    // Verify ownership by userId (convex_user_id)
+    if (!thread || ((thread as any).userId && (thread as any).userId !== convexUserId)) {
       throw new Error("Not authorized");
     }
 

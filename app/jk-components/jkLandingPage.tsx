@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -115,55 +115,218 @@ export default function JkLandingPage() {
     setOpenFAQ(openFAQ === index ? null : index);
   };
 
+  // Prevent auto-scroll on page load when URL has hash
+  useEffect(() => {
+    if (window.location.hash === '#waitlist') {
+      // Remove hash from URL without scrolling
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, []);
+
+  const scrollToWaitlist = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const waitlistSection = document.getElementById('waitlist');
+    if (waitlistSection) {
+      const elementPosition = waitlistSection.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - 80; // Account for header
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <JkPublicHeader />
 
       {/* Hero Section */}
-      <section className="flex-1 flex items-center justify-center px-6 py-20">
-        <div className="max-w-4xl w-full text-center space-y-8">
+      <section className="relative flex-1 flex items-center justify-center px-6 py-20 overflow-hidden">
+        {/* Hand Backdrop Visual */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full max-w-4xl h-full flex items-center justify-center"
+          >
+            {/* Left Hand */}
+            <Image
+              src="/images/jobkompass_hand_new_1.png"
+              alt=""
+              width={800}
+              height={800}
+              priority
+              style={{
+                objectFit: 'contain',
+                opacity: 0.6,
+                // Responsive: 0.3 on md:opacity-30 (>=768px)
+                // We'll add this with a media query below
+                transform: 'translateX(-20%) scaleX(-1)',
+                width: '100%',
+                height: '100%',
+                display: 'block',
+              }}
+            />
+            {/* Right Hand */}
+            <Image
+              src="/images/jobkompass_hand_new_1.png"
+              alt=""
+              width={800}
+              height={800}
+              priority
+              style={{
+                objectFit: 'contain',
+                opacity: 0.6,
+                // Responsive: 0.3 on md:opacity-30 (>=768px)
+                // We'll add this with a media query below
+                transform: 'translateX(20%)',
+                width: '100%',
+                height: '100%',
+                display: 'block',
+              }}
+            />
+          </motion.div>
+        </div>
+
+        <div className="relative z-10 max-w-4xl w-full text-center space-y-8">
           <div className="space-y-6">
             <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-tight">
-              Your career journey,<br />organized
+              <span className="inline-block">
+                {'Meet JobKompass'.split('').map((char, index) => (
+                  <motion.span
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.5,
+                      delay: 0.3 + index * 0.05,
+                      ease: [0.16, 1, 0.3, 1]
+                    }}
+                    className="inline-block"
+                  >
+                    {char === ' ' ? '\u00A0' : char}
+                  </motion.span>
+                ))}
+              </span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Manage your job search, organize applications, and create tailored resumes—all in one place.
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.8,
+                delay: 1.0,
+                ease: [0.16, 1, 0.3, 1]
+              }}
+              className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
+            >
+              Manage your job search, organize applications, and create tailored resumes and cover letters—all in one place. Chat with your documents to refine and improve them.
+            </motion.p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-            <JkGetStartedButton size="lg" className="text-base px-8" />
-            <Link href="#waitlist">
-              <Button size="lg" variant="outline" className="text-base px-8">
-                Join waitlist
-              </Button>
-            </Link>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.8,
+              delay: 1.2,
+              ease: [0.16, 1, 0.3, 1]
+            }}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{
+                duration: 0.6,
+                delay: 1.3,
+                ease: [0.16, 1, 0.3, 1]
+              }}
+            >
+              <JkGetStartedButton size="lg" className="text-base px-8" />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{
+                duration: 0.6,
+                delay: 1.4,
+                ease: [0.16, 1, 0.3, 1]
+              }}
+            >
+              <Link href="#waitlist" onClick={scrollToWaitlist}>
+                <Button size="lg" variant="outline" className="text-base px-8">
+                  Join waitlist
+                </Button>
+              </Link>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Capabilities Section */}
       <section className="py-20 px-6 border-t border-border">
         <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="text-center mb-12"
+          >
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              className="text-3xl md:text-4xl font-semibold tracking-tight mb-4"
+            >
+              Capabilities
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="text-muted-foreground text-lg max-w-2xl mx-auto"
+            >
+              Everything you need to manage your career journey
+            </motion.p>
+          </motion.div>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="space-y-3">
-              <h3 className="text-xl font-semibold">Organize applications</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Keep track of all your job applications in one place. Add notes, set reminders, and monitor your progress.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-xl font-semibold">Tailored resumes</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Create and customize resumes for each position. Choose from professional templates and format your content with ease.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-xl font-semibold">Stay on track</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Never miss a deadline or follow-up. JobKompass helps you manage your job search timeline effectively.
-              </p>
-            </div>
+            {[
+              {
+                title: "Organize applications",
+                description: "Keep track of all your job applications in one centralized dashboard. Add detailed notes, set reminders for follow-ups, monitor application status, and quickly add multiple jobs at once. Stay organized and never lose track of where you've applied."
+              },
+              {
+                title: "Tailored resumes & cover letters",
+                description: "Create and customize resumes and cover letters for each position. Choose from professional templates, format your content with ease, and chat with your documents to refine and improve them."
+              },
+              {
+                title: "Career guidance & interview prep",
+                description: "Get personalized career advice with proper context from your documents. Use the chat to prep for interviews, refine your applications, and get expert guidance tailored to your career journey."
+              }
+            ].map((capability, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{
+                  duration: 0.8,
+                  delay: 0.3 + index * 0.1,
+                  ease: [0.16, 1, 0.3, 1]
+                }}
+                className="space-y-3"
+              >
+                <h3 className="text-xl font-semibold">{capability.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {capability.description}
+                </p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>

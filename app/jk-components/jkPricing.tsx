@@ -138,7 +138,7 @@ export default function JkPricing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           priceId,
-          userId: user._id || user.subject,
+          userId: (user as any).convex_user_id || user._id || user.subject,
           email: user.email,
           customerId: subscription?.stripeCustomerId,
         }),
@@ -162,8 +162,12 @@ export default function JkPricing() {
   }
 
   const getButtonText = (plan: Plan) => {
-    if (plan.id === planId || (plan.id === 'starter' && planId === 'starter')) return 'Current Plan'
-    if (plan.isOneTime) return 'Start 7-Day Trial'
+    // Check if this is the current plan and subscription is canceled
+    if (isCurrentPlan(plan) && subscription?.status === 'canceled') {
+      return 'Renew Today'
+    }
+    if (isCurrentPlan(plan)) return 'Current Plan'
+    if (plan.isOneTime) return 'Start'
     if (!plan.pricing) return 'Subscribe'
     
     const selectedPricing = isAnnual ? plan.pricing.annual : plan.pricing.monthly
@@ -174,12 +178,16 @@ export default function JkPricing() {
     if (plan.id === 'starter') {
       return planId === 'starter'
     }
-    // Check if current plan matches (accounting for monthly/annual)
+    // Check if current plan matches the exact billing period (monthly vs annual)
     if (plan.id === 'plus') {
-      return planId === 'plus' || planId === 'plus-annual'
+      // If viewing annual, only match if planId is plus-annual
+      // If viewing monthly, only match if planId is plus
+      return isAnnual ? planId === 'plus-annual' : planId === 'plus'
     }
     if (plan.id === 'pro') {
-      return planId === 'pro' || planId === 'pro-annual'
+      // If viewing annual, only match if planId is pro-annual
+      // If viewing monthly, only match if planId is pro
+      return isAnnual ? planId === 'pro-annual' : planId === 'pro'
     }
     return plan.id === planId
   }
@@ -338,7 +346,11 @@ export default function JkPricing() {
                     }
                     handleSubscribe(plan)
                   }}
-                  disabled={isLoading || loadingPlan === plan.id || isCurrentPlan(plan)}
+                  disabled={
+                    isLoading || 
+                    loadingPlan === plan.id || 
+                    (isCurrentPlan(plan) && subscription?.status !== 'canceled')
+                  }
                   className={`w-full ${
                     isSelected
                       ? 'bg-primary hover:bg-primary/90 text-primary-foreground'

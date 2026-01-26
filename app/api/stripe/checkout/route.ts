@@ -3,7 +3,7 @@ import Stripe from "stripe";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_default", {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-12-15.clover",
 });
 
 export async function POST(request: NextRequest) {
@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email or customer ID required" }, { status: 400 });
     }
     
+    // Retrieve the price to determine if it's recurring
+    const price = await stripe.prices.retrieve(priceId);
+    const isRecurring = price.type === "recurring";
+    
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -56,14 +60,14 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      mode: priceId.includes("annual") || priceId.includes("monthly") ? "subscription" : "payment",
+      mode: isRecurring ? "subscription" : "payment",
       success_url: `${baseUrl}/stripe/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/pricing`,
       metadata: {
         userId: userId || "",
       },
       // Enable trial if it's a subscription
-      subscription_data: priceId.includes("annual") || priceId.includes("monthly") ? {
+      subscription_data: isRecurring ? {
         metadata: {
           userId: userId || "",
         },

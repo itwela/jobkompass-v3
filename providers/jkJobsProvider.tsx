@@ -4,6 +4,8 @@ import { createContext, useContext, ReactNode, useState, useMemo, useCallback } 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/providers/jkAuthProvider";
+import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import JkUpgradeModal from '@/app/jk-components/jkUpgradeModal';
 import { Id } from "@/convex/_generated/dataModel";
 
 interface Job {
@@ -102,6 +104,7 @@ const JobsContext = createContext<JobsContextType | undefined>(undefined);
 
 export function JkJobsProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { canAddJob, upgradeModal, setUpgradeModal } = useFeatureAccess();
   const jobs = useQuery(api.jobs.list, isAuthenticated ? {} : "skip");
   const addJob = useMutation(api.jobs.add);
   const updateJob = useMutation(api.jobs.update);
@@ -220,13 +223,27 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
       setError('Please sign in to add jobs');
       return null;
     }
+
+    // Check feature access
+    if (!canAddJob()) {
+      setError('Job limit reached. Please upgrade to add more jobs.');
+      return null; // Modal will be shown by the hook
+    }
     
     try {
       setError(null);
       const newId = await addJob(data);
       return newId;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create job. Please sign in.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create job. Please sign in.';
+      setError(errorMessage);
+      
+      // Check if it's a limit error
+      if (errorMessage.includes('limit reached') || errorMessage.includes('Job limit')) {
+        // Trigger the modal
+        canAddJob(); // This will show the modal
+      }
+      
       return null;
     }
   };
@@ -328,6 +345,15 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
   return (
     <JobsContext.Provider value={value}>
       {children}
+      <JkUpgradeModal
+        isOpen={upgradeModal.isOpen}
+        onClose={() =>
+          setUpgradeModal((prev) => ({ ...prev, isOpen: false }))
+        }
+        feature={upgradeModal.feature}
+        currentLimit={upgradeModal.currentLimit}
+        currentPlan={upgradeModal.currentPlan}
+      />
     </JobsContext.Provider>
   );
 }

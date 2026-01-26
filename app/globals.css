@@ -6,8 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ubuntu), system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -46,6 +46,17 @@
 html {
   scroll-behavior: smooth;
   scrollbar-width: none;
+  scroll-padding-top: 80px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  * {
+    scroll-behavior: inherit;
+  }
 }
 
 html::-webkit-scrollbar {
@@ -190,7 +201,7 @@ textarea[aria-label="Message input"]:focus-visible {
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-family: var(--font-ubuntu), system-ui, -apple-system, sans-serif;
   }
   
   /* Typography scale */
@@ -574,12 +585,31 @@ textarea[aria-label="Message input"]:focus-visible {
     fill: #facc15 !important;
   }
 
-  /* Error toast icon - red */
+  /* Error toast icon - red (comprehensive selectors) */
   [data-sonner-toast][data-type="error"] [data-icon],
   [data-sonner-toast][data-type="error"] [data-icon] svg,
-  [data-sonner-toast][data-type="error"] > div:first-child svg {
+  [data-sonner-toast][data-type="error"] > div:first-child svg,
+  [data-sonner-toast][data-type="error"] svg,
+  [data-sonner-toast][data-type="error"] [data-icon] *,
+  [data-sonner-toast][data-type="error"] > div:first-child,
+  [data-sonner-toast][data-type="error"] > div:first-child *,
+  [data-sonner-toast][data-type="error"] [data-icon] circle,
+  [data-sonner-toast][data-type="error"] circle,
+  [data-sonner-toast][data-type="error"] path {
     color: #ef4444 !important;
     fill: #ef4444 !important;
+    stroke: #ef4444 !important;
+  }
+  
+  /* Error toast icon background circle - light red background */
+  [data-sonner-toast][data-type="error"] [data-icon],
+  [data-sonner-toast][data-type="error"] > div:first-child {
+    background-color: #fee2e2 !important;
+  }
+  
+  /* Override any green colors on error toasts */
+  [data-sonner-toast][data-type="error"] * {
+    --toast-icon-color: #ef4444 !important;
   }
 
   /* Success toast icon - green */

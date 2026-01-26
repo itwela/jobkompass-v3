@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAuth } from "@/providers/jkAuthProvider"
+import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider"
 import { useJobs } from "@/providers/jkJobsProvider"
@@ -11,6 +12,7 @@ import { useResources } from "@/providers/jkResourcesProvider"
 import { Search, MessageSquare, FileText, Briefcase, Link2, X, Calendar, Filter } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Id } from "@/convex/_generated/dataModel"
+import Link from "next/link"
 
 interface SearchResult {
   id: string
@@ -30,6 +32,7 @@ interface JkSearchModalProps {
 
 export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
   const { isAuthenticated } = useAuth()
+  const { isFree } = useSubscription()
   const { currentThreadId, setCurrentThreadId, setCurrentMode, allModes } = useJobKompassChatWindow()
   const { documents, selectDocument } = useJobKompassDocuments()
   const { allJobs, setSelectedJobId, statusOptions } = useJobs()
@@ -325,6 +328,13 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
                 {!isAuthenticated ? (
                   <div className="px-6 py-8 text-center text-muted-foreground">
                     Sign in to search
+                  </div>
+                ) : isFree ? (
+                  <div className="px-6 py-8 text-center">
+                    <p className="text-muted-foreground mb-2">Search is only available on paid plans</p>
+                    <Link href="/pricing" className="text-primary hover:underline">
+                      Upgrade to access search
+                    </Link>
                   </div>
                 ) : searchQuery.trim() === '' ? (
                   <div className="px-6 py-8 text-center text-muted-foreground">

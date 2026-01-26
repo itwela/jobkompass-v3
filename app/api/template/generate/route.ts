@@ -82,6 +82,20 @@ export async function POST(request: NextRequest) {
     // Get user's resume preferences
     const resumePreferences = await convexClient.query(api.auth.getResumePreferences, {}) || [];
 
+    // Check if user can generate documents
+    const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+    if (!canGenerate?.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Document limit reached',
+          message: `You've reached your limit of ${canGenerate.limit} documents this month. Please upgrade to continue generating documents.`,
+          limitReached: true,
+        },
+        { status: 403 }
+      );
+    }
+
     // Get current user info (needed for cover letter name generation)
     const currentUser = await convexClient.query(api.auth.currentUser, {});
 

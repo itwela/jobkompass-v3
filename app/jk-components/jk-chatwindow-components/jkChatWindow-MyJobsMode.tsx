@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useAuth } from "@/providers/jkAuthProvider";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogIn, Filter, Search, X } from "lucide-react";
+import { LogIn, Filter, Search, X, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import JkJobsGrid from "./jkJobsGrid";
 import JkJobExpanded from "./jkJobExpanded";
 import JkConfirmDelete from "../jkConfirmDelete";
 import JkGap from "../jkGap";
 import JkTemplateSelector, { TemplateType } from "../jkTemplateSelector";
+import JkUpgradeModal from "../jkUpgradeModal";
+import JkJobInputModal from "../jkJobInputModal";
 import { toast } from "@/lib/toast";
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -44,8 +47,10 @@ export default function JkCW_MyJobsMode() {
   const [selectedJobForGeneration, setSelectedJobForGeneration] = useState<any | null>(null);
   const [selectedReferenceResumeId, setSelectedReferenceResumeId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isJobInputModalOpen, setIsJobInputModalOpen] = useState(false);
   const { user } = useAuth();
   const { resumes, resumePreferences } = useJobKompassResume();
+  const { canGenerateDocument, upgradeModal, setUpgradeModal } = useFeatureAccess();
 
   useEffect(() => {
     if (!selectionMode) {
@@ -114,6 +119,12 @@ export default function JkCW_MyJobsMode() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
+        // Check if it's a limit error
+        if (data.limitReached || response.status === 403) {
+          // Trigger the modal by calling canGenerateDocument (which will show modal if limit reached)
+          canGenerateDocument();
+          throw new Error(data.message || 'Document limit reached');
+        }
         throw new Error(data.error || 'Failed to generate document');
       }
 
@@ -186,9 +197,28 @@ export default function JkCW_MyJobsMode() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {!selectionMode ? (
-                <Button variant="outline" onClick={handleEnterSelectionMode}>
-                  Multi-select
-                </Button>
+                <>
+                  <Button variant="outline" onClick={handleEnterSelectionMode}>
+                    Multi-select
+                  </Button>
+                  <Button 
+                    variant={isJobInputModalOpen ? "outline" : "default"}
+                    className={isJobInputModalOpen ? "" : "bg-primary hover:bg-primary/90"}
+                    onClick={() => setIsJobInputModalOpen(!isJobInputModalOpen)}
+                  >
+                    {isJobInputModalOpen ? (
+                      <>
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Job
+                      </>
+                    )}
+                  </Button>
+                </>
               ) : (
                 <>
                   <span className="text-sm text-muted-foreground">
@@ -322,6 +352,26 @@ export default function JkCW_MyJobsMode() {
         }))}
         selectedReferenceResumeId={selectedReferenceResumeId}
         onSelectReferenceResume={setSelectedReferenceResumeId}
+      />
+
+      {/* Upgrade Modal */}
+      <JkUpgradeModal
+        isOpen={upgradeModal.isOpen}
+        onClose={() =>
+          setUpgradeModal((prev) => ({ ...prev, isOpen: false }))
+        }
+        feature={upgradeModal.feature}
+        currentLimit={upgradeModal.currentLimit}
+        currentPlan={upgradeModal.currentPlan}
+      />
+
+      {/* Job Input Modal */}
+      <JkJobInputModal
+        isOpen={isJobInputModalOpen}
+        onClose={() => setIsJobInputModalOpen(false)}
+        onJobAdded={() => {
+          // Jobs will automatically refresh via the provider
+        }}
       />
     </div>
   );

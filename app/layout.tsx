@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
+import { Ubuntu } from "next/font/google";
 import { JobKompassThemeProvider } from "@/providers/jkThemeProvider";
 import "./globals.css";
+
+const ubuntu = Ubuntu({
+  weight: ["300", "400", "500", "700"],
+  subsets: ["latin"],
+  variable: "--font-ubuntu",
+  display: "swap",
+});
 import { JobKompassChatWindowProvider } from "@/providers/jkChatWindowProvider";
 import JobKompassResumeProvider from "@/providers/jkResumeProvider";
 import { JobKompassDocumentsProvider } from "@/providers/jkDocumentsProvider";
@@ -36,8 +44,8 @@ export default function RootLayout({
                     <JobKompassDocumentsProvider>
                       <JobKompassChatWindowProvider>
                         <JkToastProvider>
-                      <html lang="en">
-                        <body className={`antialiased min-h-screen bg-background text-foreground`}>
+                      <html lang="en" className={ubuntu.variable}>
+                        <body className={`${ubuntu.className} antialiased min-h-screen bg-background text-foreground`}>
                           {children}
                         </body>
                       </html>

@@ -9,9 +9,27 @@ import JkContextPanel from "./jkContextPanel";
 import { useCallback, useState } from "react";
 import { Send, Plus, FileText, Briefcase, X } from "lucide-react";
 
-export default function JkInputSection() {
+interface JkInputSectionProps {
+  hideFileUpload?: boolean;
+  hideContextMenu?: boolean;
+  placeholder?: string;
+  onSend?: (value: string) => void;
+  value?: string;
+  onChange?: (value: string) => void;
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+}
+
+export default function JkInputSection({
+  hideFileUpload = false,
+  hideContextMenu = false,
+  placeholder,
+  onSend,
+  value: controlledValue,
+  onChange: controlledOnChange,
+  textareaRef: externalTextareaRef,
+}: JkInputSectionProps = {}) {
   const { 
-    textareaRef, textValue, setTextValue,
+    textareaRef: contextTextareaRef, textValue, setTextValue,
     allModes, currentMode, setCurrentMode,
     isFileMode, setIsFileMode, droppedFile, setDroppedFile, fileName, setFileName,
     attachedResumeIds, attachedJobIds, removeResumeAttachment, removeJobAttachment,
@@ -20,6 +38,13 @@ export default function JkInputSection() {
   
   const { resumes } = useJobKompassResume();
   const { allJobs } = useJobs();
+
+  // Use external ref if provided, otherwise use context ref
+  const textareaRef = externalTextareaRef || contextTextareaRef;
+  
+  // Use controlled value if provided, otherwise use context value
+  const inputValue = controlledValue !== undefined ? controlledValue : textValue;
+  const setInputValue = controlledOnChange || setTextValue;
 
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -64,10 +89,18 @@ export default function JkInputSection() {
     setIsFileMode(false);
   }, [setDroppedFile, setFileName, setIsFileMode]);
 
+  const handleSend = useCallback(() => {
+    if (onSend && inputValue.trim().length > 2) {
+      onSend(inputValue);
+    } else if (currentMode.id === '/chat' && inputValue.trim().length > 2) {
+      window.dispatchEvent(new Event('jk:sendChat'));
+    }
+  }, [onSend, inputValue, currentMode]);
+
   return (
     <div className="relative w-full">
       {/* CONTEXT PANEL - Shows user's resumes and jobs */}
-      <JkContextPanel />
+      {!hideContextMenu && <JkContextPanel />}
       
       {/* Main Input Container */}
       <div 
@@ -158,28 +191,30 @@ export default function JkInputSection() {
         {/* Input Area with inline controls */}
         <div className="flex items-end gap-2 px-2 py-3">
           <div className="flex items-center gap-4 flex-1">
-            <Button 
-              size="icon"
-              variant="ghost"
-              onClick={() => setIsFileModalOpen(true)}
-              className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
-              aria-label="Add file"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            {!hideFileUpload && (
+              <Button 
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsFileModalOpen(true)}
+                className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+                aria-label="Add file"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
             
             <div className="flex-1 min-w-0">
               <Textarea
                 ref={textareaRef}
-                placeholder={isFileMode 
+                placeholder={placeholder || (isFileMode && !hideFileUpload
                   ? "Describe what you want to do with the file..." 
-                  : "Send a message..."}
-                value={textValue}
-                onChange={(e) => setTextValue(e.target.value)}
+                  : "Send a message...")}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (currentMode.id === '/chat' && e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    window.dispatchEvent(new Event('jk:sendChat'))
+                    handleSend();
                   }
                 }}
                 aria-label="Message input"
@@ -190,18 +225,13 @@ export default function JkInputSection() {
             </div>
             
           </div>
-          { textValue.trim().length > 2 && (
+          { inputValue.trim().length > 2 && (
           <Button 
             size="icon"
             className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90 disabled:opacity-40 transition-all shrink-0"
-            onClick={() => {
-              if (currentMode.id === '/chat') {
-                window.dispatchEvent(new Event('jk:sendChat'))
-                return;
-              }
-            }}
+            onClick={handleSend}
             aria-label="Send message"
-            disabled={textValue.trim().length <= 2}
+            disabled={inputValue.trim().length <= 2}
           >
             <Send className="h-4 w-4" />
           </Button>

@@ -17,6 +17,7 @@ import type * as jobs from "../jobs.js";
 import type * as resources from "../resources.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as threads from "../threads.js";
+import type * as usage from "../usage.js";
 import type * as waitlist from "../waitlist.js";
 
 import type {
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   resources: typeof resources;
   subscriptions: typeof subscriptions;
   threads: typeof threads;
+  usage: typeof usage;
   waitlist: typeof waitlist;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

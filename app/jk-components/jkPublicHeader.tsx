@@ -44,17 +44,35 @@ export default function JkPublicHeader({
     <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-end gap-3">
-          <Image
-            src={mainAssets.logo}
-            alt="JobKompass Logo"
-            width={30}
-            height={30}
-            className="object-contain"
-            priority
-          />
-          <span className="text-xl font-semibold tracking-tight">JobKompass</span>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <Image
+              src={mainAssets.logo}
+              alt="JobKompass Logo"
+              width={30}
+              height={30}
+              className="object-contain"
+              priority
+            />
+          </motion.div>
+          <motion.span
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="text-xl font-semibold tracking-tight"
+          >
+            JobKompass
+          </motion.span>
         </Link>
-        <div className="flex items-center gap-4">
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="flex items-center gap-4"
+        >
           {isAuthenticated && user ? (
             <>
               {showPricing && (
@@ -70,16 +88,16 @@ export default function JkPublicHeader({
                     <User className="h-4 w-4" />
                     <span className="truncate max-w-[120px]">{user.name || user.email}</span>
                     {planId && planId !== 'free' && (
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                        planId.includes('pro') 
+                      <span className={`px-1.5 py-0.5 rounded-lg text-xs font-medium ${
+                        planId === 'pro' 
                           ? 'bg-primary text-primary-foreground' 
-                          : planId.includes('plus')
+                          : planId === 'plus'
                           ? 'bg-blue-500 text-white'
                           : 'bg-green-500 text-white'
                       }`}>
                         {planId === 'starter' ? 'Starter' : 
-                         planId.includes('pro') ? 'Pro' : 
-                         planId.includes('plus') ? 'Plus' : planId}
+                         planId === 'pro' ? 'Pro' : 
+                         planId === 'plus' ? 'Plus' : planId}
                       </span>
                     )}
                   </Button>
@@ -130,23 +148,41 @@ export default function JkPublicHeader({
           ) : (
             <>
               {showPricing && (
-                <Link href="/pricing">
-                  <Button variant="ghost" size="sm">
-                    Pricing
-                  </Button>
-                </Link>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <Link href="/pricing">
+                    <Button variant="ghost" size="sm">
+                      Pricing
+                    </Button>
+                  </Link>
+                </motion.div>
               )}
               {showSignIn && (
-                <Link href="/auth">
-                  <Button variant="ghost" size="sm">
-                    Sign in
-                  </Button>
-                </Link>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <Link href="/auth">
+                    <Button variant="ghost" size="sm">
+                      Sign in
+                    </Button>
+                  </Link>
+                </motion.div>
               )}
-              <JkGetStartedButton />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <JkGetStartedButton />
+              </motion.div>
             </>
           )}
-        </div>
+        </motion.div>
       </div>
     </nav>
   )
