@@ -16,11 +16,16 @@ import { mainAssets } from "@/app/lib/constants"
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"
 import JkPricingModal from "@/app/jk-components/jkPricingModal"
 import { PRICING_REDIRECT_THRESHOLD } from "@/app/lib/timePeriods"
+import { useSubscription } from "@/providers/jkSubscriptionProvider"
 
 export default function AuthPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const { signIn } = useAuthActions()
+  const { isFree, isLoading: subscriptionLoading, subscription } = useSubscription()
   const router = useRouter()
+  
+  // Check if user should see pricing prompts (free plan or cancelled subscription)
+  const shouldShowPricing = isFree || subscription?.status === 'cancelled'
   const searchParams = useSearchParams()
   const [signInStep, setSignInStep] = useState<"signIn" | "signUp">(
     searchParams.get('mode') === 'signup' ? 'signUp' : 'signIn'
@@ -34,7 +39,8 @@ export default function AuthPage() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user && !hasRedirectedRef.current) {
+    // Wait for both auth and subscription to load before checking redirect
+    if (!isLoading && !subscriptionLoading && isAuthenticated && user && !hasRedirectedRef.current) {
       const checkRedirect = async () => {
         hasRedirectedRef.current = true // Prevent multiple redirects
         
@@ -43,15 +49,22 @@ export default function AuthPage() {
         
         // Check if first sign-up (no previous lastSignInAt)
         if (wasSignUp && !previousLastSignInAt) {
-          // First sign-up: show pricing modal
-          setShowPricingModal(true)
+          // First sign-up: show pricing modal if on free plan or cancelled subscription
+          if (shouldShowPricing) {
+            setShowPricingModal(true)
+          }
           // Update lastSignInAt in background
           try {
             await updateLastSignIn()
           } catch (err) {
             console.error('Failed to update lastSignInAt:', err)
           }
-          return // Don't redirect yet, let modal show
+          // If not free plan and not cancelled, go directly to app
+          if (!shouldShowPricing) {
+            router.replace('/app')
+            return
+          }
+          return // Don't redirect yet, let modal show if free plan or cancelled
         } else if (previousLastSignInAt) {
           // Check if enough time has passed
           const timeSinceLastSignIn = Date.now() - previousLastSignInAt
@@ -62,8 +75,13 @@ export default function AuthPage() {
             } catch (err) {
               console.error('Failed to update lastSignInAt:', err)
             }
-            // Haven't signed in for threshold time: redirect to pricing
-            router.replace('/pricing')
+            // Haven't signed in for threshold time: redirect to pricing if on free plan or cancelled
+            if (shouldShowPricing) {
+              router.replace('/pricing')
+              return
+            }
+            // If not free plan and not cancelled, go to app
+            router.replace('/app')
             return
           }
         }
@@ -81,7 +99,7 @@ export default function AuthPage() {
       
       checkRedirect()
     }
-  }, [isAuthenticated, isLoading, router, user, wasSignUp, updateLastSignIn])
+  }, [isAuthenticated, isLoading, subscriptionLoading, router, user, wasSignUp, updateLastSignIn, shouldShowPricing])
 
   const getErrorMessage = (error: unknown): string => {
     // Handle different error types
