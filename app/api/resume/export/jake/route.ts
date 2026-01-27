@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { generateJakeLatex, ResumeContentForJake } from '@/lib/resume/generateJakeLatex';
 
@@ -20,7 +21,8 @@ export async function POST(req: Request) {
         const jakeResume = generateJakeLatex(content);
 
         // Create temporary directory and file
-        const tempDir = path.join(process.cwd(), 'temp');
+        // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
         const uniqueId = crypto.randomBytes(8).toString('hex');
         const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
         console.error('Jake resume export error:', error);
         // Clean up temp folder even on error
         try {
-            const tempDir = path.join(process.cwd(), 'temp');
+            const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
             if (fs.existsSync(tempDir)) {
                 fs.rmSync(tempDir, { recursive: true, force: true });
             }

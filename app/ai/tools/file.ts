@@ -11,6 +11,7 @@ import {
 import { z } from "zod";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { ConvexHttpClient } from "convex/browser";
@@ -242,8 +243,9 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       /// SECTION PDF GENERATION
     
       // Create temporary directory and file
-      const tempDir = path.join(process.cwd(), 'temp');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+      // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
+      const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
       const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
       fs.writeFileSync(tempFile, latexTemplate);
@@ -337,7 +339,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       
       // Clean up temp folder before returning
       try {
-        const tempDir = path.join(process.cwd(), 'temp');
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
         }
@@ -366,7 +368,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       console.error('Resume generation error:', error);
       // Clean up temp folder even on error
       try {
-        const tempDir = path.join(process.cwd(), 'temp');
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
         }
@@ -485,8 +487,9 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
 
       /// SECTION PDF GENERATION
       
-      const tempDir = path.join(process.cwd(), 'temp');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+      // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
+      const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
       const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       const tempFile = path.join(tempDir, `coverletter-${uniqueId}.tex`);
       fs.writeFileSync(tempFile, latexTemplate);
@@ -563,7 +566,7 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
       
       // Clean up temp folder before returning
       try {
-        const tempDir = path.join(process.cwd(), 'temp');
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
         }
@@ -583,7 +586,7 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
       console.error('Cover letter generation error:', error);
       // Clean up temp folder even on error
       try {
-        const tempDir = path.join(process.cwd(), 'temp');
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
         if (fs.existsSync(tempDir)) {
           fs.rmSync(tempDir, { recursive: true, force: true });
         }

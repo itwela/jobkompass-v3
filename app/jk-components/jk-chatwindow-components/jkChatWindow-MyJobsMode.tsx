@@ -98,7 +98,7 @@ export default function JkCW_MyJobsMode() {
 
     setIsGenerating(true);
     const typeLabel = templateSelectorType === 'resume' ? 'resume' : 'cover letter';
-    const toastId = toast.loading(`Generating ${typeLabel} for ${selectedJobForGeneration.company}...`);
+    const toastId = toast.loading(`Generating ${typeLabel} for ${selectedJobForGeneration.company ? selectedJobForGeneration.company : 'you'}...`);
 
     try {
       const response = await fetch('/api/template/generate', {
