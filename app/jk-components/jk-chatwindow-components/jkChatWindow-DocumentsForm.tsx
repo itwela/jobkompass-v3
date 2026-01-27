@@ -47,6 +47,23 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         selectDocument,
         downloadFirstVersionResume,
     } = useJobKompassDocuments();
+    
+    const markResumeAsSeen = useMutation(api.documents.markResumeAsSeen);
+    const markCoverLetterAsSeen = useMutation(api.documents.markCoverLetterAsSeen);
+    
+    // Helper function to mark document as seen
+    const markDocumentAsSeen = async (id: string, documentType: "resume" | "cover-letter") => {
+        try {
+            if (documentType === "resume") {
+                await markResumeAsSeen({ resumeId: id as Id<"resumes"> });
+            } else {
+                await markCoverLetterAsSeen({ coverLetterId: id as Id<"coverLetters"> });
+            }
+        } catch (error) {
+            // Silently fail - don't interrupt user experience
+            console.error('Failed to mark document as seen:', error);
+        }
+    };
 
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -741,6 +758,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         const ghosted = stats?.ghosted || 0;
                         const interviewing = stats?.interviewing || 0;
 
+                        // Check if document is new (never seen)
+                        const isNew = !resume?.seenAt;
+
                         return (
                             <div
                                 key={resumeId}
@@ -755,7 +775,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                 }}
                                 className={cn(
                                     "group flex flex-col gap-4 rounded-xl border bg-card p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-                                    selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200"
+                                    selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200",
+                                    !selectionMode && isNew && "border-primary border-2"
                                 )}
                             >
                                 {/* File icon/thumbnail with job count badge and type indicator */}
@@ -907,8 +928,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                                                         {/* Edit content - for both resumes and cover letters */}
                                                         <DropdownMenuItem
-                                                            onClick={(event) => {
+                                                            onClick={async (event) => {
                                                                 event.stopPropagation();
+                                                                await markDocumentAsSeen(resumeId, documentType);
                                                                 if (documentType === "resume") {
                                                                     selectDocument(resumeId, "resume");
                                                                     setEditingContentResumeId(resume._id);
@@ -923,8 +945,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         </DropdownMenuItem>
                                                         {/* Edit labels & tags - works for both resumes and cover letters */}
                                                         <DropdownMenuItem
-                                                            onClick={(event) => {
+                                                            onClick={async (event) => {
                                                                 event.stopPropagation();
+                                                                await markDocumentAsSeen(resumeId, documentType);
                                                                 handleEditMetadata(resume, documentType);
                                                             }}
                                                         >
@@ -934,8 +957,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         {/* Download - works for both if they have a fileId */}
                                                         {resume?.fileId && (
                                                             <DropdownMenuItem
-                                                                onClick={(event) => {
+                                                                onClick={async (event) => {
                                                                     event.stopPropagation();
+                                                                    await markDocumentAsSeen(resumeId, documentType);
                                                                     downloadFirstVersionResume(resume.fileId);
                                                                 }}
                                                             >
@@ -946,7 +970,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             variant="destructive"
-                                                            onClick={(event) => {
+                                                            onClick={async (event) => {
+                                                                await markDocumentAsSeen(resumeId, documentType);
                                                                 event.stopPropagation();
                                                                 setConfirmingId(resumeId);
                                                             }}

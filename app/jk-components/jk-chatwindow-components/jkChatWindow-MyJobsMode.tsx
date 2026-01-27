@@ -18,6 +18,8 @@ import JkUpgradeModal from "../jkUpgradeModal";
 import JkJobInputModal from "../jkJobInputModal";
 import { toast } from "@/lib/toast";
 import { Id } from "@/convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 export default function JkCW_MyJobsMode() {
   const {
@@ -51,6 +53,7 @@ export default function JkCW_MyJobsMode() {
   const { user } = useAuth();
   const { resumes, resumePreferences } = useJobKompassResume();
   const { canGenerateDocument, upgradeModal, setUpgradeModal } = useFeatureAccess();
+  const markJobAsSeen = useMutation(api.jobs.markJobAsSeen);
 
   useEffect(() => {
     if (!selectionMode) {

@@ -15,10 +15,61 @@ export const list = query({
     const convexUserId = (user as any).convex_user_id || userId;
 
     // Get jobs by userId (convex_user_id) only
-    return await ctx.db
+    const jobs = await ctx.db
       .query("jobs")
       .withIndex("by_user", (q) => q.eq("userId", convexUserId))
       .collect();
+    
+    // Sort by updatedAt descending (most recently updated first)
+    return jobs.sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+});
+
+// Mark job as seen
+export const markJobAsSeen = mutation({
+  args: {
+    jobId: v.id("jobs"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+
+    const convexUserId = (user as any).convex_user_id || userId;
+
+    const job = await ctx.db.get(args.jobId);
+    if (!job || job.userId !== convexUserId) {
+      throw new Error("Job not found or access denied");
+    }
+    
+    await ctx.db.patch(args.jobId, {
+      seenAt: Date.now(),
+    });
+  },
+});
+
+// Count new jobs
+export const countNewJobs = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+
+    // Get user to access convex_user_id
+    const user = await ctx.db.get(userId);
+    if (!user) return 0;
+
+    const convexUserId = (user as any).convex_user_id || userId;
+
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
+      .collect();
+
+    // Count jobs where seenAt is null (never seen)
+    return jobs.filter(job => !job.seenAt).length;
   },
 });
 

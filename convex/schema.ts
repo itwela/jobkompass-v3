@@ -20,6 +20,8 @@ const documentsTables = {
     template: v.optional(v.string()), // Template used for this resume (e.g., "modern", "classic", "minimalist")
     // Flexible content field - can be any JSON structure
     content: v.optional(v.any()),
+    // Track when user has seen/viewed this document
+    seenAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
   resumeIRs: defineTable({
     userId: v.string(),
@@ -52,6 +54,8 @@ const documentsTables = {
     template: v.optional(v.string()),
     // Flexible content field - stores the input used to generate the cover letter
     content: v.optional(v.any()),
+    // Track when user has seen/viewed this document
+    seenAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
 
   emailTemplates: defineTable({
@@ -100,6 +104,8 @@ const documentsTables = {
     notes: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
+    // Track when user has seen/viewed this job
+    seenAt: v.optional(v.number()),
   }).index("by_user", ["userId"])
     .index("by_username", ["username"]),
 

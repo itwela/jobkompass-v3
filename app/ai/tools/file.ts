@@ -99,6 +99,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
     try {
       // Check if user can generate documents
       const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+      
       if (!canGenerate?.allowed) {
         return {
           success: false,
@@ -245,7 +246,10 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       // Create temporary directory and file
       // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
       const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      
       const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
       fs.writeFileSync(tempFile, latexTemplate);
@@ -321,6 +325,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
           // Include company name in resume title if provided
           const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
           const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
+          
           await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,

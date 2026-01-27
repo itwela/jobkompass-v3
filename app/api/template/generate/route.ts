@@ -21,6 +21,7 @@ const GenerateRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    
     const {
       templateType,
       templateId,
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const convexToken = await convexAuthNextjsToken();
+    
     const convexClient = new ConvexHttpClient(convexUrl);
     if (convexToken) {
       convexClient.setAuth(convexToken);
@@ -57,15 +59,19 @@ export async function POST(request: NextRequest) {
     // Fetch reference resume from Convex (only for resume generation)
     let referenceResume = null;
     if (templateType === 'resume' && referenceResumeId) {
-      referenceResume = await convexClient.query(api.documents.getResume, {
-        resumeId: referenceResumeId as any,
-      });
+      try {
+        referenceResume = await convexClient.query(api.documents.getResume, {
+          resumeId: referenceResumeId as any,
+        });
 
-      if (!referenceResume) {
-        return NextResponse.json(
-          { success: false, error: 'Reference resume not found' },
-          { status: 404 }
-        );
+        if (!referenceResume) {
+          return NextResponse.json(
+            { success: false, error: 'Reference resume not found' },
+            { status: 404 }
+          );
+        }
+      } catch (e) {
+        throw e;
       }
     }
 
@@ -75,7 +81,7 @@ export async function POST(request: NextRequest) {
       try {
         jobDetails = await convexClient.query(api.jobs.get, { id: jobId as any });
       } catch (e) {
-        console.error('Error fetching job:', e);
+        // Ignore job fetch errors
       }
     }
 
@@ -84,6 +90,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user can generate documents
     const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+    
     if (!canGenerate?.allowed) {
       return NextResponse.json(
         {
@@ -110,6 +117,7 @@ ${templateType === 'resume' && referenceResume ? `REFERENCE RESUME DATA:
 - Resume name: ${referenceResume?.name || 'N/A'}
 - Resume content: ${JSON.stringify(referenceResume?.content || {}, null, 2)}
 
+
 TASK:
 - Use the reference resume content as the primary source for all user information (personal info, experience, education, skills, etc.).
 - Tailor the content for that specific position.
@@ -129,6 +137,8 @@ TASK:
   - Set personalInfo.email to ${currentUser?.email || 'the user\'s email'}
   - Set jobInfo.company to "${jobCompany || 'the company name'}" so the document name includes the company name.
   - Set jobInfo.position to "${jobTitle || 'the job title'}"
+  ${jobCompany ? `- Set targetCompany to "${jobCompany}" so the document name includes the company name.` : ''}
+  
 - Call createCoverLetterJakeTemplate ONCE to generate and auto-save the document.`}
 
 ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFERENCES (MUST APPLY):\n${resumePreferences.join('\n')}` : ''}
@@ -184,6 +194,7 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
         }
       }
     }
+    
     const generationToolName = templateType === 'resume' ? 'createResumeJakeTemplate' : 'createCoverLetterJakeTemplate';
     const generationToolCalled = toolCalls.some((call: {name: string}) => call.name === generationToolName);
 
@@ -200,6 +211,7 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
 
     // Check if the tool result indicates success
     const generationToolCall = toolCalls.find((call: {name: string, result?: any}) => call.name === generationToolName);
+    
     if (generationToolCall?.result && typeof generationToolCall.result === 'object' && 'success' in generationToolCall.result) {
       if (!generationToolCall.result.success) {
         return NextResponse.json(

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useQuery } from "convex/react"
+import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
@@ -33,6 +33,9 @@ interface JkSearchModalProps {
 export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
   const { isAuthenticated } = useAuth()
   const { isFree } = useSubscription()
+  const markResumeAsSeen = useMutation(api.documents.markResumeAsSeen)
+  const markCoverLetterAsSeen = useMutation(api.documents.markCoverLetterAsSeen)
+  const markJobAsSeen = useMutation(api.jobs.markJobAsSeen)
   const { currentThreadId, setCurrentThreadId, setCurrentMode, allModes } = useJobKompassChatWindow()
   const { documents, selectDocument } = useJobKompassDocuments()
   const { allJobs, setSelectedJobId, statusOptions } = useJobs()
@@ -177,7 +180,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
     return results
   }, [searchQuery, threads, documents, allResources, allJobs, isAuthenticated, dateFrom, dateTo, statusOptions])
 
-  const handleResultClick = (result: SearchResult) => {
+  const handleResultClick = async (result: SearchResult) => {
     onClose()
 
     // Navigate based on result type
@@ -202,6 +205,16 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             }))
           }, 100)
         }
+        // Mark document as seen when clicked from search
+        try {
+          if (docType === 'resume') {
+            await markResumeAsSeen({ resumeId: result.id as Id<"resumes"> })
+          } else {
+            await markCoverLetterAsSeen({ coverLetterId: result.id as Id<"coverLetters"> })
+          }
+        } catch (error) {
+          // Silently fail
+        }
       }
     } else if (result.type === 'resource') {
       setEditingId(result.id as Id<"resources">)
@@ -214,6 +227,12 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
       const jobsMode = allModes.find(mode => mode.id === '/my-jobs')
       if (jobsMode) {
         setCurrentMode(jobsMode)
+      }
+      // Mark job as seen when clicked from search
+      try {
+        await markJobAsSeen({ jobId: result.id as Id<"jobs"> })
+      } catch (error) {
+        // Silently fail
       }
     }
   }

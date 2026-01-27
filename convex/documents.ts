@@ -197,7 +197,8 @@ export const listResumes = query({
       }
     }
 
-    return allResumes;
+    // Sort by updatedAt descending (most recently updated first)
+    return allResumes.sort((a, b) => b.updatedAt - a.updatedAt);
   },
 });
 
@@ -605,10 +606,13 @@ export const listCoverLetters = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     
-    return await ctx.db
+    const coverLetters = await ctx.db
       .query("coverLetters")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
+    
+    // Sort by updatedAt descending (most recently updated first)
+    return coverLetters.sort((a, b) => b.updatedAt - a.updatedAt);
   },
 });
 
@@ -646,6 +650,93 @@ export const saveGeneratedCoverLetterWithFile = mutation({
       updatedAt: now,
       isActive: true,
     });
+  },
+});
+
+// Mark resume as seen
+export const markResumeAsSeen = mutation({
+  args: {
+    resumeId: v.id("resumes"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
+      throw new Error("Resume not found or access denied");
+    }
+    
+    await ctx.db.patch(args.resumeId, {
+      seenAt: Date.now(),
+    });
+  },
+});
+
+// Mark cover letter as seen
+export const markCoverLetterAsSeen = mutation({
+  args: {
+    coverLetterId: v.id("coverLetters"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const coverLetter = await ctx.db.get(args.coverLetterId);
+    if (!coverLetter || coverLetter.userId !== userId) {
+      throw new Error("Cover letter not found or access denied");
+    }
+    
+    await ctx.db.patch(args.coverLetterId, {
+      seenAt: Date.now(),
+    });
+  },
+});
+
+// Count new documents (resumes + cover letters)
+export const countNewDocuments = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return 0;
+
+    // Get all resumes
+    const newFormatResumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    
+    const oldFormatResumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", identity.tokenIdentifier))
+      .collect();
+
+    const allResumes = [...newFormatResumes];
+    const existingIds = new Set(newFormatResumes.map(r => r._id));
+    
+    for (const resume of oldFormatResumes) {
+      if (!existingIds.has(resume._id)) {
+        allResumes.push(resume);
+      }
+    }
+
+    // Get all cover letters
+    const coverLetters = await ctx.db
+      .query("coverLetters")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    // Count items where seenAt is null (never seen)
+    const newResumes = allResumes.filter(r => !r.seenAt);
+
+    const newCoverLetters = coverLetters.filter(cl => !cl.seenAt);
+
+    return newResumes.length + newCoverLetters.length;
   },
 });
 

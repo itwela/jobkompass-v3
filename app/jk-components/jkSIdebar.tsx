@@ -35,6 +35,10 @@ export default function JkSidebar() {
   const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
   const deleteThread = useMutation(api.threads.remove)
   const { signOut } = useAuthActions()
+  
+  // Get counts of new items
+  const newJobsCount = useQuery(api.jobs.countNewJobs, isAuthenticated ? {} : "skip") || 0
+  const newDocumentsCount = useQuery(api.documents.countNewDocuments, isAuthenticated ? {} : "skip") || 0
 
   // Listen for custom event to navigate to sign-in page
   useEffect(() => {
@@ -222,7 +226,14 @@ export default function JkSidebar() {
                 <div className="flex items-center gap-2">
                   <span>My Documents</span>
                 </div>
-                <ChevronRight className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-2">
+                  {newDocumentsCount > 0 && (
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                      {newDocumentsCount}
+                    </span>
+                  )}
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </div>
               </button>
 
               {/* My Jobs Section */}
@@ -236,7 +247,14 @@ export default function JkSidebar() {
                 <div className="flex items-center gap-2">
                   <span>My Jobs</span>
                 </div>
-                <ChevronRight className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-2">
+                  {newJobsCount > 0 && (
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                      {newJobsCount}
+                    </span>
+                  )}
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </div>
               </button>
             </div>
           </div>

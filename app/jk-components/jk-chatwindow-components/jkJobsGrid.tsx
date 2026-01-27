@@ -15,6 +15,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 interface JobCardProps {
   job: {
@@ -26,6 +28,8 @@ interface JobCardProps {
     compensation?: string;
     dateApplied?: string;
     createdAt: number;
+    updatedAt: number;
+    seenAt?: number;
   };
   index: number;
   onClick: () => void;
@@ -95,6 +99,9 @@ function JobCard({
 
   const statusColor = statusColors[job.status] || 'bg-gray-100 text-gray-800 border-gray-200';
 
+  // Check if job is new (never seen)
+  const isNew = !job.seenAt;
+
 const handleGenerateResume = (event: MouseEvent) => {
     event.stopPropagation();
     onOpenTemplateSelector('resume', job._id, job.title, job.company);
@@ -161,8 +168,13 @@ const handleGenerateResume = (event: MouseEvent) => {
         onClick={handleCardClick}
       >
         <div
-          className={`bg-card border rounded-lg p-6 h-full min-h-[230px] flex flex-col hover:shadow-lg transition-shadow ${selectionMode && selected ? 'border-blue-400 ring-2 ring-blue-200' : 'border-border'
-            }`}
+          className={`bg-card border rounded-lg p-6 h-full min-h-[230px] flex flex-col hover:shadow-lg transition-shadow ${
+            selectionMode && selected 
+              ? 'border-blue-400 ring-2 ring-blue-200' 
+              : isNew 
+                ? 'border-primary border-2' 
+                : 'border-border'
+          }`}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -246,6 +258,7 @@ export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps =
     selectedStatus,
   } = useJobs();
   const [deletingId, setDeletingId] = useState<Id<"jobs"> | null>(null);
+  const markJobAsSeen = useMutation(api.jobs.markJobAsSeen);
 
   const handleOpenTemplateSelectorInternal = (
     type: TemplateType,
@@ -318,7 +331,16 @@ export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps =
           key={job._id}
           job={job}
           index={index}
-          onClick={() => setSelectedJobId(job._id)}
+          onClick={async () => {
+            setSelectedJobId(job._id);
+            // Mark job as seen when clicked
+            try {
+              await markJobAsSeen({ jobId: job._id });
+            } catch (error) {
+              // Silently fail - don't interrupt user experience
+              console.error('Failed to mark job as seen:', error);
+            }
+          }}
           onDelete={() => handleDelete(job._id)}
           isDeleting={deletingId === job._id}
           selectionMode={selectionMode}

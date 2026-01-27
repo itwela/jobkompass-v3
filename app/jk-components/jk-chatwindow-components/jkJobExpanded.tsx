@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useRef, useEffect, useMemo } from "react";
 import JkConfirmDelete from "../jkConfirmDelete";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 export default function JkJobExpanded() {
   const {
@@ -35,6 +37,7 @@ export default function JkJobExpanded() {
   } = useJobs();
   const { resumes } = useJobKompassResume();
   const { coverLetterList } = useJobKompassDocuments();
+  const markJobAsSeen = useMutation(api.jobs.markJobAsSeen);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
@@ -45,6 +48,16 @@ export default function JkJobExpanded() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [skillInput, setSkillInput] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
+
+  // Mark job as seen when expanded view is opened
+  useEffect(() => {
+    if (selectedJobId) {
+      markJobAsSeen({ jobId: selectedJobId }).catch((error) => {
+        // Silently fail - don't interrupt user experience
+        console.error('Failed to mark job as seen:', error);
+      });
+    }
+  }, [selectedJobId, markJobAsSeen]);
 
   // Get unique resume names from saved resumes
   const resumeNames = useMemo(() => {
