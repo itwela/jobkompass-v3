@@ -111,6 +111,19 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
     });
     
     try {
+      // Check if pdflatex is available
+      try {
+        await execAsync('which pdflatex');
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] pdflatex is available`);
+      } catch (pdflatexCheckError) {
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] pdflatex not found!`, pdflatexCheckError);
+        return {
+          success: false,
+          error: 'pdflatex is not installed or not in PATH',
+          message: 'LaTeX compiler (pdflatex) is not available in this environment.',
+        };
+      }
+      
       // Check if user can generate documents
       console.log(`[${toolExecutionId}] [RESUME_TOOL] Checking document generation limits...`);
       const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
@@ -309,6 +322,18 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
             error: latexError instanceof Error ? latexError.message : String(latexError),
             pdfExists: fs.existsSync(pdfPath)
           });
+          
+          // Read the LaTeX log file to get the actual error
+          let logContent = '';
+          if (fs.existsSync(logPath)) {
+            try {
+              logContent = fs.readFileSync(logPath, 'utf-8');
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX log file contents:`, logContent);
+            } catch (logReadError) {
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] Failed to read log file:`, logReadError);
+            }
+          }
+          
           // Even if pdflatex throws an error, check if PDF was generated
           // Sometimes compilation succeeds but returns non-zero exit code
           if (fs.existsSync(pdfPath)) {
@@ -317,11 +342,19 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
           } else {
               // PDF doesn't exist, so compilation actually failed
               const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
-              console.error(`[${toolExecutionId}] [RESUME_TOOL] PDF not found after compilation error`);
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] PDF not found after compilation error`, {
+                errorMessage,
+                logContent: logContent.substring(0, 1000), // First 1000 chars of log
+                tempDir,
+                filesInDir: fs.existsSync(tempDir) ? fs.readdirSync(tempDir) : [],
+                tempFileExists: fs.existsSync(tempFile),
+                tempFileSize: fs.existsSync(tempFile) ? fs.statSync(tempFile).size : 0,
+              });
               return {
                   success: false,
                   error: `LaTeX compilation failed: ${errorMessage}`,
-                  message: 'LaTeX compilation failed. The PDF could not be generated.'
+                  message: 'LaTeX compilation failed. The PDF could not be generated.',
+                  logContent: logContent.substring(0, 2000), // Include log in response for debugging
               };
           }
       }
