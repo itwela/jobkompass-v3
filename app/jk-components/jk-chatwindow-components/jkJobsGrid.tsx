@@ -97,12 +97,12 @@ function JobCard({
 
 const handleGenerateResume = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('resume', job);
+    onOpenTemplateSelector('resume', job._id, job.title, job.company);
   };
 
   const handleGenerateCoverLetter = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('cover-letter', job);
+    onOpenTemplateSelector('cover-letter', job._id, job.title, job.company);
   };
 
   const cardDetails = (

@@ -128,11 +128,14 @@ export async function POST(req: Request) {
         }
         const pdfBuffer = fs.readFileSync(pdfPath);
 
-        // Clean up temp files
-        ['aux', 'log', 'out', 'tex', 'pdf'].forEach(ext => {
-            const file = path.join(tempDir, `coverletter-${uniqueId}.${ext}`);
-            if (fs.existsSync(file)) fs.unlinkSync(file);
-        });
+        // Clean up temp folder
+        try {
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        } catch (cleanupError) {
+            console.error('Error cleaning up temp folder:', cleanupError);
+        }
 
         // Create filename from user's name
         const firstName = content.personalInfo.firstName || '';
@@ -149,6 +152,15 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error('Jake cover letter export error:', error);
+        // Clean up temp folder even on error
+        try {
+            const tempDir = path.join(process.cwd(), 'temp');
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        } catch (cleanupError) {
+            console.error('Error cleaning up temp folder:', cleanupError);
+        }
         return NextResponse.json(
             { error: 'Failed to export cover letter', details: error instanceof Error ? error.message : String(error) },
             { status: 500 }

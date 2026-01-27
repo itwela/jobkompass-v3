@@ -335,6 +335,16 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
 
       /// SECTION RETURN RESULT
       
+      // Clean up temp folder before returning
+      try {
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
+      
       // Return LaTeX sections, and the full tex
       return {
         success: true,
@@ -354,6 +364,15 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       };
     } catch (error) {
       console.error('Resume generation error:', error);
+      // Clean up temp folder even on error
+      try {
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -540,11 +559,17 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
         console.error('Failed to auto-save cover letter:', saveError);
       }
 
-      // Clean up tex file
-      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-      if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
-
       /// SECTION RETURN RESULT
+      
+      // Clean up temp folder before returning
+      try {
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
       
       return {
         success: true,
@@ -556,6 +581,15 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
       };
     } catch (error) {
       console.error('Cover letter generation error:', error);
+      // Clean up temp folder even on error
+      try {
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

@@ -83,6 +83,63 @@ export default function AuthPage() {
     }
   }, [isAuthenticated, isLoading, router, user, wasSignUp, updateLastSignIn])
 
+  const getErrorMessage = (error: unknown): string => {
+    // Handle different error types
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase()
+      
+      // Check for common error patterns and provide user-friendly messages
+      if (message.includes('redirect') || message.includes('null is not an object')) {
+        if (signInStep === "signIn") {
+          return "The email or password you entered is incorrect. Please check your credentials and try again."
+        } else {
+          return "An account with this email may already exist. Try signing in instead, or use a different email."
+        }
+      }
+      
+      if (message.includes('user not found') || message.includes('account') || message.includes('does not exist')) {
+        if (signInStep === "signIn") {
+          return "No account found with this email. Please check your email or sign up to create a new account."
+        }
+      }
+      
+      if (message.includes('password') || message.includes('incorrect') || message.includes('invalid')) {
+        return "The email or password you entered is incorrect. Please check your credentials and try again."
+      }
+      
+      if (message.includes('email') && (message.includes('already') || message.includes('exists'))) {
+        return "An account with this email already exists. Please sign in instead."
+      }
+      
+      if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
+        return "Network error. Please check your internet connection and try again."
+      }
+      
+      // Return the original message if it's user-friendly, otherwise provide a generic one
+      if (message.length < 100 && !message.includes('error') && !message.includes('exception')) {
+        return error.message
+      }
+    }
+    
+    // Handle non-Error objects
+    if (typeof error === 'object' && error !== null) {
+      const errorObj = error as any
+      if (errorObj.message && typeof errorObj.message === 'string') {
+        return getErrorMessage(new Error(errorObj.message))
+      }
+      if (errorObj.error && typeof errorObj.error === 'string') {
+        return getErrorMessage(new Error(errorObj.error))
+      }
+    }
+    
+    // Default messages based on step
+    if (signInStep === "signIn") {
+      return "Sign in failed. Please check your email and password, then try again."
+    } else {
+      return "Sign up failed. Please check your information and try again. If you already have an account, try signing in instead."
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setAuthError(null)
@@ -96,7 +153,9 @@ export default function AuthPage() {
       await signIn("password", formData)
       // Redirect will happen via useEffect when isAuthenticated changes
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Sign in failed")
+      console.error('Authentication error:', error)
+      const friendlyMessage = getErrorMessage(error)
+      setAuthError(friendlyMessage)
     } finally {
       setAuthLoading(false)
     }
@@ -197,8 +256,39 @@ export default function AuthPage() {
               <input name="flow" type="hidden" value={signInStep} />
 
               {authError && (
-                <div className="p-3 text-sm bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
-                  {authError}
+                <div className="p-4 text-sm bg-destructive/10 border border-destructive/30 rounded-lg text-destructive space-y-2">
+                  <div className="font-medium">⚠️ {signInStep === "signIn" ? "Sign in failed" : "Sign up failed"}</div>
+                  <div>{authError}</div>
+                  {signInStep === "signIn" && (
+                    <div className="text-xs text-destructive/80 mt-2">
+                      Don't have an account?{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignInStep("signUp")
+                          setAuthError(null)
+                        }}
+                        className="underline font-medium hover:text-destructive"
+                      >
+                        Sign up here
+                      </button>
+                    </div>
+                  )}
+                  {signInStep === "signUp" && (
+                    <div className="text-xs text-destructive/80 mt-2">
+                      Already have an account?{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignInStep("signIn")
+                          setAuthError(null)
+                        }}
+                        className="underline font-medium hover:text-destructive"
+                      >
+                        Sign in here
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

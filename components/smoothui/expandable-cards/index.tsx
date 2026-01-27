@@ -22,7 +22,7 @@ export type Card = {
   };
 };
 
-const smoothEasing = [EASING_X1, EASING_Y1, EASING_X2, EASING_Y2];
+const smoothEasing: [number, number, number, number] = [EASING_X1, EASING_Y1, EASING_X2, EASING_Y2];
 
 export type ExpandableCardsProps = {
   cards: Card[];

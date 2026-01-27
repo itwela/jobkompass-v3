@@ -93,6 +93,13 @@ export const metadata: Metadata = {
   verification: {
     // Add your verification codes here when available
   },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
