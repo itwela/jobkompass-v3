@@ -4,6 +4,7 @@ import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useState } from 'react'
+import { useAuth } from '@/providers/jkAuthProvider'
 import JkUpgradeModal from '@/app/jk-components/jkUpgradeModal'
 
 interface FeatureLimits {
@@ -40,7 +41,8 @@ const PLAN_LIMITS: Record<string, FeatureLimits> = {
 
 export function useFeatureAccess() {
   const { planId, isFree, isStarter, isPlus, isPro } = useSubscription()
-  const usage = useQuery(api.usage.getUserUsage)
+  const { isAuthenticated } = useAuth()
+  const usage = useQuery(api.usage.getUserUsage, isAuthenticated ? {} : "skip")
   const [upgradeModal, setUpgradeModal] = useState<{
     isOpen: boolean
     feature: string

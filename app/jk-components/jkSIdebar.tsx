@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuthActions } from "@convex-dev/auth/react"
-import { mainAssets } from "@/app/constants"
+import { mainAssets } from "@/app/lib/constants"
 import Image from "next/image"
 import Link from "next/link"
 import JkGap from './jkGap'

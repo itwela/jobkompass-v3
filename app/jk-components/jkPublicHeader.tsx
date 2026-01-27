@@ -11,7 +11,7 @@ import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { Settings, LogOut, User, DollarSign } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { mainAssets } from '@/app/constants'
+import { mainAssets } from '@/app/lib/constants'
 import JkGetStartedButton from './jkGetStartedButton'
 
 interface JkPublicHeaderProps {

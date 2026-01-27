@@ -3,6 +3,7 @@
 import { createContext, useContext, ReactNode, useEffect } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
+import { useConvexAuth } from 'convex/react'
 
 interface SubscriptionContextType {
   subscription: any | null
@@ -29,7 +30,8 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | null>(null)
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const subscription = useQuery(api.subscriptions.getUserSubscription)
+  const { isAuthenticated } = useConvexAuth()
+  const subscription = useQuery(api.subscriptions.getUserSubscription, isAuthenticated ? {} : "skip")
   const ensureConvexUserId = useMutation(api.auth.ensureConvexUserId)
   
   const planId = subscription?.planId || null
@@ -38,8 +40,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // Ensure convex_user_id is set for the user (runs once on mount)
   // This ensures new signups and existing users have convex_user_id set
   useEffect(() => {
-    ensureConvexUserId().catch(console.error)
-  }, [ensureConvexUserId])
+    if (isAuthenticated) {
+      ensureConvexUserId().catch(console.error)
+    }
+  }, [ensureConvexUserId, isAuthenticated])
   
   const value: SubscriptionContextType = {
     subscription,

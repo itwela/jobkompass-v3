@@ -12,10 +12,10 @@ import { LogIn, ArrowLeft } from "lucide-react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import Link from "next/link"
-import { mainAssets } from "@/app/constants"
+import { mainAssets } from "@/app/lib/constants"
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"
 import JkPricingModal from "@/app/jk-components/jkPricingModal"
-import { PRICING_REDIRECT_THRESHOLD } from "@/app/constants/timePeriods"
+import { PRICING_REDIRECT_THRESHOLD } from "@/app/lib/timePeriods"
 
 export default function AuthPage() {
   const { user, isAuthenticated, isLoading } = useAuth()

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
-import { mainAssets } from "../constants";
+import { mainAssets } from "../lib/constants";
 import { useMutation } from "convex/react";
 import JkPublicHeader from "./jkPublicHeader";
 import JkGetStartedButton from "./jkGetStartedButton";
@@ -160,7 +160,7 @@ export default function JkLandingPage() {
               priority
               style={{
                 objectFit: 'contain',
-                opacity: 0.6,
+                opacity: 0.8,
                 // Responsive: 0.3 on md:opacity-30 (>=768px)
                 // We'll add this with a media query below
                 transform: 'translateX(-20%) scaleX(-1)',
@@ -178,7 +178,7 @@ export default function JkLandingPage() {
               priority
               style={{
                 objectFit: 'contain',
-                opacity: 0.6,
+                opacity: 0.8,
                 // Responsive: 0.3 on md:opacity-30 (>=768px)
                 // We'll add this with a media query below
                 transform: 'translateX(20%)',

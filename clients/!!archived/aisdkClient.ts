@@ -1,8 +1,8 @@
 import {
-    CoreTool,
     CoreAssistantMessage,
     CoreMessage,
     CoreSystemMessage,
+    Tool,
     CoreUserMessage,
     generateObject,
     generateText,
@@ -10,22 +10,20 @@ import {
     LanguageModel,
     TextPart,
   } from "ai";
-  import { ChatCompletion } from "openai/resources/chat/completions";
-  import { CreateChatCompletionOptions, LLMClient, AvailableModel } from "./lllmClient";
-  
-  export class JobKompassSdkClient extends LLMClient {
-    public type = "local-model" as const;
+  import { CreateChatCompletionOptions, LLMClient, AvailableModel } from "../!!archived/lllmClient";
+  import { ChatCompletion } from "openai/resources/index.mjs";
+  export class AISdkClient extends LLMClient {
+    public type = "aisdk" as const;
     private model: LanguageModel;
   
     constructor({ model }: { model: LanguageModel }) {
-      super(model.modelId as AvailableModel);
+      super(model as any);
       this.model = model;
     }
   
     async createChatCompletion<T = ChatCompletion>({
       options,
     }: CreateChatCompletionOptions): Promise<T> {
-      // Format the incoming messages
       const formattedMessages: CoreMessage[] = options.messages.map((message) => {
         if (Array.isArray(message.content)) {
           if (message.role === "system") {
@@ -89,18 +87,17 @@ import {
         return response.object;
       }
   
-      // For tools, if provided, we process them
-      const tools: Record<string, CoreTool> = {};
-      if (options.tools) {
-        for (const rawTool of options.tools) {
-          tools[rawTool.name] = {
-            description: rawTool.description,
-            parameters: rawTool.parameters,
-          };
-        }
-      }
+      const tools: Record<string, Tool> = {};
   
-      // Generate the response text using the local model
+      // if (options.tools) {
+      //   for (const rawTool of options.tools) {
+      //     tools[rawTool.name] = {
+      //       description: rawTool.description,
+      //       parameters: rawTool.parameters as any,
+      //     };
+      //   }
+      // }
+  
       const response = await generateText({
         model: this.model,
         messages: formattedMessages,

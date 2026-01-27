@@ -13,7 +13,7 @@ import { Check, Wrench, LogIn, FileText, AlertTriangle, MessageSquarePlus } from
 import JkSlideModalGlass from "../jkSlideModalGlass";
 import { Button } from "@/components/ui/button";
 import { Hand } from "lucide-react";
-import { mainAssets } from "@/app/constants";
+import { mainAssets } from "@/app/lib/constants";
 import Image from "next/image";
 
 interface ChatMessage {
