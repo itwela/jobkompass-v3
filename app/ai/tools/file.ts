@@ -96,11 +96,32 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
     targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
   }),
   execute: async (input) => {
+    const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting resume generation`, {
+      timestamp: new Date().toISOString(),
+      firstName: input.personalInfo?.firstName,
+      lastName: input.personalInfo?.lastName,
+      targetCompany: input.targetCompany,
+      hasExperience: !!input.experience?.length,
+      experienceCount: input.experience?.length || 0,
+      hasEducation: !!input.education?.length,
+      educationCount: input.education?.length || 0,
+    });
+    
     try {
       // Check if user can generate documents
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Checking document generation limits...`);
       const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Generation limit check`, {
+        allowed: canGenerate?.allowed,
+        limit: canGenerate?.limit,
+        used: canGenerate?.used
+      });
       
       if (!canGenerate?.allowed) {
+        console.warn(`[${toolExecutionId}] [RESUME_TOOL] Document limit reached`);
         return {
           success: false,
           error: 'Document limit reached',
@@ -243,33 +264,60 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
 
       /// SECTION PDF GENERATION
     
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting PDF generation...`);
+      
       // Create temporary directory and file
       // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
       const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Temp directory: ${tempDir}`);
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Created temp directory`);
       }
       
       const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Writing LaTeX file: ${tempFile}`);
       fs.writeFileSync(tempFile, latexTemplate);
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] LaTeX file written`, { 
+        fileSize: fs.statSync(tempFile).size 
+      });
 
       // Compile LaTeX to PDF - capture log for debugging
       // Note: pdflatex may exit with non-zero even if PDF is generated (warnings, etc.)
       const pdfPath = path.join(tempDir, `resume-${uniqueId}.pdf`);
       const logPath = path.join(tempDir, `resume-${uniqueId}.log`);
       
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting LaTeX compilation...`, { pdfPath });
+      const latexStartTime = Date.now();
+      
       try {
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Running pdflatex (first pass)...`);
           await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] First pdflatex pass completed`);
+          
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Running pdflatex (second pass)...`);
           await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Second pdflatex pass completed`);
+          
+          const latexDuration = Date.now() - latexStartTime;
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] LaTeX compilation completed`, { 
+            duration: `${latexDuration}ms` 
+          });
       } catch (latexError: unknown) {
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX compilation error`, {
+            error: latexError instanceof Error ? latexError.message : String(latexError),
+            pdfExists: fs.existsSync(pdfPath)
+          });
           // Even if pdflatex throws an error, check if PDF was generated
           // Sometimes compilation succeeds but returns non-zero exit code
           if (fs.existsSync(pdfPath)) {
+              console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF exists despite error, continuing...`);
               // PDF was generated successfully, continue
           } else {
               // PDF doesn't exist, so compilation actually failed
               const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] PDF not found after compilation error`);
               return {
                   success: false,
                   error: `LaTeX compilation failed: ${errorMessage}`,
@@ -279,7 +327,13 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       }
 
       // Verify PDF exists before trying to read it
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Verifying PDF exists...`, { pdfPath });
       if (!fs.existsSync(pdfPath)) {
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] PDF file not found after compilation!`, {
+            pdfPath,
+            tempDir,
+            filesInDir: fs.existsSync(tempDir) ? fs.readdirSync(tempDir) : []
+          });
           return {
               success: false,
               error: 'PDF file was not generated after LaTeX compilation',
@@ -290,8 +344,13 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       }
 
       // Read the generated PDF
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Reading PDF file...`);
       const pdfBuffer = fs.readFileSync(pdfPath);
       const pdfBase64 = pdfBuffer.toString('base64');
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF read successfully`, { 
+        pdfSize: pdfBuffer.length,
+        base64Length: pdfBase64.length 
+      });
 
       // Clean up temp files (but keep .tex and .log for debugging if there was an error)
       ['aux', 'out'].forEach(ext => {
@@ -301,22 +360,39 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
 
       /// SECTION AUTO-SAVE TO CONVEX
       
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting auto-save to Convex...`);
       try {
         // Get upload URL from Convex
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Getting upload URL...`);
         const uploadUrl = await convexClient.mutation(api.documents.generateUploadUrl);
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Upload URL obtained`, { 
+          hasUrl: !!uploadUrl,
+          urlLength: uploadUrl?.length || 0 
+        });
         
         // Convert Buffer to Blob for upload
         const pdfBlob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
         
         // Upload PDF to Convex storage
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Uploading PDF to Convex storage...`);
+        const uploadStartTime = Date.now();
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/pdf' },
           body: pdfBlob,
         });
+        const uploadDuration = Date.now() - uploadStartTime;
+        
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Upload response`, {
+          ok: uploadResponse.ok,
+          status: uploadResponse.status,
+          statusText: uploadResponse.statusText,
+          duration: `${uploadDuration}ms`
+        });
         
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF uploaded successfully`, { storageId });
           
           // Save resume to database
           const now = new Date();
@@ -326,6 +402,12 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
           const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
           const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
           
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Saving resume to database...`, {
+            resumeName,
+            storageId,
+            fileSize: pdfBuffer.length
+          });
+          
           await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
@@ -334,13 +416,31 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
             content: input,
             template: 'jake',
           });
+          
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume saved to database successfully`, { resumeName });
+        } else {
+          const errorText = await uploadResponse.text();
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] Upload failed`, {
+            status: uploadResponse.status,
+            statusText: uploadResponse.statusText,
+            errorText: errorText.substring(0, 500)
+          });
         }
       } catch (saveError) {
         // Don't fail the whole operation if save fails, just log it
-        console.error('Failed to auto-save resume:', saveError);
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Failed to auto-save resume:`, {
+          error: saveError instanceof Error ? saveError.message : String(saveError),
+          stack: saveError instanceof Error ? saveError.stack : undefined
+        });
       }
 
       /// SECTION RETURN RESULT
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume generation completed successfully`, {
+        totalDuration: `${totalDuration}ms`,
+        fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`
+      });
       
       // Clean up temp folder before returning
       try {
@@ -349,7 +449,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
           fs.rmSync(tempDir, { recursive: true, force: true });
         }
       } catch (cleanupError) {
-        console.error('Error cleaning up temp folder:', cleanupError);
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] Error cleaning up temp folder:`, cleanupError);
       }
       
       // Return LaTeX sections, and the full tex
@@ -370,7 +470,13 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
         documentType: 'resume',
       };
     } catch (error) {
-      console.error('Resume generation error:', error);
+      const totalDuration = Date.now() - startTime;
+      console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Resume generation error:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        totalDuration: `${totalDuration}ms`,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
+      });
       // Clean up temp folder even on error
       try {
         const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
