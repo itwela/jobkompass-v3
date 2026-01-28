@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-
 export const list = query({
   args: {},
   handler: async (ctx) => {

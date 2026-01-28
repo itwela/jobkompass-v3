@@ -1,0 +1,195 @@
+%-------------------------
+% Resume in Latex (JOBKOMPASS JAKE TEMPLATE)
+% Author : JobKompass
+% Based off of: https://github.com/sb2nov/resume
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+%----------HEADING----------
+% \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+%   \textbf{\href{http://YOUR-PORTFOLIO.com/}{\Large YOUR NAME}} & Email : \href{mailto:your.email@example.com}{your.email@example.com}\\
+%   \href{http://YOUR-PORTFOLIO.com/}{http://YOUR-PORTFOLIO.com} & Mobile : YOUR-PHONE-NUMBER \\
+% \end{tabular*}
+
+\begin{center}
+    \textbf{\Huge \scshape Alex Taylor} \\ \vspace{1pt}
+    \small \underline{U.S. Citizen} $|$ \href{mailto:alex.taylor@example.com}{\underline{alex.taylor@example.com}} $|$ \href{https://linkedin.com/in/alex-taylor}{\underline{linkedin.com/in/alex-taylor}} $|$ \href{https://github.com/alextaylor}{\underline{github.com/alextaylor}}
+\end{center}
+
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {State University}{}
+      {Bachelor of Science in Human-Computer Interaction}{2010 -- 2014}
+    \resumeItemListStart
+      \resumeItem{Relevant coursework: Interaction Design, Usability Engineering, Visual Design}
+    \resumeItemListEnd
+  \resumeSubHeadingListEnd
+
+
+%-----------EXPERIENCE-----------
+\section{Experience}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Product Manager}{Jan 2021 - Present}
+      {Innovatech Solutions}{}
+    \resumeItemListStart
+      \resumeItem{Led cross-functional teams to deliver two major product releases, increasing user retention by 18\%.}
+      \resumeItem{Defined product roadmap and prioritized features using data-driven research and stakeholder input.}
+      \resumeItem{Coached junior product owners and improved sprint predictability by 25\% through process improvements.}
+    \resumeItemListEnd
+    \resumeSubheading
+      {Senior UX Designer}{May 2017 - Dec 2020}
+      {BrightWave Software}{}
+    \resumeItemListStart
+      \resumeItem{Designed and prototyped user interfaces for web and mobile applications used by 200k+ users.}
+      \resumeItem{Conducted usability testing and iterated on designs, reducing task completion time by 30\%.}
+      \resumeItem{Collaborated with engineers to implement accessible design patterns meeting WCAG 2.1 AA standards.}
+    \resumeItemListEnd
+    \resumeSubheading
+      {UI/UX Consultant}{Jun 2014 - Apr 2017}
+      {Freelance}{}
+    \resumeItemListStart
+      \resumeItem{Delivered design solutions for startups and small businesses, improving conversion rates by up to 15\%.}
+      \resumeItem{Established design systems and documentation for consistent product experiences.}
+      \resumeItem{Provided client training on design tools and best practices.}
+    \resumeItemListEnd
+  \resumeSubHeadingListEnd
+    %-------------------------------------------
+
+  \resumeSubHeadingListEnd
+
+
+%-----------PROJECTS-----------
+\section{Projects}
+    \resumeSubHeadingListStart
+    \resumeProjectHeading
+      {\textbf{TaskFlow App} $|$ \emph{Figma, React, Node.js}}{2020}
+    \resumeItemListStart
+      \resumeItem{A productivity app that simplifies task management with an AI-suggested prioritization system.}
+      \resumeItem{Designed user flows and interactive prototypes; supported handoff to engineering with specs and assets.}
+    \resumeItemListEnd
+    \resumeProjectHeading
+      {\textbf{OpenSource Design Kit} $|$ \emph{Sketch, Storybook}}{2018}
+    \resumeItemListStart
+      \resumeItem{A reusable component and style library for rapid prototyping.}
+      \resumeItem{Maintained documentation and contributed to community examples.}
+    \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+
+
+%
+%-----------PROGRAMMING SKILLS-----------
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+        \textbf{Languages}{: Product Strategy, User Research, Interaction Design, Prototyping (Figma, Sketch), Basic HTML/CSS, Agile/Scrum} \\
+        \textbf{Additional Skills}{: Stakeholder Management, Data-informed Decision Making, Usability Testing, Public Speaking}
+    }}
+ \end{itemize}
+
+
+%-------------------------------------------
+\end{document}
