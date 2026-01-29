@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server';
-import { promisify } from 'util';
-import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
-
-const execAsync = promisify(exec);
 
 // Helper function to escape LaTeX special characters
 function escapeLatex(str: string | null | undefined) {
@@ -43,6 +37,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing cover letter content' }, { status: 400 });
         }
 
+        const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+        if (!LATEX_SERVICE_URL) {
+            return NextResponse.json({ error: 'LATEX_SERVICE_URL is not configured' }, { status: 500 });
+        }
+
         const templatePath = path.join(process.cwd(), 'templates/coverletter/jakeCoverLetter.tex');
         if (!fs.existsSync(templatePath)) {
             return NextResponse.json({ error: 'Cover letter template not found' }, { status: 500 });
@@ -69,10 +68,10 @@ export async function POST(req: Request) {
         latexTemplate = latexTemplate.replace('{{YOUR-LOCATION}}', content.personalInfo.location ? escapeLatex(content.personalInfo.location) : '');
 
         // Replace date
-        const today = new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const today = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
         latexTemplate = latexTemplate.replace('{{DATE}}', escapeLatex(today));
 
@@ -83,61 +82,42 @@ export async function POST(req: Request) {
         latexTemplate = latexTemplate.replace('{{COMPANY_ADDRESS}}', content.jobInfo.companyAddress ? escapeLatex(content.jobInfo.companyAddress) : '');
 
         // Replace salutation
-        const salutation = content.jobInfo.hiringManagerName 
+        const salutation = content.jobInfo.hiringManagerName
             ? `${escapeLatex(content.jobInfo.hiringManagerName)}`
             : 'Hiring Manager';
         latexTemplate = latexTemplate.replace('{{SALUTATION}}', salutation);
 
         // Replace paragraphs
         latexTemplate = latexTemplate.replace('{{OPENING_PARAGRAPH}}', escapeLatex(content.letterContent.openingParagraph));
-        
+
         const bodyContent = content.letterContent.bodyParagraphs
             .map(para => escapeLatex(para))
             .join('\n\n');
         latexTemplate = latexTemplate.replace('{{BODY_PARAGRAPHS}}', bodyContent);
-        
+
         latexTemplate = latexTemplate.replace('{{CLOSING_PARAGRAPH}}', escapeLatex(content.letterContent.closingParagraph));
 
         // Replace signature name
         latexTemplate = latexTemplate.replace('{{YOUR NAME}}', fullName);
 
-        // Create temporary directory and file
-        // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
-        const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        const uniqueId = crypto.randomBytes(8).toString('hex');
-        const tempFile = path.join(tempDir, `coverletter-${uniqueId}.tex`);
-        fs.writeFileSync(tempFile, latexTemplate, 'utf-8');
+        // Compile via the Docker LaTeX service
+        const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latex: latexTemplate }),
+        });
 
-        // Compile LaTeX to PDF
-        const pdfPath = path.join(tempDir, `coverletter-${uniqueId}.pdf`);
-        
-        try {
-            await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
-            await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
-        } catch (latexError: unknown) {
-            if (!fs.existsSync(pdfPath)) {
-                const logPath = path.join(tempDir, `coverletter-${uniqueId}.log`);
-                const logContent = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf-8') : String(latexError);
-                console.error('LaTeX compilation error:', logContent);
-                return NextResponse.json({ error: 'LaTeX compilation failed', log: logContent }, { status: 500 });
-            }
+        const compileResult = await compileResponse.json();
+
+        if (!compileResponse.ok || !compileResult.success) {
+            console.error('LaTeX service compilation error:', compileResult.error);
+            return NextResponse.json(
+                { error: 'LaTeX compilation failed', log: compileResult.log },
+                { status: 500 }
+            );
         }
 
-        // Verify PDF exists
-        if (!fs.existsSync(pdfPath)) {
-            return NextResponse.json({ error: 'PDF generation failed - no output file' }, { status: 500 });
-        }
-        const pdfBuffer = fs.readFileSync(pdfPath);
-
-        // Clean up temp folder
-        try {
-            if (fs.existsSync(tempDir)) {
-                fs.rmSync(tempDir, { recursive: true, force: true });
-            }
-        } catch (cleanupError) {
-            console.error('Error cleaning up temp folder:', cleanupError);
-        }
+        const pdfBuffer = Buffer.from(compileResult.pdfBase64, 'base64');
 
         // Create filename from user's name
         const firstName = content.personalInfo.firstName || '';
@@ -154,19 +134,9 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error('Jake cover letter export error:', error);
-        // Clean up temp folder even on error
-        try {
-            const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
-            if (fs.existsSync(tempDir)) {
-                fs.rmSync(tempDir, { recursive: true, force: true });
-            }
-        } catch (cleanupError) {
-            console.error('Error cleaning up temp folder:', cleanupError);
-        }
         return NextResponse.json(
             { error: 'Failed to export cover letter', details: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         );
     }
 }
-

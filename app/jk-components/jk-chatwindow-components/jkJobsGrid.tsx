@@ -38,7 +38,7 @@ interface JobCardProps {
   selectionMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
-  onOpenTemplateSelector: (type: TemplateType, jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
+  onOpenTemplateSelector: (type: TemplateType, job: any) => void;
 }
 
 function JobCard({
@@ -104,12 +104,12 @@ function JobCard({
 
 const handleGenerateResume = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('resume', job._id, job.title, job.company);
+    onOpenTemplateSelector('resume', job);
   };
 
   const handleGenerateCoverLetter = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('cover-letter', job._id, job.title, job.company);
+    onOpenTemplateSelector('cover-letter', job);
   };
 
   const cardDetails = (

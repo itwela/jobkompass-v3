@@ -88,47 +88,23 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       languages: z.array(z.string()).optional().nullable().describe('Languages spoken'),
       references: z.array(z.string()).optional().nullable().describe('References'),
     }).optional().nullable(),
-    targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
+    targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name. If no target company is provided, put nothing in this field.)'),
   }),
   execute: async (input) => {
-    const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const startTime = Date.now();
-    
-    console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting resume generation`, {
-      timestamp: new Date().toISOString(),
-      firstName: input.personalInfo?.firstName,
-      lastName: input.personalInfo?.lastName,
-      targetCompany: input.targetCompany,
-      hasExperience: !!input.experience?.length,
-      experienceCount: input.experience?.length || 0,
-      hasEducation: !!input.education?.length,
-      educationCount: input.education?.length || 0,
-    });
-    
     try {
       // Verify LATEX_SERVICE_URL is configured
       const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
       if (!LATEX_SERVICE_URL) {
-        console.error(`[${toolExecutionId}] [RESUME_TOOL] LATEX_SERVICE_URL not set!`);
         return {
           success: false,
           error: 'LATEX_SERVICE_URL environment variable is not configured',
           message: 'LaTeX compilation service is not configured. Set LATEX_SERVICE_URL in your environment.',
         };
       }
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] Using LaTeX service at ${LATEX_SERVICE_URL}`);
-      
+
       // Check if user can generate documents
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] Checking document generation limits...`);
       const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] Generation limit check`, {
-        allowed: canGenerate?.allowed,
-        limit: canGenerate?.limit,
-        used: canGenerate?.used
-      });
-      
       if (!canGenerate?.allowed) {
-        console.warn(`[${toolExecutionId}] [RESUME_TOOL] Document limit reached`);
         return {
           success: false,
           error: 'Document limit reached',
@@ -271,9 +247,6 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
 
       /// SECTION PDF GENERATION (via Docker LaTeX service)
 
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting PDF generation via LaTeX service...`);
-      const latexStartTime = Date.now();
-
       const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -281,19 +254,8 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       });
 
       const compileResult = await compileResponse.json();
-      const latexDuration = Date.now() - latexStartTime;
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] LaTeX service responded`, {
-        ok: compileResponse.ok,
-        status: compileResponse.status,
-        duration: `${latexDuration}ms`,
-        success: compileResult.success,
-      });
 
       if (!compileResponse.ok || !compileResult.success) {
-        console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX service compilation failed`, {
-          error: compileResult.error,
-          log: compileResult.log?.substring(0, 1000),
-        });
         return {
           success: false,
           error: `LaTeX compilation failed: ${compileResult.error}`,
@@ -304,61 +266,23 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
 
       const pdfBase64 = compileResult.pdfBase64;
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF received from service`, {
-        pdfSize: pdfBuffer.length,
-        base64Length: pdfBase64.length,
-      });  
 
       /// SECTION AUTO-SAVE TO CONVEX
-      
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting auto-save to Convex...`);
+
       try {
-        // Get upload URL from Convex
-        console.log(`[${toolExecutionId}] [RESUME_TOOL] Getting upload URL...`);
         const uploadUrl = await convexClient.mutation(api.documents.generateUploadUrl);
-        console.log(`[${toolExecutionId}] [RESUME_TOOL] Upload URL obtained`, { 
-          hasUrl: !!uploadUrl,
-          urlLength: uploadUrl?.length || 0 
-        });
-        
-        // Convert Buffer to Blob for upload
         const pdfBlob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
-        
-        // Upload PDF to Convex storage
-        console.log(`[${toolExecutionId}] [RESUME_TOOL] Uploading PDF to Convex storage...`);
-        const uploadStartTime = Date.now();
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/pdf' },
           body: pdfBlob,
         });
-        const uploadDuration = Date.now() - uploadStartTime;
-        
-        console.log(`[${toolExecutionId}] [RESUME_TOOL] Upload response`, {
-          ok: uploadResponse.ok,
-          status: uploadResponse.status,
-          statusText: uploadResponse.statusText,
-          duration: `${uploadDuration}ms`
-        });
-        
+
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
-          console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF uploaded successfully`, { storageId });
-          
-          // Save resume to database
-          const now = new Date();
-          const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); // e.g. "Jun 10, 24"
-          
-          // Include company name in resume title if provided
           const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
           const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
-          
-          console.log(`[${toolExecutionId}] [RESUME_TOOL] Saving resume to database...`, {
-            resumeName,
-            storageId,
-            fileSize: pdfBuffer.length
-          });
-          
+
           await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
@@ -367,33 +291,12 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
             content: input,
             template: 'jake',
           });
-          
-          console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume saved to database successfully`, { resumeName });
-        } else {
-          const errorText = await uploadResponse.text();
-          console.error(`[${toolExecutionId}] [RESUME_TOOL] Upload failed`, {
-            status: uploadResponse.status,
-            statusText: uploadResponse.statusText,
-            errorText: errorText.substring(0, 500)
-          });
         }
-      } catch (saveError) {
-        // Don't fail the whole operation if save fails, just log it
-        console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Failed to auto-save resume:`, {
-          error: saveError instanceof Error ? saveError.message : String(saveError),
-          stack: saveError instanceof Error ? saveError.stack : undefined
-        });
+      } catch {
+        // Don't fail the whole operation if save fails
       }
 
       /// SECTION RETURN RESULT
-      
-      const totalDuration = Date.now() - startTime;
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume generation completed successfully`, {
-        totalDuration: `${totalDuration}ms`,
-        fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`
-      });
-      
-      // Return LaTeX sections, and the full tex
       return {
         success: true,
         message: 'Resume generated and saved successfully',
@@ -411,13 +314,6 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
         documentType: 'resume',
       };
     } catch (error) {
-      const totalDuration = Date.now() - startTime;
-      console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Resume generation error:`, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        totalDuration: `${totalDuration}ms`,
-        errorType: error instanceof Error ? error.constructor.name : typeof error
-      });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -586,8 +482,8 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
             template: 'jake',
           });
         }
-      } catch (saveError) {
-        console.error('Failed to auto-save cover letter:', saveError);
+      } catch {
+        // Don't fail the whole operation if save fails
       }
 
       /// SECTION RETURN RESULT
@@ -601,7 +497,6 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
         documentType: 'cover-letter',
       };
     } catch (error) {
-      console.error('Cover letter generation error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -1131,7 +1026,6 @@ const createGetLimitsDiagnosticsTool = (convexClient: ConvexHttpClient) =>
     execute: async () => {
       try {
         const diagnostics = await convexClient.query(api.usage.getLimitsDiagnostics, {});
-        console.log("[getLimitsDiagnostics]", diagnostics);
         return {
           success: true,
           diagnostics,
