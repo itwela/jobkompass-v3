@@ -183,14 +183,15 @@ function CapabilityCard({ capability, index }: { capability: { title: string; de
   return (
     <motion.article
       ref={cardRef}
-      initial={{ opacity: 0, y: 60 }}
+      initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
+      viewport={{ once: true, margin: "0px 0px -80px 0px" }}
       transition={{
-        duration: 0.8,
-        delay: 0.2 + index * 0.15,
-        ease: [0.16, 1, 0.3, 1]
+        duration: 0.5,
+        delay: index * 0.08,
+        ease: [0.25, 0.1, 0.25, 1]
       }}
+      style={{ willChange: "transform, opacity" }}
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
