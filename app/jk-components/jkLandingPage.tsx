@@ -240,16 +240,16 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
 
-      {/* Hand Backdrop Visual - hidden on small screens */}
-      <div className="absolute inset-0 hidden md:flex items-center justify-center pointer-events-none">
+      {/* Hand Backdrop Visual - hidden on small screens, aligned to bottom */}
+      <div className="absolute inset-0 hidden md:flex items-end justify-center pointer-events-none">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-4xl h-full flex items-center justify-center"
+          className="relative w-full max-w-7xl h-full flex items-end justify-center"
         >
           {/* Left Hand - 25% closer inward on mobile (15% vs 20%) */}
-          <div className="flex-1 flex justify-center items-center translate-x-[-15%] md:translate-x-[-20%]">
+          <div className="flex-1 flex justify-center items-end md:translate-x-[-40%]">
             <Image
               src="/images/jobkompass_hand_new_1.png"
               alt="JobKompass career management platform visual element"
@@ -267,7 +267,7 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
             />
           </div>
           {/* Right Hand - 25% closer inward on mobile */}
-          <div className="flex-1 flex justify-center items-center translate-x-[15%] md:translate-x-[20%]">
+          <div className="flex-1 flex justify-center items-end md:translate-x-[40%]">
             <Image
               src="/images/jobkompass_hand_new_1.png"
               alt="JobKompass career management platform visual element"

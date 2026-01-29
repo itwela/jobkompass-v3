@@ -38,7 +38,7 @@ interface JobCardProps {
   selectionMode: boolean;
   selected: boolean;
   onToggleSelect: () => void;
-  onOpenTemplateSelector: (type: TemplateType, jobId: Id<"jobs">, jobTitle: string, jobCompany: string) => void;
+  onOpenTemplateSelector: (type: TemplateType, job: JobForTemplateSelection) => void;
 }
 
 function JobCard({
@@ -104,12 +104,12 @@ function JobCard({
 
 const handleGenerateResume = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('resume', job._id, job.title, job.company);
+    onOpenTemplateSelector('resume', job);
   };
 
   const handleGenerateCoverLetter = (event: MouseEvent) => {
     event.stopPropagation();
-    onOpenTemplateSelector('cover-letter', job._id, job.title, job.company);
+    onOpenTemplateSelector('cover-letter', job);
   };
 
   const cardDetails = (
@@ -240,8 +240,11 @@ const handleGenerateResume = (event: MouseEvent) => {
   );
 }
 
+/** Job shape for template generation: pass full job so toast and API get company. Do not pass (jobId, jobTitle, jobCompany). */
+type JobForTemplateSelection = { _id: Id<"jobs">; title: string; company: string };
+
 interface JkJobsGridProps {
-  onOpenTemplateSelector?: (type: TemplateType, job: any) => void;
+  onOpenTemplateSelector?: (type: TemplateType, job: JobForTemplateSelection) => void;
 }
 
 export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps = {}) {

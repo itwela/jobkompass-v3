@@ -86,9 +86,10 @@ export default function JkCW_MyJobsMode() {
     }
   };
 
+  /** Receives full job object from grid (not jobId/jobTitle/jobCompany) so toast and API get company. */
   const handleOpenTemplateSelector = (
     type: TemplateType,
-    job: any,
+    job: { _id: Id<"jobs">; title: string; company: string },
   ) => {
     setTemplateSelectorType(type);
     setSelectedJobForGeneration(job);

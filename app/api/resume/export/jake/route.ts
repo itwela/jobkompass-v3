@@ -27,7 +27,7 @@ export async function POST(req: Request) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                latexContent,
+                latex: latexContent,
                 filename: `resume-${uniqueId}`,
             }),
         });

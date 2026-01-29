@@ -276,7 +276,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          latexContent: latexTemplate,
+          latex: latexTemplate,
           filename: `resume-${uniqueId}`,
         }),
       });
@@ -563,7 +563,7 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          latexContent: latexTemplate,
+          latex: latexTemplate,
           filename: `coverletter-${uniqueId}`,
         }),
       });
