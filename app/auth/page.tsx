@@ -30,6 +30,12 @@ export default function AuthPage() {
   const [signInStep, setSignInStep] = useState<"signIn" | "signUp">(
     searchParams.get('mode') === 'signup' ? 'signUp' : 'signIn'
   )
+  // Sync signInStep to URL so /auth?mode=signup always shows signup (e.g. from pricing)
+  useEffect(() => {
+    if (searchParams.get('mode') === 'signup') {
+      setSignInStep('signUp')
+    }
+  }, [searchParams])
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
   const [showPricingModal, setShowPricingModal] = useState(false)

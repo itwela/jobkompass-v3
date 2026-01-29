@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
@@ -105,6 +106,7 @@ const plans: Plan[] = [
 ]
 
 export default function JkPricing() {
+  const router = useRouter()
   const { user, isAuthenticated } = useAuth()
   const { subscription, isLoading, planId } = useSubscription()
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
@@ -113,7 +115,7 @@ export default function JkPricing() {
 
   const handleSubscribe = async (plan: Plan) => {
     if (!isAuthenticated || !user) {
-      window.location.href = '/auth?mode=signup'
+      router.push('/auth?mode=signup')
       return
     }
 
@@ -275,7 +277,7 @@ export default function JkPricing() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
                 onClick={() => !isCurrentPlan(plan) && setSelectedPlanId(plan.id)}
-                className={`relative border rounded-2xl p-8 bg-card cursor-pointer transition-all duration-200 flex flex-col ${
+                className={`group/card relative border rounded-2xl p-8 bg-card cursor-pointer transition-all duration-200 flex flex-col ${
                   isSelected
                     ? 'border-primary shadow-lg scale-105'
                     : plan.popular
@@ -338,32 +340,43 @@ export default function JkPricing() {
                   ))}
                 </ul>
 
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!isSelected && !isCurrentPlan(plan)) {
-                      setSelectedPlanId(plan.id)
+                {!isAuthenticated ? (
+                  <Link href="/auth?mode=signup" className="block w-full" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      className="w-full opacity-60 cursor-pointer transition-opacity duration-200 group-hover/card:opacity-100 active:opacity-100 bg-primary hover:bg-primary text-primary-foreground"
+                      variant="default"
+                    >
+                      {getButtonText(plan)}
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (!isSelected && !isCurrentPlan(plan)) {
+                        setSelectedPlanId(plan.id)
+                      }
+                      handleSubscribe(plan)
+                    }}
+                    disabled={
+                      isLoading ||
+                      loadingPlan === plan.id ||
+                      (isCurrentPlan(plan) && subscription?.status !== 'canceled')
                     }
-                    handleSubscribe(plan)
-                  }}
-                  disabled={
-                    isLoading || 
-                    loadingPlan === plan.id || 
-                    (isCurrentPlan(plan) && subscription?.status !== 'canceled')
-                  }
-                  className={`w-full ${
-                    isSelected
-                      ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                      : 'bg-primary hover:bg-primary text-primary-foreground opacity-100'
-                  }`}
-                  variant="default"
-                >
-                  {loadingPlan === plan.id ? (
-                    'Loading...'
-                  ) : (
-                    getButtonText(plan)
-                  )}
-                </Button>
+                    className={`w-full opacity-100 hover:opacity-100 active:opacity-100 cursor-pointer ${
+                      isSelected
+                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                        : 'bg-primary hover:bg-primary text-primary-foreground'
+                    }`}
+                    variant="default"
+                  >
+                    {loadingPlan === plan.id ? (
+                      'Loading...'
+                    ) : (
+                      getButtonText(plan)
+                    )}
+                  </Button>
+                )}
               </motion.div>
             )
           })}
