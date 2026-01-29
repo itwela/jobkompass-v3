@@ -21,8 +21,8 @@ export default function JkConsole() {
         allModes
     } = useJobKompassChatWindow()
     
-    // Only show input in home and chat modes
-    const shouldShowInput = currentMode.id === '/home' || currentMode.id === '/chat'
+    // Only show input in chat mode
+    const shouldShowInput = currentMode.id === '/chat'
 
     const handleFileSelect = useCallback((file: File) => {
         setDroppedFile(file);

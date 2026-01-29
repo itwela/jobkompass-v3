@@ -267,17 +267,28 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+              <style dangerouslySetInnerHTML={{ __html: `
+                .jk-search-modal-input,
+                .jk-search-modal-input:focus,
+                .jk-search-modal-input:focus-visible,
+                .jk-search-modal-input:active {
+                  outline: none !important;
+                  box-shadow: none !important;
+                  border-color: transparent !important;
+                }
+              ` }}></style>
               {/* Header */}
               <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
                 <div className="flex items-center gap-3 flex-1">
                   <Search className="h-5 w-5 text-muted-foreground" />
                   <input
                     ref={inputRef}
+                    data-search-modal-input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Search chats, documents, resources, or jobs..."
-                    className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:outline-none outline-none text-base px-0 placeholder:text-muted-foreground"
+                    className="jk-search-modal-input flex-1 border-0 bg-transparent text-base px-0 placeholder:text-muted-foreground"
                   />
                 </div>
                 <button

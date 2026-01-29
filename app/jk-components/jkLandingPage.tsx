@@ -26,7 +26,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How do I get started?",
-    answer: "Simply click Get started to begin. You can add your first job application or upload your resume, and the platform will guide you through the setup."
+    answer: "Simply click Get started to begin. You can paste your resume into Chat and ask the AI to tweak or create one for you, add your first job in My Jobs, and the platform will guide you through the rest. Document uploads are coming soon."
   },
   {
     question: "Is my data secure?",

@@ -48,23 +48,23 @@ const helpGuides: HelpGuide[] = [
       {
         title: 'Welcome to JobKompass',
         type: 'text',
-        content: 'JobKompass is your all-in-one career management platform. Whether you\'re job hunting, building your resume, or tracking applications, we\'ve got you covered.',
+        content: 'JobKompass is your all-in-one career management platform. Organize your job search, manage resumes and cover letters, and track applications—all in one place. Sign in to unlock everything.',
       },
       {
         title: 'Quick Start Steps',
         type: 'steps',
         content: [
           {
-            description: 'Sign in using the JobKompass icon in the sidebar to access all features',
+            description: 'Sign in using the JobKompass icon in the sidebar (or Get started on the landing page)',
           },
           {
-            description: 'Upload your resume in Documents mode to get started with resume management',
+            description: 'Paste your resume into Chat—ask the AI to tweak it and it can create a resume for you right in the chat',
           },
           {
-            description: 'Add your first job application in Jobs mode to begin tracking',
+            description: 'Add jobs in My Jobs (click Add Job, or ask the AI in Chat to save a job to your job dashboard from a link)',
           },
           {
-            description: 'Chat with our AI assistant to get personalized career guidance',
+            description: 'Use Chat for resume tips, cover letters, and job-search advice; you can edit documents later in My Documents',
           },
         ],
       },
@@ -73,19 +73,24 @@ const helpGuides: HelpGuide[] = [
         type: 'list',
         content: [
           {
-            title: 'Chat Mode',
-            description: 'Get instant AI-powered help with resumes, cover letters, and job search advice',
+            title: 'Chat',
+            description: 'Paste your resume here; the AI can tweak it and create a resume or cover letter on the spot.',
             action: { label: 'Go to Chat', modeId: '/chat' },
           },
           {
-            title: 'Documents Mode',
-            description: 'Upload and manage your resumes and cover letters',
+            title: 'My Documents',
+            description: 'Edit and download resumes and cover letters created in Chat. Use any as a reference resume for jobs. Document uploads coming soon.',
             action: { label: 'Go to Documents', modeId: '/documents' },
           },
           {
-            title: 'Jobs Mode',
-            description: 'Track your job applications and stay organized',
+            title: 'My Jobs',
+            description: 'Track applications and status (Applied, Interviewing, Offered, etc.)',
             action: { label: 'Go to Jobs', modeId: '/my-jobs' },
+          },
+          {
+            title: 'Links & Resources',
+            description: 'Save job boards, articles, and tools in one place',
+            action: { label: 'Go to Resources', modeId: '/resources' },
           },
         ],
       },
@@ -94,29 +99,29 @@ const helpGuides: HelpGuide[] = [
   {
     id: 'resumes',
     title: 'Resumes & Documents',
-    description: 'Master resume creation, optimization, and management to land your dream job.',
+    description: 'Create resumes and cover letters in Chat, then edit and download them in My Documents.',
     icon: '📄',
     sections: [
       {
-        title: 'Why Use Documents Mode?',
+        title: 'Why Use My Documents?',
         type: 'text',
-        content: 'The Documents mode is your central hub for all your career documents. Upload, organize, and manage multiple versions of your resume and cover letters with ease.',
+        content: 'My Documents is where you edit and download resumes and cover letters. Right now you create them in Chat: paste your resume, ask the AI to tweak it, and it can make a resume or cover letter for you on the spot. You can then open it in My Documents to edit and download, and use it as a reference resume for jobs. Document uploads are coming soon.',
       },
       {
         title: 'Getting the Best Results',
         type: 'tips',
         content: [
           {
-            description: 'Upload your existing resume to get started - our AI can analyze and improve it',
+            description: 'Paste your resume into Chat and ask the AI to improve it or create a new version—it can generate a document right in the chat',
           },
           {
-            description: 'Use multiple resume versions for different job types (technical, creative, leadership, etc.)',
+            description: 'Open My Documents later to edit the content, then Save to update the stored PDF and Download when you\'re ready to apply',
           },
           {
-            description: 'Add labels and tags to organize your documents - e.g., "Software Engineer", "Marketing Manager"',
+            description: 'Use any saved resume as a reference resume when creating tailored versions for specific jobs',
           },
           {
-            description: 'Download your resume as PDF for applications - always use PDF format for ATS compatibility',
+            description: 'Always download as PDF for applications—our export is ATS-friendly',
           },
         ],
       },
@@ -126,15 +131,15 @@ const helpGuides: HelpGuide[] = [
         content: [
           {
             title: 'ATS Optimization',
-            description: 'Use standard section headers (Experience, Education, Skills). Include relevant keywords from job descriptions. Keep formatting clean and simple.',
+            description: 'Use clear section headers (Experience, Education, Skills). Include keywords from the job description. Keep formatting clean.',
           },
           {
-            title: 'Content Guidelines',
-            description: 'Start bullet points with action verbs. Quantify achievements with numbers. Keep descriptions concise but impactful.',
+            title: 'Content',
+            description: 'Start bullets with action verbs. Quantify results with numbers. Keep descriptions concise.',
           },
           {
             title: 'Customization',
-            description: 'Tailor your resume for each application. Use the Chat mode to get AI assistance in customizing content for specific roles.',
+            description: 'Tailor content for each role. Use Chat to get AI suggestions based on a job description.',
           },
         ],
       },
@@ -143,19 +148,16 @@ const helpGuides: HelpGuide[] = [
         type: 'steps',
         content: [
           {
-            description: 'Navigate to Documents mode using the sidebar or typing "/documents"',
+            description: 'In Chat: paste your resume and ask the AI to tweak it or create a new one—it can make the document for you right there',
           },
           {
-            description: 'Click "Upload Document" to add your resume or cover letter',
+            description: 'Open My Documents from the sidebar (or type /documents in Chat) to see your saved resumes and cover letters',
           },
           {
-            description: 'Add labels and tags to organize your documents',
+            description: 'Click a document to open the editor; edit content then Save to update the PDF',
           },
           {
-            description: 'Use Chat mode to ask for resume improvements or generate new versions',
-          },
-          {
-            description: 'Download your optimized resume as PDF when ready to apply',
+            description: 'Use Download to get a PDF for applications; use documents as reference resumes when applying to jobs',
           },
         ],
       },
@@ -164,29 +166,29 @@ const helpGuides: HelpGuide[] = [
   {
     id: 'job-tracking',
     title: 'Job Tracking',
-    description: 'Organize and manage your job applications efficiently with our job tracker.',
+    description: 'Track applications and status in one place with My Jobs.',
     icon: '💼',
     sections: [
       {
-        title: 'Why Track Your Jobs?',
+        title: 'Why Use My Jobs?',
         type: 'text',
-        content: 'Keeping track of your job applications helps you stay organized, follow up at the right times, and never miss an opportunity. Our Jobs mode makes this effortless.',
+        content: 'My Jobs keeps all your applications in one place. Add a job by link or form, update status as you go, and never lose track of follow-ups.',
       },
       {
         title: 'Getting the Best Results',
         type: 'tips',
         content: [
           {
-            description: 'Add jobs quickly using the Chat mode - just paste a job link and say "/add job" or ask the AI to add it',
+            description: 'Click "Add Job" and paste a job URL—we\'ll pull in title, company, and details when possible',
           },
           {
-            description: 'Update job status regularly to keep your pipeline current (Interested, Applied, Interviewing, Offered, Rejected)',
+            description: 'You can also have the AI add a job from Chat: paste a link and ask it to save the job to your job dashboard',
           },
           {
-            description: 'Add notes for each job - interview questions, company insights, contact information',
+            description: 'Update status as you move through the process: Applied, Interviewing, Offered, Rejected',
           },
           {
-            description: 'Use the expanded view to see all details and take action',
+            description: 'Click a job card to expand and view or edit full details and notes',
           },
         ],
       },
@@ -196,23 +198,23 @@ const helpGuides: HelpGuide[] = [
         content: [
           {
             title: 'Interested',
-            description: 'Jobs you\'re considering but haven\'t applied to yet',
+            description: 'Considering but haven\'t applied yet',
           },
           {
             title: 'Applied',
-            description: 'Jobs you\'ve submitted applications for',
+            description: 'Application submitted',
           },
           {
             title: 'Interviewing',
-            description: 'Jobs where you\'re in the interview process',
+            description: 'In the interview process',
           },
           {
             title: 'Offered',
-            description: 'Jobs where you\'ve received an offer',
+            description: 'Offer received',
           },
           {
             title: 'Rejected',
-            description: 'Jobs you didn\'t get or withdrew from',
+            description: 'Not moving forward or withdrew',
           },
         ],
       },
@@ -221,19 +223,16 @@ const helpGuides: HelpGuide[] = [
         type: 'steps',
         content: [
           {
-            description: 'Go to Jobs mode from the sidebar or type "/my-jobs"',
+            description: 'Open My Jobs from the sidebar or type /my-jobs in Chat',
           },
           {
-            description: 'Add a job by clicking "Add Job" or using Chat mode with a job link',
+            description: 'Click "Add Job" to add manually, or paste a job link in Chat and ask the AI to add it to your job dashboard',
           },
           {
-            description: 'The AI will automatically extract job details from the link',
+            description: 'We\'ll try to fill in title, company, and other details from the link',
           },
           {
-            description: 'Update status as you progress through the application process',
-          },
-          {
-            description: 'Click on any job card to expand and view/edit full details',
+            description: 'Update status and notes as you progress; click a card to expand and edit',
           },
         ],
       },
@@ -241,38 +240,30 @@ const helpGuides: HelpGuide[] = [
   },
   {
     id: 'ai-chat',
-    title: 'AI Chat Assistant',
-    description: 'Leverage our AI assistant for personalized career guidance and document help.',
+    title: 'Chat (AI Assistant)',
+    description: 'Paste your resume, get tweaks and new documents on the spot, plus job search advice and quick actions.',
     icon: '💬',
     sections: [
       {
-        title: 'Your AI Career Assistant',
+        title: 'What Is Chat?',
         type: 'text',
-        content: 'Our AI assistant is trained specifically on career guidance, resume optimization, and job search strategies. It can help you at every step of your career journey.',
+        content: 'Chat is JobKompass\'s AI assistant. Paste your resume and ask it to tweak or create a new one—it can make a resume or cover letter for you right in the chat. You can edit it later in My Documents and use it as a reference for jobs. Chat can also add jobs from links, give job-search and interview advice, and use your existing documents and jobs for personalized suggestions.',
       },
       {
         title: 'What the AI Can Do',
         type: 'list',
         content: [
           {
-            title: 'Resume Creation & Editing',
-            description: 'Create new resumes from scratch or improve existing ones. Get suggestions for ATS optimization, formatting, and content improvements.',
+            title: 'Resumes & Cover Letters',
+            description: 'Generate a resume or cover letter from scratch, or improve an existing one. Ask for ATS-friendly wording and structure.',
           },
           {
-            title: 'Cover Letter Writing',
-            description: 'Generate tailored cover letters for specific job applications. Get help with tone, structure, and key points.',
-          },
-          {
-            title: 'Job Search Strategy',
-            description: 'Get advice on finding jobs, networking, interview preparation, and salary negotiation.',
+            title: 'Job Search & Applications',
+            description: 'Paste a job link and ask the AI to add it to My Jobs. Ask for interview prep, salary tips, and application strategy.',
           },
           {
             title: 'Career Guidance',
-            description: 'Ask questions about career transitions, skill development, industry trends, and more.',
-          },
-          {
-            title: 'Document Management',
-            description: 'The AI can access your existing resumes and jobs to provide personalized advice based on what you already have.',
+            description: 'Ask about career moves, skills, and industry trends. The AI can reference your saved documents and jobs when you ask.',
           },
         ],
       },
@@ -281,37 +272,13 @@ const helpGuides: HelpGuide[] = [
         type: 'tips',
         content: [
           {
-            description: 'Be specific in your requests - "Create a resume for a software engineer position" works better than "make a resume"',
+            description: 'Be specific: "Create a resume for a backend engineer role" works better than "make a resume"',
           },
           {
-            description: 'Attach relevant documents - the AI can read your resumes and job descriptions to provide better suggestions',
+            description: 'Reference your data: "Improve my current resume" or "Compare my resume to this job"',
           },
           {
-            description: 'Reference your existing data - ask things like "improve my current resume" or "compare my resume to this job posting"',
-          },
-          {
-            description: 'Use commands like "/add job [link]" or "/download-resume" for quick actions',
-          },
-          {
-            description: 'Ask follow-up questions - the AI remembers context within a conversation thread',
-          },
-        ],
-      },
-      {
-        title: 'Quick Commands',
-        type: 'list',
-        content: [
-          {
-            title: '/add job [link]',
-            description: 'Automatically add a job from a URL',
-          },
-          {
-            title: '/download-resume',
-            description: 'Download your resume as PDF',
-          },
-          {
-            title: '/start',
-            description: 'Get a personalized getting started guide',
+            description: 'Follow up in the same thread—the AI keeps context for the conversation',
           },
         ],
       },
@@ -320,32 +287,29 @@ const helpGuides: HelpGuide[] = [
   {
     id: 'resources',
     title: 'Links & Resources',
-    description: 'Save and organize job boards, helpful articles, tools, and networking resources.',
+    description: 'Save job boards, articles, and tools in one place.',
     icon: '🔗',
     sections: [
       {
-        title: 'Why Save Resources?',
+        title: 'Why Use Links & Resources?',
         type: 'text',
-        content: 'During your job search, you\'ll come across countless useful links - job boards, company research, career advice articles, networking platforms, and tools. Save them all in one place for easy access.',
+        content: 'Keep job boards, company pages, articles, and tools in one place. You can also add information you use over and over in applications—boilerplate answers, contact details, common phrases—so it\'s always easy to find and copy quickly when you need it.',
       },
       {
         title: 'Getting the Best Results',
         type: 'tips',
         content: [
           {
-            description: 'Categorize your resources using the predefined categories (Job Board, Company, Networking, Learning, Tools, etc.)',
+            description: 'Store text you reuse often: application answers, contact info, elevator pitch, or anything you copy into forms—then reference and copy it quickly whenever you need it',
           },
           {
-            description: 'Add descriptions and notes to remember why you saved a resource',
+            description: 'Use categories (Job Board, Company, Networking, Learning, Tools) to stay organized',
           },
           {
-            description: 'Use the search feature to quickly find saved resources',
+            description: 'Add a short description so you remember why you saved a link or note',
           },
           {
-            description: 'Filter by category to see resources by type',
-          },
-          {
-            description: 'The AI can automatically save resources it mentions during conversations',
+            description: 'Use search and filters to find resources quickly',
           },
         ],
       },
@@ -355,23 +319,23 @@ const helpGuides: HelpGuide[] = [
         content: [
           {
             title: 'Job Board',
-            description: 'LinkedIn, Indeed, company career pages, specialized job boards',
+            description: 'LinkedIn, Indeed, company career pages, niche boards',
           },
           {
             title: 'Company',
-            description: 'Company research, Glassdoor reviews, company culture info',
+            description: 'Company research, reviews, culture',
           },
           {
             title: 'Networking',
-            description: 'Professional networks, events, industry groups, alumni networks',
+            description: 'Events, groups, alumni networks',
           },
           {
             title: 'Learning',
-            description: 'Courses, tutorials, certifications, skill development resources',
+            description: 'Courses, certs, skill-building',
           },
           {
             title: 'Tools',
-            description: 'Resume builders, portfolio sites, interview prep tools, salary calculators',
+            description: 'Resume tools, portfolios, interview prep, salary calculators',
           },
         ],
       },
@@ -380,19 +344,16 @@ const helpGuides: HelpGuide[] = [
         type: 'steps',
         content: [
           {
-            description: 'Go to Links & Resources mode from the sidebar',
+            description: 'Open Links & Resources from the sidebar',
           },
           {
-            description: 'Click "New Note" to manually add a resource, or let the AI save resources automatically',
+            description: 'Click "New Note" to add a link or a note (title, URL if you have one, description, category)',
           },
           {
-            description: 'Fill in the title, URL, description, and select a category',
+            description: 'Add reusable text—application answers, contact info, phrases—so you can copy it quickly whenever you apply',
           },
           {
-            description: 'Click on any sticky note to edit it later',
-          },
-          {
-            description: 'Use search and filters to find resources quickly',
+            description: 'Click a note to edit it later; use search and filters to find things',
           },
         ],
       },
@@ -401,68 +362,56 @@ const helpGuides: HelpGuide[] = [
   {
     id: 'workflow',
     title: 'Complete Workflow',
-    description: 'Learn the optimal workflow for using JobKompass throughout your job search.',
+    description: 'A simple flow from setup to applications and follow-up.',
     icon: '🔄',
     sections: [
       {
         title: 'The JobKompass Workflow',
         type: 'text',
-        content: 'Follow this recommended workflow to get the most out of JobKompass and streamline your job search process.',
+        content: 'Use this flow to get the most out of JobKompass: set up once, then discover jobs, apply, and follow up—all in one place.',
       },
       {
-        title: '1. Setup Phase',
+        title: '1. Setup',
         type: 'steps',
         content: [
           {
-            description: 'Upload your existing resume(s) in Documents mode',
+            description: 'Paste your resume into Chat and ask the AI to tweak it or create a new one—it can make the document for you on the spot',
           },
           {
-            description: 'Ask the AI in Chat mode to analyze and suggest improvements',
+            description: 'Edit and download from My Documents; use any as a reference resume for jobs',
           },
           {
-            description: 'Create optimized versions for different job types',
-          },
-          {
-            description: 'Save useful resources like job boards and company pages',
+            description: 'Save useful links (job boards, companies) in Links & Resources',
           },
         ],
       },
       {
-        title: '2. Job Discovery',
+        title: '2. Finding Jobs',
         type: 'steps',
         content: [
           {
-            description: 'Browse job boards and company websites',
+            description: 'Browse job boards and company sites; save job links in Links & Resources so you can get back to them',
           },
           {
-            description: 'Use Resources mode to save interesting opportunities',
+            description: 'Have the AI add a job to your job dashboard: paste a link in Chat or in My Documents and ask it to save the job to My Jobs—or click Add Job in My Jobs to add it yourself',
           },
           {
-            description: 'Ask the AI for job search strategies in your field',
-          },
-          {
-            description: 'Add jobs to track in Jobs mode as you find them',
+            description: 'Ask the AI for job-search or industry advice when you need it',
           },
         ],
       },
       {
-        title: '3. Application Phase',
+        title: '3. Applying',
         type: 'steps',
         content: [
           {
-            description: 'For each job, review the job description in Jobs mode',
+            description: 'Open the job in My Jobs and review the description',
           },
           {
-            description: 'Use Chat mode to customize your resume for the specific role',
+            description: 'Use Chat to tailor your resume and generate a cover letter (paste or reference your saved resume)',
           },
           {
-            description: 'Generate a tailored cover letter using the AI assistant',
-          },
-          {
-            description: 'Download your customized resume and cover letter',
-          },
-          {
-            description: 'Submit your application and update job status',
+            description: 'Download resume and cover letter as PDFs, submit, then update job status',
           },
         ],
       },
@@ -471,19 +420,13 @@ const helpGuides: HelpGuide[] = [
         type: 'steps',
         content: [
           {
-            description: 'Update job status to "Interviewing" when you get responses',
+            description: 'Set status to Interviewing when you get a response',
           },
           {
-            description: 'Use Chat mode for interview preparation and practice',
+            description: 'Use Chat for interview prep; add notes on the job in My Jobs',
           },
           {
-            description: 'Add interview notes and company insights in Jobs mode',
-          },
-          {
-            description: 'Use Resources mode to save helpful interview prep materials',
-          },
-          {
-            description: 'Update status as you progress (Offered, Rejected, etc.)',
+            description: 'Update status to Offered or Rejected and keep notes for next time',
           },
         ],
       },
@@ -492,19 +435,13 @@ const helpGuides: HelpGuide[] = [
         type: 'tips',
         content: [
           {
-            description: 'Check your Jobs mode regularly to follow up on applications',
+            description: 'Check My Jobs often so you don\'t miss follow-ups',
           },
           {
-            description: 'Keep multiple resume versions ready for different types of roles',
+            description: 'Use Chat as your hub—it can see your documents and jobs',
           },
           {
-            description: 'Let the AI save resources automatically during conversations',
-          },
-          {
-            description: 'Use Chat mode as your central hub - it can access all your data',
-          },
-          {
-            description: 'Regularly review and update your documents and job statuses',
+            description: 'Keep one or two resume versions ready for different role types',
           },
         ],
       },
