@@ -107,17 +107,22 @@ export function JobKompassDocumentsProvider({ children }: { children: React.Reac
   }, [coverLetters, resumes, documents, isLoading, selectedDocument, currentResumeId, resumeList, setCurrentResumeId]);
 
   // One-shot download function (imperative query -> open URL). No state/useEffect needed.
+  // Open a window *synchronously* (before any await) so mobile doesn't block it as a popup.
   const downloadFirstVersionResume = async (fileId: Id<"_storage"> | undefined) => {
     if (!fileId) {
       console.log("No fileId provided");
       return;
     }
 
+    const w = window.open("", "_blank");
     try {
-      console.log("Downloading file with fileId:", fileId);
       const url = await convex.query(api.documents.getFileUrlById, { fileId });
-      if (url) window.open(url, "_blank");
+      if (url) {
+        if (w) w.location.href = url;
+        else window.open(url, "_blank");
+      } else if (w) w.close();
     } catch (err) {
+      if (w) w.close();
       console.error("Failed to download resume file:", err);
     }
   };

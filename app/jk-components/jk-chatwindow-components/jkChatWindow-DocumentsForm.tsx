@@ -959,8 +959,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             <DropdownMenuItem
                                                                 onClick={async (event) => {
                                                                     event.stopPropagation();
-                                                                    await markDocumentAsSeen(resumeId, documentType);
                                                                     downloadFirstVersionResume(resume.fileId);
+                                                                    void markDocumentAsSeen(resumeId, documentType);
                                                                 }}
                                                             >
                                                                 <Download className="h-4 w-4" />
