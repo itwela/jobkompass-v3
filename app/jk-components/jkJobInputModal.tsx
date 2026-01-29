@@ -40,6 +40,7 @@ export default function JkJobInputModal({
   const handleSend = async (value: string) => {
     if (!value.trim() || isSubmitting) return;
 
+    setInputValue(""); // Wipe input immediately so it acts like a real input
     setIsSubmitting(true);
     const toastId = toast.loading("Adding job(s) to your tracker...");
 
@@ -54,17 +55,19 @@ export default function JkJobInputModal({
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Failed to add job');
+      // 2xx = success (job was added). Only treat non-2xx as failure so we never throw when the API actually succeeded.
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || 'Failed to add job');
       }
 
       toast.dismiss(toastId);
-      toast.success(data.message || "Job(s) added successfully!", {
-        description: data.jobsAdded 
-          ? `${data.jobsAdded} job(s) have been added to your tracker.`
-          : undefined
+      toast.success(data?.message ?? 'Job(s) added successfully!', {
+        description:
+          typeof data?.jobsAdded === 'number'
+            ? `${data.jobsAdded} job(s) have been added to your tracker.`
+            : undefined
       });
 
       setInputValue("");

@@ -87,22 +87,38 @@ export async function POST(request: NextRequest) {
     // Run the agent with the job information
     const result = await run(agent, [user(jobInformation)], { maxTurns: 3 });
 
-    // Extract tool calls from the result history
-    const toolCalls: Array<{ name: string; result?: any }> = [];
-    if (result.history) {
-      const callResults = new Map();
+    // Helper: tool output can be JSON string from the SDK; normalize to object
+    const parseToolResult = (raw: unknown): Record<string, unknown> | null => {
+      if (raw == null) return null;
+      if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
 
-      // First pass: collect function call results
+    // Extract tool calls from the result history
+    const toolCalls: Array<{ name: string; result?: Record<string, unknown> | null }> = [];
+    if (result.history) {
+      const callResults = new Map<string, unknown>();
+
+      // First pass: collect function call results (SDK may use function_call_result or function_call_output)
       for (const item of result.history) {
-        if (
-          item &&
-          typeof item === 'object' &&
-          'type' in item &&
-          item.type === 'function_call_result'
-        ) {
-          const typedItem = item as { callId?: string; output?: any };
-          if (typedItem.callId) {
-            callResults.set(typedItem.callId, typedItem.output);
+        if (item && typeof item === 'object' && 'type' in item) {
+          const type = (item as { type?: string }).type;
+          if (type === 'function_call_result' || type === 'function_call_output') {
+            const typedItem = item as { callId?: string; call_id?: string; output?: unknown };
+            const callId = typedItem.callId ?? typedItem.call_id;
+            if (callId != null) {
+              callResults.set(callId, typedItem.output);
+            }
           }
         }
       }
@@ -110,18 +126,18 @@ export async function POST(request: NextRequest) {
       // Second pass: collect function calls and match with results
       for (const item of result.history) {
         if (item && typeof item === 'object' && 'type' in item) {
-          if (item.type === 'function_call') {
+          if ((item as { type: string }).type === 'function_call') {
             const typedItem = item as {
               name?: string;
               callId?: string;
-              arguments?: any;
+              call_id?: string;
             };
             if (typedItem.name) {
+              const callId = typedItem.callId ?? typedItem.call_id;
+              const rawResult = callId ? callResults.get(callId) : undefined;
               toolCalls.push({
                 name: typedItem.name,
-                result: typedItem.callId
-                  ? callResults.get(typedItem.callId)
-                  : undefined,
+                result: parseToolResult(rawResult),
               });
             }
           }
@@ -146,18 +162,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check results
+    // Check results (result is normalized object; success may be boolean)
     const successfulJobs = jobToolCalls.filter(
-      (call) => call.result?.success === true
+      (call) => call.result && call.result.success === true
     );
     const failedJobs = jobToolCalls.filter(
-      (call) => call.result?.success !== true
+      (call) => !call.result || call.result.success !== true
     );
 
-    if (successfulJobs.length === 0) {
+    // Explicit failure: parsed result with success === false or an error field (not just message – that can be success text)
+    const explicitFailure = failedJobs.find(
+      (call) =>
+        call.result &&
+        (call.result.success === false || typeof call.result.error === 'string')
+    );
+
+    if (successfulJobs.length === 0 && explicitFailure) {
+      const err = explicitFailure.result!;
       const errorMessage =
-        failedJobs[0]?.result?.message ||
-        failedJobs[0]?.result?.error ||
+        (typeof err.error === 'string' ? err.error : null) ||
+        (typeof err.message === 'string' ? err.message : null) ||
         'Failed to add jobs';
       return NextResponse.json(
         {
@@ -169,19 +193,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Success response
+    // Success: we parsed at least one success, or we had tool calls but no parseable failure (assume added)
+    const jobsAddedCount =
+      successfulJobs.length > 0 ? successfulJobs.length : jobToolCalls.length;
     const message =
-      successfulJobs.length === 1
+      jobsAddedCount === 1
         ? 'Job added successfully!'
-        : `${successfulJobs.length} jobs added successfully!`;
+        : `${jobsAddedCount} jobs added successfully!`;
 
-    return NextResponse.json({
-      success: true,
-      message,
-      jobsAdded: successfulJobs.length,
-      failedJobs: failedJobs.length,
-      agentResponse: result.finalOutput,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message,
+        jobsAdded: jobsAddedCount,
+        failedJobs: failedJobs.length,
+        agentResponse: result.finalOutput,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error('Error adding job:', error);
     return NextResponse.json(
