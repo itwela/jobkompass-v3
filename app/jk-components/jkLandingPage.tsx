@@ -26,7 +26,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How do I get started?",
-    answer: "Simply click 'Enter JobKompass' to begin. You can start by adding your first job application or uploading your resume. The platform will guide you through the setup process."
+    answer: "Simply click Get started to begin. You can add your first job application or upload your resume, and the platform will guide you through the setup."
   },
   {
     question: "Is my data secure?",
@@ -34,7 +34,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "Can I customize my resume?",
-    answer: "Absolutely. JobKompass offers multiple resume templates and allows you to customize your resume for each job application. You can edit, format, and tailor your resume to match specific job requirements."
+    answer: "Yes. We currently offer one resume template, with more on the way soon. You can still customize your resume for each job—edit, format, and tailor it to match specific job requirements."
   },
   {
     question: "How do I track my job applications?",
@@ -239,46 +239,49 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
 
-      {/* Hand Backdrop Visual - Static as requested */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* Hand Backdrop Visual - hidden on small screens */}
+      <div className="absolute inset-0 hidden md:flex items-center justify-center pointer-events-none">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-4xl h-full flex items-center justify-center"
         >
-          {/* Left Hand */}
-          <Image
-            src="/images/jobkompass_hand_new_1.png"
-            alt="JobKompass career management platform visual element"
-            width={800}
-            height={800}
-            priority
-            style={{
-              objectFit: 'contain',
-              opacity: 0.8,
-              transform: 'translateX(-20%) scaleX(-1)',
-              width: '100%',
-              height: '100%',
-              display: 'block',
-            }}
-          />
-          {/* Right Hand */}
-          <Image
-            src="/images/jobkompass_hand_new_1.png"
-            alt="JobKompass career management platform visual element"
-            width={800}
-            height={800}
-            priority
-            style={{
-              objectFit: 'contain',
-              opacity: 0.8,
-              transform: 'translateX(20%)',
-              width: '100%',
-              height: '100%',
-              display: 'block',
-            }}
-          />
+          {/* Left Hand - 25% closer inward on mobile (15% vs 20%) */}
+          <div className="flex-1 flex justify-center items-center translate-x-[-15%] md:translate-x-[-20%]">
+            <Image
+              src="/images/jobkompass_hand_new_1.png"
+              alt="JobKompass career management platform visual element"
+              width={800}
+              height={800}
+              priority
+              style={{
+                objectFit: 'contain',
+                opacity: 0.8,
+                transform: 'scaleX(-1)',
+                width: '100%',
+                height: '100%',
+                display: 'block',
+              }}
+            />
+          </div>
+          {/* Right Hand - 25% closer inward on mobile */}
+          <div className="flex-1 flex justify-center items-center translate-x-[15%] md:translate-x-[20%]">
+            <Image
+              src="/images/jobkompass_hand_new_1.png"
+              alt="JobKompass career management platform visual element"
+              width={800}
+              height={800}
+              priority
+              style={{
+                objectFit: 'contain',
+                opacity: 0.8,
+                width: '100%',
+                height: '100%',
+                display: 'block',
+              }}
+            />
+          </div>
         </motion.div>
       </div>
 
@@ -288,9 +291,9 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
       >
 
 
-        {/* Main heading with character animation */}
-        <div className="space-y-6">
-          <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-tight">
+        {/* Main heading with character animation - smaller on mobile to avoid "JobKomp" / "ass" break */}
+        <div className="space-y-6 max-w-[95vw] mx-auto md:max-w-none">
+          <h1 className="text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
             <span className="inline-block">
               {'Meet JobKompass'.split('').map((char, index) => (
                 <motion.span
@@ -355,9 +358,9 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
               ease: [0.16, 1, 0.3, 1]
             }}
           >
-            <Link href="#waitlist" onClick={scrollToWaitlist}>
+            <Link href="/pricing">
               <Button size="lg" variant="outline" className="text-base px-8">
-                Join waitlist
+                See Pricing
               </Button>
             </Link>
           </motion.div>
@@ -663,112 +666,21 @@ export default function JkLandingPage() {
           </div>
         </section>
 
-        {/* Waitlist Section */}
+        {/* Waitlist Section - commented out
         <section id="waitlist" className="relative py-32 px-6 overflow-hidden" aria-labelledby="waitlist-heading">
-          {/* Background effects */}
           <div className="absolute inset-0 bg-gradient-to-b from-muted/30 via-background to-muted/30" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[150px]" />
-          
           <div className="max-w-2xl mx-auto relative">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="text-center space-y-4 mb-12"
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary"
-              >
-                <Target className="h-4 w-4" />
-                <span>Early Access</span>
-              </motion.div>
-
-              <h2 id="waitlist-heading" className="text-4xl md:text-5xl font-semibold tracking-tight">
-                Stay in the loop
-              </h2>
-              <p className="text-muted-foreground text-lg">
-                Join our waitlist to be notified about new features and updates
-              </p>
+            <motion.div ... >
+              <h2 id="waitlist-heading">Stay in the loop</h2>
+              <p>Join our waitlist to be notified about new features and updates</p>
             </motion.div>
-
-            <motion.form
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={handleWaitlistSubmit}
-              className="relative space-y-5 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl p-8 md:p-10 shadow-2xl shadow-primary/5"
-              aria-label="Join waitlist form"
-            >
-              {/* Decorative gradient */}
-              <div className="absolute -top-px left-4 right-4 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-              
-              <div className="space-y-2">
-                <label htmlFor="waitlist-name" className="text-sm font-medium flex items-center gap-2">
-                  Name
-                  <span className="text-xs text-muted-foreground font-normal">(optional)</span>
-                </label>
-                <Input
-                  id="waitlist-name"
-                  type="text"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={isSubmitting}
-                  className="h-12 bg-background/50 border-border/50 focus:border-primary/50 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="waitlist-email" className="text-sm font-medium flex items-center gap-2">
-                  Email
-                  <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  id="waitlist-email"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  className="h-12 bg-background/50 border-border/50 focus:border-primary/50 transition-colors"
-                />
-              </div>
-
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Button 
-                  type="submit" 
-                  className="w-full h-12 text-base shadow-lg shadow-primary/25" 
-                  size="default"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="h-5 w-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
-                    />
-                  ) : (
-                    "Join waitlist"
-                  )}
-                </Button>
-              </motion.div>
-
-              <p className="text-xs text-center text-muted-foreground">
-                We respect your privacy. Unsubscribe at any time.
-              </p>
+            <motion.form onSubmit={handleWaitlistSubmit} ... >
+              ... name + email inputs + "Join waitlist" submit button ...
             </motion.form>
           </div>
         </section>
+        */}
 
         {/* FAQ Section */}
         <section className="py-32 px-6" aria-labelledby="faq-heading">

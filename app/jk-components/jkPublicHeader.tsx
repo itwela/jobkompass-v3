@@ -71,7 +71,7 @@ export default function JkPublicHeader({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-center gap-4"
+          className="flex items-center gap-2 sm:gap-4"
         >
           {isAuthenticated && user ? (
             <>
