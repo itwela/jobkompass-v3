@@ -1016,15 +1016,19 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
 
       try {
         // Check if user can add jobs
-        const canAdd = await convexClient.query(api.usage.canAddJob, {});
-        if (!canAdd?.allowed) {
-          return {
-            success: false,
-            message: `You've reached your job tracking limit of ${canAdd.limit} jobs. Please upgrade to Pro plan for unlimited job tracking.`,
-            error: 'Job limit reached',
-            limitReached: true,
-          };
-        }
+        // const canAdd = await convexClient.query(api.usage.canAddJob, {});
+        // if (!canAdd?.allowed) {
+        //   return {
+        //     success: false,
+        //     message:
+        //       canAdd.subscriptionStatus === "inactive"
+        //         ? `Your subscription isn’t active right now, so you’re currently limited to the Free plan (${canAdd.limit ?? 10} jobs).`
+        //         : `Your job tracker is full for your ${canAdd.planLabel ?? "current"} plan (${canAdd.limit ?? 10} jobs).` +
+        //           (canAdd.upgradeSuggestion ? ` ${canAdd.upgradeSuggestion}` : ""),
+        //     error: 'Job limit reached',
+        //     limitReached: true,
+        //   };
+        // }
 
         // Get user's convex_user_id for the agent tool
         const user = await convexClient.query(api.auth.currentUser);
@@ -1252,6 +1256,34 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
     },
   });
 
+// Limits Diagnostics Tool (for debugging plan/limits)
+const createGetLimitsDiagnosticsTool = (convexClient: ConvexHttpClient) =>
+  tool({
+    name: "getLimitsDiagnostics",
+    description:
+      "Debug tool: returns subscription + computed limits for jobs/documents, including raw planId/status and whether the subscription is active.",
+    parameters: z.object({}),
+    execute: async () => {
+      try {
+        const diagnostics = await convexClient.query(api.usage.getLimitsDiagnostics, {});
+        console.log("[getLimitsDiagnostics]", diagnostics);
+        return {
+          success: true,
+          diagnostics,
+          message: "Fetched limits diagnostics.",
+        };
+      } catch (error) {
+        console.error("Failed to fetch limits diagnostics via tool:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          message: "Failed to fetch limits diagnostics.",
+          error: errorMessage,
+        };
+      }
+    },
+  });
+
 export {
   createResumeJakeTemplateTool,
   createCoverLetterJakeTemplateTool,
@@ -1259,6 +1291,7 @@ export {
   createAddToJobsTool,
   createGetUserResumesTool,
   createGetUserJobsTool,
+  createGetLimitsDiagnosticsTool,
   createGetResumeByIdTool,
   createGetJobByIdTool,
   createGetUserResumePreferencesTool,

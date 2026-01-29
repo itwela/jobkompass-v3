@@ -1,6 +1,91 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+
+const PLAN_LIMITS: Record<string, number | null> = {
+  free: 10,
+  starter: 100,
+  plus: 100,
+  "plus-annual": 100,
+  pro: null, // Unlimited
+  "pro-annual": null, // Unlimited
+};
+
+function planLabelFromPlanId(planId: string) {
+  if (planId === "free") return "Free";
+  if (planId === "starter") return "Starter";
+  if (planId === "plus" || planId === "plus-annual") return "Plus";
+  if (planId === "pro" || planId === "pro-annual") return "Pro";
+  return planId;
+}
+
+function upgradeSuggestionForPlan(planId: string) {
+  if (planId === "free") return "Upgrade to Plus (100 jobs) or Pro (unlimited jobs).";
+  if (planId === "starter" || planId === "plus" || planId === "plus-annual") {
+    return "Upgrade to Pro for unlimited job tracking.";
+  }
+  return "Upgrade your plan to increase job limits.";
+}
+
+async function resolveJobLimitForUser(ctx: any, convexUserId: string) {
+  const subscription = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_user", (q: any) => q.eq("userId", convexUserId))
+    .first();
+
+  const rawPlanId = subscription?.planId || "free";
+  const rawStatus = subscription?.status || null;
+  
+  // Match the same "active" logic as `usage.canAddJob`:
+  // active/trialing/past_due OR missing status but a paid planId (back-compat)
+  const isActive =
+    rawStatus === "active" ||
+    rawStatus === "trialing" ||
+    rawStatus === "past_due" ||
+    (rawStatus === null && rawPlanId !== "free");
+
+  // Treat inactive subscriptions as free for gating purposes
+  const planId = isActive ? rawPlanId : "free";
+  const subscriptionStatus = isActive ? rawStatus : "inactive";
+  // IMPORTANT: `null` means "unlimited" (e.g. Pro). Do NOT use `??` here.
+  const limit = Object.prototype.hasOwnProperty.call(PLAN_LIMITS, planId)
+    ? PLAN_LIMITS[planId]
+    : PLAN_LIMITS.free;
+
+  return {
+    planId,
+    planLabel: planLabelFromPlanId(planId),
+    subscriptionStatus,
+    limit,
+    upgradeSuggestion: upgradeSuggestionForPlan(planId),
+  };
+}
+
+async function enforceJobLimitOrThrow(ctx: any, convexUserId: string) {
+  const { planId, planLabel, subscriptionStatus, limit, upgradeSuggestion } =
+    await resolveJobLimitForUser(ctx, convexUserId);
+
+  // Unlimited plans
+  if (limit === null) return;
+
+  const jobsCount = (
+    await ctx.db.query("jobs").withIndex("by_user", (q: any) => q.eq("userId", convexUserId)).collect()
+  ).length;
+
+  if (jobsCount >= limit) {
+    const statusNote =
+      subscriptionStatus === "inactive"
+        ? " Your subscription is not active, so you're currently treated as Free for limits."
+        : "";
+
+    throw new Error(
+      `Job limit reached. You can track up to ${limit} jobs on your ${planLabel} plan.` +
+        statusNote +
+        ` ${upgradeSuggestion}`
+    );
+  }
+}
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -114,7 +199,6 @@ export const add = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Check if user can add jobs
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -122,40 +206,7 @@ export const add = mutation({
     if (!user) throw new Error("User not found");
 
     const convexUserId = (user as any).convex_user_id || userId;
-
-    // Get subscription
-    const subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-      .first();
-
-    const planId = subscription?.planId || "free";
-
-    // Define limits (null means unlimited)
-    const PLAN_LIMITS: Record<string, number | null> = {
-      free: 10,
-      starter: 100,
-      plus: 100,
-      "plus-annual": 100,
-      pro: null, // Unlimited
-      "pro-annual": null, // Unlimited
-    };
-
-    const limit = PLAN_LIMITS[planId] ?? PLAN_LIMITS.free;
-
-    // If not unlimited, check limit
-    if (limit !== null) {
-      const allJobs = await ctx.db
-        .query("jobs")
-        .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-        .collect();
-
-      const jobsCount = allJobs.length;
-
-      if (jobsCount >= limit) {
-        throw new Error(`Job limit reached. You can track up to ${limit} jobs on your current plan. Upgrade to Pro for unlimited job tracking.`);
-      }
-    }
+    await enforceJobLimitOrThrow(ctx, convexUserId);
 
     const now = Date.now();
     return await ctx.db.insert("jobs", {
@@ -255,6 +306,7 @@ export const addInternal = internalMutation({
   handler: async (ctx, args) => {
     // userId must be the convex_user_id
     const { userId, ...jobData } = args;
+    await enforceJobLimitOrThrow(ctx, userId);
     const now = Date.now();
     return await ctx.db.insert("jobs", {
       userId, // Use convex_user_id as the sole identifier
@@ -288,6 +340,7 @@ export const addForAgent = mutation({
     // Note: This is a special mutation for the agent
     // userId must be the convex_user_id
     const { userId, ...jobData } = args;
+    await enforceJobLimitOrThrow(ctx, userId);
     const now = Date.now();
     return await ctx.db.insert("jobs", {
       userId, // Use convex_user_id as the sole identifier
