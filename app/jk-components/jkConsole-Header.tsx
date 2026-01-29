@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, Link2, MoreVertical, Type, ChevronDown } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,11 +10,17 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAuth } from "@/providers/jkAuthProvider";
+import { useSubscription } from "@/providers/jkSubscriptionProvider";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Jk_AutoFill from "./jk-AutoFill";
 import JkUpgradeButton from "./jkUpgradeButton";
 import { nooutline } from "@/lib/utils";
+import { mainAssets } from "@/app/lib/constants";
+import Image from "next/image";
+import Link from "next/link";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import JkGap from "./jkGap";
 
 interface JkConsoleHeaderProps {
     sidebarOpen: boolean;
@@ -23,6 +29,10 @@ interface JkConsoleHeaderProps {
 
 export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConsoleHeaderProps) {
     const { user, isAuthenticated, isLoading: authCheckLoading } = useAuth();
+    const { planId, subscription, isPro, isProAnnual } = useSubscription();
+    const { getUsageStats } = useFeatureAccess();
+    const usage = getUsageStats();
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [showSignIn, setShowSignIn] = useState(false)
     const [signInStep, setSignInStep] = useState<"signIn" | "signUp">("signIn")
     const [authError, setAuthError] = useState<string | null>(null)
@@ -86,10 +96,14 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
     }
     const [retitling, setRetitling] = useState(false)
     const [isModeMenuOpen, setIsModeMenuOpen] = useState(false)
-    const { currentMode, setCurrentMode, allModes, currentThreadId } = useJobKompassChatWindow()
-    const { signIn } = useAuthActions()
+    const { currentMode, setCurrentMode, allModes, currentThreadId, setCurrentThreadId } = useJobKompassChatWindow()
+    const { signIn, signOut } = useAuthActions()
     
+    // Data for titles, conversations, and notification badges
     const threadData = useQuery(api.threads.get, currentThreadId ? { threadId: currentThreadId } : "skip")
+    const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
+    const newJobsCount = useQuery(api.jobs.countNewJobs, isAuthenticated ? {} : "skip") || 0
+    const newDocumentsCount = useQuery(api.documents.countNewDocuments, isAuthenticated ? {} : "skip") || 0
     const updateTitle = useMutation(api.threads.updateTitle)
     
     // Retitle function
@@ -141,6 +155,55 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
         }
     };
 
+    // Mobile navigation helpers
+    const handleNewChat = () => {
+        const chatMode = allModes.find(mode => mode.id === '/chat')
+        if (chatMode) {
+            setCurrentMode(chatMode)
+        }
+    }
+
+    const handleResourcesClick = () => {
+        const resourcesMode = allModes.find(mode => mode.id === '/resources')
+        if (resourcesMode) {
+            setCurrentMode(resourcesMode)
+        }
+    }
+
+    const handleMyDocumentsClick = () => {
+        const docsMode = allModes.find(mode => mode.id === '/documents')
+        if (docsMode) {
+            setCurrentMode(docsMode)
+        }
+    }
+
+    const handleMyJobsClick = () => {
+        const jobsMode = allModes.find(mode => mode.id === '/my-jobs')
+        if (jobsMode) {
+            setCurrentMode(jobsMode)
+        }
+    }
+
+    const handleThreadClick = (threadId: any) => {
+        const chatMode = allModes.find(mode => mode.id === '/chat')
+        if (chatMode) {
+            setCurrentMode(chatMode)
+        }
+        setCurrentThreadId(threadId)
+    }
+
+    const handleSettingsClick = () => {
+        const settingsMode = allModes.find(mode => mode.id === '/settings')
+        if (settingsMode) {
+            setCurrentMode(settingsMode)
+        }
+    }
+
+    const handleSignOut = async () => {
+        await signOut()
+        setCurrentThreadId(null)
+    }
+
     return ( 
         <>
             {/* Desktop Header with Breadcrumb */}
@@ -188,46 +251,38 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                     <SheetTrigger asChild>
                         <Button variant="ghost" size="icon">
                             <Menu className="h-5 w-5" />
-                            <span className="sr-only">Toggle sidebar</span>
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="w-64 p-0 flex flex-col">
+                    <SheetContent side="left" className="w-[80vw] max-w-sm sm:w-72 p-0 flex flex-col overflow-hidden">
                         <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-                        <div className="p-4 border-b border-border">
-                            <h2 className="text-lg font-semibold tracking-tight">JobKompass</h2>
+                        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                            <Image
+                                src={mainAssets.logo}
+                                alt="JobKompass Logo"
+                                width={28}
+                                height={28}
+                                className="object-contain"
+                            />
+                            {/* Radix Sheet close button sits in the top-right; this empty span helps visually center the logo */}
+                            <span className="w-7 h-7" aria-hidden="true" />
                         </div>
-                        <div className="flex items-center justify-between px-4 pb-4 pt-2">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
-                                <Plus className="h-4 w-4" />
-                                <span className="sr-only">New chat</span>
-                            </Button>
-                            {isAuthenticated && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-9 w-9 rounded-lg"
-                                    onClick={() => {
-                                        const settingsMode = allModes.find(m => m.id === '/settings')
-                                        if (settingsMode) {
-                                            setCurrentMode(settingsMode)
-                                            setSidebarOpen(false)
-                                        }
-                                    }}
-                                >
-                                    <Settings className="h-4 w-4" />
-                                    <span className="sr-only">Settings</span>
-                                </Button>
-                            )}
-                        </div>
-                        <div className="flex-1 overflow-y-auto chat-scroll p-2">
+                    
+                        <div className="flex-1 flex flex-col px-2">
                             <div className="space-y-1">
                                 <button
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-foreground"
                                     onClick={() => {
-                                        const resourcesMode = allModes.find(m => m.id === '/resources')
-                                        if (resourcesMode) {
-                                            setCurrentMode(resourcesMode)
-                                            setSidebarOpen(false)
-                                        }
+                                        handleNewChat();
+                                        setSidebarOpen(false);
+                                    }}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span>New Chat</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleResourcesClick();
+                                        setSidebarOpen(false);
                                     }}
                                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                                         currentMode.id === '/resources'
@@ -238,38 +293,220 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                     <Link2 className="h-4 w-4" />
                                     <span>Links & Resources</span>
                                 </button>
-                                {isAuthenticated && (
-                                    <button
-                                        onClick={() => {
-                                            const settingsMode = allModes.find(m => m.id === '/settings')
-                                            if (settingsMode) {
-                                                setCurrentMode(settingsMode)
-                                                setSidebarOpen(false)
-                                            }
-                                        }}
-                                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                            currentMode.id === '/settings'
-                                                ? 'bg-accent text-accent-foreground'
-                                                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                                        }`}
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                        <span>Settings</span>
-                                    </button>
-                                )}
-                                <div className="px-3 py-2 rounded-lg text-sm text-muted-foreground">
-                                    No conversations yet
+                                <button
+                                    onClick={() => {
+                                        handleMyDocumentsClick();
+                                        setSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/documents'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Type className="h-4 w-4" />
+                                        <span>My Documents</span>
+                                    </span>
+                                    {newDocumentsCount > 0 && (
+                                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                            {newDocumentsCount}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleMyJobsClick();
+                                        setSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/my-jobs'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Briefcase className="h-4 w-4" />
+                                        <span>My Jobs</span>
+                                    </span>
+                                    {newJobsCount > 0 && (
+                                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                            {newJobsCount}
+                                        </span>
+                                    )}
+                                </button>
+                                <div className="mt-3 border-t border-border pt-2 flex-1 flex flex-col">
+                                    <div className="px-3 py-1 text-xs font-semibold text-muted-foreground">
+                                        Conversations
+                                    </div>
+                                    {(!isAuthenticated || threads === undefined) && (
+                                        <div className="px-3 py-2 rounded-lg text-sm text-muted-foreground">
+                                            {isAuthenticated ? 'Loading conversations...' : 'Sign in to view conversations'}
+                                        </div>
+                                    )}
+                                    {threads && threads.length === 0 && (
+                                        <div className="px-3 py-2 rounded-lg text-sm text-muted-foreground">
+                                            No conversations yet
+                                        </div>
+                                    )}
+                                    {threads && threads.length > 0 && (
+                                        <div className="space-y-1 flex-1 overflow-y-auto max-h-[67vh] no-scrollbar">
+                                            {threads.map((thread: any) => (
+                                                <button
+                                                    key={thread._id}
+                                                    onClick={() => handleThreadClick(thread._id)}
+                                                    className={`w-full flex items-start gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                                                        currentThreadId === thread._id
+                                                            ? 'bg-accent text-accent-foreground'
+                                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                                    }`}
+                                                >
+                                                    <MessageSquare className="h-4 w-4 mt-0.5" />
+                                                    <div className="flex-1 overflow-hidden">
+                                                        <div className="truncate font-medium">{thread.title}</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                            <div className="h-15"></div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Mobile User info / Sign in */}
-                        <div className="p-3 border-t border-border">
+                        {/* Mobile User info / Sign in - inline dropdown so it receives clicks above sheet content */}
+                        <div className="relative p-3 border-t border-border mt-auto sticky bottom-0 bg-background">
                             {isAuthenticated && user ? (
-                                <div className="px-3 py-2 rounded-lg bg-muted/50">
-                                    <div className="text-sm font-medium truncate">{user.email}</div>
-                                    <div className="text-xs text-muted-foreground">Signed in</div>
-                                </div>
+                                <>
+                                    {userMenuOpen && (
+                                        <>
+                                            {/* Overlay above sheet so clicks close menu; sits above sheet z-50 */}
+                                            <div
+                                                className="fixed inset-0 z-[60]"
+                                                onClick={() => setUserMenuOpen(false)}
+                                                aria-hidden="true"
+                                            />
+                                            {/* Dropdown panel: above overlay, inline in sheet so it gets clicks */}
+                                            <div
+                                                className="absolute bottom-full left-0 right-0 z-[70] mt-2 rounded-xl border border-border bg-popover shadow-lg overflow-hidden"
+                                                onClick={(e) => e.stopPropagation()}
+                                                role="menu"
+                                            >
+                                                {planId && planId !== 'free' && (
+                                                    <div className="px-4 py-3 border-b border-border bg-muted/30">
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="text-muted-foreground">Documents</span>
+                                                                <span className="font-medium text-foreground">
+                                                                    {usage.documentsUsed}/{usage.documentsLimit}
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-primary transition-all"
+                                                                    style={{
+                                                                        width: `${Math.min(100, (usage.documentsUsed / usage.documentsLimit) * 100)}%`,
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="text-muted-foreground">Jobs</span>
+                                                                <span className="font-medium text-foreground">
+                                                                    {usage.jobsUsed}
+                                                                    {usage.jobsLimit !== null ? `/${usage.jobsLimit}` : (planId === 'pro' || planId === 'pro-annual' ? ' / ∞' : ' / Unlimited')}
+                                                                </span>
+                                                            </div>
+                                                            {usage.jobsLimit !== null && (
+                                                                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-primary transition-all"
+                                                                        style={{
+                                                                            width: `${Math.min(100, (usage.jobsUsed / usage.jobsLimit) * 100)}%`,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <Link href="/" onClick={() => { setUserMenuOpen(false); setSidebarOpen(false); }}>
+                                                    <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border active:bg-accent">
+                                                        <Home className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="text-sm font-medium text-foreground">Landing Page</span>
+                                                    </div>
+                                                </Link>
+                                                <div
+                                                    onClick={() => { handleSettingsClick(); setUserMenuOpen(false); setSidebarOpen(false); }}
+                                                    className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border active:bg-accent"
+                                                    role="menuitem"
+                                                >
+                                                    <Settings className="h-4 w-4 text-muted-foreground" />
+                                                    <span className="text-sm font-medium text-foreground">Settings</span>
+                                                </div>
+                                                <Link href="/pricing" onClick={() => { setUserMenuOpen(false); setSidebarOpen(false); }}>
+                                                    <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border active:bg-accent">
+                                                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="text-sm font-medium text-foreground">
+                                                            {isPro || isProAnnual ? 'Manage my plan' : 'Upgrade your plan'}
+                                                        </span>
+                                                    </div>
+                                                </Link>
+                                                <div
+                                                    onClick={() => { handleSignOut(); setUserMenuOpen(false); setSidebarOpen(false); }}
+                                                    className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors active:bg-accent"
+                                                    role="menuitem"
+                                                >
+                                                    <LogOut className="h-4 w-4 text-destructive" />
+                                                    <span className="text-sm font-medium text-destructive">Sign out</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="w-full px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left flex items-center justify-between gap-2"
+                                        onClick={() => setUserMenuOpen(!userMenuOpen)}
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-medium truncate">
+                                                {user.name || user.email}
+                                            </div>
+                                            {user.username && (
+                                                <div className="text-xs text-muted-foreground truncate">
+                                                    @{user.username}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {planId && planId !== 'free' && (
+                                            <span
+                                                className="px-2 py-0.5 rounded-full text-xs font-medium shrink-0"
+                                                style={
+                                                    subscription?.status === 'canceled'
+                                                        ? { backgroundColor: 'var(--chart-4)', color: 'white' }
+                                                        : planId === 'pro' || planId === 'pro-annual'
+                                                        ? { backgroundColor: '#9333ea', color: 'white' }
+                                                        : planId === 'plus' || planId === 'plus-annual'
+                                                        ? { backgroundColor: '#3b82f6', color: 'white' }
+                                                        : { backgroundColor: '#22c55e', color: 'white' }
+                                                }
+                                            >
+                                                {subscription?.status === 'canceled' ? (
+                                                    planId === 'pro' || planId === 'pro-annual'
+                                                        ? 'Renew Pro'
+                                                        : planId === 'plus' || planId === 'plus-annual'
+                                                        ? 'Renew Plus'
+                                                        : 'Renew'
+                                                ) : (
+                                                    planId === 'starter' ? 'Starter' :
+                                                    planId === 'pro-annual' ? 'Pro Annual' :
+                                                    planId === 'plus-annual' ? 'Plus Annual' :
+                                                    planId === 'pro' ? 'Pro' :
+                                                    planId === 'plus' ? 'Plus' : planId
+                                                )}
+                                            </span>
+                                        )}
+                                    </button>
+                                </>
                             ) : (
                                 <Popover open={showSignIn} onOpenChange={setShowSignIn}>
                                     <PopoverTrigger asChild>

@@ -36,21 +36,15 @@ async function resolveJobLimitForUser(ctx: any, convexUserId: string) {
   const rawPlanId = subscription?.planId || "free";
   const rawStatus = subscription?.status || null;
   
-  // Match the same "active" logic as `usage.canAddJob`:
-  // active/trialing/past_due OR missing status but a paid planId (back-compat)
-  const isActive =
-    rawStatus === "active" ||
-    rawStatus === "trialing" ||
-    rawStatus === "past_due" ||
-    (rawStatus === null && rawPlanId !== "free");
+  // Consider subscription active if status is active, trialing, or past_due (grace period)
+  // Also treat missing status with a paid plan as active (for backwards compatibility)
+  const isActive = rawStatus === "active" || rawStatus === "trialing" || rawStatus === "past_due" ||
+                   (rawStatus === null && rawPlanId !== "free");
 
   // Treat inactive subscriptions as free for gating purposes
   const planId = isActive ? rawPlanId : "free";
   const subscriptionStatus = isActive ? rawStatus : "inactive";
-  // IMPORTANT: `null` means "unlimited" (e.g. Pro). Do NOT use `??` here.
-  const limit = Object.prototype.hasOwnProperty.call(PLAN_LIMITS, planId)
-    ? PLAN_LIMITS[planId]
-    : PLAN_LIMITS.free;
+  const limit = PLAN_LIMITS[planId] ?? PLAN_LIMITS.free;
 
   return {
     planId,
@@ -85,7 +79,6 @@ async function enforceJobLimitOrThrow(ctx: any, convexUserId: string) {
     );
   }
 }
-
 export const list = query({
   args: {},
   handler: async (ctx) => {

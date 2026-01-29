@@ -11,8 +11,13 @@ import {
 import { z } from "zod";
 import path from "path";
 import fs from "fs";
+import os from "os";
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+
+const execAsync = promisify(exec);
 
 
 // Helper function to escape LaTeX special characters
@@ -88,23 +93,48 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       languages: z.array(z.string()).optional().nullable().describe('Languages spoken'),
       references: z.array(z.string()).optional().nullable().describe('References'),
     }).optional().nullable(),
-    targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name. If no target company is provided, put nothing in this field.)'),
+    targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
   }),
   execute: async (input) => {
+    const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const startTime = Date.now();
+    
+    console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting resume generation`, {
+      timestamp: new Date().toISOString(),
+      firstName: input.personalInfo?.firstName,
+      lastName: input.personalInfo?.lastName,
+      targetCompany: input.targetCompany,
+      hasExperience: !!input.experience?.length,
+      experienceCount: input.experience?.length || 0,
+      hasEducation: !!input.education?.length,
+      educationCount: input.education?.length || 0,
+    });
+    
     try {
-      // Verify LATEX_SERVICE_URL is configured
-      const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
-      if (!LATEX_SERVICE_URL) {
+      // Check if pdflatex is available
+      try {
+        await execAsync('which pdflatex');
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] pdflatex is available`);
+      } catch (pdflatexCheckError) {
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] pdflatex not found!`, pdflatexCheckError);
         return {
           success: false,
-          error: 'LATEX_SERVICE_URL environment variable is not configured',
-          message: 'LaTeX compilation service is not configured. Set LATEX_SERVICE_URL in your environment.',
+          error: 'pdflatex is not installed or not in PATH',
+          message: 'LaTeX compiler (pdflatex) is not available in this environment.',
         };
       }
-
+      
       // Check if user can generate documents
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Checking document generation limits...`);
       const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Generation limit check`, {
+        allowed: canGenerate?.allowed,
+        limit: canGenerate?.limit,
+        used: canGenerate?.used
+      });
+      
       if (!canGenerate?.allowed) {
+        console.warn(`[${toolExecutionId}] [RESUME_TOOL] Document limit reached`);
         return {
           success: false,
           error: 'Document limit reached',
@@ -245,44 +275,172 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       // Note: jakeLatex_2.tex template doesn't have an "Additional Information" section
       // If needed, it would need to be added to the template first
 
-      /// SECTION PDF GENERATION (via Docker LaTeX service)
-
-      const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latex: latexTemplate }),
+      /// SECTION PDF GENERATION
+    
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting PDF generation...`);
+      
+      // Create temporary directory and file
+      // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
+      const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Temp directory: ${tempDir}`);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Created temp directory`);
+      }
+      
+      const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Writing LaTeX file: ${tempFile}`);
+      fs.writeFileSync(tempFile, latexTemplate);
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] LaTeX file written`, { 
+        fileSize: fs.statSync(tempFile).size 
       });
 
-      const compileResult = await compileResponse.json();
-
-      if (!compileResponse.ok || !compileResult.success) {
-        return {
-          success: false,
-          error: `LaTeX compilation failed: ${compileResult.error}`,
-          message: 'LaTeX compilation failed. The PDF could not be generated.',
-          logContent: compileResult.log?.substring(0, 2000),
-        };
+      // Compile LaTeX to PDF - capture log for debugging
+      // Note: pdflatex may exit with non-zero even if PDF is generated (warnings, etc.)
+      const pdfPath = path.join(tempDir, `resume-${uniqueId}.pdf`);
+      const logPath = path.join(tempDir, `resume-${uniqueId}.log`);
+      
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting LaTeX compilation...`, { pdfPath });
+      const latexStartTime = Date.now();
+      
+      try {
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Running pdflatex (first pass)...`);
+          await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] First pdflatex pass completed`);
+          
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Running pdflatex (second pass)...`);
+          await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Second pdflatex pass completed`);
+          
+          const latexDuration = Date.now() - latexStartTime;
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] LaTeX compilation completed`, { 
+            duration: `${latexDuration}ms` 
+          });
+      } catch (latexError: unknown) {
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX compilation error`, {
+            error: latexError instanceof Error ? latexError.message : String(latexError),
+            pdfExists: fs.existsSync(pdfPath)
+          });
+          
+          // Read the LaTeX log file to get the actual error
+          let logContent = '';
+          if (fs.existsSync(logPath)) {
+            try {
+              logContent = fs.readFileSync(logPath, 'utf-8');
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX log file contents:`, logContent);
+            } catch (logReadError) {
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] Failed to read log file:`, logReadError);
+            }
+          }
+          
+          // Even if pdflatex throws an error, check if PDF was generated
+          // Sometimes compilation succeeds but returns non-zero exit code
+          if (fs.existsSync(pdfPath)) {
+              console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF exists despite error, continuing...`);
+              // PDF was generated successfully, continue
+          } else {
+              // PDF doesn't exist, so compilation actually failed
+              const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
+              console.error(`[${toolExecutionId}] [RESUME_TOOL] PDF not found after compilation error`, {
+                errorMessage,
+                logContent: logContent.substring(0, 1000), // First 1000 chars of log
+                tempDir,
+                filesInDir: fs.existsSync(tempDir) ? fs.readdirSync(tempDir) : [],
+                tempFileExists: fs.existsSync(tempFile),
+                tempFileSize: fs.existsSync(tempFile) ? fs.statSync(tempFile).size : 0,
+              });
+              return {
+                  success: false,
+                  error: `LaTeX compilation failed: ${errorMessage}`,
+                  message: 'LaTeX compilation failed. The PDF could not be generated.',
+                  logContent: logContent.substring(0, 2000), // Include log in response for debugging
+              };
+          }
       }
 
-      const pdfBase64 = compileResult.pdfBase64;
-      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+      // Verify PDF exists before trying to read it
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Verifying PDF exists...`, { pdfPath });
+      if (!fs.existsSync(pdfPath)) {
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] PDF file not found after compilation!`, {
+            pdfPath,
+            tempDir,
+            filesInDir: fs.existsSync(tempDir) ? fs.readdirSync(tempDir) : []
+          });
+          return {
+              success: false,
+              error: 'PDF file was not generated after LaTeX compilation',
+              message: 'LaTeX compilation completed but PDF file is missing.',
+              debugTexPath: tempFile,
+              logPath: logPath
+          };
+      }
+
+      // Read the generated PDF
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Reading PDF file...`);
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      const pdfBase64 = pdfBuffer.toString('base64');
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF read successfully`, { 
+        pdfSize: pdfBuffer.length,
+        base64Length: pdfBase64.length 
+      });
+
+      // Clean up temp files (but keep .tex and .log for debugging if there was an error)
+      ['aux', 'out'].forEach(ext => {
+          const file = path.join(tempDir, `resume-${uniqueId}.${ext}`);
+          if (fs.existsSync(file)) fs.unlinkSync(file);
+      });  
 
       /// SECTION AUTO-SAVE TO CONVEX
-
+      
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting auto-save to Convex...`);
       try {
+        // Get upload URL from Convex
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Getting upload URL...`);
         const uploadUrl = await convexClient.mutation(api.documents.generateUploadUrl);
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Upload URL obtained`, { 
+          hasUrl: !!uploadUrl,
+          urlLength: uploadUrl?.length || 0 
+        });
+        
+        // Convert Buffer to Blob for upload
         const pdfBlob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
+        
+        // Upload PDF to Convex storage
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Uploading PDF to Convex storage...`);
+        const uploadStartTime = Date.now();
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/pdf' },
           body: pdfBlob,
         });
-
+        const uploadDuration = Date.now() - uploadStartTime;
+        
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Upload response`, {
+          ok: uploadResponse.ok,
+          status: uploadResponse.status,
+          statusText: uploadResponse.statusText,
+          duration: `${uploadDuration}ms`
+        });
+        
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF uploaded successfully`, { storageId });
+          
+          // Save resume to database
+          const now = new Date();
+          const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }); // e.g. "Jun 10, 24"
+          
+          // Include company name in resume title if provided
           const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
           const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
-
+          
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] Saving resume to database...`, {
+            resumeName,
+            storageId,
+            fileSize: pdfBuffer.length
+          });
+          
           await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
@@ -291,12 +449,43 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
             content: input,
             template: 'jake',
           });
+          
+          console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume saved to database successfully`, { resumeName });
+        } else {
+          const errorText = await uploadResponse.text();
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] Upload failed`, {
+            status: uploadResponse.status,
+            statusText: uploadResponse.statusText,
+            errorText: errorText.substring(0, 500)
+          });
         }
-      } catch {
-        // Don't fail the whole operation if save fails
+      } catch (saveError) {
+        // Don't fail the whole operation if save fails, just log it
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Failed to auto-save resume:`, {
+          error: saveError instanceof Error ? saveError.message : String(saveError),
+          stack: saveError instanceof Error ? saveError.stack : undefined
+        });
       }
 
       /// SECTION RETURN RESULT
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume generation completed successfully`, {
+        totalDuration: `${totalDuration}ms`,
+        fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`
+      });
+      
+      // Clean up temp folder before returning
+      try {
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] Error cleaning up temp folder:`, cleanupError);
+      }
+      
+      // Return LaTeX sections, and the full tex
       return {
         success: true,
         message: 'Resume generated and saved successfully',
@@ -314,6 +503,22 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
         documentType: 'resume',
       };
     } catch (error) {
+      const totalDuration = Date.now() - startTime;
+      console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Resume generation error:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        totalDuration: `${totalDuration}ms`,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
+      });
+      // Clean up temp folder even on error
+      try {
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -424,35 +629,50 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
       // Replace signature name
       latexTemplate = latexTemplate.replace('{{YOUR NAME}}', fullName);
 
-      /// SECTION PDF GENERATION (via Docker LaTeX service)
+      /// SECTION PDF GENERATION
+      
+      // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
+      const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      const tempFile = path.join(tempDir, `coverletter-${uniqueId}.tex`);
+      fs.writeFileSync(tempFile, latexTemplate);
 
-      const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
-      if (!LATEX_SERVICE_URL) {
+      const pdfPath = path.join(tempDir, `coverletter-${uniqueId}.pdf`);
+      const logPath = path.join(tempDir, `coverletter-${uniqueId}.log`);
+
+      try {
+        await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+        await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+      } catch (latexError: unknown) {
+        if (!fs.existsSync(pdfPath)) {
+          const errorMessage = latexError instanceof Error ? latexError.message : String(latexError);
+          return {
+            success: false,
+            error: `LaTeX compilation failed: ${errorMessage}`,
+            message: 'LaTeX compilation failed. The PDF could not be generated.'
+          };
+        }
+      }
+
+      if (!fs.existsSync(pdfPath)) {
         return {
           success: false,
-          error: 'LATEX_SERVICE_URL environment variable is not configured',
-          message: 'LaTeX compilation service is not configured.',
+          error: 'PDF file was not generated after LaTeX compilation',
+          message: 'LaTeX compilation completed but PDF file is missing.',
+          debugTexPath: tempFile,
+          logPath: logPath
         };
       }
 
-      const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latex: latexTemplate }),
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      const pdfBase64 = pdfBuffer.toString('base64');
+
+      // Clean up temp files
+      ['aux', 'out', 'log'].forEach(ext => {
+        const file = path.join(tempDir, `coverletter-${uniqueId}.${ext}`);
+        if (fs.existsSync(file)) fs.unlinkSync(file);
       });
-
-      const compileResult = await compileResponse.json();
-
-      if (!compileResponse.ok || !compileResult.success) {
-        return {
-          success: false,
-          error: `LaTeX compilation failed: ${compileResult.error}`,
-          message: 'LaTeX compilation failed. The PDF could not be generated.',
-        };
-      }
-
-      const pdfBase64 = compileResult.pdfBase64;
-      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
       /// SECTION AUTO-SAVE TO CONVEX
       
@@ -482,11 +702,21 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
             template: 'jake',
           });
         }
-      } catch {
-        // Don't fail the whole operation if save fails
+      } catch (saveError) {
+        console.error('Failed to auto-save cover letter:', saveError);
       }
 
       /// SECTION RETURN RESULT
+      
+      // Clean up temp folder before returning
+      try {
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
       
       return {
         success: true,
@@ -497,6 +727,16 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
         documentType: 'cover-letter',
       };
     } catch (error) {
+      console.error('Cover letter generation error:', error);
+      // Clean up temp folder even on error
+      try {
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-coverletter');
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+      } catch (cleanupError) {
+        console.error('Error cleaning up temp folder:', cleanupError);
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -776,19 +1016,19 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
 
       try {
         // Check if user can add jobs
-        // const canAdd = await convexClient.query(api.usage.canAddJob, {});
-        // if (!canAdd?.allowed) {
-        //   return {
-        //     success: false,
-        //     message:
-        //       canAdd.subscriptionStatus === "inactive"
-        //         ? `Your subscription isn’t active right now, so you’re currently limited to the Free plan (${canAdd.limit ?? 10} jobs).`
-        //         : `Your job tracker is full for your ${canAdd.planLabel ?? "current"} plan (${canAdd.limit ?? 10} jobs).` +
-        //           (canAdd.upgradeSuggestion ? ` ${canAdd.upgradeSuggestion}` : ""),
-        //     error: 'Job limit reached',
-        //     limitReached: true,
-        //   };
-        // }
+        const canAdd = await convexClient.query(api.usage.canAddJob, {});
+        if (!canAdd?.allowed) {
+          return {
+            success: false,
+            message:
+              canAdd.subscriptionStatus === "inactive"
+                ? `Your subscription isn’t active right now, so you’re currently limited to the Free plan (${canAdd.limit ?? 10} jobs).`
+                : `Your job tracker is full for your ${canAdd.planLabel ?? "current"} plan (${canAdd.limit ?? 10} jobs).` +
+                  (canAdd.upgradeSuggestion ? ` ${canAdd.upgradeSuggestion}` : ""),
+            error: 'Job limit reached',
+            limitReached: true,
+          };
+        }
 
         // Get user's convex_user_id for the agent tool
         const user = await convexClient.query(api.auth.currentUser);
@@ -1016,33 +1256,6 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
     },
   });
 
-// Limits Diagnostics Tool (for debugging plan/limits)
-const createGetLimitsDiagnosticsTool = (convexClient: ConvexHttpClient) =>
-  tool({
-    name: "getLimitsDiagnostics",
-    description:
-      "Debug tool: returns subscription + computed limits for jobs/documents, including raw planId/status and whether the subscription is active.",
-    parameters: z.object({}),
-    execute: async () => {
-      try {
-        const diagnostics = await convexClient.query(api.usage.getLimitsDiagnostics, {});
-        return {
-          success: true,
-          diagnostics,
-          message: "Fetched limits diagnostics.",
-        };
-      } catch (error) {
-        console.error("Failed to fetch limits diagnostics via tool:", error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return {
-          success: false,
-          message: "Failed to fetch limits diagnostics.",
-          error: errorMessage,
-        };
-      }
-    },
-  });
-
 export {
   createResumeJakeTemplateTool,
   createCoverLetterJakeTemplateTool,
@@ -1050,7 +1263,6 @@ export {
   createAddToJobsTool,
   createGetUserResumesTool,
   createGetUserJobsTool,
-  createGetLimitsDiagnosticsTool,
   createGetResumeByIdTool,
   createGetJobByIdTool,
   createGetUserResumePreferencesTool,

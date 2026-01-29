@@ -19,8 +19,17 @@ const GenerateRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const startTime = Date.now();
+  
+  console.log(`[${requestId}] [TEMPLATE_GENERATE] Starting template generation request`, {
+    timestamp: new Date().toISOString(),
+  });
+
   try {
     const body = await request.json();
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Request body received`, { body });
+    
     const {
       templateType,
       templateId,
@@ -29,8 +38,15 @@ export async function POST(request: NextRequest) {
       jobCompany,
       referenceResumeId,
     } = GenerateRequestSchema.parse(body);
-
-    console.log('Job Company: ', jobCompany);
+    
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Parsed request`, {
+      templateType,
+      templateId,
+      jobId,
+      jobTitle,
+      jobCompany,
+      hasReferenceResumeId: !!referenceResumeId,
+    });
 
     // Reference resume is only required for resume generation
     if (templateType === 'resume' && !referenceResumeId) {
@@ -61,16 +77,24 @@ export async function POST(request: NextRequest) {
     let referenceResume = null;
     if (templateType === 'resume' && referenceResumeId) {
       try {
+        console.log(`[${requestId}] [TEMPLATE_GENERATE] Fetching reference resume`, { referenceResumeId });
         referenceResume = await convexClient.query(api.documents.getResume, {
           resumeId: referenceResumeId as any,
         });
+        console.log(`[${requestId}] [TEMPLATE_GENERATE] Reference resume fetched`, { 
+          hasResume: !!referenceResume,
+          resumeName: referenceResume?.name 
+        });
+
         if (!referenceResume) {
+          console.error(`[${requestId}] [TEMPLATE_GENERATE] Reference resume not found`);
           return NextResponse.json(
             { success: false, error: 'Reference resume not found' },
             { status: 404 }
           );
         }
       } catch (e) {
+        console.error(`[${requestId}] [TEMPLATE_GENERATE] Error fetching reference resume:`, e);
         throw e;
       }
     }
@@ -79,16 +103,36 @@ export async function POST(request: NextRequest) {
     let jobDetails = null;
     if (jobId) {
       try {
+        console.log(`[${requestId}] [TEMPLATE_GENERATE] Fetching job details`, { jobId });
         jobDetails = await convexClient.query(api.jobs.get, { id: jobId as any });
-      } catch {
+        console.log(`[${requestId}] [TEMPLATE_GENERATE] Job details fetched`, { 
+          hasJob: !!jobDetails,
+          jobCompany: jobDetails?.company 
+        });
+      } catch (e) {
+        console.warn(`[${requestId}] [TEMPLATE_GENERATE] Error fetching job details (ignored):`, e);
         // Ignore job fetch errors
       }
     }
 
+    // Get user's resume preferences
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Fetching resume preferences`);
     const resumePreferences = await convexClient.query(api.auth.getResumePreferences, {}) || [];
-    const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Resume preferences`, { 
+      count: resumePreferences.length 
+    });
 
+    // Check if user can generate documents
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Checking document generation limits`);
+    const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Generation limit check`, {
+      allowed: canGenerate?.allowed,
+      limit: canGenerate?.limit,
+      used: canGenerate?.used
+    });
+    
     if (!canGenerate?.allowed) {
+      console.warn(`[${requestId}] [TEMPLATE_GENERATE] Document limit reached`);
       return NextResponse.json(
         {
           success: false,
@@ -142,6 +186,14 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
 
 - Do not call any other tools.`;
 
+    // Create the agent with minimal turns to avoid loops
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Creating agent`, {
+      templateType,
+      templateId,
+      hasResumeTool: !!resumeTool,
+      hasCoverLetterTool: !!coverLetterTool,
+    });
+    
     const agent = new Agent({
       name: 'JobKompassTemplateGenerator',
       instructions: instructions,
@@ -157,8 +209,24 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
     }
     userMessage += ` Use the provided context to fill details. Then call the generation tool once to produce and save the document.`;
 
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Running agent`, {
+      userMessage: userMessage.substring(0, 200) + '...',
+      maxTurns: 3,
+    });
+    
+    const agentStartTime = Date.now();
+    // Run the agent with minimal turns (just 1-2 turns should be enough)
     const result = await run(agent, [user(userMessage)], { maxTurns: 3 });
+    const agentDuration = Date.now() - agentStartTime;
+    
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Agent execution completed`, {
+      duration: `${agentDuration}ms`,
+      hasHistory: !!result.history,
+      historyLength: result.history?.length || 0,
+    });
 
+    // Extract tool calls from the result history
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Extracting tool calls from agent history`);
     const toolCalls: Array<{name: string, result?: any}> = [];
     if (result.history) {
       const callResults = new Map();
@@ -188,11 +256,28 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
         }
       }
     }
-
+    
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Tool calls extracted`, {
+      toolCallsCount: toolCalls.length,
+      toolNames: toolCalls.map(c => c.name),
+    });
+    
     const generationToolName = templateType === 'resume' ? 'createResumeJakeTemplate' : 'createCoverLetterJakeTemplate';
     const generationToolCalled = toolCalls.some((call: {name: string}) => call.name === generationToolName);
+    
+    console.log(`[${requestId}] [TEMPLATE_GENERATE] Generation tool check`, {
+      generationToolName,
+      generationToolCalled,
+      toolCallResults: toolCalls.filter(c => c.name === generationToolName).map(c => ({
+        name: c.name,
+        hasResult: !!c.result,
+        resultSuccess: c.result?.success,
+        resultError: c.result?.error,
+      })),
+    });
 
     if (!generationToolCalled) {
+      console.error(`[${requestId}] [TEMPLATE_GENERATE] Generation tool was not called!`);
       return NextResponse.json(
         {
           success: false,
@@ -224,6 +309,7 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
       message: `${templateType === 'resume' ? 'Resume' : 'Cover letter'} generated and saved successfully`,
     });
   } catch (error) {
+    console.error('Template generation error:', error);
     return NextResponse.json(
       {
         success: false,

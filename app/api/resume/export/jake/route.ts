@@ -1,5 +1,13 @@
 import { NextResponse } from 'next/server';
+import { promisify } from 'util';
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
 import { generateJakeLatex, ResumeContentForJake } from '@/lib/resume/generateJakeLatex';
+
+const execAsync = promisify(exec);
 
 export async function POST(req: Request) {
     try {
@@ -9,44 +17,61 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing resume content' }, { status: 400 });
         }
 
-        const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
-        if (!LATEX_SERVICE_URL) {
-            return NextResponse.json({ error: 'LATEX_SERVICE_URL is not configured' }, { status: 500 });
-        }
-
         // Generate LaTeX from content
         const jakeResume = generateJakeLatex(content);
 
-        // Compile via the Docker LaTeX service
-        const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ latex: jakeResume }),
-        });
+        // Create temporary directory and file
+        // Use os.tmpdir() for serverless compatibility (returns /tmp in serverless environments)
+        const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const uniqueId = crypto.randomBytes(8).toString('hex');
+        const tempFile = path.join(tempDir, `resume-${uniqueId}.tex`);
+        fs.writeFileSync(tempFile, jakeResume, 'utf-8');
 
-        const compileResult = await compileResponse.json();
-
-        if (!compileResponse.ok || !compileResult.success) {
-            console.error('LaTeX service compilation error:', compileResult.error);
-            return NextResponse.json(
-                { error: 'LaTeX compilation failed', log: compileResult.log },
-                { status: 500 }
-            );
+        // Compile LaTeX to PDF
+        const pdfPath = path.join(tempDir, `resume-${uniqueId}.pdf`);
+        
+        try {
+            await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+            await execAsync(`pdflatex -interaction=nonstopmode -output-directory ${tempDir} ${tempFile}`);
+        } catch (latexError: unknown) {
+            // pdflatex may exit with non-zero even if PDF is generated (warnings, etc.)
+            // Check if PDF was actually generated before failing
+            if (!fs.existsSync(pdfPath)) {
+                const logPath = path.join(tempDir, `resume-${uniqueId}.log`);
+                const logContent = fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf-8') : String(latexError);
+                console.error('LaTeX compilation error:', logContent);
+                return NextResponse.json({ error: 'LaTeX compilation failed', log: logContent }, { status: 500 });
+            }
+            // PDF exists despite error, continue
         }
 
-        const pdfBuffer = Buffer.from(compileResult.pdfBase64, 'base64');
+        // Verify PDF exists
+        if (!fs.existsSync(pdfPath)) {
+            return NextResponse.json({ error: 'PDF generation failed - no output file' }, { status: 500 });
+        }
+        const pdfBuffer = fs.readFileSync(pdfPath);
+
+        // Clean up temp folder
+        try {
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        } catch (cleanupError) {
+            console.error('Error cleaning up temp folder:', cleanupError);
+        }
 
         // Create filename from user's name - support both firstName/lastName and combined name
         let firstName = content.personalInfo.firstName || '';
         let lastName = content.personalInfo.lastName || '';
-
+        
         // Fallback to splitting name if firstName/lastName not provided
         if (!firstName && !lastName && content.personalInfo.name) {
             const nameParts = content.personalInfo.name.split(' ');
             firstName = nameParts[0] || '';
             lastName = nameParts.slice(1).join('-') || '';
         }
-
+        
         const safeFileName = `${firstName}-${lastName}`.replace(/[^a-zA-Z0-9-]/g, '') || 'resume';
 
         return new NextResponse(new Uint8Array(pdfBuffer), {
@@ -59,9 +84,20 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error('Jake resume export error:', error);
+        // Clean up temp folder even on error
+        try {
+            const tempDir = path.join(os.tmpdir(), 'jobkompass-resume');
+            if (fs.existsSync(tempDir)) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        } catch (cleanupError) {
+            console.error('Error cleaning up temp folder:', cleanupError);
+        }
         return NextResponse.json(
             { error: 'Failed to export resume', details: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         );
     }
 }
+
+

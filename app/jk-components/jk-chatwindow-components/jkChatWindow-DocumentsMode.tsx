@@ -54,8 +54,8 @@ export default function JkCW_DocumentsMode() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-        <div className="max-w-7xl mx-auto w-full px-6 py-8">
+    <div className="h-full overflow-y-auto overflow-x-hidden min-w-0">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 min-w-0">
         <header className="space-y-4 border-b border-border pb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">My Documents</h1>

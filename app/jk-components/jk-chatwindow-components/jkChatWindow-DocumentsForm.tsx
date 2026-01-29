@@ -605,8 +605,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     return (
         <div className="space-y-6 py-2">
             {/* Header with stats and upload */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
                     <div className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
                             <CalendarClock className="h-4 w-4 text-foreground/70" />
@@ -652,7 +652,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     placeholder="Search by name, label, or tags..."
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
-                    className="w-full max-w-sm"
+                    className="w-full min-w-0 max-w-sm"
                 />
             </div>
 
@@ -726,7 +726,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     )}
                 </div>
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
                     {filteredDocuments.map((doc: any, index: number) => {
                         const resume = doc;
                         const documentType = doc.documentType || "resume";
@@ -774,13 +774,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     }
                                 }}
                                 className={cn(
-                                    "group flex flex-col gap-4 rounded-xl border bg-card p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                                    "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 min-w-0 overflow-hidden",
                                     selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200",
                                     !selectionMode && isNew && "border-primary border-2"
                                 )}
                             >
                                 {/* File icon/thumbnail with job count badge and type indicator */}
-                                <div className="relative flex h-32 items-center justify-center rounded-lg border border-border/70 bg-muted/30">
+                                <div className="relative flex h-24 sm:h-28 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30">
                                     {/* Document type badge - top right */}
                                     <div className="absolute top-2 right-2 z-10">
                                         {documentType === "resume" ? (
@@ -819,9 +819,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     )}
                                 </div>
 
-                                <div className="flex flex-1 flex-col gap-3">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex-1 space-y-1.5 min-w-0">
+                                <div className="flex min-w-0 flex-1 flex-col gap-2 sm:gap-3">
+                                    <div className="flex min-w-0 items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1 space-y-1.5">
                                             <div>
                                                 <p className="text-sm font-semibold text-foreground truncate">{title}</p>
                                                 {resume?.fileName && (

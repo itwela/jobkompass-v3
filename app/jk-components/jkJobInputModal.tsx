@@ -40,9 +40,6 @@ export default function JkJobInputModal({
   const handleSend = async (value: string) => {
     if (!value.trim() || isSubmitting) return;
 
-    // Clear input immediately so it doesn't sit on screen while loading
-    setInputValue("");
-
     setIsSubmitting(true);
     const toastId = toast.loading("Adding job(s) to your tracker...");
 
@@ -57,25 +54,17 @@ export default function JkJobInputModal({
         }),
       });
 
-      let data: any = null;
-      try {
-        data = await response.json();
-      } catch {
-        // If we can't parse JSON but the response is OK, treat as success
-      }
+      const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          (data && (data.error || data.message)) ||
-            `Failed to add job (status ${response.status})`
-        );
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Failed to add job');
       }
 
       toast.dismiss(toastId);
-      toast.success(data?.message || "Job(s) added successfully!", {
-        description: data?.jobsAdded
+      toast.success(data.message || "Job(s) added successfully!", {
+        description: data.jobsAdded 
           ? `${data.jobsAdded} job(s) have been added to your tracker.`
-          : undefined,
+          : undefined
       });
 
       setInputValue("");

@@ -170,7 +170,6 @@ export const canAddJob = query({
 
     const rawPlanId = subscription?.planId || "free";
     const rawStatus = subscription?.status || null;
-    const subscriptionFound = Boolean(subscription);
 
     // Consider subscription active if status is active, trialing, or past_due (grace period)
     // Also treat missing status with a paid plan as active (for backwards compatibility)
@@ -190,10 +189,7 @@ export const canAddJob = query({
       "pro-annual": null, // Unlimited
     };
 
-    // IMPORTANT: `null` means "unlimited" (e.g. Pro). Do NOT use `??` here.
-    const limit = Object.prototype.hasOwnProperty.call(PLAN_LIMITS, planId)
-      ? PLAN_LIMITS[planId]
-      : PLAN_LIMITS.free;
+    const limit = PLAN_LIMITS[planId] ?? PLAN_LIMITS.free;
 
     const planLabel =
       planId === "free"
@@ -222,12 +218,6 @@ export const canAddJob = query({
         planId,
         planLabel,
         subscriptionStatus: status,
-        upgradeSuggestion,
-        rawPlanId,
-        rawStatus,
-        isActive,
-        subscriptionFound,
-        convexUserId,
       };
     }
 
@@ -250,11 +240,6 @@ export const canAddJob = query({
         planLabel,
         subscriptionStatus: status,
         upgradeSuggestion,
-        rawPlanId,
-        rawStatus,
-        isActive,
-        subscriptionFound,
-        convexUserId,
       };
     }
 
@@ -265,185 +250,6 @@ export const canAddJob = query({
       planId,
       planLabel,
       subscriptionStatus: status,
-      upgradeSuggestion,
-      rawPlanId,
-      rawStatus,
-      isActive,
-      subscriptionFound,
-      convexUserId,
-    };
-  },
-});
-
-export const getLimitsDiagnostics = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return { ok: false, reason: "Not authenticated" };
-
-    const user = await ctx.db.get(userId);
-    if (!user) return { ok: false, reason: "User not found" };
-
-    const convexUserId = (user as any).convex_user_id || userId;
-
-    const subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-      .first();
-
-    const canAddJob = await (async () => {
-      // Inline the same logic as canAddJob, but always return full details.
-      const rawPlanId = subscription?.planId || "free";
-      const rawStatus = subscription?.status || null;
-      const subscriptionFound = Boolean(subscription);
-
-      const isActive =
-        rawStatus === "active" ||
-        rawStatus === "trialing" ||
-        rawStatus === "past_due" ||
-        (rawStatus === null && rawPlanId !== "free");
-
-      const planId = isActive ? rawPlanId : "free";
-      const status = isActive ? rawStatus : "inactive";
-
-      const PLAN_LIMITS: Record<string, number | null> = {
-        free: 10,
-        starter: 100,
-        plus: 100,
-        "plus-annual": 100,
-        pro: null,
-        "pro-annual": null,
-      };
-
-      // IMPORTANT: `null` means "unlimited" (e.g. Pro). Do NOT use `??` here.
-      const limit = Object.prototype.hasOwnProperty.call(PLAN_LIMITS, planId)
-        ? PLAN_LIMITS[planId]
-        : PLAN_LIMITS.free;
-
-      const allJobs = await ctx.db
-        .query("jobs")
-        .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-        .collect();
-
-      const used = allJobs.length;
-
-      return {
-        allowed: limit === null ? true : used < limit,
-        used,
-        limit,
-        planId,
-        subscriptionStatus: status,
-        rawPlanId,
-        rawStatus,
-        isActive,
-        subscriptionFound,
-        convexUserId,
-      };
-    })();
-
-    const canGenerateDocument = await (async () => {
-      const rawPlanId = subscription?.planId || "free";
-      const rawStatus = subscription?.status || null;
-
-      const isActive =
-        rawStatus === "active" ||
-        rawStatus === "trialing" ||
-        rawStatus === "past_due" ||
-        (rawStatus === null && rawPlanId !== "free");
-
-      const planId = isActive ? rawPlanId : "free";
-
-      const PLAN_LIMITS: Record<string, number> = {
-        free: 3,
-        starter: 10,
-        plus: 60,
-        "plus-annual": 60,
-        pro: 180,
-        "pro-annual": 180,
-      };
-
-      const limit = Object.prototype.hasOwnProperty.call(PLAN_LIMITS, planId)
-        ? PLAN_LIMITS[planId]
-        : PLAN_LIMITS.free;
-
-      const now = Date.now();
-      const currentMonth = new Date(now);
-      currentMonth.setDate(1);
-      currentMonth.setHours(0, 0, 0, 0);
-      const monthStart = currentMonth.getTime();
-
-      const allResumes = await ctx.db
-        .query("resumes")
-        .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-        .collect();
-
-      const allCoverLetters = await ctx.db
-        .query("coverLetters")
-        .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-        .collect();
-
-      const generatedResumesThisMonth = allResumes.filter(
-        (r) => r.fileId && r.createdAt >= monthStart
-      ).length;
-
-      const generatedCoverLettersThisMonth = allCoverLetters.filter(
-        (c) => c.fileId && c.createdAt >= monthStart
-      ).length;
-
-      const used = generatedResumesThisMonth + generatedCoverLettersThisMonth;
-
-      return {
-        allowed: used < limit,
-        used,
-        limit,
-        planId,
-        monthStart,
-        rawPlanId,
-        rawStatus,
-        isActive,
-        convexUserId,
-      };
-    })();
-
-    const planLimits = {
-      jobs: {
-        free: 10,
-        starter: 100,
-        plus: 100,
-        "plus-annual": 100,
-        pro: "unlimited",
-        "pro-annual": "unlimited",
-      } as const,
-      documentsPerMonth: {
-        free: 3,
-        starter: 10,
-        plus: 60,
-        "plus-annual": 60,
-        pro: 180,
-        "pro-annual": 180,
-      } as const,
-    };
-
-    return {
-      ok: true,
-      convexUserId,
-      planLimits,
-      subscription: subscription
-        ? {
-            planId: subscription.planId,
-            status: subscription.status,
-            stripeSubscriptionId: subscription.stripeSubscriptionId,
-            stripeCustomerId: subscription.stripeCustomerId,
-            currentPeriodStart: subscription.currentPeriodStart,
-            currentPeriodEnd: subscription.currentPeriodEnd,
-            trialEnd: subscription.trialEnd,
-            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-            createdAt: subscription.createdAt,
-            updatedAt: subscription.updatedAt,
-          }
-        : null,
-      canAddJob,
-      canGenerateDocument,
     };
   },
 });
