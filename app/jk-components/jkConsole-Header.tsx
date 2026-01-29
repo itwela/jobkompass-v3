@@ -281,17 +281,24 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                 </button>
                                 <button
                                     onClick={() => {
-                                        handleResourcesClick();
+                                        handleMyJobsClick();
                                         setSidebarOpen(false);
                                     }}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                        currentMode.id === '/resources'
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/my-jobs'
                                             ? 'bg-accent text-accent-foreground'
                                             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                     }`}
                                 >
-                                    <Link2 className="h-4 w-4" />
-                                    <span>Links & Resources</span>
+                                    <span className="flex items-center gap-2">
+                                        <Briefcase className="h-4 w-4" />
+                                        <span>My Jobs</span>
+                                    </span>
+                                    {newJobsCount > 0 && (
+                                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                            {newJobsCount}
+                                        </span>
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => {
@@ -316,24 +323,32 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                 </button>
                                 <button
                                     onClick={() => {
-                                        handleMyJobsClick();
+                                        const chatMode = allModes.find(mode => mode.id === '/chat');
+                                        if (chatMode) setCurrentMode(chatMode);
                                         setSidebarOpen(false);
                                     }}
-                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                                        currentMode.id === '/my-jobs'
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/chat'
                                             ? 'bg-accent text-accent-foreground'
                                             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                     }`}
                                 >
-                                    <span className="flex items-center gap-2">
-                                        <Briefcase className="h-4 w-4" />
-                                        <span>My Jobs</span>
-                                    </span>
-                                    {newJobsCount > 0 && (
-                                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                                            {newJobsCount}
-                                        </span>
-                                    )}
+                                    <MessageSquare className="h-4 w-4" />
+                                    <span>Chat</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleResourcesClick();
+                                        setSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/resources'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                    }`}
+                                >
+                                    <Link2 className="h-4 w-4" />
+                                    <span>Links & Resources</span>
                                 </button>
                                 <div className="mt-3 border-t border-border pt-2 flex-1 flex flex-col">
                                     <div className="px-3 py-1 text-xs font-semibold text-muted-foreground">

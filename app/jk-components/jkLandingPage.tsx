@@ -11,8 +11,9 @@ import JkPublicHeader from "./jkPublicHeader";
 import JkGetStartedButton from "./jkGetStartedButton";
 import { api } from "@/convex/_generated/api";
 import { toast } from "@/lib/toast";
-import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap } from "lucide-react";
+import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useMotionTemplate } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FAQItem {
   question: string;
@@ -292,11 +293,11 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
       >
 
 
-        {/* Main heading with character animation - smaller on mobile to avoid "JobKomp" / "ass" break */}
+        {/* Main heading with character animation; line break before "Faster" for emphasis */}
         <div className="space-y-6 max-w-[95vw] mx-auto md:max-w-none">
           <h1 className="text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
-            <span className="inline-block">
-              {'Meet JobKompass'.split('').map((char, index) => (
+            <span className="block">
+              {'Land Your Dream Job'.split('').map((char, index) => (
                 <motion.span
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
@@ -307,6 +308,23 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
                     ease: [0.16, 1, 0.3, 1]
                   }}
                   className="inline-block"
+                >
+                  {char === ' ' ? '\u00A0' : char}
+                </motion.span>
+              ))}
+            </span>
+            <span className="block mt-1 md:mt-1.5 text-6xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold tracking-tight">
+              {'Faster'.split('').map((char, index) => (
+                <motion.span
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.5,
+                    delay: 0.85 + index * 0.05,
+                    ease: [0.16, 1, 0.3, 1]
+                  }}
+                  className="inline-block bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent"
                 >
                   {char === ' ' ? '\u00A0' : char}
                 </motion.span>
@@ -324,7 +342,7 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
             }}
             className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed"
           >
-            Manage your job search, organize applications, and create tailored resumes and cover letters all in one place. Chat with your documents to refine and improve them.
+            AI-powered resume building, application tracking, and document chat, all in one place.
           </motion.p>
         </div>
 
@@ -641,12 +659,23 @@ export default function JkLandingPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight mb-6"
+                className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight mb-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1"
               >
-                Everything you need to{" "}
-                <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
-                  succeed
-                </span>
+                <span>Track 100 Jobs.</span>
+                <span>Generate 60 Documents.</span>
+                <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">Land Your Dream Role.</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center text-muted-foreground cursor-help" aria-label="Plan info">
+                        <Info className="h-5 w-5" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs text-sm">
+                      <p>These limits are included on the <strong>Plus</strong> plan. Higher tiers get more documents; Pro includes unlimited job tracking.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </motion.h2>
               <motion.p
                 initial={{ opacity: 0, y: 30 }}

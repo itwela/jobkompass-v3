@@ -190,52 +190,20 @@ export default function JkSidebar() {
             </button>
             <button
               onClick={handleNewChat}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              className="flex h-9 w-9 md:w-auto md:gap-2 md:px-3 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               title="New Chat"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden md:inline text-sm font-medium">New chat</span>
             </button>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
-          {/* Navigation Sections - Everything else */}
+          {/* Navigation Sections: My Jobs, My Documents, Chat, then Links & Resources */}
           <div className="flex flex-col gap-2 flex-shrink-0">
             <div className="p-2 pb-0.5 space-y-1">
-              {/* Links & Resources Section */}
-              <button
-                onClick={handleResourcesClick}
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resources'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-                  }`}
-              >
-                <span>Links & Resources</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-
-              {/* My Documents Section */}
-              <button
-                onClick={handleMyDocumentsClick}
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resume'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span>My Documents</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {newDocumentsCount > 0 && (
-                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                      {newDocumentsCount}
-                    </span>
-                  )}
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </div>
-              </button>
-
               {/* My Jobs Section */}
               <button
                 onClick={handleMyJobsClick}
@@ -256,22 +224,57 @@ export default function JkSidebar() {
                   <ChevronRight className="h-3.5 w-3.5" />
                 </div>
               </button>
+
+              {/* My Documents Section */}
+              <button
+                onClick={handleMyDocumentsClick}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/documents'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>My Documents</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {newDocumentsCount > 0 && (
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                      {newDocumentsCount}
+                    </span>
+                  )}
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </div>
+              </button>
+
+              {/* Chat Section */}
+              <button
+                onClick={handleChatToggle}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/chat'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <span>Chat</span>
+                <ChevronRight
+                  className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
+                />
+              </button>
+
+              {/* Links & Resources Section */}
+              <button
+                onClick={handleResourcesClick}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/resources'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <span>Links & Resources</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
-          {/* Navigation Sections - Chat */}
-          <div className="px-2 pt-0.5 space-y-1">
-
-            <button
-              onClick={handleChatToggle}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-            >
-              <span>Chat</span>
-              <ChevronRight
-                className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
-              />
-            </button>
-          </div>
+          {/* Chat threads list (below nav) */}
           <div className="overflow-y-auto no-scrollbar">
             
           
