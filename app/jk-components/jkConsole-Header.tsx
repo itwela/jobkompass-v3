@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -21,6 +21,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import JkGap from "./jkGap";
+import { toast } from "@/lib/toast";
 
 interface JkConsoleHeaderProps {
     sidebarOpen: boolean;
@@ -108,48 +109,48 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
     
     // Retitle function
     const handleRetitle = async () => {
-        if (!currentThreadId || !threadData?.messages) return;
-        
+        if (!currentThreadId) return;
+        const messages = threadData?.messages;
+        if (!messages?.length) {
+            toast.info("Add some messages first", "Start a conversation, then use Retitle to generate a title.");
+            return;
+        }
+
+        const allText = messages
+            .map((msg: { role?: string; content?: string }) => `${msg.role ?? "user"}: ${typeof msg.content === "string" ? msg.content : ""}`)
+            .join("\n");
+        const last2000Chars = allText.slice(-2000);
+        if (!last2000Chars.trim()) {
+            toast.info("Add some messages first", "Start a conversation, then use Retitle to generate a title.");
+            return;
+        }
+
         setRetitling(true);
         try {
-            // Get last 2000 characters from messages
-            const allText = threadData.messages
-                .map((msg: any) => `${msg.role}: ${msg.content}`)
-                .join('\n');
-            const last2000Chars = allText.slice(-2000);
-            
-            // Call OpenAI to generate title
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`
-                },
-                body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'Generate a concise, descriptive title (max 50 characters) for this conversation. Only return the title, nothing else.'
-                        },
-                        {
-                            role: 'user',
-                            content: last2000Chars
-                        }
-                    ],
-                    max_tokens: 50,
-                    temperature: 0.7
-                })
+            const response = await fetch("/api/chat/retitle", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ excerpt: last2000Chars }),
             });
-            
             const data = await response.json();
-            const newTitle = data.choices[0].message.content.trim();
-            
-            // Update thread with new title
+
+            if (!response.ok) {
+                const message = data.error ?? "Failed to generate title";
+                toast.error("Retitle failed", typeof message === "string" ? message : "Please try again.");
+                return;
+            }
+
+            const newTitle = typeof data.title === "string" ? data.title.trim().slice(0, 100) : null;
+            if (!newTitle) {
+                toast.error("Retitle failed", "No title was generated. Please try again.");
+                return;
+            }
+
             await updateTitle({ threadId: currentThreadId, title: newTitle });
-            
+            toast.success("Title updated", "Chat title has been updated.");
         } catch (error) {
-            console.error('Error retitling:', error);
+            console.error("Error retitling:", error);
+            toast.error("Retitle failed", "Something went wrong. Please try again.");
         } finally {
             setRetitling(false);
         }
@@ -227,9 +228,13 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                 {currentMode.id === '/chat' && currentThreadId && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="p-0 hover:opacity-70 transition-opacity">
-                                <MoreVertical className="h-5 w-5" />
-                                <span className="sr-only">More options</span>
+                            <button className="p-0 hover:opacity-70 transition-opacity" disabled={retitling}>
+                                {retitling ? (
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                ) : (
+                                    <MoreVertical className="h-5 w-5" />
+                                )}
+                                <span className="sr-only">{retitling ? "Retitling..." : "More options"}</span>
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
