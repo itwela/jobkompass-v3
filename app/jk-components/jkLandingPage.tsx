@@ -295,7 +295,7 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
 
         {/* Main heading with character animation; line break before "Faster" for emphasis */}
         <div className="space-y-6 max-w-[95vw] mx-auto md:max-w-none">
-          <h1 className="text-4xl sm:text-5xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-4xl lg:text-5xl font-semibold tracking-tight leading-tight">
             <span className="block">
               {'Land Your Dream Job'.split('').map((char, index) => (
                 <motion.span
