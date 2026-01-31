@@ -97,7 +97,7 @@ export default function JkCW_MyJobsMode() {
     setIsTemplateModalOpen(true);
   };
 
-  const handleTemplateSelect = async (templateId: string) => {
+  const handleTemplateSelect = async (templateId: string, resumeInput?: { referenceResumeId?: string; resumePdf?: string; resumeText?: string; promptText?: string }) => {
     if (!selectedJobForGeneration) return;
 
     setIsGenerating(true);
@@ -105,19 +105,28 @@ export default function JkCW_MyJobsMode() {
     const toastId = toast.loading(`Generating ${typeLabel} for ${selectedJobForGeneration.company ? selectedJobForGeneration.company : 'you'}...`);
 
     try {
+      const body: Record<string, unknown> = {
+        templateType: templateSelectorType,
+        templateId: templateId,
+        jobId: selectedJobForGeneration._id?.toString(),
+        jobTitle: selectedJobForGeneration.title,
+        jobCompany: selectedJobForGeneration.company,
+      };
+      if (templateSelectorType === 'resume' && resumeInput) {
+        body.referenceResumeId = resumeInput.referenceResumeId ?? undefined;
+        body.resumePdf = resumeInput.resumePdf;
+        body.resumeText = resumeInput.resumeText;
+        body.promptText = resumeInput.promptText;
+      } else if (templateSelectorType === 'resume') {
+        body.referenceResumeId = selectedReferenceResumeId ?? undefined;
+      }
+
       const response = await fetch('/api/template/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          templateType: templateSelectorType,
-          templateId: templateId,
-          jobId: selectedJobForGeneration._id?.toString(),
-          jobTitle: selectedJobForGeneration.title,
-          jobCompany: selectedJobForGeneration.company,
-          referenceResumeId: templateSelectorType === 'resume' ? selectedReferenceResumeId : undefined,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();

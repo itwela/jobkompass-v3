@@ -8,12 +8,12 @@ import Image from "next/image";
 import { mainAssets } from "../lib/constants";
 import { AI_MODELS } from "@/lib/aiModels";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import JkPublicHeader from "./jkPublicHeader";
 import JkGetStartedButton from "./jkGetStartedButton";
 import { api } from "@/convex/_generated/api";
 import { toast } from "@/lib/toast";
-import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info, Sparkles, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useMotionTemplate } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -29,7 +29,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How do I get started?",
-    answer: "Simply click Get started to begin. You can paste your resume into Chat and ask the AI to tweak or create one for you, add your first job in My Jobs, and the platform will guide you through the rest. Document uploads are coming soon."
+    answer: "Simply click Get started to begin. You can upload a PDF resume in My Documents and we'll extract it, or paste your resume into Chat and ask the AI to tweak or create one for you. Add your first job in My Jobs and the platform will guide you through the rest."
   },
   {
     question: "Is my data secure?",
@@ -168,6 +168,87 @@ function FAQItem({ item, isOpen, onToggle, index }: { item: FAQItem; isOpen: boo
   );
 }
 
+// Animated number that counts up when in view
+function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    if (hasAnimated.current || value === 0) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && !hasAnimated.current) {
+          hasAnimated.current = true;
+          const duration = 1500;
+          const start = 0;
+          const startTime = performance.now();
+          const step = (now: number) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.floor(start + (value - start) * eased));
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value]);
+
+  return (
+    <span ref={ref}>{display.toLocaleString()}{suffix}</span>
+  );
+}
+
+// Stats section - under the 3 cards, styled like other sections
+function FreeResumeStats() {
+  const stats = useQuery(api.freeResumeStats.getStats);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="mt-24 text-center"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6"
+      >
+        <FileText className="h-4 w-4" />
+        <span>Free Resume Generator</span>
+      </motion.div>
+      <h3 className="text-3xl md:text-4xl font-semibold tracking-tight mb-4">
+        {stats && stats.totalGenerations > 0 ? (
+          <>
+            <AnimatedNumber value={stats.totalGenerations} /> resumes generated
+          </>
+        ) : (
+          <>Try it free — no signup required</>
+        )}
+      </h3>
+      <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+        JobKompass has helped users create over {stats?.totalGenerations} free resumes. Enter your text or upload a PDF and we will extract and format it instantly. Go try it out for yourself today!
+      </p>
+      <Link href="/free-resume-parser">
+        <Button size="lg" className="gap-2">
+          Try Now
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </Link>
+    </motion.div>
+  );
+}
+
 // Models we use - cute avatar badges (e.g. above Features)
 function ModelsWeUse() {
   const models = AI_MODELS;
@@ -178,14 +259,16 @@ function ModelsWeUse() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-wrap items-center justify-center gap-3 mb-12"
+      className="mb-12"
     >
-      <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Sparkles className="h-4 w-4 text-primary" />
-        Powered by
-      </span>
+      <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Powered by
+        </span>
+      </div>
       <TooltipProvider>
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2">
           {models.map((model) => (
             <Tooltip key={model.id}>
               <TooltipTrigger asChild>
@@ -417,21 +500,6 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
             }}
           >
             <JkGetStartedButton size="lg" className="text-base px-8" />
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              duration: 0.6,
-              delay: 1.35,
-              ease: [0.16, 1, 0.3, 1]
-            }}
-          >
-            <Link href="/free-resume-parser">
-              <Button size="lg" variant="secondary" className="text-base px-8">
-                Free Resume Generator
-              </Button>
-            </Link>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -767,6 +835,8 @@ export default function JkLandingPage() {
                 <CapabilityCard key={index} capability={capability} index={index} />
               ))}
             </div>
+
+            <FreeResumeStats />
           </div>
         </section>
 
@@ -940,6 +1010,27 @@ export default function JkLandingPage() {
             </>
           )}
         </AnimatePresence>
+
+        {/* Sticky free resume CTA - bottom right */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed bottom-6 right-6 z-40"
+        >
+          <Link
+            href="/free-resume-parser"
+            className="flex items-center gap-3 px-4 py-3 rounded-full shadow-lg border border-border bg-card/95 backdrop-blur-sm hover:border-primary/40 hover:shadow-xl transition-all duration-300 group"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <div className="pr-1">
+              <p className="text-sm font-semibold text-foreground leading-tight">Free Resume Generator</p>
+              <p className="text-xs text-muted-foreground">Try it now — no signup required</p>
+            </div>
+          </Link>
+        </motion.div>
       </main>
     </>
   );

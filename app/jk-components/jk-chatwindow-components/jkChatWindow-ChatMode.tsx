@@ -79,7 +79,8 @@ export default function JkCW_ChatMode() {
     const { 
         textValue, setTextValue, textareaRef, currentThreadId, setCurrentThreadId,
         attachedResumeIds, attachedJobIds, clearAllAttachments,
-        droppedFile, setDroppedFile, fileName, setFileName, setIsFileMode
+        droppedFile, setDroppedFile, fileName, setFileName, setIsFileMode,
+        selectedResumeTemplateId,
     } = useJobKompassChatWindow()
     const { user, isAuthenticated, isLoading: authLoading } = useAuth()
     
@@ -237,6 +238,7 @@ export default function JkCW_ChatMode() {
                     username: user?.username || user?.email || undefined,
                     contextResumeIds: attachedResumeIds.length > 0 ? attachedResumeIds : undefined,
                     contextJobIds: attachedJobIds.length > 0 ? attachedJobIds : undefined,
+                    contextResumeTemplateId: selectedResumeTemplateId ?? undefined,
                 })
             })
             

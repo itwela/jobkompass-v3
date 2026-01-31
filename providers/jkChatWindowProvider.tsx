@@ -50,6 +50,9 @@ interface ChatInteractionStateContextType {
   addJobAttachment: (id: Id<"jobs">) => void;
   removeJobAttachment: (id: Id<"jobs">) => void;
   clearAllAttachments: () => void;
+  // Resume template for creation (used by AI when generating resumes in chat)
+  selectedResumeTemplateId: string | null;
+  setSelectedResumeTemplateId: (id: string | null) => void;
   // File upload modal
   isFileModalOpen: boolean;
   setIsFileModalOpen: (open: boolean) => void;
@@ -146,6 +149,9 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     setAttachedCoverLetterIds([]);
     setAttachedJobIds([]);
   };
+
+  // Resume template selection for AI creation
+  const [selectedResumeTemplateId, setSelectedResumeTemplateId] = useState<string | null>(null);
 
   // NOTE - TEXT AREA STUFF
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
@@ -272,6 +278,8 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     addJobAttachment,
     removeJobAttachment,
     clearAllAttachments,
+    selectedResumeTemplateId,
+    setSelectedResumeTemplateId,
     // Thread management
     currentThreadId,
     setCurrentThreadId,

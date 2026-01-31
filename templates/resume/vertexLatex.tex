@@ -1,0 +1,77 @@
+%-------------------------
+% VERTEX - Left-accent bar layout (JobKompass)
+% Distinct from Jake: left bars, more whitespace, different structure
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+\geometry{margin=0.7in}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\raggedbottom
+\raggedright
+
+\definecolor{accent}{RGB}{30, 64, 175}
+% Section: thick left bar + uppercase title, generous space below
+\titleformat{\section}{\color{accent}\normalsize\bfseries\uppercase}{\rule{5pt}{16pt}}{0.7em}{}
+\titlespacing*{\section}{0pt}{18pt}{12pt}
+
+\newcommand{\vertexItem}[1]{\item\small{#1 \vspace{-2pt}}}
+\newcommand{\vertexSubheading}[4]{
+  \vspace{2pt}\item
+  \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+    \textbf{#1} & #2 \\
+    \textit{\small#3} & \textit{\small #4} \\
+  \end{tabular*}\vspace{-4pt}
+}
+\newcommand{\vertexProjectHeading}[2]{
+  \vspace{2pt}\item
+  \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+    \small#1 & #2 \\
+  \end{tabular*}\vspace{-4pt}
+}
+\newcommand{\vertexSubHeadingListStart}{\begin{itemize}[leftmargin=0.18in, label={}, itemsep=6pt]}
+\newcommand{\vertexSubHeadingListEnd}{\end{itemize}\vspace{4pt}}
+\newcommand{\vertexItemListStart}{\begin{itemize}[itemsep=2pt]}
+\newcommand{\vertexItemListEnd}{\end{itemize}\vspace{2pt}}
+
+\begin{document}
+\vspace*{-2mm}
+
+\begin{center}
+XXXVERTEXHEADERXXX
+\end{center}
+
+\vspace{10pt}
+\section*{Experience}
+\vspace{4pt}
+\vertexSubHeadingListStart
+XXXVERTEXEXPERIENCEXXX
+\vertexSubHeadingListEnd
+
+\section*{Education}
+\vspace{4pt}
+\vertexSubHeadingListStart
+XXXVERTEXEDUCATIONXXX
+\vertexSubHeadingListEnd
+
+\section*{Projects}
+\vspace{4pt}
+\vertexSubHeadingListStart
+XXXVERTEXPROJECTSXXX
+\vertexSubHeadingListEnd
+
+\section*{Technical Skills}
+\vspace{4pt}
+XXXVERTEXSKILLSXXX
+
+\end{document}

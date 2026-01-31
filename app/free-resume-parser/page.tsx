@@ -13,12 +13,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import Link from 'next/link';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
-import { RESUME_TEMPLATES } from '@/lib/templates';
+import { getFreeResumeTemplates } from '@/lib/templates';
 import { getModelsForFreeResume } from '@/lib/aiModels';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -34,6 +39,7 @@ import {
   X,
   Plus,
   Copy,
+  ChevronDown,
 } from 'lucide-react';
 import { COPY_TO_AI_OPTIONS, getCopyPromptForTemplate } from '@/lib/copyToAiPrompts';
 
@@ -48,12 +54,20 @@ export default function FreeResumeParserPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showEmailGate, setShowEmailGate] = useState(false);
-  const [gateMode, setGateMode] = useState<'signup' | 'verify'>('signup');
+  const [gateMode, setGateMode] = useState<'signup' | 'verify' | 'limit'>('signup');
   const [gateEmail, setGateEmail] = useState('');
   const [gateName, setGateName] = useState('');
   const [verifyEmail, setVerifyEmail] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
   const [storedEmail, setStoredEmail] = useState<string | null>(null);
+  const [generatedDownloads, setGeneratedDownloads] = useState<
+    { id: string; templateName: string; pdfBase64: string }[]
+  >([]);
+  const [isPdfIframeLoaded, setIsPdfIframeLoaded] = useState(false);
+
+  useEffect(() => {
+    if (pdfBase64) setIsPdfIframeLoaded(false);
+  }, [pdfBase64]);
 
   const addToEmailList = useMutation(api.emailList.add);
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState<string | null>(null);
@@ -97,20 +111,42 @@ export default function FreeResumeParserPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      let data: { error?: string; details?: string; limitReached?: boolean; pdfBase64?: string } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { error: `Server error (${res.status} ${res.statusText})` };
+      }
       if (!res.ok) {
-        toast.error(data.error || 'Failed to parse resume');
+        toast.error(data.error || 'Failed to parse resume', {
+          description: data.details || (res.status >= 500 ? `Status: ${res.status} ${res.statusText}` : undefined),
+          duration: 10000,
+        });
         if (res.status === 403) {
-          setEmailVerified(false);
-          setStoredEmail(null);
-          setShowEmailGate(true);
+          if (data.limitReached) {
+            setShowEmailGate(true);
+            setGateMode('limit');
+          } else {
+            setEmailVerified(false);
+            setStoredEmail(null);
+            setShowEmailGate(true);
+          }
         }
         return;
       }
-      setPdfBase64(data.pdfBase64);
+      setPdfBase64(data.pdfBase64!);
+      const templateName = getFreeResumeTemplates().find((t) => t.id === selectedTemplateId)?.name ?? selectedTemplateId;
+      setGeneratedDownloads((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), templateName, pdfBase64: data.pdfBase64! },
+      ]);
       toast.success('Resume formatted successfully!');
     } catch (err) {
-      toast.error('Something went wrong. Please try again.');
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error('Something went wrong. Please try again.', {
+        description: msg,
+        duration: 10000,
+      });
       console.error(err);
     } finally {
       setIsGenerating(false);
@@ -251,12 +287,23 @@ export default function FreeResumeParserPage() {
     }
   }, [gateMode, pendingVerifyEmail, checkResult, runGenerateAfterVerify]);
 
-  const handleDownload = () => {
-    if (!pdfBase64) return;
+  const handleDownload = (pdfBase64ToUse?: string) => {
+    const b64 = pdfBase64ToUse ?? pdfBase64;
+    if (!b64) return;
     const link = document.createElement('a');
-    link.href = `data:application/pdf;base64,${pdfBase64}`;
+    link.href = `data:application/pdf;base64,${b64}`;
     link.download = 'formatted-resume.pdf';
     link.click();
+  };
+
+  const handleChangeTemplate = () => {
+    setSelectedTemplateId(null);
+    setPdfBase64(null);
+  };
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    setPdfBase64(null);
   };
 
   const structuredData = {
@@ -303,7 +350,7 @@ export default function FreeResumeParserPage() {
                 Free Resume Generator
               </h1>
               <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
-                Paste your resume text or upload a PDF — we&apos;ll extract and format it into a professional PDF for free. No signup
+                Paste your resume text or upload a PDF, we&apos;ll extract and format it into a professional PDF for free. No signup
                 required to start.
               </p>
               <TooltipProvider>
@@ -456,45 +503,79 @@ export default function FreeResumeParserPage() {
               </motion.div>
 
               <motion.div
-                className="flex flex-col rounded-xl border border-border bg-card/50 p-6 max-h-[560px] min-h-[560px]"
+                className="flex flex-col rounded-xl border border-border bg-card/50 p-6 max-h-[560px] min-h-[560px] overflow-y-auto no-scrollbar"
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
               >
                 {!selectedTemplateId ? (
                   /* No template selected: show only template picker */
-                  <div className="flex flex-col h-full">
-                    <label className="text-sm font-medium mb-4 flex-shrink-0">
-                      <Sparkles className="h-4 w-4 inline mr-2" />
-                      Choose a template
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto">
-                      {RESUME_TEMPLATES.map((template, index) => (
+                  <div className="flex flex-col h-full min-h-0">
+                    <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                      <label className="text-sm font-medium">
+                        <Sparkles className="h-4 w-4 inline mr-2" />
+                        Choose a template
+                        <span className="ml-2 text-muted-foreground font-normal">
+                          ({getFreeResumeTemplates().length} available)
+                        </span>
+                      </label>
+                      {generatedDownloads.length > 0 && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                              <Download className="h-3.5 w-3.5" />
+                              Downloads
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-2" align="end">
+                            <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                              Generated resumes
+                            </p>
+                            <div className="max-h-[200px] overflow-y-auto space-y-1">
+                              {generatedDownloads.map((d, idx) => (
+                                <button
+                                  key={d.id}
+                                  type="button"
+                                  onClick={() => handleDownload(d.pdfBase64)}
+                                  className="flex items-center gap-2 w-full px-2 py-2 rounded-md hover:bg-muted text-left text-sm"
+                                >
+                                  <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                  <span className="truncate flex-1">
+                                    {d.templateName} ({(idx + 1).toString()})
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
+                    <div className="flex flex-row gap-3 flex-1 min-h-0 overflow-x-auto no-scrollbar">
+                      {getFreeResumeTemplates().map((template, index) => (
                         <motion.button
                           key={template.id}
                           type="button"
-                          onClick={() => setSelectedTemplateId(template.id)}
-                          className="relative rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-md overflow-hidden transition-all duration-200 text-left group"
-                          initial={{ opacity: 0, scale: 0.96 }}
-                          animate={{ opacity: 1, scale: 1 }}
+                          onClick={() => handleSelectTemplate(template.id)}
+                          className="flex flex-col flex-shrink-0 w-[280px] min-w-[280px] h-full rounded-xl border-2 border-border hover:border-primary overflow-hidden transition-colors duration-200 text-left group"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
                           transition={{ duration: 0.4, delay: 0.1 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
                         >
-                          <div className="aspect-[3/4] relative bg-muted/30">
+                          <div className="flex-1 min-h-0 relative bg-muted/30 aspect-[3/4]">
                             <Image
                               src={template.previewImage}
                               alt={template.name}
                               fill
                               className="object-cover object-top"
-                              sizes="(max-width: 640px) 100vw, 50vw"
+                              sizes="280px"
                             />
                             <div className="absolute inset-0 bg-transparent group-hover:bg-black/5 transition-opacity" />
                           </div>
-                          <div className="p-2.5 bg-background/95 backdrop-blur-sm">
+                          <div className="p-3 bg-background/95 backdrop-blur-sm flex-shrink-0 rounded-b-xl overflow-hidden">
                             <p className="font-medium text-sm truncate">{template.name}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {template.tags?.slice(0, 2).map((tag) => (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {template.tags?.map((tag) => (
                                 <span
                                   key={tag}
                                   className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground"
@@ -511,29 +592,74 @@ export default function FreeResumeParserPage() {
                 ) : (
                   /* Template selected: show preview with template name at top */
                   <>
-                    <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Selected template: <span className="text-foreground">{RESUME_TEMPLATES.find((t) => t.id === selectedTemplateId)?.name}</span>
+                    <div className="flex items-center justify-between mb-3 flex-shrink-0 gap-2">
+                      <span className="text-xs font-medium text-muted-foreground truncate">
+                        Selected template: <span className="text-foreground">{getFreeResumeTemplates().find((t) => t.id === selectedTemplateId)?.name}</span>
                       </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setSelectedTemplateId(null)}
-                      >
-                        Change template
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={handleChangeTemplate}
+                        >
+                          Change template
+                        </Button>
+                        {generatedDownloads.length > 0 && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs gap-1"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Downloads
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-2" align="end">
+                              <p className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+                                Generated resumes
+                              </p>
+                              <div className="max-h-[200px] overflow-y-auto space-y-1">
+                                {generatedDownloads.map((d, idx) => (
+                                  <button
+                                    key={d.id}
+                                    type="button"
+                                    onClick={() => handleDownload(d.pdfBase64)}
+                                    className="flex items-center gap-2 w-full px-2 py-2 rounded-md hover:bg-muted text-left text-sm"
+                                  >
+                                    <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="truncate flex-1">
+                                      {d.templateName} ({(idx + 1).toString()})
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
                     </div>
                     <div className="flex-1 min-h-0 flex flex-col rounded-lg border border-dashed border-border bg-muted/30 overflow-hidden">
                       <div className="flex-1 min-h-[320px] flex flex-col items-center justify-center overflow-hidden p-4">
                         {pdfBase64 ? (
                           <div className="w-full h-full flex flex-col min-h-0">
-                            <iframe
-                              src={`data:application/pdf;base64,${pdfBase64}#toolbar=0`}
-                              className="flex-1 min-h-[320px] w-full"
-                              title="Resume preview"
-                            />
-                            <Button onClick={handleDownload} className="mt-4 gap-2 w-full flex-shrink-0">
+                            <div className="relative flex-1 min-h-[320px] w-full bg-white overflow-hidden">
+                              {!isPdfIframeLoaded && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+                                </div>
+                              )}
+                              <iframe
+                                src={`data:application/pdf;base64,${pdfBase64}#toolbar=0`}
+                                className="flex-1 min-h-[320px] w-full"
+                                title="Resume preview"
+                                onLoad={() => setIsPdfIframeLoaded(true)}
+                              />
+                            </div>
+                            <Button onClick={() => handleDownload()} className="mt-4 gap-2 w-full flex-shrink-0">
                               <Download className="h-4 w-4" />
                               Download PDF
                             </Button>
@@ -633,17 +759,39 @@ export default function FreeResumeParserPage() {
 
       <Dialog open={showEmailGate} onOpenChange={setShowEmailGate}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              One quick step to generate
-            </DialogTitle>
-            <DialogDescription>
-              Join our email list to use the free resume generator. We&apos;ll only send you useful
-              career tips — no spam.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 border-b mb-4">
+          {gateMode === 'limit' ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Free limit reached
+                </DialogTitle>
+                <DialogDescription>
+                  You&apos;ve used your 2 free resumes. Sign up for JobKompass to unlock unlimited
+                  resume generation, AI tailoring, job tracking, and more.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="pt-2">
+                <Link href="/auth">
+                  <Button className="w-full" size="lg">
+                    Sign up for JobKompass
+                  </Button>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  One quick step to generate
+                </DialogTitle>
+                <DialogDescription>
+                  Join our email list to use the free resume generator. We&apos;ll only send you useful
+                  career tips — no spam.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-2 border-b mb-4">
             <button
               type="button"
               onClick={() => setGateMode('signup')}
@@ -664,7 +812,7 @@ export default function FreeResumeParserPage() {
                   : 'border-transparent text-muted-foreground'
               }`}
             >
-              I already signed up
+              I&apos;m already on the mailing list :D
             </button>
           </div>
           {gateMode === 'signup' ? (
@@ -724,6 +872,8 @@ export default function FreeResumeParserPage() {
                 Verify & Generate
               </Button>
             </form>
+          )}
+            </>
           )}
         </DialogContent>
       </Dialog>

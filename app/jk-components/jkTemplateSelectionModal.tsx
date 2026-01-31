@@ -5,7 +5,7 @@ import { X, FileText, FileCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Id } from "@/convex/_generated/dataModel";
-import { RESUME_TEMPLATES, COVER_LETTER_TEMPLATES } from "@/lib/templates";
+import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES } from "@/lib/templates";
 
 export type DocumentType = "resume" | "cover-letter";
 
@@ -25,7 +25,7 @@ interface JkTemplateSelectionModalProps {
   jobCompany?: string;
 }
 
-const resumeTemplates: TemplateOption[] = RESUME_TEMPLATES.map((t) => ({
+const resumeTemplates: TemplateOption[] = getAppResumeTemplateOptions().map((t) => ({
   id: t.id,
   name: t.name,
   description: t.description,

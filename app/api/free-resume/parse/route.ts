@@ -2,77 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
-import { isValidResumeTemplateId } from '@/lib/templates';
-import { generateJakeLatex, ResumeContentForJake } from '@/lib/resume/generateJakeLatex';
-
-const EXTRACTION_SYSTEM_PROMPT = `You are a resume parsing expert. Extract all information from the provided resume text and output a valid JSON object that matches this exact structure. Return ONLY valid JSON, no markdown or extra text.
-
-Structure (ResumeContentForJake):
-{
-  "personalInfo": {
-    "firstName": "string",
-    "lastName": "string",
-    "email": "string",
-    "location": "string or null",
-    "linkedin": "string or null",
-    "github": "string or null",
-    "portfolio": "string or null",
-    "citizenship": "string or null"
-  },
-  "experience": [
-    {
-      "company": "string",
-      "title": "string",
-      "location": "string or null",
-      "date": "string (e.g. 'Jan 2020 - Present' or 'Jun 2018 - Dec 2019')",
-      "details": ["bullet point 1", "bullet point 2"]
-    }
-  ],
-  "education": [
-    {
-      "name": "school name",
-      "degree": "e.g. Bachelor of Science",
-      "field": "e.g. Computer Science or null",
-      "location": "string or null",
-      "startDate": "e.g. Aug 2016 or null",
-      "endDate": "e.g. May 2020 or Present",
-      "details": ["GPA: 3.8", "honors", "etc"] or []
-    }
-  ],
-  "projects": [
-    {
-      "name": "project name",
-      "description": "brief description",
-      "date": "string or null",
-      "technologies": ["tech1", "tech2"] or null,
-      "details": ["additional bullet"] or null
-    }
-  ] or null,
-  "skills": {
-    "technical": ["skill1", "skill2"],
-    "additional": ["soft skill 1"] or null
-  } or null,
-  "additionalInfo": {
-    "languages": [{"language": "English", "proficiency": "Native"}] or null,
-    "interests": ["interest1"] or null
-  } or null
-}
-
-Rules:
-- Extract everything you can find. Use empty strings or null for missing optional fields.
-- personalInfo.firstName, lastName, email are required - infer from content.
-- For experience/education dates, use human-readable format like "Jan 2020 - Present".
-- All arrays use [] if empty, not null (except optional top-level like projects, skills).
-- Extract bullet points into details arrays.
-- For skills, put programming languages/tools in technical, soft skills in additional.
-- CRITICAL: Never include empty, blank, or whitespace-only items in any details arrays. Each bullet must have real content. Omit any bullet that would be empty—do not add placeholder bullets.`;
+import { getFreeResumeTemplates, isValidResumeTemplateId } from '@/lib/templates';
+import { generateResumeLatex } from '@/lib/resume/generators';
+import { extractResumeContent } from '@/lib/resume/extractFromPdf';
 
 const MAX_PDF_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
-
-const OPENROUTER_MODEL_PRIMARY = 'arcee-ai/trinity-mini:free';
-const OPENROUTER_MODEL_FALLBACK = 'google/gemma-3-27b-it:free';
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,7 +18,9 @@ export async function POST(request: NextRequest) {
       templateId?: string;
     };
 
-    if (!templateId || typeof templateId !== 'string' || !isValidResumeTemplateId(templateId)) {
+    const freeTemplates = getFreeResumeTemplates();
+    const isFreeTemplate = freeTemplates.some((t) => t.id === templateId);
+    if (!templateId || typeof templateId !== 'string' || !isValidResumeTemplateId(templateId) || !isFreeTemplate) {
       return NextResponse.json(
         { error: 'Please select a valid template' },
         { status: 400 }
@@ -147,154 +83,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call OpenRouter to extract resume content
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) {
+    // Check free resume limit (2 per email, unlimited for plus/pro)
+    const limitCheck = await convexClient.query(api.freeResumeStats.checkFreeResumeLimit, {
+      email: sanitizedEmail,
+    });
+    if (!limitCheck.canGenerate) {
       return NextResponse.json(
-        { error: 'OpenRouter not configured. Please set OPENROUTER_API_KEY.' },
-        { status: 503 }
+        {
+          error: "You've used your 2 free resumes. Sign up to unlock unlimited resume generation.",
+          limitReached: true,
+          count: limitCheck.count,
+          limit: limitCheck.limit,
+        },
+        { status: 403 }
       );
     }
+    const isPlusOrPro = limitCheck.isPlusOrPro ?? false;
 
-    const buildOpenRouterBody = (model: string) => {
-      if (hasPdf) {
-        const fileData =
-          resumePdf!.startsWith('data:') ? resumePdf! : `data:application/pdf;base64,${resumePdf!}`;
-        const pdfUserText =
-          'Extract and format this resume from the attached PDF into the required JSON structure. Return ONLY valid JSON.';
-        return {
-          model,
-          messages: [
-            { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: pdfUserText,
-                },
-                {
-                  type: 'file',
-                  file: {
-                    filename: 'resume.pdf',
-                    file_data: fileData,
-                  },
-                },
-              ],
-            },
-          ],
-          plugins: [
-            {
-              id: 'file-parser',
-              pdf: { engine: 'pdf-text' },
-            },
-          ],
-          temperature: 0.2,
-          max_tokens: 4096,
-        };
-      }
-      const textToExtract = (resumeText as string).trim();
-      return {
-        model,
-        messages: [
-          { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Extract and format this resume:\n\n${textToExtract}`,
-          },
-        ],
-        temperature: 0.2,
-        max_tokens: 4096,
-      };
-    };
-
-    const callOpenRouter = async (model: string) => {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${openRouterKey}`,
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://jobkompass.com',
-        },
-        body: JSON.stringify(buildOpenRouterBody(model)),
+    // Extract resume content via OpenRouter AI
+    let parsed;
+    try {
+      parsed = await extractResumeContent({
+        resumePdf: hasPdf ? (resumePdf as string) : undefined,
+        resumeText: hasText ? (resumeText as string) : undefined,
+        fallbackEmail: sanitizedEmail,
       });
-      return res;
-    };
-
-    let openRouterResponse = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
-
-    // Retry primary model once on 502/429/503
-    if (!openRouterResponse.ok && [502, 429, 503].includes(openRouterResponse.status)) {
-      await sleep(2000);
-      openRouterResponse = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
-    }
-
-    // Fallback to alternate model if still failing
-    if (!openRouterResponse.ok && [502, 429, 503].includes(openRouterResponse.status)) {
-      await sleep(1000);
-      openRouterResponse = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
-    }
-
-    if (!openRouterResponse.ok) {
-      const errText = await openRouterResponse.text();
-      console.error('OpenRouter error:', openRouterResponse.status, errText);
-      const isRateLimit = openRouterResponse.status === 429;
+    } catch (extractErr) {
+      const errMsg = extractErr instanceof Error ? extractErr.message : String(extractErr);
+      const errStack = extractErr instanceof Error ? extractErr.stack : undefined;
+      const isRateLimit = errMsg.includes('429');
       return NextResponse.json(
         {
           error: isRateLimit
             ? 'This free tool is popular right now. Please try again in a minute.'
             : 'AI extraction failed. Please try again.',
+          details: errMsg,
+          ...(process.env.NODE_ENV === 'development' && errStack ? { stack: errStack } : {}),
         },
         { status: 502 }
       );
-    }
-
-    const openRouterData = await openRouterResponse.json();
-    const content = openRouterData.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      return NextResponse.json(
-        { error: 'AI did not return valid content' },
-        { status: 502 }
-      );
-    }
-
-    // Parse JSON - strip DeepSeek R1 <think></think> blocks, then handle markdown code blocks
-    let jsonStr = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) jsonStr = jsonMatch[1].trim();
-
-    let parsed: ResumeContentForJake;
-    try {
-      parsed = JSON.parse(jsonStr) as ResumeContentForJake;
-    } catch {
-      return NextResponse.json(
-        { error: 'Failed to parse extracted resume data' },
-        { status: 502 }
-      );
-    }
-
-    // Validate and normalize
-    if (!parsed.personalInfo) parsed.personalInfo = { email: sanitizedEmail, firstName: '', lastName: '' };
-    if (!parsed.personalInfo.email) parsed.personalInfo.email = sanitizedEmail;
-    parsed.experience = parsed.experience || [];
-    parsed.education = parsed.education || [];
-    parsed.projects = parsed.projects || null;
-    parsed.skills = parsed.skills || { technical: [], additional: null };
-    if (!Array.isArray(parsed.skills.technical)) parsed.skills.technical = [];
-
-    // Strip empty/blank bullets from all details arrays
-    const filterEmptyBullets = (arr: string[] | null | undefined) =>
-      Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s.trim().length > 0) : [];
-    parsed.experience.forEach((e) => {
-      if (e.details) e.details = filterEmptyBullets(e.details);
-    });
-    parsed.education.forEach((e) => {
-      if (e.details) e.details = filterEmptyBullets(e.details);
-    });
-    if (parsed.projects) {
-      parsed.projects.forEach((p) => {
-        if (p.details) p.details = filterEmptyBullets(p.details);
-      });
     }
 
     // Generate LaTeX and compile to PDF
@@ -306,7 +133,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const latexContent = generateJakeLatex(parsed);
+    const latexContent = generateResumeLatex(parsed, templateId);
     const uniqueId = crypto.randomBytes(8).toString('hex');
 
     const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
@@ -322,9 +149,10 @@ export async function POST(request: NextRequest) {
     if (!compileResponse.ok) {
       const errorData = await compileResponse.json().catch(() => ({}));
       const log = errorData.log ?? '';
+      const details = log || errorData.error || compileResponse.statusText;
       console.error('LaTeX service error', { status: compileResponse.status, error: errorData.error, log });
       return NextResponse.json(
-        { error: 'PDF generation failed', log: log || errorData.error || compileResponse.statusText },
+        { error: 'PDF generation failed', details: String(details) },
         { status: 500 }
       );
     }
@@ -334,20 +162,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'LaTeX service did not return a PDF' }, { status: 500 });
     }
 
-    // Record stats (fire-and-forget, don't block response)
-    try {
-      const textCharCount = hasText ? (resumeText as string).length : 0;
-      const pdfBytes = hasPdf
-        ? Math.floor(((resumePdf as string).replace(/^data:application\/pdf;base64,/, '').length * 3) / 4)
-        : undefined;
-      await convexClient.mutation(api.freeResumeStats.recordGeneration, {
-        inputType: hasPdf ? 'pdf' : 'text',
-        textCharacterCount: textCharCount,
-        pdfSizeBytes: pdfBytes,
-        templateId,
-      });
-    } catch (statsErr) {
-      console.warn('Free resume stats recording failed:', statsErr);
+    // Record stats only for free users (not plus/pro) - so the count reflects actual free-tier usage
+    if (!isPlusOrPro) {
+      try {
+        const textCharCount = hasText ? (resumeText as string).length : 0;
+        const pdfBytes = hasPdf
+          ? Math.floor(((resumePdf as string).replace(/^data:application\/pdf;base64,/, '').length * 3) / 4)
+          : undefined;
+        await convexClient.mutation(api.freeResumeStats.recordGeneration, {
+          email: sanitizedEmail,
+          inputType: hasPdf ? 'pdf' : 'text',
+          textCharacterCount: textCharCount,
+          pdfSizeBytes: pdfBytes,
+          templateId,
+        });
+      } catch (statsErr) {
+        console.warn('Free resume stats recording failed:', statsErr);
+      }
     }
 
     return NextResponse.json({
@@ -356,11 +187,14 @@ export async function POST(request: NextRequest) {
       content: parsed,
     });
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
     console.error('Free resume parse error:', error);
     return NextResponse.json(
       {
         error: 'Failed to process resume',
-        details: error instanceof Error ? error.message : String(error),
+        details: errMsg,
+        ...(process.env.NODE_ENV === 'development' && errStack ? { stack: errStack } : {}),
       },
       { status: 500 }
     );

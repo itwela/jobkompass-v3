@@ -208,6 +208,7 @@ const schema = defineSchema({
 
   // Free Resume Generator stats - track usage for analytics / portfolio
   freeResumeGenerations: defineTable({
+    email: v.optional(v.string()), // Track by email for unauthenticated limit (2 per email)
     createdAt: v.number(),
     inputType: v.union(v.literal("text"), v.literal("pdf")),
     textCharacterCount: v.number(),
@@ -215,7 +216,8 @@ const schema = defineSchema({
     templateId: v.string(),
   })
     .index("by_created_at", ["createdAt"])
-    .index("by_input_type", ["inputType"]),
+    .index("by_input_type", ["inputType"])
+    .index("by_email", ["email"]),
 });
 
 export default schema;

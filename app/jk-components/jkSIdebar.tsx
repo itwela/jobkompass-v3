@@ -194,7 +194,6 @@ export default function JkSidebar() {
               title="New Chat"
             >
               <Plus className="h-4 w-4 flex-shrink-0" />
-              <span className="hidden md:inline text-sm font-medium">New chat</span>
             </button>
           </div>
         </div>

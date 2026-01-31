@@ -79,7 +79,7 @@ const helpGuides: HelpGuide[] = [
           },
           {
             title: 'My Documents',
-            description: 'Edit and download resumes and cover letters created in Chat. Use any as a reference resume for jobs. Document uploads coming soon.',
+            description: 'Edit and download resumes and cover letters. Upload a PDF resume and we extract it into an editable format. Use any as a reference resume for jobs.',
             action: { label: 'Go to Documents', modeId: '/documents' },
           },
           {
@@ -105,7 +105,7 @@ const helpGuides: HelpGuide[] = [
       {
         title: 'Why Use My Documents?',
         type: 'text',
-        content: 'My Documents is where you edit and download resumes and cover letters. Right now you create them in Chat: paste your resume, ask the AI to tweak it, and it can make a resume or cover letter for you on the spot. You can then open it in My Documents to edit and download, and use it as a reference resume for jobs. Document uploads are coming soon.',
+        content: 'My Documents is where you edit and download resumes and cover letters. You can upload a PDF resume and we\'ll extract it into an editable format with AI. Or create them in Chat: paste your resume, ask the AI to tweak it, and it can make a resume or cover letter for you. Use any as a reference resume for jobs.',
       },
       {
         title: 'Getting the Best Results',

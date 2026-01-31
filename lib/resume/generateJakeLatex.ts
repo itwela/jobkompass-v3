@@ -1,28 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { escapeLatex } from './types';
 
-// Helper function to escape LaTeX special characters
-function escapeLatex(text: string | null | undefined): string {
-    if (!text) return '';
-    return text
-        .replace(/\\/g, '\\textbackslash{}')
-        .replace(/&/g, '\\&')
-        .replace(/%/g, '\\%')
-        .replace(/\$/g, '\\$')
-        .replace(/#/g, '\\#')
-        .replace(/_/g, '\\_')
-        .replace(/\{/g, '\\{')
-        .replace(/\}/g, '\\}')
-        .replace(/~/g, '\\textasciitilde{}')
-        .replace(/\^/g, '\\textasciicircum{}');
-}
+export type { Language, ResumeContent } from './types';
 
-export interface Language {
-    language: string;
-    proficiency: string;
-}
-
-// Type definition for the resume content
+/** @deprecated Use ResumeContent from types - kept for backward compatibility */
 export interface ResumeContentForJake {
     personalInfo: {
         name?: string; // Optional - fallback if firstName/lastName not provided
