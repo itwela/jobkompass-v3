@@ -33,7 +33,9 @@ import {
   Upload,
   X,
   Plus,
+  Copy,
 } from 'lucide-react';
+import { COPY_TO_AI_OPTIONS, getCopyPromptForTemplate } from '@/lib/copyToAiPrompts';
 
 export default function FreeResumeParserPage() {
   const [resumeText, setResumeText] = useState('');
@@ -397,7 +399,7 @@ export default function FreeResumeParserPage() {
                           onClick={() => setShowPromptInput(true)}
                         >
                           <Plus className="h-3.5 w-3.5" />
-                          Add prompt
+                          Still need to add more instructions?
                         </Button>
                       ) : (
                         <div className="flex gap-2">
@@ -542,9 +544,60 @@ export default function FreeResumeParserPage() {
                             <p className="text-sm">Generating your resume PDF...</p>
                           </div>
                         ) : (
-                          <p className="text-muted-foreground text-center text-sm">
-                            Your formatted resume will appear here after generation.
-                          </p>
+                          <div className="flex flex-col items-center gap-4 w-full max-w-sm mx-auto">
+                            <div className="w-full">
+                              <p className="text-sm text-foreground font-medium text-center mb-3">
+                                Not sure what to put? Your AI already knows you.
+                              </p>
+                              <p className="text-xs text-muted-foreground text-center mb-4">
+                                Copy the prompt, paste it into your AI, then paste the output back here.
+                              </p>
+                              <div className="flex flex-col gap-2 items-center">
+                                {COPY_TO_AI_OPTIONS.map((ai) => (
+                                  <div
+                                    key={ai.id}
+                                    className="flex items-center gap-1 w-full max-w-[240px]"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const prompt = getCopyPromptForTemplate('resume');
+                                        navigator.clipboard.writeText(prompt).then(() => {
+                                          toast.success('Prompt copied to clipboard', {
+                                            description: 'Paste into your AI, then copy the output back here.',
+                                          });
+                                        }).catch(() => {
+                                          toast.error('Failed to copy');
+                                        });
+                                      }}
+                                      className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors text-left"
+                                    >
+                                      <Avatar className="h-5 w-5 shrink-0">
+                                        <AvatarImage src={ai.logoUrl} alt="" />
+                                        <AvatarFallback className="text-xs">
+                                          {ai.name.charAt(0)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-sm font-medium flex-1">{ai.name}</span>
+                                      <Copy className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    </button>
+                                    <a
+                                      href={ai.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-2 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors shrink-0"
+                                      aria-label={`Open ${ai.name}`}
+                                    >
+                                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-muted-foreground text-center text-sm mt-2">
+                              Your formatted resume will appear here after generation.
+                            </p>
+                          </div>
                         )}
                       </div>
                     </div>
