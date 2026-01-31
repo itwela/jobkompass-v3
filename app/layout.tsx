@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next"  
 import type { Metadata } from "next";
 import { Ubuntu } from "next/font/google";
 import { JobKompassThemeProvider } from "@/providers/jkThemeProvider";

@@ -14,6 +14,8 @@ import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RESUME_TEMPLATES, COVER_LETTER_TEMPLATES, getDefaultResumeTemplateId, getDefaultCoverLetterTemplateId } from "@/lib/templates";
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
 import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEditor";
 import JkComingSoonTooltip from "../jkComingSoonTooltip";
@@ -342,7 +344,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         setEditingName(doc.name || "");
         setEditingLabel(doc.label || "");
         setEditingTags(doc.tags || []);
-        setEditingTemplate(doc.template || "");
+        setEditingTemplate(doc.template || (docType === "resume" ? getDefaultResumeTemplateId() : getDefaultCoverLetterTemplateId()));
         setNewTagInput("");
     };
 
@@ -1070,12 +1072,21 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-xs font-medium text-foreground">Template</label>
-                                                <Input
-                                                    value={editingTemplate}
-                                                    onChange={(e) => setEditingTemplate(e.target.value)}
-                                                    placeholder="e.g., modern, classic, minimalist"
-                                                    className="h-8"
-                                                />
+                                                <Select
+                                                    value={editingTemplate || undefined}
+                                                    onValueChange={(v) => setEditingTemplate(v || "")}
+                                                >
+                                                    <SelectTrigger className="h-8">
+                                                        <SelectValue placeholder="Select template" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(documentType === "resume" ? RESUME_TEMPLATES : COVER_LETTER_TEMPLATES).map((t) => (
+                                                            <SelectItem key={t.id} value={t.id}>
+                                                                {t.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                             <div className="flex gap-2 pt-2">
                                                 <Button

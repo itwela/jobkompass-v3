@@ -373,6 +373,21 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
             animate={{ opacity: 1, scale: 1 }}
             transition={{
               duration: 0.6,
+              delay: 1.35,
+              ease: [0.16, 1, 0.3, 1]
+            }}
+          >
+            <Link href="/free-resume-parser">
+              <Button size="lg" variant="secondary" className="text-base px-8">
+                Free Resume Generator
+              </Button>
+            </Link>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              duration: 0.6,
               delay: 1.4,
               ease: [0.16, 1, 0.3, 1]
             }}
@@ -398,11 +413,15 @@ export default function JkLandingPage() {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   
-  const addToWaitlist = useMutation(api.waitlist.add);
+  const addToEmailList = useMutation(api.emailList.add);
 
   const handleWaitlistSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
     if (!email) {
       toast.error("Please enter your email address");
       return;
@@ -416,7 +435,11 @@ export default function JkLandingPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await addToWaitlist({ email, name: name || undefined });
+      const result = await addToEmailList({
+        email,
+        name: name.trim(),
+        submissionType: "waitlist",
+      });
       
       if (result.success) {
         setEmail("");

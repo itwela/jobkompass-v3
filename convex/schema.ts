@@ -159,13 +159,24 @@ const schema = defineSchema({
     .index("by_username", ["username"])
     .index("by_convex_user_id", ["convex_user_id"]),
 
-  // Waitlist table
+  // Waitlist table (deprecated - use emailList with submissionType: 'waitlist')
   waitlist: defineTable({
     email: v.string(),
     name: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_email", ["email"]),
+
+  // Email list - unified table for lead capture (free-resume, waitlist, etc.)
+  emailList: defineTable({
+    email: v.string(),
+    name: v.string(),
+    submissionType: v.string(), // 'free-resume' | 'waitlist' | etc.
+    createdAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_email_and_type", ["email", "submissionType"])
+    .index("by_submission_type", ["submissionType"]),
 
   // Subscriptions table
   subscriptions: defineTable({
@@ -194,6 +205,17 @@ const schema = defineSchema({
     createdAt: v.number(),
   }).index("by_referrer", ["referrerUserId"])
     .index("by_referred", ["referredUserId"]),
+
+  // Free Resume Generator stats - track usage for analytics / portfolio
+  freeResumeGenerations: defineTable({
+    createdAt: v.number(),
+    inputType: v.union(v.literal("text"), v.literal("pdf")),
+    textCharacterCount: v.number(),
+    pdfSizeBytes: v.optional(v.number()),
+    templateId: v.string(),
+  })
+    .index("by_created_at", ["createdAt"])
+    .index("by_input_type", ["inputType"]),
 });
 
 export default schema;

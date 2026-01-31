@@ -5,40 +5,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, FileText, FileCheck, Sparkles, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+    RESUME_TEMPLATES,
+    COVER_LETTER_TEMPLATES,
+    type Template,
+    type TemplateType,
+} from '@/lib/templates'
 
-export type TemplateType = 'resume' | 'cover-letter'
-
-export interface Template {
-    id: string
-    name: string
-    description: string
-    previewImage: string
-    tags?: string[]
-    features?: string[]
-}
-
-// Default templates with preview images
-export const resumeTemplates: Template[] = [
-    {
-        id: 'jake',
-        name: 'JobKompass Jake',
-        description: 'A clean, ATS-optimized professional resume template. Perfect for tech roles with clear section hierarchy and modern typography.',
-        previewImage: '/images/jobkompass_preview_resume_jake.png',
-        tags: ['ATS-Friendly', 'Professional', 'Tech'],
-        features: ['Optimized for ATS systems', 'Clean section hierarchy', 'Modern typography', 'Tech-focused layout'],
-    },
-]
-
-export const coverLetterTemplates: Template[] = [
-    {
-        id: 'jake',
-        name: 'JobKompass Jake',
-        description: 'A matching cover letter template that pairs perfectly with the Jake resume. Clean formatting with professional structure.',
-        previewImage: '/images/jobkompass_preview_cover_letter_jake.png',
-        tags: ['Professional', 'Matching', 'Clean'],
-        features: ['Matches Jake resume', 'Professional tone', 'Clear structure', 'ATS-compatible'],
-    },
-]
+export type { TemplateType, Template }
+export const resumeTemplates = RESUME_TEMPLATES
+export const coverLetterTemplates = COVER_LETTER_TEMPLATES
 
 interface JkTemplateSelectorProps {
     isOpen: boolean
