@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -281,9 +282,18 @@ export default function FreeResumeParserPage() {
       />
       <JkPublicHeader showPricing showSignIn />
       <main className="flex-1">
-        <section className="relative py-12 px-4 md:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-10">
+        <section className="relative py-12 px-4 md:px-6 lg:px-8 overflow-hidden">
+          {/* Subtle gradient orbs like landing */}
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto relative">
+            <motion.div
+              className="text-center mb-10"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            >
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
                 Free Resume Generator
               </h1>
@@ -291,10 +301,15 @@ export default function FreeResumeParserPage() {
                 Paste your resume text or upload a PDF — we&apos;ll extract and format it into a professional PDF for free. No signup
                 required to start.
               </p>
-            </div>
+            </motion.div>
 
             <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
-              <div className="flex flex-col rounded-xl border border-border bg-card/50 p-6 max-h-[560px] min-h-[560px]">
+              <motion.div
+                className="flex flex-col rounded-xl border border-border bg-card/50 p-6 max-h-[560px] min-h-[560px]"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              >
                 <label className="text-sm font-medium mb-2 flex-shrink-0">
                   <FileText className="h-4 w-4 inline mr-2" /> Paste text or upload PDF
                 </label>
@@ -404,9 +419,14 @@ export default function FreeResumeParserPage() {
                     </span>
                   )}
                 </div>
-              </div>
+              </motion.div>
 
-              <div className="flex flex-col rounded-xl border border-border bg-card/50 p-6 max-h-[560px] min-h-[560px]">
+              <motion.div
+                className="flex flex-col rounded-xl border border-border bg-card/50 p-6 max-h-[560px] min-h-[560px]"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              >
                 {!selectedTemplateId ? (
                   /* No template selected: show only template picker */
                   <div className="flex flex-col h-full">
@@ -415,12 +435,17 @@ export default function FreeResumeParserPage() {
                       Choose a template
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto">
-                      {RESUME_TEMPLATES.map((template) => (
-                        <button
+                      {RESUME_TEMPLATES.map((template, index) => (
+                        <motion.button
                           key={template.id}
                           type="button"
                           onClick={() => setSelectedTemplateId(template.id)}
                           className="relative rounded-xl border-2 border-border hover:border-primary/50 hover:shadow-md overflow-hidden transition-all duration-200 text-left group"
+                          initial={{ opacity: 0, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.4, delay: 0.1 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                         >
                           <div className="aspect-[3/4] relative bg-muted/30">
                             <Image
@@ -445,7 +470,7 @@ export default function FreeResumeParserPage() {
                               ))}
                             </div>
                           </div>
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
@@ -493,10 +518,16 @@ export default function FreeResumeParserPage() {
                     </div>
                   </>
                 )}
-              </div>
+              </motion.div>
             </div>
 
-            <div className="mt-12 p-6 rounded-xl border border-primary/20 bg-primary/5 text-center">
+            <motion.div
+              className="mt-12 p-6 rounded-xl border border-primary/20 bg-primary/5 text-center"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.5, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
               <h3 className="font-semibold text-lg mb-2">
                 Love this? Get more with JobKompass
               </h3>
@@ -510,7 +541,7 @@ export default function FreeResumeParserPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-            </div>
+            </motion.div>
           </div>
         </section>
       </main>
