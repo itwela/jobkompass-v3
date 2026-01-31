@@ -5,12 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, FileText, FileCheck, Sparkles, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
     RESUME_TEMPLATES,
     COVER_LETTER_TEMPLATES,
     type Template,
     type TemplateType,
 } from '@/lib/templates'
+import { getModelForTemplateGeneration } from '@/lib/aiModels'
 
 export type { TemplateType, Template }
 export const resumeTemplates = RESUME_TEMPLATES
@@ -262,9 +265,41 @@ export default function JkTemplateSelector({
 
                         {/* Footer */}
                         <div className="border-t bg-muted/20">
-                            <div className="p-5 flex items-center gap-2 text-muted-foreground">
-                                <Sparkles className="h-3 w-3" />
-                                <p className="text-xs">More templates coming soon</p>
+                            <div className="p-5 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Sparkles className="h-3 w-3" />
+                                    <p className="text-xs">More templates coming soon</p>
+                                </div>
+                                <TooltipProvider>
+                                    {(() => {
+                                        const model = getModelForTemplateGeneration();
+                                        if (!model) return null;
+                                        return (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium">
+                                                        <Avatar className="h-3.5 w-3.5">
+                                                            {model.logoUrl ? (
+                                                                <AvatarImage src={model.logoUrl} alt="" />
+                                                            ) : null}
+                                                            <AvatarFallback className="text-[9px]">
+                                                                {model.provider.charAt(0)}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        Powered by {model.name}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="max-w-xs">
+                                                    <p className="font-medium">{model.name}</p>
+                                                    <p className="text-muted-foreground text-xs">{model.provider}</p>
+                                                    {model.description ? (
+                                                        <p className="text-muted-foreground text-xs mt-1">{model.description}</p>
+                                                    ) : null}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        );
+                                    })()}
+                                </TooltipProvider>
                             </div>
                         </div>
                     </motion.div>

@@ -19,6 +19,9 @@ import { api } from '@/convex/_generated/api';
 import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
 import { RESUME_TEMPLATES } from '@/lib/templates';
+import { getModelsForFreeResume } from '@/lib/aiModels';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   FileText,
   Download,
@@ -297,10 +300,39 @@ export default function FreeResumeParserPage() {
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
                 Free Resume Generator
               </h1>
-              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
                 Paste your resume text or upload a PDF — we&apos;ll extract and format it into a professional PDF for free. No signup
                 required to start.
               </p>
+              <TooltipProvider>
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <span className="text-xs text-muted-foreground mr-1">Powered by</span>
+                  {getModelsForFreeResume().map((model) => (
+                    <Tooltip key={model.id}>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2 py-1 text-xs font-medium">
+                          <Avatar className="h-4 w-4">
+                            {model.logoUrl ? (
+                              <AvatarImage src={model.logoUrl} alt="" />
+                            ) : null}
+                            <AvatarFallback className="text-[10px]">
+                              {model.provider.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {model.name}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p className="font-medium">{model.name}</p>
+                        <p className="text-muted-foreground text-xs">{model.provider}</p>
+                        {model.description ? (
+                          <p className="text-muted-foreground text-xs mt-1">{model.description}</p>
+                        ) : null}
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </TooltipProvider>
             </motion.div>
 
             <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">

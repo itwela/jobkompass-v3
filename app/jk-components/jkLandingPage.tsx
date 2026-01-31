@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
 import { mainAssets } from "../lib/constants";
+import { AI_MODELS } from "@/lib/aiModels";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMutation } from "convex/react";
 import JkPublicHeader from "./jkPublicHeader";
 import JkGetStartedButton from "./jkGetStartedButton";
 import { api } from "@/convex/_generated/api";
 import { toast } from "@/lib/toast";
-import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info, Sparkles } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useMotionTemplate } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -162,6 +164,54 @@ function FAQItem({ item, isOpen, onToggle, index }: { item: FAQItem; isOpen: boo
           )}
         </AnimatePresence>
       </div>
+    </motion.div>
+  );
+}
+
+// Models we use - cute avatar badges (e.g. above Features)
+function ModelsWeUse() {
+  const models = AI_MODELS;
+  if (models.length === 0) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-wrap items-center justify-center gap-3 mb-12"
+    >
+      <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Sparkles className="h-4 w-4 text-primary" />
+        Powered by
+      </span>
+      <TooltipProvider>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {models.map((model) => (
+            <Tooltip key={model.id}>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5">
+                  <Avatar className="h-5 w-5">
+                    {model.logoUrl ? (
+                      <AvatarImage src={model.logoUrl} alt="" />
+                    ) : null}
+                    <AvatarFallback className="text-xs">
+                      {model.provider.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {model.name}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs">
+                <p className="font-medium">{model.name}</p>
+                <p className="text-muted-foreground text-xs">{model.provider}</p>
+                {model.description ? (
+                  <p className="text-muted-foreground text-xs mt-1">{model.description}</p>
+                ) : null}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+      </TooltipProvider>
     </motion.div>
   );
 }
@@ -651,13 +701,14 @@ export default function JkLandingPage() {
         <HeroSection scrollToWaitlist={scrollToWaitlist} />
 
         {/* Capabilities Section */}
-        <section className="relative py-32 px-6" aria-labelledby="capabilities-heading">
+        <section className="relative pt-12 pb-32 px-6" aria-labelledby="capabilities-heading">
           {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-primary/5 to-transparent rounded-full blur-3xl" />
           </div>
 
           <div className="max-w-6xl mx-auto relative">
+            <ModelsWeUse />
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}

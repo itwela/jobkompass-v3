@@ -15,6 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Hand } from "lucide-react";
 import { mainAssets } from "@/app/lib/constants";
 import Image from "next/image";
+import { getModelForChat } from "@/lib/aiModels";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ChatMessage {
   id: string;
@@ -449,8 +452,40 @@ export default function JkCW_ChatMode() {
                         <motion.div className="text-3xl font-semibold mb-3 flex items-start gap-1 justify-center" variants={introChildVariants}>
                             <Hand className="h-8 w-8 inline-block mr-2" /> Hi! I'm JobKompass, your AI career assistant
                         </motion.div>
-                        <motion.div className="text-muted-foreground mb-8" variants={introChildVariants}>
+                        <motion.div className="text-muted-foreground mb-4" variants={introChildVariants}>
                             I can help you create resumes, analyze your career, and provide job search guidance.
+                        </motion.div>
+                        <motion.div variants={introChildVariants} className="mb-8">
+                            <TooltipProvider>
+                                {(() => {
+                                    const model = getModelForChat();
+                                    if (!model) return null;
+                                    return (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs font-medium shadow-sm">
+                                                    <Avatar className="h-4 w-4">
+                                                        {model.logoUrl ? (
+                                                            <AvatarImage src={model.logoUrl} alt="" />
+                                                        ) : null}
+                                                        <AvatarFallback className="text-[10px]">
+                                                            {model.provider.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    Powered by {model.name}
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" className="max-w-xs">
+                                                <p className="font-medium">{model.name}</p>
+                                                <p className="text-muted-foreground text-xs">{model.provider}</p>
+                                                {model.description ? (
+                                                    <p className="text-muted-foreground text-xs mt-1">{model.description}</p>
+                                                ) : null}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    );
+                                })()}
+                            </TooltipProvider>
                         </motion.div>
                         <motion.div
                             className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl w-full"
