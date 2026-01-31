@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { escapeLatex } from './types';
+import { escapeLatex, type Language } from './types';
 
 export type { Language, ResumeContent } from './types';
 

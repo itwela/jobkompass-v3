@@ -13,7 +13,7 @@ import JkJobsGrid from "./jkJobsGrid";
 import JkJobExpanded from "./jkJobExpanded";
 import JkConfirmDelete from "../jkConfirmDelete";
 import JkGap from "../jkGap";
-import JkTemplateSelector, { TemplateType } from "../jkTemplateSelector";
+import JkTemplateSelector, { TemplateType, ResumeInputOptions } from "../jkTemplateSelector";
 import JkUpgradeModal from "../jkUpgradeModal";
 import JkJobInputModal from "../jkJobInputModal";
 import { toast } from "@/lib/toast";
@@ -97,7 +97,7 @@ export default function JkCW_MyJobsMode() {
     setIsTemplateModalOpen(true);
   };
 
-  const handleTemplateSelect = async (templateId: string, resumeInput?: { referenceResumeId?: string; resumePdf?: string; resumeText?: string; promptText?: string }) => {
+  const handleTemplateSelect = async (templateId: string, resumeInput?: ResumeInputOptions) => {
     if (!selectedJobForGeneration) return;
 
     setIsGenerating(true);
