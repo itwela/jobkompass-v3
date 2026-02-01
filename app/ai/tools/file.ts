@@ -666,7 +666,7 @@ const createGetUserJobsTool = (convexClient: ConvexHttpClient) =>
       "Fetch all job applications from the user's job tracker to understand what jobs they're tracking. Use this when the user asks about their job applications or wants help with job management.",
     parameters: z.object({
       status: z
-        .enum(["Interested", "Applied", "Interviewing", "Offered", "Rejected"])
+        .enum(["Interested", "Applied", "Callback", "Interviewing", "Offered", "Rejected"])
         .optional()
         .nullable()
         .describe("Filter jobs by status. If not provided, returns all jobs."),
@@ -719,9 +719,9 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
         .nullable()
         .describe("Full URL for the job posting."),
       status: z
-        .enum(["Interested", "Applied", "Interviewing", "Offered", "Rejected"])
+        .enum(["Interested", "Applied", "Callback", "Interviewing", "Offered", "Rejected"])
         .default("Interested")
-        .describe("Job status (Interested, Applied, Interviewing, Offered, Rejected). Defaults to 'Interested'."),
+        .describe("Job status (Interested, Applied, Callback, Interviewing, Offered, Rejected). Defaults to 'Interested'."),
       compensation: z
         .string()
         .optional()

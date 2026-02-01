@@ -91,7 +91,7 @@ const documentsTables = {
     company: v.string(),
     title: v.string(),
     link: v.string(),
-    status: v.string(), // e.g., "Interested", "Applied", "Interviewing", "Rejected", "Offered"
+    status: v.string(), // e.g., "Interested", "Applied", "Callback", "Interviewing", "Rejected", "Offered"
     compensation: v.optional(v.string()), // e.g., "$100k-$150k", "€60k", "Competitive"
     keywords: v.optional(v.array(v.string())),
     skills: v.optional(v.array(v.string())),

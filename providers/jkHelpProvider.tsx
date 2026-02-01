@@ -84,7 +84,7 @@ const helpGuides: HelpGuide[] = [
           },
           {
             title: 'My Jobs',
-            description: 'Track applications and status (Applied, Interviewing, Offered, etc.)',
+            description: 'Track applications and status (Applied, Callback, Interviewing, Offered, etc.)',
             action: { label: 'Go to Jobs', modeId: '/my-jobs' },
           },
           {
@@ -185,7 +185,7 @@ const helpGuides: HelpGuide[] = [
             description: 'You can also have the AI add a job from Chat: paste a link and ask it to save the job to your job dashboard',
           },
           {
-            description: 'Update status as you move through the process: Applied, Interviewing, Offered, Rejected',
+            description: 'Update status as you move through the process: Applied, Callback, Interviewing, Offered, Rejected',
           },
           {
             description: 'Click a job card to expand and view or edit full details and notes',
@@ -203,6 +203,10 @@ const helpGuides: HelpGuide[] = [
           {
             title: 'Applied',
             description: 'Application submitted',
+          },
+          {
+            title: 'Callback',
+            description: 'They reached out—moving to next step',
           },
           {
             title: 'Interviewing',
@@ -420,7 +424,7 @@ const helpGuides: HelpGuide[] = [
         type: 'steps',
         content: [
           {
-            description: 'Set status to Interviewing when you get a response',
+            description: 'Set status to Callback when they reach out, then Interviewing once you\'re in the process',
           },
           {
             description: 'Use Chat for interview prep; add notes on the job in My Jobs',

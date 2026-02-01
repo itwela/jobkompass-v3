@@ -33,6 +33,7 @@ interface JobKompassResumeContextType {
     rejected: number;
     ghosted: number;
     applied: number;
+    callback: number;
     interviewing: number;
   }>;
   resumePreferences: string[] | null | undefined;
@@ -42,6 +43,7 @@ interface JobKompassResumeContextType {
     rejected: number;
     ghosted: number;
     applied: number;
+    callback: number;
     interviewing: number;
   }>;
   
@@ -87,6 +89,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
       rejected: number;
       ghosted: number;
       applied: number;
+      callback: number;
       interviewing: number;
     }> = {};
     
@@ -111,6 +114,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
           rejected: 0,
           ghosted: 0,
           applied: 0,
+          callback: 0,
           interviewing: 0,
         };
         
@@ -126,6 +130,8 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
             stats[resumeTitle].ghosted++;
           } else if (status === 'applied') {
             stats[resumeTitle].applied++;
+          } else if (status === 'callback') {
+            stats[resumeTitle].callback++;
           } else if (status === 'interviewing') {
             stats[resumeTitle].interviewing++;
           }
@@ -146,6 +152,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
       rejected: number;
       ghosted: number;
       applied: number;
+      callback: number;
       interviewing: number;
     }> = {};
     
@@ -170,6 +177,7 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
           rejected: 0,
           ghosted: 0,
           applied: 0,
+          callback: 0,
           interviewing: 0,
         };
         
@@ -185,6 +193,8 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
             stats[coverLetterTitle].ghosted++;
           } else if (status === 'applied') {
             stats[coverLetterTitle].applied++;
+          } else if (status === 'callback') {
+            stats[coverLetterTitle].callback++;
           } else if (status === 'interviewing') {
             stats[coverLetterTitle].interviewing++;
           }

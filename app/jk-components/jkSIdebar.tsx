@@ -200,7 +200,7 @@ export default function JkSidebar() {
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
 
-          {/* Navigation Sections: My Jobs, My Documents, Chat, then Links & Resources */}
+          {/* Navigation Sections: My Jobs, My Documents, Performance, Links & Resources, Chat */}
           <div className="flex flex-col gap-2 flex-shrink-0">
             <div className="p-2 pb-0.5 space-y-1">
               {/* My Jobs Section */}
@@ -245,18 +245,22 @@ export default function JkSidebar() {
                 </div>
               </button>
 
-              {/* Chat Section */}
+              {/* Performance Section */}
               <button
-                onClick={handleChatToggle}
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/chat'
+                onClick={() => {
+                  const perfMode = allModes.find(mode => mode.id === '/performance');
+                  if (perfMode) setCurrentMode(perfMode);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/performance'
                   ? 'bg-accent text-accent-foreground'
                   : 'text-foreground/80 hover:text-foreground hover:bg-accent'
                   }`}
               >
-                <span>Chat</span>
-                <ChevronRight
-                  className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
-                />
+                <div className="flex items-center gap-2">
+                  <span>Performance</span>
+                  <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">New</span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
 
               {/* Links & Resources Section */}
@@ -269,6 +273,20 @@ export default function JkSidebar() {
               >
                 <span>Links & Resources</span>
                 <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Chat Section */}
+              <button
+                onClick={handleChatToggle}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/chat'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <span>Chat</span>
+                <ChevronRight
+                  className={`h-3.5 w-3.5 transition-transform ${isThreadsExpanded ? 'rotate-90' : ''}`}
+                />
               </button>
             </div>
           </div>

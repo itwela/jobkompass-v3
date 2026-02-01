@@ -82,18 +82,18 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
 
   // STUB - STEP 1 OF ADDING A NEW MODE
   const [allModes, setAllModes] = useState<ModeType[]>([
-    { id: '/help', name: 'Help', command: 'Help' },
-    { id: '/chat', name: 'Chat', command: 'Chat' },
-    { id: '/my-jobs', name: 'Jobs', command: 'Jobs' },
-    { id: '/documents', name: 'Documents', command: 'Documents' },
-    { id: '/resources', name: 'Links & Resources', command: 'Links & Resources' },
-    { id: '/settings', name: 'Settings', command: 'Settings' },
+    { id: '/my-jobs', name: 'My Jobs', command: 'My Jobs' },
+    { id: '/documents', name: 'My Documents', command: 'My Documents' },
     { id: '/performance', name: 'Performance', command: 'Performance' },
+    { id: '/resources', name: 'Links & Resources', command: 'Links & Resources' },
+    { id: '/chat', name: 'Chat', command: 'Chat' },
+    { id: '/help', name: 'Help', command: 'Help' },
+    { id: '/settings', name: 'Settings', command: 'Settings' },
   ]);
   // STUB -----
 
   // NOTE - MODE STUFF
-  const [startingMode, setStartingMode] = useState<ModeType>(allModes[2]); // Chat Mode is default
+  const [startingMode, setStartingMode] = useState<ModeType>(allModes[4]); // Chat Mode is default (index 4 after reorder)
   const [currentMode, setCurrentMode] = useState<ModeType>(startingMode);
   const [wantsHelp, setWantsHelp] = useState<boolean>(false);
   const [wantsToAddJob, setWantsToAddJob] = useState<boolean>(false);

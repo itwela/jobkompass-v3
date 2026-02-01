@@ -8,7 +8,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2 } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
@@ -845,6 +845,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         const offered = stats?.offered || 0;
                         const rejected = stats?.rejected || 0;
                         const ghosted = stats?.ghosted || 0;
+                        const callback = stats?.callback ?? 0;
                         const interviewing = stats?.interviewing || 0;
 
                         // Check if document is new (never seen)
@@ -938,12 +939,18 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                 )}
                                             </div>
                                             {/* Status badges - matching My Jobs status colors (only for resumes) */}
-                                            {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0) && (
+                                            {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0 || callback > 0) && (
                                                 <div className="flex flex-wrap gap-1.5 pt-1">
                                                     {offered > 0 && (
                                                         <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
                                                             <TrendingUp className="h-2.5 w-2.5" />
                                                             {offered} offered
+                                                        </span>
+                                                    )}
+                                                    {callback > 0 && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800">
+                                                            <Phone className="h-2.5 w-2.5" />
+                                                            {callback} callback
                                                         </span>
                                                     )}
                                                     {interviewing > 0 && (
