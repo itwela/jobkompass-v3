@@ -17,13 +17,11 @@ import JkGetStartedButton from './jkGetStartedButton'
 interface JkPublicHeaderProps {
   showPricing?: boolean
   showSignIn?: boolean
-  showFreeResumeGenerator?: boolean
 }
 
 export default function JkPublicHeader({ 
   showPricing = false, 
   showSignIn = true,
-  showFreeResumeGenerator = true
 }: JkPublicHeaderProps = {}) {
   const { user, isAuthenticated } = useAuth()
   const { planId } = useSubscription()
@@ -149,13 +147,6 @@ export default function JkPublicHeader({
             </>
           ) : (
             <>
-              {showFreeResumeGenerator && (
-                <Link href="/free-resume-generator">
-                  <Button variant="ghost" size="sm">
-                    Free Resume Generator
-                  </Button>
-                </Link>
-              )}
               {showPricing && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}

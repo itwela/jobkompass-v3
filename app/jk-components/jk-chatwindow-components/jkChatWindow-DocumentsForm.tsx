@@ -19,6 +19,7 @@ import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES, getDefaultResumeTe
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
 import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEditor";
 import { toast } from "@/lib/toast";
+import { BlurFade } from "@/components/ui/blur-fade";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -850,8 +851,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         const isNew = !resume?.seenAt;
 
                         return (
+                            <BlurFade key={resumeId} delay={0.0618 + index * 0.05} inView>
                             <div
-                                key={resumeId}
                                 role="button"
                                 tabIndex={0}
                                 onClick={() => handleDocumentClick(resumeId, documentType)}
@@ -1205,6 +1206,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     </div>
                                 </div>
                             </div>
+                            </BlurFade>
                         );
                     })}
                 </div>

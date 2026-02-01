@@ -66,7 +66,10 @@ export default function JkTemplateSelector({
     const [resumePdfName, setResumePdfName] = useState<string | null>(null)
     const [resumeText, setResumeText] = useState('')
     const [promptText, setPromptText] = useState('')
+    const [descriptionExpanded, setDescriptionExpanded] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const DESC_TRUNCATE = 70
 
     const selectedTemplate = templates.find(t => t.id === selectedTemplateId)
 
@@ -79,8 +82,13 @@ export default function JkTemplateSelector({
             setResumePdfName(null)
             setResumeText('')
             setPromptText('')
+            setDescriptionExpanded(false)
         }
     }, [isOpen])
+
+    useEffect(() => {
+        setDescriptionExpanded(false)
+    }, [selectedTemplateId])
 
     const handleTemplateClick = (templateId: string) => {
         if (selectedTemplateId === templateId) {
@@ -133,7 +141,7 @@ export default function JkTemplateSelector({
             referenceResumeId: resumeInputMode === 'reference' ? selectedReferenceResumeId ?? undefined : undefined,
             resumePdf: resumeInputMode === 'upload' && resumePdf ? resumePdf : undefined,
             resumeText: resumeInputMode === 'paste' && resumeText.trim() ? resumeText.trim() : undefined,
-            promptText: promptText.trim() || undefined,
+            promptText: resumeInputMode === 'paste' ? (promptText.trim() || undefined) : undefined,
         } : undefined
 
         onSelectTemplate(selectedTemplateId, resumeInput)
@@ -154,7 +162,7 @@ export default function JkTemplateSelector({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
                         transition={{ duration: 0.15 }}
-                        className="relative !no-scrollbar flex flex-col justify-between w-full max-w-4xl max-h-[70vh] h-full bg-background border border-border rounded-xl shadow-2xl"
+                        className="relative !no-scrollbar flex flex-col justify-between w-full max-w-4xl max-h-[80vh] h-full bg-background border border-border rounded-xl shadow-2xl !no-scrollbar"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -193,7 +201,7 @@ export default function JkTemplateSelector({
                                             key={template.id}
                                             layout
                                             onClick={() => handleTemplateClick(template.id)}
-                                            className={`place-self-center !no-scrollbar flex h-full relative rounded-lg overflow-hidden cursor-pointer transition-all ${isSelected
+                                            className={`place-self-center flex h-full relative rounded-lg overflow-hidden cursor-pointer transition-all ${isSelected
                                                     ? 'ring-2 ring-primary/20'
                                                     : 'border-2 border-border hover:border-muted-foreground/40'
                                                 }`}
@@ -248,22 +256,38 @@ export default function JkTemplateSelector({
                                                         >
                                                             <div className="p-5 bg-muted/30 h-full flex flex-col min-w-[280px]">
                                                                 <h3 className="font-semibold mb-2">{template.name}</h3>
-                                                                <p className="text-sm text-muted-foreground mb-3">
-                                                                    {template.description}
-                                                                </p>
-                                                                <ul className="space-y-1 mb-4 flex-1">
-                                                                    {template.features?.map((feature, index) => (
-                                                                        <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                            <div className="w-1 h-1 rounded-full bg-primary" />
-                                                                            {feature}
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                                {/* Resume input: 3 options (only for resumes) */}
+                                                                <div className="text-sm text-muted-foreground mb-3">
+                                                                    <p>
+                                                                        {descriptionExpanded || (template.description?.length ?? 0) <= DESC_TRUNCATE
+                                                                            ? template.description
+                                                                            : `${template.description?.slice(0, DESC_TRUNCATE).trim()}...`}
+                                                                    </p>
+                                                                    {descriptionExpanded && (template.features?.length ?? 0) > 0 && (
+                                                                        <ul className="space-y-1 mt-2">
+                                                                            {template.features?.map((feature, index) => (
+                                                                                <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                                    <div className="w-1 h-1 rounded-full bg-primary shrink-0" />
+                                                                                    {feature}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    )}
+                                                                    {((template.description?.length ?? 0) > DESC_TRUNCATE || (template.features?.length ?? 0) > 0) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => { e.stopPropagation(); setDescriptionExpanded((v) => !v); }}
+                                                                            className="text-primary hover:underline text-xs mt-0.5 font-medium"
+                                                                        >
+                                                                            {descriptionExpanded ? 'See less' : 'See more'}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {/* Resume input + Use Template - justified to bottom */}
+                                                                <div className="mt-auto space-y-4 pt-4">
                                                                 {type === 'resume' && (
-                                                                    <div className="mb-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
                                                                         <label className="text-xs font-medium text-muted-foreground block">
-                                                                            How would you like to provide your resume?
+                                                                            How would you like to provide the reference content?
                                                                         </label>
                                                                         <div className="flex gap-2 flex-wrap">
                                                                             <Button
@@ -363,17 +387,6 @@ export default function JkTemplateSelector({
                                                                                 <p className="text-[10px] text-muted-foreground">Tip: You can add instructions in the box above to tailor the output (e.g. &quot;emphasize leadership&quot;, &quot;make it more concise&quot;).</p>
                                                                             </div>
                                                                         )}
-
-                                                                        {/* Optional instructions for reference & upload modes too */}
-                                                                        {(resumeInputMode === 'reference' || resumeInputMode === 'upload') && (
-                                                                            <Input
-                                                                                placeholder="Optional: Add instructions (e.g. emphasize leadership)"
-                                                                                value={promptText}
-                                                                                onChange={(e) => setPromptText(e.target.value)}
-                                                                                className="text-sm mt-2"
-                                                                                sanitize={false}
-                                                                            />
-                                                                        )}
                                                                     </div>
                                                                 )}
 
@@ -388,6 +401,7 @@ export default function JkTemplateSelector({
                                                                     <Sparkles className="h-4 w-4" />
                                                                     {isGenerating ? 'Generating...' : 'Use Template'}
                                                                 </Button>
+                                                                </div>
                                                             </div>
                                                         </motion.div>
                                                     )}

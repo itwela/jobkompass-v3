@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useMotionTemplate } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,6 +42,77 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { COPY_TO_AI_OPTIONS, getCopyPromptForTemplate } from '@/lib/copyToAiPrompts';
+
+// Animated background gradient that follows the cursor (matches landing page)
+function AnimatedBackground() {
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const { clientX, clientY } = e;
+      const { innerWidth, innerHeight } = window;
+      mouseX.set((clientX / innerWidth) * 100);
+      mouseY.set((clientY / innerHeight) * 100);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [mouseX, mouseY]);
+
+  const background = useMotionTemplate`radial-gradient(600px circle at ${mouseX}% ${mouseY}%, rgba(33, 150, 243, 0.06), transparent 40%)`;
+
+  return (
+    <motion.div
+      className="absolute inset-0 pointer-events-none"
+      style={{ background }}
+    />
+  );
+}
+
+// Floating particles (matches landing page)
+function FloatingParticles() {
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 20 }, (_, i) => ({
+        id: i,
+        size: 2 + (i % 4) + 1,
+        x: 5 + (i * 5) % 90,
+        y: 5 + (i * 7) % 90,
+        duration: 15 + (i % 10),
+        delay: (i % 5) * 0.5,
+      })),
+    []
+  );
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map((particle) => (
+        <motion.div
+          key={particle.id}
+          className="absolute rounded-full bg-primary/20"
+          style={{
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            left: `${particle.x}%`,
+            top: `${particle.y}%`,
+          }}
+          animate={{
+            y: [0, -30, 0],
+            opacity: [0.2, 0.5, 0.2],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: particle.duration,
+            delay: particle.delay,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function FreeResumeGeneratorPage() {
   const [resumeText, setResumeText] = useState('');
@@ -335,7 +406,10 @@ export default function FreeResumeGeneratorPage() {
       <JkPublicHeader showPricing showSignIn />
       <main className="flex-1">
         <section className="relative py-12 px-4 md:px-6 lg:px-8 overflow-hidden">
-          {/* Subtle gradient orbs like landing */}
+          {/* Cursor-following blue glow + floating particles (matches landing page) */}
+          <AnimatedBackground />
+          <FloatingParticles />
+          {/* Subtle gradient orbs */}
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
           <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
 
