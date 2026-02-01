@@ -424,8 +424,7 @@ export default function FreeResumeGeneratorPage() {
                 Free Resume Generator
               </h1>
               <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
-                Paste your resume text or upload a PDF, we&apos;ll extract and format it into a professional PDF for free. No signup
-                required to start.
+                Paste your resume text or upload a PDF, we&apos;ll extract and format it into a professional PDF for free. Yes you read that correctly, for FREE.
               </p>
               <TooltipProvider>
                 <div className="flex items-center justify-center gap-2 flex-wrap">
