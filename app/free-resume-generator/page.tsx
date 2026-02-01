@@ -631,7 +631,7 @@ export default function FreeResumeGeneratorPage() {
                           key={template.id}
                           type="button"
                           onClick={() => handleSelectTemplate(template.id)}
-                          className="flex flex-col flex-shrink-0 w-[280px] min-w-[280px] h-full rounded-xl border-2 border-border hover:border-primary overflow-hidden transition-colors duration-200 text-left group"
+                          className="flex flex-col flex-shrink-0 w-full max-w-[400px] h-full rounded-xl border-2 border-border hover:border-primary overflow-hidden transition-colors duration-200 text-left group"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ duration: 0.4, delay: 0.1 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
