@@ -646,7 +646,7 @@ export default function JkCW_ResourcesMode() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <AnimatePresence mode="popLayout">
             {filteredResources.map((resource, index) => (
-              <BlurFade key={resource._id} delay={0.0618 + index * 0.05} inView>
+              <BlurFade key={resource._id} delay={0.0618 + index * 0.05} inView={false}>
               <StickyNote
                 resource={resource}
                 isEditing={editingId === resource._id}
