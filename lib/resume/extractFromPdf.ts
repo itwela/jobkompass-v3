@@ -1,6 +1,6 @@
 /**
  * Shared resume extraction logic for PDF/text input.
- * Used by: free-resume parser, My Documents upload.
+ * Used by: free-resume generator, My Documents upload.
  */
 
 import type { ResumeContentForJake } from './generateJakeLatex';

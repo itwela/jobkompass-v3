@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import { COPY_TO_AI_OPTIONS, getCopyPromptForTemplate } from '@/lib/copyToAiPrompts';
 
-export default function FreeResumeParserPage() {
+export default function FreeResumeGeneratorPage() {
   const [resumeText, setResumeText] = useState('');
   const [resumePdf, setResumePdf] = useState<string | null>(null);
   const [resumePdfName, setResumePdfName] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export default function FreeResumeParserPage() {
       payload.resumeText = textToSend;
     }
     try {
-      const res = await fetch('/api/free-resume/parse', {
+      const res = await fetch('/api/free-resume/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -322,7 +322,7 @@ export default function FreeResumeParserPage() {
       'Download formatted resume',
       'No signup required to access',
     ],
-    url: 'https://jobkompass.com/free-resume-parser',
+    url: 'https://jobkompass.com/free-resume-generator',
     author: { '@type': 'Organization', name: 'JobKompass' },
   };
 

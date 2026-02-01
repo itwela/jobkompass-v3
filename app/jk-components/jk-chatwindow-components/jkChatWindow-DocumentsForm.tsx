@@ -270,19 +270,19 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
             });
 
             setUploadProgress(25);
-            // 2. Parse PDF with AI (extract structured content)
-            const parseRes = await fetch("/api/documents/parse-resume-pdf", {
+            // 2. Generate PDF with AI (extract structured content)
+            const generateResumePdfRes = await fetch("/api/documents/generate-resume-pdf", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ resumePdf: base64 }),
             });
 
-            if (!parseRes.ok) {
-                const err = await parseRes.json().catch(() => ({}));
-                throw new Error(err.error || "Failed to parse resume");
+            if (!generateResumePdfRes.ok) {
+                const err = await generateResumePdfRes.json().catch(() => ({}));
+                throw new Error(err.error || "Failed to generate resume PDF");
             }
 
-            const { content } = await parseRes.json();
+            const { content } = await generateResumePdfRes.json();
             setUploadProgress(50);
 
             // 3. Generate PDF from extracted content via Jake template

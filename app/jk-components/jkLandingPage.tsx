@@ -239,7 +239,7 @@ function FreeResumeStats() {
       <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
         JobKompass has helped users create over {stats?.totalGenerations} free resumes. Enter your text or upload a PDF and we will extract and format it instantly. Go try it out for yourself today!
       </p>
-      <Link href="/free-resume-parser">
+      <Link href="/free-resume-generator">
         <Button size="lg" className="gap-2">
           Try Now
           <ArrowRight className="h-4 w-4" />
@@ -1019,7 +1019,7 @@ export default function JkLandingPage() {
           className="fixed bottom-6 right-6 z-40"
         >
           <Link
-            href="/free-resume-parser"
+            href="/free-resume-generator"
             className="flex items-center gap-3 px-4 py-3 rounded-full shadow-lg border border-border bg-card/95 backdrop-blur-sm hover:border-primary/40 hover:shadow-xl transition-all duration-300 group"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">

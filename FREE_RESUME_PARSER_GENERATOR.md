@@ -1,8 +1,8 @@
-# Free Resume Parser — Lead Magnet Setup
+# Free Resume Generator — Lead Magnet Setup
 
 ## Overview
 
-The Free Resume Parser is a lead magnet that lets users paste their resume text, sign up to the email list (or verify if already signed up), and receive a professionally formatted PDF resume.
+The Free Resume Generator is a lead magnet that lets users paste their resume text, sign up to the email list (or verify if already signed up), and receive a professionally formatted PDF resume.
 
 ## Environment Variables
 
@@ -24,7 +24,7 @@ NEXT_PUBLIC_APP_URL=https://jobkompass.com
 
 1. Run `npx convex dev` to push the new schema (adds `emailList` table).
 2. The `emailList` table replaces the waitlist concept with submission types:
-   - `free-resume` — signups from the Free Resume Parser
+   - `free-resume` — signups from the Free Resume Generator
    - `waitlist` — signups from the main waitlist / landing page
 
 ## Features
@@ -39,7 +39,7 @@ NEXT_PUBLIC_APP_URL=https://jobkompass.com
 
 ## LaTeX Service
 
-The parse API sends both `latex` and `latexContent` to the compile endpoint for compatibility. If your LaTeX service expects only one, ensure it matches.
+The generator API sends both `latex` and `latexContent` to the compile endpoint for compatibility. If your LaTeX service expects only one, ensure it matches.
 
 ## Stats Tracking
 

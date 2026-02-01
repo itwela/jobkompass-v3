@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     'free resume builder',
     'resume to PDF',
     'parse resume text',
+    'generate resume PDF',
     'resume information extraction',
     'free resume tool',
   ],
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
     title: 'Free Resume Generator — Extract & Format Your Resume Instantly | JobKompass',
     description:
       'Paste your resume text — we\'ll extract and format it into a professional PDF for free. Extract experience, education, skills automatically. Download a professionally formatted PDF.',
-    url: 'https://jobkompass.com/free-resume-parser',
+    url: 'https://jobkompass.com/free-resume-generator',
     siteName: 'JobKompass',
     type: 'website',
   },
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
     description: 'Paste your resume text. We extract and format it into a professional PDF. Download in seconds.',
   },
   alternates: {
-    canonical: 'https://jobkompass.com/free-resume-parser',
+    canonical: 'https://jobkompass.com/free-resume-generator',
   },
   robots: {
     index: true,
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function FreeResumeParserLayout({
+export default function FreeResumeGeneratorLayout({
   children,
 }: {
   children: React.ReactNode;

@@ -1,6 +1,6 @@
 /**
- * AI models used across the app (e.g. free resume parser, future features).
- * Keep in sync with API routes that call OpenRouter (e.g. OPENROUTER_MODEL_* in free-resume parse route).
+ * AI models used across the app (e.g. free resume generator, future features).
+ * Keep in sync with API routes that call OpenRouter (e.g. OPENROUTER_MODEL_* in free-resume generator route).
  */
 
 export interface AIModelInfo {
@@ -48,7 +48,7 @@ export const AI_MODELS: AIModelInfo[] = [
   },
 ];
 
-/** OpenRouter model ids used by the free resume parser (primary + fallback). */
+/** OpenRouter model ids used by the free resume generator (primary + fallback). */
 export const FREE_RESUME_MODEL_IDS = [
   'arcee-ai/trinity-mini:free',
   'google/gemma-3-27b-it:free',
