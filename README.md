@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Job Kompass
 
-## Getting Started
+Job Kompass is an AI-powered career management platform designed to help job seekers organize their job search, manage applications, and create professional documents. The platform streamlines the entire job hunting process by providing intelligent tools for resume building, cover letter generation, application tracking, and career guidance.
 
-First, run the development server:
+## What is Job Kompass?
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Job Kompass is a comprehensive career management platform that combines artificial intelligence with intuitive tools to make your job search more efficient and organized. Whether you're actively job hunting or preparing for your next career move, Job Kompass provides everything you need in one place.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Key Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Resume & Cover Letter Creation**: Generate professional, ATS-optimized resumes and tailored cover letters using AI-powered templates
+- **Job Application Tracking**: Organize and track all your job applications in a centralized dashboard with status updates and notes
+- **AI-Powered Chat**: Chat with your documents to refine and improve them, get career advice, and prepare for interviews
+- **Document Management**: Store and manage all your career documents in one secure location
+- **Career Guidance**: Receive personalized career advice and interview preparation tips powered by AI
+- **Resource Library**: Save and organize useful job boards, company links, and career resources
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### How It Works
 
-## Learn More
+1. **Upload or Create**: Start by uploading your existing resume or create a new one using our AI-powered resume builder
+2. **Track Applications**: Add jobs to your dashboard and track their status throughout the application process
+3. **Tailor Documents**: Use the AI chat to customize your resume and cover letter for each specific job application
+4. **Get Guidance**: Receive personalized career advice and interview preparation support
+5. **Stay Organized**: Keep all your job search materials, applications, and resources in one centralized platform
 
-To learn more about Next.js, take a look at the following resources:
+Job Kompass is designed to make your career journey smoother, more organized, and more successful by leveraging the power of AI to handle the time-consuming aspects of job searching, so you can focus on landing your dream role.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Made by Itwela Ibomu x Caveman Creative**
