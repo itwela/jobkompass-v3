@@ -109,6 +109,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <>
+    <Analytics/>
     <ConvexAuthNextjsServerProvider>
       <JkConvexProviders>
         <JkAuthProvider>
@@ -138,5 +140,6 @@ export default function RootLayout({
         </JkAuthProvider>
       </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>
+    </>
     );
 }
