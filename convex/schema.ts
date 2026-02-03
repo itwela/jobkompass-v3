@@ -178,6 +178,19 @@ const schema = defineSchema({
     .index("by_email_and_type", ["email", "submissionType"])
     .index("by_submission_type", ["submissionType"]),
 
+  // Contacts table - contact form submissions
+  contacts: defineTable({
+    name: v.string(),
+    email: v.string(),
+    subject: v.string(),
+    message: v.string(),
+    createdAt: v.number(),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  })
+    .index("by_email", ["email"])
+    .index("by_created_at", ["createdAt"]),
+
   // Subscriptions table
   subscriptions: defineTable({
     userId: v.string(),

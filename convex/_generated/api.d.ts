@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as contacts from "../contacts.js";
 import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
 import type * as emailList from "../emailList.js";
@@ -38,6 +39,7 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  contacts: typeof contacts;
   documents: typeof documents;
   dopeAgents: typeof dopeAgents;
   emailList: typeof emailList;

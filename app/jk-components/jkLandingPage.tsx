@@ -924,9 +924,9 @@ export default function JkLandingPage() {
               </div>
               
               <div className="flex items-center gap-8 text-sm text-muted-foreground">
-                <Link href="#" className="hover:text-foreground transition-colors">Privacy</Link>
-                <Link href="#" className="hover:text-foreground transition-colors">Terms</Link>
-                <Link href="#" className="hover:text-foreground transition-colors">Contact</Link>
+                <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+                <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+                <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
               </div>
 
               <p className="text-sm text-muted-foreground">

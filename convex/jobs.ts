@@ -27,23 +27,42 @@ function upgradeSuggestionForPlan(planId: string) {
   return "Upgrade your plan to increase job limits.";
 }
 
+
+// ROS THIS IS GIVING ERRORS
 async function resolveJobLimitForUser(ctx: any, convexUserId: string) {
-  const subscription = await ctx.db
+  let subscription = await ctx.db
     .query("subscriptions")
     .withIndex("by_user", (q: any) => q.eq("userId", convexUserId))
     .first();
+  if (!subscription) {
+    const authUserId = await getAuthUserId(ctx);
+    if (authUserId && authUserId !== convexUserId) {
+      subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q: any) => q.eq("userId", authUserId))
+        .first();
+    }
+  }
 
-  const rawPlanId = subscription?.planId || "free";
-  const rawStatus = subscription?.status || null;
-  
-  // Consider subscription active if status is active, trialing, or past_due (grace period)
-  // Also treat missing status with a paid plan as active (for backwards compatibility)
+  const rawPlanId = (subscription?.planId || "free").toLowerCase();
+  const rawStatus = (subscription?.status || "").toLowerCase();
+
+  // Pro plans: NEVER demote to free. Pro members always get unlimited jobs.
+  const isProPlan = rawPlanId === "pro" || rawPlanId === "pro-annual";
+  if (isProPlan) {
+    return {
+      planId: rawPlanId,
+      planLabel: "Pro",
+      subscriptionStatus: rawStatus || "active",
+      limit: null,
+      upgradeSuggestion: "Upgrade your plan to increase job limits.",
+    };
+  }
+
   const isActive = rawStatus === "active" || rawStatus === "trialing" || rawStatus === "past_due" ||
-                   (rawStatus === null && rawPlanId !== "free");
-
-  // Treat inactive subscriptions as free for gating purposes
+                   (rawStatus === "" && rawPlanId !== "free");
   const planId = isActive ? rawPlanId : "free";
-  const subscriptionStatus = isActive ? rawStatus : "inactive";
+  const subscriptionStatus = isActive ? rawStatus || "active" : "inactive";
   const limit = PLAN_LIMITS[planId] ?? PLAN_LIMITS.free;
 
   return {
@@ -59,7 +78,6 @@ async function enforceJobLimitOrThrow(ctx: any, convexUserId: string) {
   const { planId, planLabel, subscriptionStatus, limit, upgradeSuggestion } =
     await resolveJobLimitForUser(ctx, convexUserId);
 
-  // Unlimited plans
   if (limit === null) return;
 
   const jobsCount = (
@@ -79,6 +97,7 @@ async function enforceJobLimitOrThrow(ctx: any, convexUserId: string) {
     );
   }
 }
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -310,6 +329,7 @@ export const addInternal = internalMutation({
   },
 });
 
+///TODO
 // Public mutation for agent tool to add jobs with userId
 export const addForAgent = mutation({
   args: {

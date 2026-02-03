@@ -705,6 +705,7 @@ const createGetUserJobsTool = (convexClient: ConvexHttpClient) =>
     },
   });
 
+// TODO
 const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "addJobToTracker",
@@ -802,7 +803,8 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
       } = input;
 
       try {
-        // Check if user can add jobs
+
+        // THIS IS GIVING ERRORS
         const canAdd = await convexClient.query(api.usage.canAddJob, {});
         if (!canAdd?.allowed) {
           return {
@@ -812,12 +814,11 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
                 ? `Your subscription isn’t active right now, so you’re currently limited to the Free plan (${canAdd.limit ?? 10} jobs).`
                 : `Your job tracker is full for your ${canAdd.planLabel ?? "current"} plan (${canAdd.limit ?? 10} jobs).` +
                   (canAdd.upgradeSuggestion ? ` ${canAdd.upgradeSuggestion}` : ""),
-            error: 'Job limit reached',
+            error: "Job limit reached",
             limitReached: true,
           };
         }
 
-        // Get user's convex_user_id for the agent tool
         const user = await convexClient.query(api.auth.currentUser);
         if (!user) {
           return {
@@ -990,7 +991,7 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "getUserUsage",
     description:
-      "Get the user's current usage statistics including documents generated this month and total jobs tracked. Use this to check limits before generating documents or adding jobs. Always available.",
+      "Get the user's current usage statistics (documents generated this month, jobs tracked). Use for informational context. Pro/Plus users have unlimited job tracking - always call addJobToTracker when the user wants to save a job. Do NOT refuse to add jobs based on this data.",
     parameters: z.object({}),
     execute: async () => {
       try {
@@ -1005,7 +1006,7 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
 
         // Get subscription to determine limits
         const subscription = await convexClient.query(api.subscriptions.getUserSubscription);
-        const planId = subscription?.planId || "free";
+        const rawPlanId = (subscription?.planId || "free").toLowerCase();
 
         const PLAN_LIMITS: Record<string, { documentsPerMonth: number; jobsLimit: number | null }> = {
           free: { documentsPerMonth: 3, jobsLimit: 10 },
@@ -1016,7 +1017,10 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
           "pro-annual": { documentsPerMonth: 180, jobsLimit: null },
         };
 
-        const limits = PLAN_LIMITS[planId] || PLAN_LIMITS.free;
+        // Pro plans: always unlimited jobs (case-insensitive)
+        const limits = (rawPlanId === "pro" || rawPlanId === "pro-annual")
+          ? PLAN_LIMITS.pro
+          : (PLAN_LIMITS[rawPlanId] || PLAN_LIMITS.free);
 
         return {
           success: true,
@@ -1027,7 +1031,7 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
             jobsCount: usage.jobsCount || 0,
             jobsLimit: limits.jobsLimit,
             jobsRemaining: limits.jobsLimit === null ? null : Math.max(0, limits.jobsLimit - (usage.jobsCount || 0)),
-            planId,
+            planId: rawPlanId,
           },
           message: `Current usage: ${usage.documentsGeneratedThisMonth || 0}/${limits.documentsPerMonth} documents this month, ${usage.jobsCount || 0}${limits.jobsLimit === null ? '' : `/${limits.jobsLimit}`} jobs tracked.`,
         };
