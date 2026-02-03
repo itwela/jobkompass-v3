@@ -79,6 +79,7 @@ export default function JkCW_ChatMode() {
     const { 
         textValue, setTextValue, textareaRef, currentThreadId, setCurrentThreadId,
         attachedResumeIds, attachedJobIds, clearAllAttachments,
+        selectedResumeTemplateId,
         droppedFile, setDroppedFile, fileName, setFileName, setIsFileMode,
         allModes, setCurrentMode
     } = useJobKompassChatWindow()
