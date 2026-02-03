@@ -1,6 +1,7 @@
 'use client'
 
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"
+import JkFooter from "@/app/jk-components/jkFooter"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
@@ -167,6 +168,7 @@ export default function TermsPage() {
           </section>
         </div>
       </main>
+      <JkFooter />
     </div>
   )
 }

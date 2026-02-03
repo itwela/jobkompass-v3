@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"
+import JkFooter from "@/app/jk-components/jkFooter"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -331,6 +332,7 @@ export default function ContactPage() {
           </div>
         </div>
       </main>
+      <JkFooter />
     </div>
   )
 }

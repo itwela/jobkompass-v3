@@ -23,6 +23,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
+import JkFooter from '@/app/jk-components/jkFooter';
 import { getFreeResumeTemplates } from '@/lib/templates';
 import { getModelsForFreeResume } from '@/lib/aiModels';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -829,6 +830,7 @@ export default function FreeResumeGeneratorPage() {
           </div>
         </section>
       </main>
+      <JkFooter />
 
       <Dialog open={showEmailGate} onOpenChange={setShowEmailGate}>
         <DialogContent className="sm:max-w-md">
