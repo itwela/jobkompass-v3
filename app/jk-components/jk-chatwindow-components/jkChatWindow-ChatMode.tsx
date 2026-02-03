@@ -76,8 +76,11 @@ export default function JkCW_ChatMode() {
     const { 
         textValue, setTextValue, textareaRef, currentThreadId, setCurrentThreadId,
         attachedResumeIds, attachedJobIds, clearAllAttachments,
-        droppedFile, setDroppedFile, fileName, setFileName, setIsFileMode
+        droppedFile, setDroppedFile, fileName, setFileName, setIsFileMode,
+        allModes, setCurrentMode
     } = useJobKompassChatWindow()
+    
+    const [showMorePrompts, setShowMorePrompts] = useState(false)
     const { user, isAuthenticated, isLoading: authLoading } = useAuth()
     
     const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -374,7 +377,7 @@ export default function JkCW_ChatMode() {
     }
 
     // Chat suggestions
-    const suggestions = [
+    const allSuggestions = [
         "Help me find jobs I'm actually qualified for",
         "Improve my resume for a specific job posting",
         "Write a cover letter that doesn't sound generic",
@@ -382,6 +385,13 @@ export default function JkCW_ChatMode() {
         "Prepare me for an interview for this role",
         "Tell me what I should be doing next in my job search"
     ]
+    
+    // On mobile, show 3 at a time. On desktop, show all 6
+    const firstSet = allSuggestions.slice(0, 3)
+    const secondSet = allSuggestions.slice(3, 6)
+    
+    // For mobile: show first 3 or second 3 based on state
+    const mobileSuggestions = showMorePrompts ? secondSet : firstSet
 
     if (authLoading) {
         return (
@@ -441,32 +451,71 @@ export default function JkCW_ChatMode() {
                 <div className="max-w-3xl mx-auto px-6 py-6 w-full">
                 {messages.length === 0 ? (
                     <motion.div
-                        className="flex flex-col items-center justify-center min-h-[60vh] text-center"
+                        className="flex flex-col items-center justify-center min-h-[60vh] text-center w-full"
                         initial="hidden"
                         animate="visible"
                         variants={introWrapperVariants}
                     >
-                        <motion.div className="text-3xl font-semibold mb-3 flex items-start gap-1 justify-center" variants={introChildVariants}>
-                            <Hand className="h-8 w-8 inline-block mr-2" /> Hi! I'm JobKompass, your AI career assistant
+                        <motion.div className="text-2xl font-semibold mb-3 flex items-start gap-1 justify-center" variants={introChildVariants}>
+                            <Hand className="hidden sm:inline-block h-8 w-8 mr-2" /> Hi! I'm JobKompass, your AI career assistant
                         </motion.div>
                         <motion.div className="text-muted-foreground mb-8" variants={introChildVariants}>
                             I can help you create resumes, analyze your career, and provide job search guidance.
                         </motion.div>
+                        <motion.div 
+                            className="mb-4 w-full flex justify-center"
+                            variants={introChildVariants}
+                        >
+                            <div className="max-w-xl w-full text-center flex justify-center">
+                                <p className="text-sm text-muted-foreground flex gap-2 items-center">
+                                    Just getting started?{' '}
+                                    <button
+                                        onClick={() => {
+                                            const helpMode = allModes.find(mode => mode.id === '/help');
+                                            if (helpMode) {
+                                                setCurrentMode(helpMode);
+                                            }
+                                        }}
+                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+                                    >
+                                        Head over to the help section
+                                    </button>
+                                </p>
+                            </div>
+                        </motion.div>
                         <motion.div
-                            className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl w-full"
+                            className="w-full flex justify-center"
                             initial="hidden"
                             animate="visible"
                             variants={suggestionGridVariants}
                         >
-                            {suggestions.map((suggestion, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => handleSuggestionClick(suggestion)}
-                                    className="px-4 py-3 text-left text-sm rounded-xl border border-border hover:bg-accent hover:border-border/50 transition-all duration-150 text-foreground hover:shadow-sm"
+                            <div className="flex flex-col gap-3 w-full max-w-xl">
+                                {mobileSuggestions.map((suggestion, index) => (
+                                    <button
+                                        key={`${showMorePrompts ? 'second' : 'first'}-${index}`}
+                                        onClick={() => handleSuggestionClick(suggestion)}
+                                        className="px-4 py-3 text-center text-sm rounded-xl border border-border hover:bg-accent hover:border-border/50 transition-all duration-150 text-foreground hover:shadow-sm"
+                                    >
+                                        {suggestion}
+                                    </button>
+                                ))}
+                            </div>
+                        </motion.div>
+                        
+                        {/* Toggle button */}
+                        <motion.div 
+                            className="mt-4 w-full flex justify-center"
+                            variants={introChildVariants}
+                        >
+                            <div className="w-full max-w-xl">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowMorePrompts(!showMorePrompts)}
+                                    className="w-full"
                                 >
-                                    {suggestion}
-                                </button>
-                            ))}
+                                    {showMorePrompts ? 'Go back' : 'See more prompts'}
+                                </Button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 ) : (

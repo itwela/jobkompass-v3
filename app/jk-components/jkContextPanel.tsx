@@ -65,13 +65,13 @@ export default function JkContextPanel() {
           onClick={() => setIsExpanded(true)}
           className="w-full flex items-center justify-between gap-2 bg-card/50 hover:bg-card"
         >
-          <div className="flex items-center gap-2">
-            <Radar className="h-4 w-4" />
-            <span className="text-sm font-medium">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Radar className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-medium truncate">
               Context ({resumesList.length} resumes, {coverLettersList.length} cover letters, {jobsList.length} jobs)
             </span>
           </div>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 shrink-0" />
         </Button>
       </div>
     );
