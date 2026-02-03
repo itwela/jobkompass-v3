@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next"  
 import type { Metadata } from "next";
 import { Ubuntu } from "next/font/google";
 import { JobKompassThemeProvider } from "@/providers/jkThemeProvider";
@@ -108,6 +109,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    <>
+    <Analytics/>
     <ConvexAuthNextjsServerProvider>
       <JkConvexProviders>
         <JkAuthProvider>
@@ -137,5 +140,6 @@ export default function RootLayout({
         </JkAuthProvider>
       </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>
+    </>
     );
 }

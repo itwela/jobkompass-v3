@@ -5,7 +5,13 @@ const nextConfig: NextConfig = {
     mcpServer: true,
   },
   reactStrictMode: true,
-  /* config options here */
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'openrouter.ai', pathname: '/**' },
+      { protocol: 'https', hostname: 'www.google.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'openai.com', pathname: '/**' },
+    ],
+  },
 };
 
 export default nextConfig;

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { getResumeExportRoute, getDefaultResumeTemplateId } from "@/lib/templates";
 import { X, Save, Download, Loader2, CheckCircle } from "lucide-react";
 import JkCW_ResumeContentEditor from "./jkChatWindow-ResumeContentEditor";
 import JkSlideModalGlass from "../jkSlideModalGlass";
@@ -27,8 +28,8 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
     // Ref to hold current form content
     const formContentRef = React.useRef<any>(null);
 
-    // Get the template from the resume (default to "jake")
-    const template = resume?.template || "jake";
+    // Get the template from the resume (default from centralized constants)
+    const template = resume?.template || getDefaultResumeTemplateId();
 
     // Initialize from resume
     React.useEffect(() => {
@@ -50,10 +51,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             }
             
             // Step 1: Generate PDF from the edited content
-            const apiRoute = template === "jake" 
-                ? "/api/resume/export/jake"
-                : "/api/resume/export/jake"; // Default to jake for now
-            
+            const apiRoute = getResumeExportRoute(template);
             const pdfResponse = await fetch(apiRoute, {
                 method: "POST",
                 headers: {
@@ -133,10 +131,8 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                 return;
             }
 
-            // Determine which API route to call based on template
-            const apiRoute = template === "jake" 
-                ? "/api/resume/export/jake"
-                : "/api/resume/export/jake"; // Default to jake for now
+            // Use centralized template -> export route mapping
+            const apiRoute = getResumeExportRoute(template);
 
             const response = await fetch(apiRoute, {
                 method: "POST",

@@ -1,28 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { escapeLatex, type Language } from './types';
 
-// Helper function to escape LaTeX special characters
-function escapeLatex(text: string | null | undefined): string {
-    if (!text) return '';
-    return text
-        .replace(/\\/g, '\\textbackslash{}')
-        .replace(/&/g, '\\&')
-        .replace(/%/g, '\\%')
-        .replace(/\$/g, '\\$')
-        .replace(/#/g, '\\#')
-        .replace(/_/g, '\\_')
-        .replace(/\{/g, '\\{')
-        .replace(/\}/g, '\\}')
-        .replace(/~/g, '\\textasciitilde{}')
-        .replace(/\^/g, '\\textasciicircum{}');
-}
+export type { Language, ResumeContent } from './types';
 
-export interface Language {
-    language: string;
-    proficiency: string;
-}
-
-// Type definition for the resume content
+/** @deprecated Use ResumeContent from types - kept for backward compatibility */
 export interface ResumeContentForJake {
     personalInfo: {
         name?: string; // Optional - fallback if firstName/lastName not provided
@@ -130,13 +112,15 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
         headerContent
     );
 
-    // Generate education content
+    // Generate education content - filter empty bullets
     const educationContent = Array.isArray(content.education) && content.education.length > 0
         ? content.education.map((edu) => {
             const degreeText = `${escapeLatex(edu.degree)}${edu.field ? ` in ${escapeLatex(edu.field)}` : ''}`;
             const dates = edu.startDate ? `${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}` : escapeLatex(edu.endDate);
-            const items = Array.isArray(edu.details) && edu.details.length
-                ? `\n    \\resumeItemListStart\n${edu.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
+            const validDetails = (Array.isArray(edu.details) ? edu.details : [])
+                .filter((d) => typeof d === 'string' && d.trim().length > 0);
+            const items = validDetails.length
+                ? `\n    \\resumeItemListStart\n${validDetails.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
                 : '';
             return `    \\resumeSubheading\n      {${escapeLatex(edu.name)}}{${escapeLatex(edu.location || '')}}\n      {${degreeText}}{${dates}}${items}`;
         }).join('\n')
@@ -148,11 +132,13 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
         `\\section{Education}\n  \\resumeSubHeadingListStart\n${educationContent || '    % No education entries'}\n  \\resumeSubHeadingListEnd`
     );
 
-    // Generate experience content
+    // Generate experience content - filter empty bullets
     const experienceContent = Array.isArray(content.experience) && content.experience.length > 0
         ? content.experience.map((exp) => {
-            const items = Array.isArray(exp.details) && exp.details.length
-                ? `\n    \\resumeItemListStart\n${exp.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
+            const validDetails = (Array.isArray(exp.details) ? exp.details : [])
+                .filter((d) => typeof d === 'string' && d.trim().length > 0);
+            const items = validDetails.length
+                ? `\n    \\resumeItemListStart\n${validDetails.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
                 : '';
             return `    \\resumeSubheading\n      {${escapeLatex(exp.title)}}{${escapeLatex(exp.date)}}\n      {${escapeLatex(exp.company)}}{${escapeLatex(exp.location || '')}}${items}`;
         }).join('\n')
@@ -164,23 +150,31 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
         `\\section{Experience}\n  \\resumeSubHeadingListStart\n${experienceContent || '    % No experience entries'}\n  \\resumeSubHeadingListEnd`
     );
 
-    // Generate projects content
+    // Generate projects content - only include non-empty bullets, skip projects with no content
     const projectsContent = Array.isArray(content.projects) && content.projects.length > 0
-        ? content.projects.map((proj) => {
-            const projectName = proj.technologies && proj.technologies.length
-                ? `\\textbf{${escapeLatex(proj.name)}} $|$ \\emph{${escapeLatex(proj.technologies.join(', '))}}`
-                : `\\textbf{${escapeLatex(proj.name)}}`;
-            const items = Array.isArray(proj.details) && proj.details.length
-                ? `\n    \\resumeItemListStart\n      \\resumeItem{${escapeLatex(proj.description)}}\n${proj.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
-                : `\n    \\resumeItemListStart\n      \\resumeItem{${escapeLatex(proj.description)}}\n    \\resumeItemListEnd`;
-            return `    \\resumeProjectHeading\n      {${projectName}}{${escapeLatex(proj.date || '')}}${items}`;
-        }).join('\n')
+        ? content.projects
+            .map((proj) => {
+                const projectName = proj.technologies && proj.technologies.length
+                    ? `\\textbf{${escapeLatex(proj.name)}} $|$ \\emph{${escapeLatex(proj.technologies.join(', '))}}`
+                    : `\\textbf{${escapeLatex(proj.name)}}`;
+                const desc = (proj.description || '').trim();
+                const detailList = (Array.isArray(proj.details) ? proj.details : [])
+                    .filter((d) => typeof d === 'string' && d.trim().length > 0);
+                const allBullets = desc ? [desc, ...detailList] : detailList;
+                if (allBullets.length === 0) return null;
+                const items = `\n    \\resumeItemListStart\n${allBullets.map((b) => `      \\resumeItem{${escapeLatex(b)}}`).join('\n')}\n    \\resumeItemListEnd`;
+                return `    \\resumeProjectHeading\n      {${projectName}}{${escapeLatex(proj.date || '')}}${items}`;
+            })
+            .filter(Boolean)
+            .join('\n')
         : '';
     
-    // Replace projects section
+    // Replace projects section - omit entirely if no projects
     latexTemplate = latexTemplate.replace(
         /\\section{Projects}[\s\S]*?\\resumeSubHeadingListEnd/,
-        `\\section{Projects}\n    \\resumeSubHeadingListStart\n${projectsContent || '      % No projects'}\n    \\resumeSubHeadingListEnd`
+        projectsContent
+            ? `\\section{Projects}\n    \\resumeSubHeadingListStart\n${projectsContent}\n    \\resumeSubHeadingListEnd`
+            : ''
     );
 
     // Generate skills content

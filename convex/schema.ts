@@ -91,7 +91,7 @@ const documentsTables = {
     company: v.string(),
     title: v.string(),
     link: v.string(),
-    status: v.string(), // e.g., "Interested", "Applied", "Interviewing", "Rejected", "Offered"
+    status: v.string(), // e.g., "Interested", "Applied", "Callback", "Interviewing", "Rejected", "Offered"
     compensation: v.optional(v.string()), // e.g., "$100k-$150k", "€60k", "Competitive"
     keywords: v.optional(v.array(v.string())),
     skills: v.optional(v.array(v.string())),
@@ -159,13 +159,37 @@ const schema = defineSchema({
     .index("by_username", ["username"])
     .index("by_convex_user_id", ["convex_user_id"]),
 
-  // Waitlist table
+  // Waitlist table (deprecated - use emailList with submissionType: 'waitlist')
   waitlist: defineTable({
     email: v.string(),
     name: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_email", ["email"]),
+
+  // Email list - unified table for lead capture (free-resume, waitlist, etc.)
+  emailList: defineTable({
+    email: v.string(),
+    name: v.string(),
+    submissionType: v.string(), // 'free-resume' | 'waitlist' | etc.
+    createdAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_email_and_type", ["email", "submissionType"])
+    .index("by_submission_type", ["submissionType"]),
+
+  // Contacts table - contact form submissions
+  contacts: defineTable({
+    name: v.string(),
+    email: v.string(),
+    subject: v.string(),
+    message: v.string(),
+    createdAt: v.number(),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  })
+    .index("by_email", ["email"])
+    .index("by_created_at", ["createdAt"]),
 
   // Subscriptions table
   subscriptions: defineTable({
@@ -194,6 +218,19 @@ const schema = defineSchema({
     createdAt: v.number(),
   }).index("by_referrer", ["referrerUserId"])
     .index("by_referred", ["referredUserId"]),
+
+  // Free Resume Generator stats - track usage for analytics / portfolio
+  freeResumeGenerations: defineTable({
+    email: v.optional(v.string()), // Track by email for unauthenticated limit (2 per email)
+    createdAt: v.number(),
+    inputType: v.union(v.literal("text"), v.literal("pdf")),
+    textCharacterCount: v.number(),
+    pdfSizeBytes: v.optional(v.number()),
+    templateId: v.string(),
+  })
+    .index("by_created_at", ["createdAt"])
+    .index("by_input_type", ["inputType"])
+    .index("by_email", ["email"]),
 });
 
 export default schema;

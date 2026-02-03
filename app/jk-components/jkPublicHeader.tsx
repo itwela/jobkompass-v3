@@ -21,7 +21,7 @@ interface JkPublicHeaderProps {
 
 export default function JkPublicHeader({ 
   showPricing = false, 
-  showSignIn = true 
+  showSignIn = true,
 }: JkPublicHeaderProps = {}) {
   const { user, isAuthenticated } = useAuth()
   const { planId } = useSubscription()

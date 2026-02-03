@@ -2,23 +2,82 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES, getDefaultResumeTemplateId, getDefaultCoverLetterTemplateId } from "@/lib/templates";
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
 import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEditor";
-import JkComingSoonTooltip from "../jkComingSoonTooltip";
+import { toast } from "@/lib/toast";
+import { BlurFade } from "@/components/ui/blur-fade";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
+
+function DocumentPreviewThumbnail({
+    fileId,
+    documentType,
+    className,
+}: {
+    fileId?: Id<"_storage">;
+    documentType: "resume" | "cover-letter";
+    className?: string;
+}) {
+    const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+    const url = useQuery(
+        api.documents.getFileUrl,
+        fileId ? { fileId } : "skip"
+    );
+
+    // Reset loaded state when url changes
+    useEffect(() => {
+        if (url) setIsIframeLoaded(false);
+    }, [url]);
+
+    if (!fileId || !url) {
+        return (
+            <div className={cn("flex items-center justify-center w-full h-full bg-white", className)}>
+                {documentType === "resume" ? (
+                    <FileText className="h-12 w-12 text-muted-foreground/60" />
+                ) : (
+                    <FileCheck className="h-12 w-12 text-purple-500/60" />
+                )}
+            </div>
+        );
+    }
+    return (
+        <div className={cn("relative w-full h-full overflow-hidden bg-white", className)}>
+            {!isIframeLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+                </div>
+            )}
+            <iframe
+                src={`${url}#toolbar=0&navpanes=0&scrollbar=0`}
+                className="w-full h-full border-0 translate-y-[-2%] rounded-lg pointer-events-none block"
+                style={{
+                    transform: "scale(1.2)",
+                    transformOrigin: "center top",
+                }}
+                title="Document preview"
+                onLoad={() => {
+                    setTimeout(() => {
+                        setIsIframeLoaded(true);
+                    }, 2618);
+                }}
+            />
+        </div>
+    );
+}
 
 interface JkCW_DocumentsFormProps {
     typeFilter?: DocumentTypeFilter;
@@ -95,6 +154,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     // Mutations
     const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
     const uploadResumeFile = useMutation(api.documents.uploadResumeFile);
+    const saveGeneratedResumeWithFile = useMutation(api.documents.saveGeneratedResumeWithFile);
     const updateResumeFileMetadata = useMutation(api.documents.updateResumeFileMetadata);
     const updateCoverLetterMetadata = useMutation(api.documents.updateCoverLetterMetadata);
     const deleteCoverLetterMutation = useMutation(api.documents.deleteCoverLetter);
@@ -133,10 +193,6 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         setEditingContentResumeId(null);
     }, [typeFilter]);
 
-    // Debug effect for upload dialog
-    useEffect(() => {
-        console.log("Upload dialog state changed:", { showUploadDialog, pendingFile: pendingFile?.name });
-    }, [showUploadDialog, pendingFile]);
 
     const handleEnterSelectionMode = () => {
         setSelectionMode(true);
@@ -183,73 +239,111 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         }
     };
 
-    // File upload handler
+    // File upload handler - PDF: AI extraction → structured content → generate PDF → save
     const handleFileUpload = async (file: File, name: string, label?: string, tags?: string[]) => {
         if (!file) {
             console.error("No file provided to upload");
             return;
         }
 
-        console.log("handleFileUpload called", { fileName: file.name, name, label, tags });
+        const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+        if (!isPdf) {
+            toast.error("Only PDF files are supported", {
+                description: "We use AI to extract your resume content. PDF format is required.",
+            });
+            return;
+        }
+
         setIsUploading(true);
         setUploadProgress(10);
 
         try {
-            console.log("Generating upload URL...");
-            // Generate upload URL
-            const uploadUrl = await generateUploadUrl();
-            console.log("Upload URL generated:", uploadUrl);
-            
-            setUploadProgress(30);
-            console.log("Uploading file to storage...");
-            // Upload file to Convex storage
-            const result = await fetch(uploadUrl, {
-                method: "POST",
-                headers: { "Content-Type": file.type },
-                body: file,
+            // 1. Read PDF as base64
+            setUploadProgress(15);
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = reader.result as string;
+                    resolve(dataUrl);
+                };
+                reader.onerror = () => reject(new Error("Failed to read file"));
+                reader.readAsDataURL(file);
             });
 
-            if (!result.ok) {
-                const errorText = await result.text();
-                console.error("Upload failed:", result.status, errorText);
-                throw new Error(`Failed to upload file: ${result.status} ${errorText}`);
+            setUploadProgress(25);
+            // 2. Generate PDF with AI (extract structured content)
+            const generateResumePdfRes = await fetch("/api/documents/generate-resume-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ resumePdf: base64 }),
+            });
+
+            if (!generateResumePdfRes.ok) {
+                const err = await generateResumePdfRes.json().catch(() => ({}));
+                throw new Error(err.error || "Failed to generate resume PDF");
             }
 
-            setUploadProgress(60);
-            // Convex returns the storage ID in a JSON response
-            const responseData = await result.json();
-            console.log("Upload response:", responseData);
-            const storageId = responseData.storageId;
-            
-            if (!storageId) {
-                console.error("No storageId in response:", responseData);
-                throw new Error("No storage ID returned from upload");
+            const { content } = await generateResumePdfRes.json();
+            setUploadProgress(50);
+
+            // 3. Generate PDF from extracted content via Jake template
+            const exportRes = await fetch("/api/resume/export/jake", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content }),
+            });
+
+            if (!exportRes.ok) {
+                const err = await exportRes.json().catch(() => ({}));
+                throw new Error(err.error || "Failed to generate PDF");
             }
-            
-            console.log("Storage ID:", storageId);
-            setUploadProgress(75);
-            
-            console.log("Saving resume metadata...");
-            // Save resume metadata with user-provided name, label, and tags
-            const resumeId = await uploadResumeFile({
-                name: name || file.name.replace(/\.[^/.]+$/, ""),
+
+            const pdfBlob = await exportRes.blob();
+            setUploadProgress(70);
+
+            // 4. Upload PDF to Convex storage
+            const uploadUrl = await generateUploadUrl();
+            const uploadRes = await fetch(uploadUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/pdf" },
+                body: pdfBlob,
+            });
+
+            if (!uploadRes.ok) {
+                throw new Error("Failed to upload PDF");
+            }
+
+            const { storageId } = await uploadRes.json();
+            if (!storageId) throw new Error("No storage ID returned");
+
+            setUploadProgress(90);
+
+            // 5. Save resume with content and file
+            const resumeName = name || file.name.replace(/\.[^/.]+$/, "");
+            const pdfFileName = `${resumeName.replace(/[^a-zA-Z0-9-_]/g, "-")}-resume.pdf`;
+
+            await saveGeneratedResumeWithFile({
+                name: resumeName,
                 fileId: storageId as Id<"_storage">,
-                fileName: file.name,
-                fileType: file.type,
-                fileSize: file.size,
+                fileName: pdfFileName,
+                fileSize: pdfBlob.size,
+                content,
+                template: "jake",
                 label: label || undefined,
                 tags: tags && tags.length > 0 ? tags : undefined,
             });
 
-            console.log("Resume saved with ID:", resumeId);
             setUploadProgress(100);
-            
-            // Small delay to show 100% completion
-            await new Promise(resolve => setTimeout(resolve, 300));
+            toast.success("Resume uploaded and extracted", {
+                description: "Your resume content has been extracted. You can now edit and download it.",
+            });
+            await new Promise((r) => setTimeout(r, 300));
         } catch (error) {
-            console.error("Error uploading file:", error);
-            alert(`Failed to upload resume: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            throw error; // Re-throw so handleConfirmUpload knows it failed
+            console.error("Error uploading resume:", error);
+            toast.error("Failed to upload resume", {
+                description: error instanceof Error ? error.message : "Please try again.",
+            });
+            throw error;
         } finally {
             setIsUploading(false);
             setUploadProgress(0);
@@ -261,29 +355,14 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
 
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        console.log("handleFileInputChange called", { file: file?.name });
-        
-        if (!file) {
-            console.log("No file selected");
-            return;
-        }
+        if (!file) return;
 
-        console.log("File selected:", file.name);
-        // Set default name from filename
         const defaultName = file.name.replace(/\.[^/.]+$/, "");
-        
-        // Update all state
         setPendingFile(file);
         setUploadName(defaultName);
         setUploadLabel("");
         setUploadTags([]);
         setUploadTagInput("");
-        
-        // Open dialog - using setTimeout to ensure state is set
-        setTimeout(() => {
-            console.log("Setting showUploadDialog to true");
-            setShowUploadDialog(true);
-        }, 0);
     };
 
     const handleAddUploadTag = () => {
@@ -342,7 +421,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         setEditingName(doc.name || "");
         setEditingLabel(doc.label || "");
         setEditingTags(doc.tags || []);
-        setEditingTemplate(doc.template || "");
+        setEditingTemplate(doc.template || (docType === "resume" ? getDefaultResumeTemplateId() : getDefaultCoverLetterTemplateId()));
         setNewTagInput("");
     };
 
@@ -434,28 +513,17 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         <div className="space-y-3">
                             <h2 className="text-xl font-semibold">No documents yet</h2>
                             <p className="text-sm text-muted-foreground">
-                                Document upload feature coming soon! For now, you can generate resumes using the AI chat.
+                                Upload a PDF resume and we&apos;ll extract your content into an editable format. Or generate resumes using the AI chat.
                             </p>
                         </div>
-                        <JkComingSoonTooltip>
-                            <Button
-                                onClick={() => {}}
-                                disabled={true}
-                                className="gap-2 pointer-events-none"
-                                size="lg"
-                            >
-                                <Upload className="h-4 w-4" />
-                                Upload Document
-                            </Button>
-                        </JkComingSoonTooltip>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".pdf,.doc,.docx"
-                            onChange={handleFileInputChange}
-                            className="hidden"
-                            key="file-input-empty"
-                        />
+                        <Button
+                            onClick={() => setShowUploadDialog(true)}
+                            className="gap-2"
+                            size="lg"
+                        >
+                            <Upload className="h-4 w-4" />
+                            Upload PDF Resume
+                        </Button>
                     </div>
                 </section>
 
@@ -469,13 +537,44 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         <DialogHeader>
                             <DialogTitle>Upload Resume</DialogTitle>
                             <DialogDescription>
-                                Add details about your resume before uploading.
+                                {pendingFile
+                                    ? "We'll extract your resume content with AI and make it editable. Add a name and optional metadata."
+                                    : "Choose a PDF resume to upload. We'll extract your content with AI and make it editable."}
                             </DialogDescription>
                         </DialogHeader>
                         
                         <div className="space-y-4 py-4">
-                            {/* File name display */}
+                            {/* Choose file button - when no file selected yet */}
+                            {!pendingFile ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 py-10 px-4 transition-colors"
+                                    >
+                                        <Upload className="h-10 w-10 text-muted-foreground" />
+                                        <span className="text-sm font-medium text-foreground">Choose PDF file</span>
+                                        <span className="text-xs text-muted-foreground">Click to browse</span>
+                                    </button>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={handleCancelUpload}>
+                                            Cancel
+                                        </Button>
+                                    </DialogFooter>
+                                </>
+                            ) : null}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                onChange={handleFileInputChange}
+                                className="hidden"
+                                key="file-input-upload-dialog"
+                            />
+
+                            {/* File name display + form - when file selected */}
                             {pendingFile && (
+                                <>
                                 <div className="rounded-lg border border-border bg-muted/20 p-3">
                                     <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-muted-foreground" />
@@ -485,7 +584,6 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         </span>
                                     </div>
                                 </div>
-                            )}
 
                             {/* Name input */}
                             <div className="space-y-2">
@@ -561,7 +659,6 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     </Button>
                                 </div>
                             </div>
-                        </div>
 
                         {/* Upload progress indicator */}
                         {isUploading && (
@@ -596,6 +693,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                 {isUploading ? "Uploading..." : "Upload Resume"}
                             </Button>
                         </DialogFooter>
+                                </>
+                            )}
+                        </div>
                     </DialogContent>
                 </Dialog>
             </div>
@@ -624,26 +724,15 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         >
                             Multi-select
                         </Button>
-                            <JkComingSoonTooltip>
-                                <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={() => {}}
-                                    disabled={true}
-                                    className="gap-2 pointer-events-none"
-                                >
-                                    <Upload className="h-4 w-4" />
-                                    Upload Document
-                                </Button>
-                            </JkComingSoonTooltip>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".pdf,.doc,.docx"
-                                onChange={handleFileInputChange}
-                                className="hidden"
-                                key="file-input-header"
-                            />
+                            <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => setShowUploadDialog(true)}
+                                className="gap-2"
+                            >
+                                <Upload className="h-4 w-4" />
+                                Upload PDF Resume
+                            </Button>
                         </>
                     )}
                 </div>
@@ -756,14 +845,15 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         const offered = stats?.offered || 0;
                         const rejected = stats?.rejected || 0;
                         const ghosted = stats?.ghosted || 0;
+                        const callback = stats?.callback ?? 0;
                         const interviewing = stats?.interviewing || 0;
 
                         // Check if document is new (never seen)
                         const isNew = !resume?.seenAt;
 
                         return (
+                            <BlurFade key={resumeId} delay={0.0618 + index * 0.05} inView>
                             <div
-                                key={resumeId}
                                 role="button"
                                 tabIndex={0}
                                 onClick={() => handleDocumentClick(resumeId, documentType)}
@@ -779,8 +869,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     !selectionMode && isNew && "border-primary border-2"
                                 )}
                             >
-                                {/* File icon/thumbnail with job count badge and type indicator */}
-                                <div className="relative flex h-24 sm:h-28 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30">
+                                {/* Document preview thumbnail with job count badge and type indicator */}
+                                <div className="relative flex h-24 sm:h-28 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30 overflow-hidden">
+                                    <DocumentPreviewThumbnail
+                                        fileId={resume?.fileId}
+                                        documentType={documentType}
+                                        className="absolute inset-0"
+                                    />
                                     {/* Document type badge - top right */}
                                     <div className="absolute top-2 right-2 z-10">
                                         {documentType === "resume" ? (
@@ -797,25 +892,12 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     </div>
                                     {/* Job count badge - top left */}
                                     {totalJobs > 0 && (
-                                        <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                                             <div className="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
                                                 <Briefcase className="h-3 w-3" />
                                                 <span>{totalJobs} job{totalJobs !== 1 ? 's' : ''}</span>
                                             </div>
                                         </div>
-                                    )}
-                                    {resume?.fileId ? (
-                                        documentType === "resume" ? (
-                                            <FileText className="h-12 w-12 text-muted-foreground/60" />
-                                        ) : (
-                                            <FileCheck className="h-12 w-12 text-purple-500/60" />
-                                        )
-                                    ) : (
-                                        documentType === "resume" ? (
-                                            <FileText className="h-12 w-12 text-muted-foreground/40" />
-                                        ) : (
-                                            <FileCheck className="h-12 w-12 text-purple-500/40" />
-                                        )
                                     )}
                                 </div>
 
@@ -857,12 +939,18 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                 )}
                                             </div>
                                             {/* Status badges - matching My Jobs status colors (only for resumes) */}
-                                            {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0) && (
+                                            {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0 || callback > 0) && (
                                                 <div className="flex flex-wrap gap-1.5 pt-1">
                                                     {offered > 0 && (
                                                         <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
                                                             <TrendingUp className="h-2.5 w-2.5" />
                                                             {offered} offered
+                                                        </span>
+                                                    )}
+                                                    {callback > 0 && (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800">
+                                                            <Phone className="h-2.5 w-2.5" />
+                                                            {callback} callback
                                                         </span>
                                                     )}
                                                     {interviewing > 0 && (
@@ -1070,12 +1158,21 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-xs font-medium text-foreground">Template</label>
-                                                <Input
-                                                    value={editingTemplate}
-                                                    onChange={(e) => setEditingTemplate(e.target.value)}
-                                                    placeholder="e.g., modern, classic, minimalist"
-                                                    className="h-8"
-                                                />
+                                                <Select
+                                                    value={editingTemplate || undefined}
+                                                    onValueChange={(v) => setEditingTemplate(v || "")}
+                                                >
+                                                    <SelectTrigger className="h-8">
+                                                        <SelectValue placeholder="Select template" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {(documentType === "resume" ? getAppResumeTemplateOptions() : COVER_LETTER_TEMPLATES).map((t) => (
+                                                            <SelectItem key={t.id} value={t.id}>
+                                                                {t.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                             <div className="flex gap-2 pt-2">
                                                 <Button
@@ -1116,6 +1213,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     </div>
                                 </div>
                             </div>
+                            </BlurFade>
                         );
                     })}
                 </div>
@@ -1132,7 +1230,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     <DialogHeader>
                         <DialogTitle>Upload Resume</DialogTitle>
                         <DialogDescription>
-                            Add details about your resume before uploading. You can add labels and tags later.
+                            We&apos;ll extract your resume content with AI and make it editable. Add a name and optional metadata.
                         </DialogDescription>
                     </DialogHeader>
                     
@@ -1284,6 +1382,170 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     />
                 </div>
             )}
+
+            {/* Upload PDF modal - shared between empty state and documents view */}
+            <Dialog open={showUploadDialog} onOpenChange={(open) => {
+                if (!open) handleCancelUpload();
+            }}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Upload Resume</DialogTitle>
+                        <DialogDescription>
+                            {pendingFile
+                                ? "We'll extract your resume content with AI and make it editable. Add a name and optional metadata."
+                                : "Choose a PDF resume to upload. We'll extract your content with AI and make it editable."}
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 py-4">
+                        {!pendingFile ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 py-10 px-4 transition-colors"
+                                >
+                                    <Upload className="h-10 w-10 text-muted-foreground" />
+                                    <span className="text-sm font-medium text-foreground">Choose PDF file</span>
+                                    <span className="text-xs text-muted-foreground">Click to browse</span>
+                                </button>
+                                <DialogFooter>
+                                    <Button type="button" variant="outline" onClick={handleCancelUpload}>
+                                        Cancel
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        ) : null}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            onChange={handleFileInputChange}
+                            className="hidden"
+                            key="file-input-upload-dialog-main"
+                        />
+
+                        {pendingFile && (
+                            <>
+                                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">{pendingFile.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            ({(pendingFile.size / 1024).toFixed(1)} KB)
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label htmlFor="upload-name-main" className="text-sm font-medium text-foreground">
+                                        Name <span className="text-muted-foreground">(required)</span>
+                                    </label>
+                                    <Input
+                                        id="upload-name-main"
+                                        value={uploadName}
+                                        onChange={(e) => setUploadName(e.target.value)}
+                                        placeholder="e.g., Software Engineer Resume"
+                                        className="h-9"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label htmlFor="upload-label-main" className="text-sm font-medium text-foreground">
+                                        Label <span className="text-muted-foreground">(optional)</span>
+                                    </label>
+                                    <Input
+                                        id="upload-label-main"
+                                        value={uploadLabel}
+                                        onChange={(e) => setUploadLabel(e.target.value)}
+                                        placeholder="e.g., Software Engineer, Marketing Manager"
+                                        className="h-9"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-foreground">
+                                        Tags <span className="text-muted-foreground">(optional)</span>
+                                    </label>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {uploadTags.map((tag, idx) => (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
+                                            >
+                                                {tag}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveUploadTag(tag)}
+                                                    className="hover:text-blue-900"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={uploadTagInput}
+                                            onChange={(e) => setUploadTagInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    handleAddUploadTag();
+                                                }
+                                            }}
+                                            placeholder="Add a tag and press Enter"
+                                            className="h-9 flex-1"
+                                        />
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleAddUploadTag}
+                                            disabled={!uploadTagInput.trim()}
+                                            variant="outline"
+                                        >
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {isUploading && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-2 flex-1 rounded-full bg-muted">
+                                                <div 
+                                                    className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                                                    style={{ width: `${uploadProgress}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-sm text-muted-foreground whitespace-nowrap">{uploadProgress}%</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground text-center">Uploading your resume...</p>
+                                    </div>
+                                )}
+
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={handleCancelUpload}
+                                        disabled={isUploading}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={handleConfirmUpload}
+                                        disabled={!uploadName.trim() || isUploading}
+                                    >
+                                        {isUploading ? "Uploading..." : "Upload Resume"}
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             <JkGap size="small" />
         </div>

@@ -27,6 +27,7 @@ interface JobCardProps {
     status: string;
     compensation?: string;
     dateApplied?: string;
+    easyApply?: string;
     createdAt: number;
     updatedAt: number;
     seenAt?: number;
@@ -92,6 +93,7 @@ function JobCard({
   const statusColors: Record<string, string> = {
     Interested: 'bg-blue-100 text-blue-800 border-blue-200',
     Applied: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    Callback: 'bg-cyan-100 text-cyan-800 border-cyan-200',
     Interviewing: 'bg-purple-100 text-purple-800 border-purple-200',
     Rejected: 'bg-red-100 text-red-800 border-red-200',
     Offered: 'bg-green-100 text-green-800 border-green-200',
@@ -126,15 +128,22 @@ const handleGenerateResume = (event: MouseEvent) => {
       <JkCompensationBadge compensation={job.compensation} />
 
       <div className="flex items-center gap-2 justify-between w-full">
-        <a
-          href={job.link}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="flex items-center gap-1 text-xs text-blue-800 hover:text-blue-900 hover:underline"
-        >
-          View Job <ExternalLink className="h-3 w-3" />
-        </a>
+        <div className="flex items-center gap-2 min-w-0">
+          {job.easyApply && job.easyApply.toLowerCase() !== 'no' && (
+            <span className="text-xs text-muted-foreground shrink-0">
+              {job.easyApply} ·
+            </span>
+          )}
+          <a
+            href={job.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 text-xs text-blue-800 hover:text-blue-900 hover:underline shrink-0"
+          >
+            View Job <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

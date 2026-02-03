@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2 } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -328,18 +328,21 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                 </button>
                                 <button
                                     onClick={() => {
-                                        const chatMode = allModes.find(mode => mode.id === '/chat');
-                                        if (chatMode) setCurrentMode(chatMode);
+                                        const perfMode = allModes.find(mode => mode.id === '/performance');
+                                        if (perfMode) setCurrentMode(perfMode);
                                         setSidebarOpen(false);
                                     }}
                                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                        currentMode.id === '/chat'
+                                        currentMode.id === '/performance'
                                             ? 'bg-accent text-accent-foreground'
                                             : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                     }`}
                                 >
-                                    <MessageSquare className="h-4 w-4" />
-                                    <span>Chat</span>
+                                    <span className="flex items-center gap-2">
+                                        <TrendingUp className="h-4 w-4" />
+                                        <span>Performance</span>
+                                    </span>
+                                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">New</span>
                                 </button>
                                 <button
                                     onClick={() => {
@@ -354,6 +357,21 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                 >
                                     <Link2 className="h-4 w-4" />
                                     <span>Links & Resources</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const chatMode = allModes.find(mode => mode.id === '/chat');
+                                        if (chatMode) setCurrentMode(chatMode);
+                                        setSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/chat'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                    }`}
+                                >
+                                    <MessageSquare className="h-4 w-4" />
+                                    <span>Chat</span>
                                 </button>
                                 <div className="mt-3 border-t border-border pt-2 flex-1 flex flex-col">
                                     <div className="px-3 py-1 text-xs font-semibold text-muted-foreground">

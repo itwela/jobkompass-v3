@@ -14,6 +14,7 @@ import fs from "fs";
 import os from "os";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { generateResumeLatex } from "@/lib/resume/generators";
 
 
 // Helper function to escape LaTeX special characters
@@ -39,12 +40,11 @@ function getFormattedTime() {
   return `${date} ${time}`;
 }
 
-const jakeResumeTemplatePath = path.join(process.cwd(), 'templates/resume/jakeLatex.tex');
 const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLetter/jakeCoverLetter.tex');
 
  const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
    name: 'createResumeJakeTemplate',
-   description: 'Generate a professional resume using the Jake LaTeX template. This tool creates an ATS-optimized resume with proper formatting and structure. Automatically saves the resume to the user\'s documents.',
+   description: 'Generate a professional resume using the JobKompass Jake template. The user selects the template in the Context panel. Do NOT call this tool until the user has selected a template - if they ask to create a resume without a selection, ask them to select one first. Automatically saves the resume to the user\'s documents.',
    parameters: z.object({
     personalInfo: z.object({
       firstName: z.string().describe('First name of the person'),
@@ -90,6 +90,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
       references: z.array(z.string()).optional().nullable().describe('References'),
     }).optional().nullable(),
     targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
+    templateId: z.enum(['jake']).describe('REQUIRED: Use "jake" (JobKompass Jake) - the only template currently available.'),
   }),
   execute: async (input) => {
     const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -135,137 +136,9 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
         };
       }
 
-      /// SECTION FILE SETUP
-      // get the time in a human readable format
       const formattedTime = getFormattedTime();
-
-      const templatePath = jakeResumeTemplatePath;
-      if (!fs.existsSync(templatePath)) {
-        throw new Error(`LaTeX template not found at ${templatePath}`);
-      }
-
-      let latexTemplate = fs.readFileSync(templatePath, 'utf-8');
-
-
-      /// SECTION RESUME CONTENT GENERATION
-
-      // Replace header section - match the template format exactly
-      const fullName = `${escapeLatex(input.personalInfo.firstName)} ${escapeLatex(input.personalInfo.lastName)}`;
-      const contactParts = [];
-      
-      // Add citizenship if provided
-      if (input.personalInfo.citizenship) {
-        contactParts.push(`\\underline{${escapeLatex(input.personalInfo.citizenship)}}`);
-      }
-
-
-      contactParts.push(`\\href{mailto:${escapeLatex(input.personalInfo.email)}}{\\underline{${escapeLatex(input.personalInfo.email)}}}`);
-      
-      // // Add location if provided
-      // if (input.personalInfo.location) {
-      //   contactParts.push(escapeLatex(input.personalInfo.location));
-      // }
-      
-      if (input.personalInfo.linkedin) {
-        // Extract handle from URL - handle both full URLs and partial URLs
-        let linkedinHandle = input.personalInfo.linkedin
-          .replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, '') // Remove full URL
-          .replace(/^linkedin\.com\/in\//, '') // Remove partial URL
-          .replace(/\/$/, ''); // Remove trailing slash
-        contactParts.push(`\\href{https://linkedin.com/in/${escapeLatex(linkedinHandle)}}{\\underline{linkedin.com/in/${escapeLatex(linkedinHandle)}}}`);
-      }
-      
-      if (input.personalInfo.github) {
-        // Extract handle from URL - handle both full URLs and partial URLs
-        let githubHandle = input.personalInfo.github
-          .replace(/^https?:\/\/(www\.)?github\.com\//, '') // Remove full URL
-          .replace(/^github\.com\//, '') // Remove partial URL
-          .replace(/\/$/, ''); // Remove trailing slash
-        contactParts.push(`\\href{https://github.com/${escapeLatex(githubHandle)}}{\\underline{github.com/${escapeLatex(githubHandle)}}}`);
-      }
-      
-      const headerContent = `\\begin{center}\n    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{1pt}\n    \\small ${contactParts.join(' $|$ ')}\n\\end{center}`;
-      
-      // Replace the header block in template (everything between \begin{center} and \end{center})
-      latexTemplate = latexTemplate.replace(
-        /\\begin{center}[\s\S]*?\\end{center}/,
-        headerContent
-      );
-
-      // Generate education content - template uses \resumeSubheading{School}{Location}{Degree}{Dates}
-      const educationContent = Array.isArray(input.education) && input.education.length > 0
-        ? input.education.map((edu) => {
-            const degreeText = `${escapeLatex(edu.degree)}${edu.field ? ` in ${escapeLatex(edu.field)}` : ''}`;
-            const dates = edu.startDate ? `${escapeLatex(edu.startDate)} -- ${escapeLatex(edu.endDate)}` : escapeLatex(edu.endDate);
-            const items = Array.isArray(edu.details) && edu.details.length
-              ? `\n    \\resumeItemListStart\n${edu.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
-              : '';
-            // Format: \resumeSubheading{Arg1}{Arg2}{Arg3}{Arg4} - all on same line or properly separated
-            return `    \\resumeSubheading\n      {${escapeLatex(edu.name)}}{${escapeLatex(edu.location || '')}}\n      {${degreeText}}{${dates}}${items}`;
-          }).join('\n')
-        : '';
-      
-      // Replace education section - match from \section to \resumeSubHeadingListEnd
-      latexTemplate = latexTemplate.replace(
-        /\\section{Education}[\s\S]*?\\resumeSubHeadingListEnd/,
-        `\\section{Education}\n  \\resumeSubHeadingListStart\n${educationContent || '    % No education entries'}\n  \\resumeSubHeadingListEnd`
-      );
-
-      // Generate experience content - template uses \resumeSubheading{Title}{Dates}{Company}{Location}
-      const experienceContent = Array.isArray(input.experience) && input.experience.length > 0
-        ? input.experience.map((exp) => {
-            const items = Array.isArray(exp.details) && exp.details.length
-              ? `\n    \\resumeItemListStart\n${exp.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
-              : '';
-            // Note: jakeLatex_2.tex uses {Title}{Dates}{Company}{Location} format
-            return `    \\resumeSubheading\n      {${escapeLatex(exp.title)}}{${escapeLatex(exp.date)}}\n      {${escapeLatex(exp.company)}}{${escapeLatex(exp.location || '')}}${items}`;
-          }).join('\n')
-        : '';
-      
-      // Replace experience section
-      latexTemplate = latexTemplate.replace(
-        /\\section{Experience}[\s\S]*?\\resumeSubHeadingListEnd/,
-        `\\section{Experience}\n  \\resumeSubHeadingListStart\n${experienceContent || '    % No experience entries'}\n  \\resumeSubHeadingListEnd`
-      );
-
-      // Generate projects content - template uses \resumeProjectHeading{Project Name | Technologies}{Date}
-      const projectsContent = Array.isArray(input.projects) && input.projects.length > 0
-        ? input.projects.map((proj) => {
-            const projectName = proj.technologies && proj.technologies.length
-              ? `\\textbf{${escapeLatex(proj.name)}} $|$ \\emph{${escapeLatex(proj.technologies.join(', '))}}`
-              : `\\textbf{${escapeLatex(proj.name)}}`;
-            const items = Array.isArray(proj.details) && proj.details.length
-              ? `\n    \\resumeItemListStart\n      \\resumeItem{${escapeLatex(proj.description)}}\n${proj.details.map((detail) => `      \\resumeItem{${escapeLatex(detail)}}`).join('\n')}\n    \\resumeItemListEnd`
-              : `\n    \\resumeItemListStart\n      \\resumeItem{${escapeLatex(proj.description)}}\n    \\resumeItemListEnd`;
-            return `    \\resumeProjectHeading\n      {${projectName}}{${escapeLatex(proj.date || '')}}${items}`;
-          }).join('\n')
-        : '';
-      
-      // Replace projects section
-      latexTemplate = latexTemplate.replace(
-        /\\section{Projects}[\s\S]*?\\resumeSubHeadingListEnd/,
-        `\\section{Projects}\n    \\resumeSubHeadingListStart\n${projectsContent || '      % No projects'}\n    \\resumeSubHeadingListEnd`
-      );
-
-      // Generate skills content - template uses simple \textbf{Category}{: Skills} format
-      const skillsParts = [];
-      if (input.skills?.technical && input.skills.technical.length) {
-        skillsParts.push(`        \\textbf{Languages}{: ${escapeLatex(input.skills.technical.join(', '))}} \\\\`);
-      }
-      if (input.skills?.additional && input.skills.additional.length) {
-        skillsParts.push(`        \\textbf{Additional Skills}{: ${escapeLatex(input.skills.additional.join(', '))}}`);
-      }
-      const skillsContent = skillsParts.length > 0 ? skillsParts.join('\n') : '';
-      
-      // Replace skills section - template has a specific structure with \small{\item{...}}
-      const skillsSectionContent = skillsContent || '        % No skills listed';
-      latexTemplate = latexTemplate.replace(
-        /\\section{Technical Skills}[\s\S]*?\\end{itemize}/,
-        `\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n    \\small{\\item{\n${skillsSectionContent}\n    }}\n \\end{itemize}`
-      );
-
-      // Note: jakeLatex_2.tex template doesn't have an "Additional Information" section
-      // If needed, it would need to be added to the template first
+      const templateId = input.templateId || 'jake';
+      const latexTemplate = generateResumeLatex(input as any, templateId);
 
       /// SECTION PDF GENERATION (LaTeX service)
     
@@ -365,7 +238,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLet
             fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`,
             fileSize: pdfBuffer.length,
             content: input,
-            template: 'jake',
+            template: templateId,
           });
           
           console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume saved to database successfully`, { resumeName });
@@ -793,7 +666,7 @@ const createGetUserJobsTool = (convexClient: ConvexHttpClient) =>
       "Fetch all job applications from the user's job tracker to understand what jobs they're tracking. Use this when the user asks about their job applications or wants help with job management.",
     parameters: z.object({
       status: z
-        .enum(["Interested", "Applied", "Interviewing", "Offered", "Rejected"])
+        .enum(["Interested", "Applied", "Callback", "Interviewing", "Offered", "Rejected"])
         .optional()
         .nullable()
         .describe("Filter jobs by status. If not provided, returns all jobs."),
@@ -832,6 +705,7 @@ const createGetUserJobsTool = (convexClient: ConvexHttpClient) =>
     },
   });
 
+// TODO
 const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "addJobToTracker",
@@ -846,9 +720,9 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
         .nullable()
         .describe("Full URL for the job posting."),
       status: z
-        .enum(["Interested", "Applied", "Interviewing", "Offered", "Rejected"])
+        .enum(["Interested", "Applied", "Callback", "Interviewing", "Offered", "Rejected"])
         .default("Interested")
-        .describe("Job status (Interested, Applied, Interviewing, Offered, Rejected). Defaults to 'Interested'."),
+        .describe("Job status (Interested, Applied, Callback, Interviewing, Offered, Rejected). Defaults to 'Interested'."),
       compensation: z
         .string()
         .optional()
@@ -929,7 +803,8 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
       } = input;
 
       try {
-        // Check if user can add jobs
+
+        // THIS IS GIVING ERRORS
         const canAdd = await convexClient.query(api.usage.canAddJob, {});
         if (!canAdd?.allowed) {
           return {
@@ -939,12 +814,11 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
                 ? `Your subscription isn’t active right now, so you’re currently limited to the Free plan (${canAdd.limit ?? 10} jobs).`
                 : `Your job tracker is full for your ${canAdd.planLabel ?? "current"} plan (${canAdd.limit ?? 10} jobs).` +
                   (canAdd.upgradeSuggestion ? ` ${canAdd.upgradeSuggestion}` : ""),
-            error: 'Job limit reached',
+            error: "Job limit reached",
             limitReached: true,
           };
         }
 
-        // Get user's convex_user_id for the agent tool
         const user = await convexClient.query(api.auth.currentUser);
         if (!user) {
           return {
@@ -1117,7 +991,7 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
   tool({
     name: "getUserUsage",
     description:
-      "Get the user's current usage statistics including documents generated this month and total jobs tracked. Use this to check limits before generating documents or adding jobs. Always available.",
+      "Get the user's current usage statistics (documents generated this month, jobs tracked). Use for informational context. Pro/Plus users have unlimited job tracking - always call addJobToTracker when the user wants to save a job. Do NOT refuse to add jobs based on this data.",
     parameters: z.object({}),
     execute: async () => {
       try {
@@ -1132,7 +1006,7 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
 
         // Get subscription to determine limits
         const subscription = await convexClient.query(api.subscriptions.getUserSubscription);
-        const planId = subscription?.planId || "free";
+        const rawPlanId = (subscription?.planId || "free").toLowerCase();
 
         const PLAN_LIMITS: Record<string, { documentsPerMonth: number; jobsLimit: number | null }> = {
           free: { documentsPerMonth: 3, jobsLimit: 10 },
@@ -1143,7 +1017,10 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
           "pro-annual": { documentsPerMonth: 180, jobsLimit: null },
         };
 
-        const limits = PLAN_LIMITS[planId] || PLAN_LIMITS.free;
+        // Pro plans: always unlimited jobs (case-insensitive)
+        const limits = (rawPlanId === "pro" || rawPlanId === "pro-annual")
+          ? PLAN_LIMITS.pro
+          : (PLAN_LIMITS[rawPlanId] || PLAN_LIMITS.free);
 
         return {
           success: true,
@@ -1154,7 +1031,7 @@ const createGetUserUsageTool = (convexClient: ConvexHttpClient) =>
             jobsCount: usage.jobsCount || 0,
             jobsLimit: limits.jobsLimit,
             jobsRemaining: limits.jobsLimit === null ? null : Math.max(0, limits.jobsLimit - (usage.jobsCount || 0)),
-            planId,
+            planId: rawPlanId,
           },
           message: `Current usage: ${usage.documentsGeneratedThisMonth || 0}/${limits.documentsPerMonth} documents this month, ${usage.jobsCount || 0}${limits.jobsLimit === null ? '' : `/${limits.jobsLimit}`} jobs tracked.`,
         };

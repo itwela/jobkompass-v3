@@ -54,7 +54,8 @@ export function useFeatureAccess() {
     currentLimit: '',
   })
 
-  const currentPlan = planId || 'free'
+  // Normalize planId (handles "Pro", "PRO", etc. from Stripe)
+  const currentPlan = (planId || 'free').toLowerCase()
   const limits = PLAN_LIMITS[currentPlan] || PLAN_LIMITS.free
 
   // Check if user can generate documents

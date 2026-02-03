@@ -35,10 +35,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const ensureConvexUserId = useMutation(api.auth.ensureConvexUserId)
   
   const planId = subscription?.planId || null
-  const status = subscription?.status || null
+  const planKey = (planId || '').toLowerCase()
+  const status = (subscription?.status || '').toLowerCase()
   
   // Ensure convex_user_id is set for the user (runs once on mount)
-  // This ensures new signups and existing users have convex_user_id set
   useEffect(() => {
     if (isAuthenticated) {
       ensureConvexUserId().catch(console.error)
@@ -48,12 +48,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const value: SubscriptionContextType = {
     subscription,
     isLoading: subscription === undefined,
-    isFree: !subscription || planId === 'free',
-    isStarter: planId === 'starter' && (status === 'active' || status === 'trialing'),
-    isPlus: (planId === 'plus' || planId === 'plus-annual') && (status === 'active' || status === 'trialing'),
-    isPro: (planId === 'pro' || planId === 'pro-annual') && (status === 'active' || status === 'trialing'),
-    isPlusAnnual: planId === 'plus-annual' && (status === 'active' || status === 'trialing'),
-    isProAnnual: planId === 'pro-annual' && (status === 'active' || status === 'trialing'),
+    isFree: !subscription || planKey === 'free',
+    isStarter: planKey === 'starter' && (status === 'active' || status === 'trialing'),
+    isPlus: (planKey === 'plus' || planKey === 'plus-annual') && (status === 'active' || status === 'trialing'),
+    isPro: (planKey === 'pro' || planKey === 'pro-annual') && (status === 'active' || status === 'trialing'),
+    isPlusAnnual: planKey === 'plus-annual' && (status === 'active' || status === 'trialing'),
+    isProAnnual: planKey === 'pro-annual' && (status === 'active' || status === 'trialing'),
     hasActiveSubscription: status === 'active' || status === 'trialing',
     isTrialing: status === 'trialing',
     planId,

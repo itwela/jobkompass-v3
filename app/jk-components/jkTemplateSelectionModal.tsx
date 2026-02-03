@@ -5,6 +5,7 @@ import { X, FileText, FileCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Id } from "@/convex/_generated/dataModel";
+import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES } from "@/lib/templates";
 
 export type DocumentType = "resume" | "cover-letter";
 
@@ -24,23 +25,19 @@ interface JkTemplateSelectionModalProps {
   jobCompany?: string;
 }
 
-const resumeTemplates: TemplateOption[] = [
-  {
-    id: "jake",
-    name: "Jake",
-    description: "ATS-optimized professional resume template with clean formatting",
-    icon: <FileText className="h-5 w-5" />,
-  },
-];
+const resumeTemplates: TemplateOption[] = getAppResumeTemplateOptions().map((t) => ({
+  id: t.id,
+  name: t.name,
+  description: t.description,
+  icon: <FileText className="h-5 w-5" />,
+}));
 
-const coverLetterTemplates: TemplateOption[] = [
-  {
-    id: "standard",
-    name: "Standard",
-    description: "Professional cover letter template with traditional formatting",
-    icon: <FileCheck className="h-5 w-5" />,
-  },
-];
+const coverLetterTemplates: TemplateOption[] = COVER_LETTER_TEMPLATES.map((t) => ({
+  id: t.id,
+  name: t.name,
+  description: t.description,
+  icon: <FileCheck className="h-5 w-5" />,
+}));
 
 export default function JkTemplateSelectionModal({
   isOpen,

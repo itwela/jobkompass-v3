@@ -1,50 +1,41 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, FileText, FileCheck, Sparkles, Check } from 'lucide-react'
+import { X, FileText, FileCheck, Sparkles, Check, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+    getAppResumeTemplateOptions,
+    COVER_LETTER_TEMPLATES,
+    type Template,
+    type TemplateType,
+} from '@/lib/templates'
+import { getModelForTemplateGeneration } from '@/lib/aiModels'
+import { toast } from '@/lib/toast'
 
-export type TemplateType = 'resume' | 'cover-letter'
+export type { TemplateType, Template }
+export const resumeTemplates = getAppResumeTemplateOptions()
+export const coverLetterTemplates = COVER_LETTER_TEMPLATES
 
-export interface Template {
-    id: string
-    name: string
-    description: string
-    previewImage: string
-    tags?: string[]
-    features?: string[]
+export type ResumeInputMode = 'reference' | 'upload' | 'paste';
+
+export interface ResumeInputOptions {
+    referenceResumeId?: string | null
+    resumePdf?: string
+    resumeText?: string
+    promptText?: string
 }
-
-// Default templates with preview images
-export const resumeTemplates: Template[] = [
-    {
-        id: 'jake',
-        name: 'JobKompass Jake',
-        description: 'A clean, ATS-optimized professional resume template. Perfect for tech roles with clear section hierarchy and modern typography.',
-        previewImage: '/images/jobkompass_preview_resume_jake.png',
-        tags: ['ATS-Friendly', 'Professional', 'Tech'],
-        features: ['Optimized for ATS systems', 'Clean section hierarchy', 'Modern typography', 'Tech-focused layout'],
-    },
-]
-
-export const coverLetterTemplates: Template[] = [
-    {
-        id: 'jake',
-        name: 'JobKompass Jake',
-        description: 'A matching cover letter template that pairs perfectly with the Jake resume. Clean formatting with professional structure.',
-        previewImage: '/images/jobkompass_preview_cover_letter_jake.png',
-        tags: ['Professional', 'Matching', 'Clean'],
-        features: ['Matches Jake resume', 'Professional tone', 'Clear structure', 'ATS-compatible'],
-    },
-]
 
 interface JkTemplateSelectorProps {
     isOpen: boolean
     onClose: () => void
     type: TemplateType
-    onSelectTemplate: (templateId: string) => void
+    onSelectTemplate: (templateId: string, resumeInput?: ResumeInputOptions) => void
     selectedReferenceResumeId?: string | null
     onSelectReferenceResume?: (resumeId: string) => void
     referenceResumes?: Array<{ id: string; name: string }>
@@ -70,6 +61,15 @@ export default function JkTemplateSelector({
     const Icon = type === 'resume' ? FileText : FileCheck
 
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+    const [resumeInputMode, setResumeInputMode] = useState<ResumeInputMode>('reference')
+    const [resumePdf, setResumePdf] = useState<string | null>(null)
+    const [resumePdfName, setResumePdfName] = useState<string | null>(null)
+    const [resumeText, setResumeText] = useState('')
+    const [promptText, setPromptText] = useState('')
+    const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const DESC_TRUNCATE = 70
 
     const selectedTemplate = templates.find(t => t.id === selectedTemplateId)
 
@@ -77,31 +77,74 @@ export default function JkTemplateSelector({
     useEffect(() => {
         if (!isOpen) {
             setSelectedTemplateId(null)
+            setResumeInputMode('reference')
+            setResumePdf(null)
+            setResumePdfName(null)
+            setResumeText('')
+            setPromptText('')
+            setDescriptionExpanded(false)
         }
     }, [isOpen])
 
+    useEffect(() => {
+        setDescriptionExpanded(false)
+    }, [selectedTemplateId])
+
     const handleTemplateClick = (templateId: string) => {
         if (selectedTemplateId === templateId) {
-            // Deselect if already selected
             setSelectedTemplateId(null)
         } else {
-            // Select the template
             setSelectedTemplateId(templateId)
         }
     }
 
-    const handleUseTemplate = () => {
-        if (!selectedTemplateId) return;
-        
-        // For resumes: need selected template AND (no reference resumes OR reference resume selected)
-        // For cover letters: only need selected template
-        const canGenerate = type === 'resume' 
-            ? (!isGenerating && (referenceResumes.length === 0 || selectedReferenceResumeId))
-            : !isGenerating;
-        
-        if (canGenerate) {
-            onSelectTemplate(selectedTemplateId)
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        if (file.type !== 'application/pdf') {
+            toast.error('Please upload a PDF file')
+            return
         }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('PDF must be under 5MB')
+            return
+        }
+        const reader = new FileReader()
+        reader.onload = () => {
+            const result = reader.result as string
+            const base64 = result.includes(',') ? result.split(',')[1]! : result
+            setResumePdf(base64)
+            setResumePdfName(file.name)
+        }
+        reader.readAsDataURL(file)
+        e.target.value = ''
+    }
+
+    const clearPdf = () => {
+        setResumePdf(null)
+        setResumePdfName(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    const hasResumeInput = type === 'resume'
+        ? (resumeInputMode === 'reference' && referenceResumes.length > 0 && !!selectedReferenceResumeId) ||
+          (resumeInputMode === 'upload' && !!resumePdf) ||
+          (resumeInputMode === 'paste' && !!resumeText.trim())
+        : true
+
+    const handleUseTemplate = () => {
+        if (!selectedTemplateId) return
+        if (type === 'resume' && !hasResumeInput) return
+        if (isGenerating) return
+
+        const resumeInput: ResumeInputOptions | undefined = type === 'resume' ? {
+            referenceResumeId: resumeInputMode === 'reference' ? selectedReferenceResumeId ?? undefined : undefined,
+            resumePdf: resumeInputMode === 'upload' && resumePdf ? resumePdf : undefined,
+            resumeText: resumeInputMode === 'paste' && resumeText.trim() ? resumeText.trim() : undefined,
+            promptText: resumeInputMode === 'paste' ? (promptText.trim() || undefined) : undefined,
+        } : undefined
+
+        onSelectTemplate(selectedTemplateId, resumeInput)
     }
 
     return (
@@ -119,7 +162,7 @@ export default function JkTemplateSelector({
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
                         transition={{ duration: 0.15 }}
-                        className="relative !no-scrollbar flex flex-col justify-between w-full max-w-4xl max-h-[70vh] h-full bg-background border border-border rounded-xl shadow-2xl"
+                        className="relative !no-scrollbar flex flex-col justify-between w-full max-w-4xl max-h-[80vh] h-full bg-background border border-border rounded-xl shadow-2xl !no-scrollbar"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -158,7 +201,7 @@ export default function JkTemplateSelector({
                                             key={template.id}
                                             layout
                                             onClick={() => handleTemplateClick(template.id)}
-                                            className={`place-self-center !no-scrollbar flex h-full relative rounded-lg overflow-hidden cursor-pointer transition-all ${isSelected
+                                            className={`place-self-center flex h-full relative rounded-lg overflow-hidden cursor-pointer transition-all ${isSelected
                                                     ? 'ring-2 ring-primary/20'
                                                     : 'border-2 border-border hover:border-muted-foreground/40'
                                                 }`}
@@ -213,54 +256,142 @@ export default function JkTemplateSelector({
                                                         >
                                                             <div className="p-5 bg-muted/30 h-full flex flex-col min-w-[280px]">
                                                                 <h3 className="font-semibold mb-2">{template.name}</h3>
-                                                                <p className="text-sm text-muted-foreground mb-3">
-                                                                    {template.description}
-                                                                </p>
-                                                                <ul className="space-y-1 mb-4 flex-1">
-                                                                    {template.features?.map((feature, index) => (
-                                                                        <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                            <div className="w-1 h-1 rounded-full bg-primary" />
-                                                                            {feature}
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                                {/* Reference resume selector (only for resumes) */}
-                                                                {type === 'resume' && referenceResumes.length > 0 && (
-                                                                    <div className="mb-4">
-                                                                        <label className="text-xs text-muted-foreground block mb-2">
-                                                                            Select reference resume (required)
-                                                                        </label>
-                                                                        <Select
-                                                                            value={selectedReferenceResumeId ?? undefined}
-                                                                            onValueChange={(value) => {
-                                                                                onSelectReferenceResume?.(value)
-                                                                            }}
+                                                                <div className="text-sm text-muted-foreground mb-3">
+                                                                    <p>
+                                                                        {descriptionExpanded || (template.description?.length ?? 0) <= DESC_TRUNCATE
+                                                                            ? template.description
+                                                                            : `${template.description?.slice(0, DESC_TRUNCATE).trim()}...`}
+                                                                    </p>
+                                                                    {descriptionExpanded && (template.features?.length ?? 0) > 0 && (
+                                                                        <ul className="space-y-1 mt-2">
+                                                                            {template.features?.map((feature, index) => (
+                                                                                <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                                    <div className="w-1 h-1 rounded-full bg-primary shrink-0" />
+                                                                                    {feature}
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    )}
+                                                                    {((template.description?.length ?? 0) > DESC_TRUNCATE || (template.features?.length ?? 0) > 0) && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => { e.stopPropagation(); setDescriptionExpanded((v) => !v); }}
+                                                                            className="text-primary hover:underline text-xs mt-0.5 font-medium"
                                                                         >
-                                                                            <SelectTrigger 
-                                                                                className="w-full"
-                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            {descriptionExpanded ? 'See less' : 'See more'}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {/* Resume input + Use Template - justified to bottom */}
+                                                                <div className="mt-auto space-y-4 pt-4">
+                                                                {type === 'resume' && (
+                                                                    <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                                                        <label className="text-xs font-medium text-muted-foreground block">
+                                                                            How would you like to provide the reference content?
+                                                                        </label>
+                                                                        <div className="flex gap-2 flex-wrap">
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant={resumeInputMode === 'reference' ? 'default' : 'outline'}
+                                                                                size="sm"
+                                                                                onClick={() => setResumeInputMode('reference')}
                                                                             >
-                                                                                <SelectValue placeholder="Select a resume" />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                {referenceResumes.map((resume) => (
-                                                                                    <SelectItem 
-                                                                                        key={resume.id} 
-                                                                                        value={resume.id}
+                                                                                1. Reference resume
+                                                                            </Button>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant={resumeInputMode === 'upload' ? 'default' : 'outline'}
+                                                                                size="sm"
+                                                                                onClick={() => setResumeInputMode('upload')}
+                                                                            >
+                                                                                2. Upload new
+                                                                            </Button>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant={resumeInputMode === 'paste' ? 'default' : 'outline'}
+                                                                                size="sm"
+                                                                                onClick={() => setResumeInputMode('paste')}
+                                                                            >
+                                                                                3. Paste text
+                                                                            </Button>
+                                                                        </div>
+
+                                                                        {resumeInputMode === 'reference' && (
+                                                                            <div>
+                                                                                {referenceResumes.length > 0 ? (
+                                                                                    <Select
+                                                                                        value={selectedReferenceResumeId ?? undefined}
+                                                                                        onValueChange={(v) => onSelectReferenceResume?.(v)}
                                                                                     >
-                                                                                        {resume.name}
-                                                                                    </SelectItem>
-                                                                                ))}
-                                                                            </SelectContent>
-                                                                        </Select>
+                                                                                        <SelectTrigger className="w-full">
+                                                                                            <SelectValue placeholder="Select a resume" />
+                                                                                        </SelectTrigger>
+                                                                                        <SelectContent>
+                                                                                            {referenceResumes.map((r) => (
+                                                                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                                                                            ))}
+                                                                                        </SelectContent>
+                                                                                    </Select>
+                                                                                ) : (
+                                                                                    <p className="text-xs text-muted-foreground">No resumes in your documents yet. Use upload or paste instead.</p>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {resumeInputMode === 'upload' && (
+                                                                            <div className="space-y-2">
+                                                                                <input
+                                                                                    ref={fileInputRef}
+                                                                                    type="file"
+                                                                                    accept=".pdf,application/pdf"
+                                                                                    onChange={handleFileChange}
+                                                                                    className="hidden"
+                                                                                />
+                                                                                {resumePdf ? (
+                                                                                    <div className="flex items-center gap-2 p-2 rounded-lg border bg-background">
+                                                                                        <FileText className="h-4 w-4 text-primary shrink-0" />
+                                                                                        <span className="text-sm truncate flex-1">{resumePdfName || 'resume.pdf'}</span>
+                                                                                        <Button type="button" variant="ghost" size="sm" onClick={clearPdf}>Remove</Button>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="outline"
+                                                                                        className="w-full gap-2"
+                                                                                        onClick={() => fileInputRef.current?.click()}
+                                                                                    >
+                                                                                        <Upload className="h-4 w-4" />
+                                                                                        Choose PDF file
+                                                                                    </Button>
+                                                                                )}
+                                                                                <p className="text-[10px] text-muted-foreground">We&apos;ll extract content with AI and format it in this template.</p>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {resumeInputMode === 'paste' && (
+                                                                            <div className="space-y-2">
+                                                                                <Textarea
+                                                                                    placeholder="Paste your resume text here..."
+                                                                                    value={resumeText}
+                                                                                    onChange={(e) => setResumeText(e.target.value)}
+                                                                                    className="min-h-[80px] text-sm resize-none"
+                                                                                    sanitize={false}
+                                                                                />
+                                                                                <Input
+                                                                                    placeholder="Optional: Add instructions (e.g. emphasize leadership, make it concise)"
+                                                                                    value={promptText}
+                                                                                    onChange={(e) => setPromptText(e.target.value)}
+                                                                                    className="text-sm"
+                                                                                    sanitize={false}
+                                                                                />
+                                                                                <p className="text-[10px] text-muted-foreground">Tip: You can add instructions in the box above to tailor the output (e.g. &quot;emphasize leadership&quot;, &quot;make it more concise&quot;).</p>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 )}
 
                                                                 <Button
-                                                                    disabled={
-                                                                        isGenerating ||
-                                                                        (type === 'resume' && referenceResumes.length > 0 && !selectedReferenceResumeId)
-                                                                    }
+                                                                    disabled={isGenerating || (type === 'resume' && !hasResumeInput)}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         handleUseTemplate()
@@ -270,6 +401,7 @@ export default function JkTemplateSelector({
                                                                     <Sparkles className="h-4 w-4" />
                                                                     {isGenerating ? 'Generating...' : 'Use Template'}
                                                                 </Button>
+                                                                </div>
                                                             </div>
                                                         </motion.div>
                                                     )}
@@ -286,9 +418,41 @@ export default function JkTemplateSelector({
 
                         {/* Footer */}
                         <div className="border-t bg-muted/20">
-                            <div className="p-5 flex items-center gap-2 text-muted-foreground">
-                                <Sparkles className="h-3 w-3" />
-                                <p className="text-xs">More templates coming soon</p>
+                            <div className="p-5 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Sparkles className="h-3 w-3" />
+                                    <p className="text-xs">More templates coming soon</p>
+                                </div>
+                                <TooltipProvider>
+                                    {(() => {
+                                        const model = getModelForTemplateGeneration();
+                                        if (!model) return null;
+                                        return (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/60 px-2.5 py-1 text-xs font-medium">
+                                                        <Avatar className="h-3.5 w-3.5">
+                                                            {model.logoUrl ? (
+                                                                <AvatarImage src={model.logoUrl} alt="" />
+                                                            ) : null}
+                                                            <AvatarFallback className="text-[9px]">
+                                                                {model.provider.charAt(0)}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        Powered by {model.name}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="max-w-xs">
+                                                    <p className="font-medium">{model.name}</p>
+                                                    <p className="text-muted-foreground text-xs">{model.provider}</p>
+                                                    {model.description ? (
+                                                        <p className="text-muted-foreground text-xs mt-1">{model.description}</p>
+                                                    ) : null}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        );
+                                    })()}
+                                </TooltipProvider>
                             </div>
                         </div>
                     </motion.div>

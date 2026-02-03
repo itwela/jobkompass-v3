@@ -15,11 +15,15 @@ export default function WaitlistPage() {
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const addToWaitlist = useMutation(api.waitlist.add);
+  const addToEmailList = useMutation(api.emailList.add);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
     if (!email) {
       toast.error("Please enter your email address");
       return;
@@ -34,7 +38,11 @@ export default function WaitlistPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await addToWaitlist({ email, name: name || undefined });
+      const result = await addToEmailList({
+        email,
+        name: name.trim(),
+        submissionType: "waitlist",
+      });
       
       if (result.success) {
         toast.success("Successfully added to waitlist!", "We'll notify you when new features are available.");
@@ -80,7 +88,7 @@ export default function WaitlistPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-medium">
-                Name (Optional)
+                Name <span className="text-destructive">*</span>
               </label>
               <Input
                 id="name"
@@ -88,6 +96,7 @@ export default function WaitlistPage() {
                 placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
                 disabled={isSubmitting}
               />
             </div>

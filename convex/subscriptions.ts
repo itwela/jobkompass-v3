@@ -20,11 +20,17 @@ export const getUserSubscription = query({
     // Get convex_user_id (should always be set)
     const convexUserId = (user as any).convex_user_id || userId;
 
-    // Find subscription by convex_user_id
-    const subscription = await ctx.db
+    // Find subscription - try convexUserId first, then auth userId (subscriptions may be stored under either)
+    let subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", convexUserId))
       .first();
+    if (!subscription && convexUserId !== userId) {
+      subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+    }
     
     return subscription;
   },

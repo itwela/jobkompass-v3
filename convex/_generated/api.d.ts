@@ -9,8 +9,11 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as contacts from "../contacts.js";
 import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
+import type * as emailList from "../emailList.js";
+import type * as freeResumeStats from "../freeResumeStats.js";
 import type * as http from "../http.js";
 import type * as inputSanitizer from "../inputSanitizer.js";
 import type * as jobs from "../jobs.js";
@@ -36,8 +39,11 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  contacts: typeof contacts;
   documents: typeof documents;
   dopeAgents: typeof dopeAgents;
+  emailList: typeof emailList;
+  freeResumeStats: typeof freeResumeStats;
   http: typeof http;
   inputSanitizer: typeof inputSanitizer;
   jobs: typeof jobs;

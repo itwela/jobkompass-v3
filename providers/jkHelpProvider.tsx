@@ -79,12 +79,12 @@ const helpGuides: HelpGuide[] = [
           },
           {
             title: 'My Documents',
-            description: 'Edit and download resumes and cover letters created in Chat. Use any as a reference resume for jobs. Document uploads coming soon.',
+            description: 'Edit and download resumes and cover letters. Upload a PDF resume and we extract it into an editable format. Use any as a reference resume for jobs.',
             action: { label: 'Go to Documents', modeId: '/documents' },
           },
           {
             title: 'My Jobs',
-            description: 'Track applications and status (Applied, Interviewing, Offered, etc.)',
+            description: 'Track applications and status (Applied, Callback, Interviewing, Offered, etc.)',
             action: { label: 'Go to Jobs', modeId: '/my-jobs' },
           },
           {
@@ -105,7 +105,7 @@ const helpGuides: HelpGuide[] = [
       {
         title: 'Why Use My Documents?',
         type: 'text',
-        content: 'My Documents is where you edit and download resumes and cover letters. Right now you create them in Chat: paste your resume, ask the AI to tweak it, and it can make a resume or cover letter for you on the spot. You can then open it in My Documents to edit and download, and use it as a reference resume for jobs. Document uploads are coming soon.',
+        content: 'My Documents is where you edit and download resumes and cover letters. You can upload a PDF resume and we\'ll extract it into an editable format with AI. Or create them in Chat: paste your resume, ask the AI to tweak it, and it can make a resume or cover letter for you. Use any as a reference resume for jobs.',
       },
       {
         title: 'Getting the Best Results',
@@ -185,7 +185,7 @@ const helpGuides: HelpGuide[] = [
             description: 'You can also have the AI add a job from Chat: paste a link and ask it to save the job to your job dashboard',
           },
           {
-            description: 'Update status as you move through the process: Applied, Interviewing, Offered, Rejected',
+            description: 'Update status as you move through the process: Applied, Callback, Interviewing, Offered, Rejected',
           },
           {
             description: 'Click a job card to expand and view or edit full details and notes',
@@ -203,6 +203,10 @@ const helpGuides: HelpGuide[] = [
           {
             title: 'Applied',
             description: 'Application submitted',
+          },
+          {
+            title: 'Callback',
+            description: 'They reached out—moving to next step',
           },
           {
             title: 'Interviewing',
@@ -420,7 +424,7 @@ const helpGuides: HelpGuide[] = [
         type: 'steps',
         content: [
           {
-            description: 'Set status to Interviewing when you get a response',
+            description: 'Set status to Callback when they reach out, then Interviewing once you\'re in the process',
           },
           {
             description: 'Use Chat for interview prep; add notes on the job in My Jobs',

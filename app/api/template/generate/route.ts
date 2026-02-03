@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Agent, run, user } from '@openai/agents';
 import { setDefaultOpenAIKey } from '@openai/agents';
 import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from '@/app/ai/tools/file';
+import { extractResumeContent } from '@/lib/resume/extractFromPdf';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 
@@ -16,6 +17,9 @@ const GenerateRequestSchema = z.object({
   jobTitle: z.string().optional(),
   jobCompany: z.string().optional(),
   referenceResumeId: z.string().optional(),
+  resumePdf: z.string().optional(),
+  resumeText: z.string().optional(),
+  promptText: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -37,7 +41,14 @@ export async function POST(request: NextRequest) {
       jobTitle,
       jobCompany,
       referenceResumeId,
+      resumePdf,
+      resumeText,
+      promptText,
     } = GenerateRequestSchema.parse(body);
+    
+    const hasReferenceResume = !!referenceResumeId;
+    const hasResumePdf = !!resumePdf && resumePdf.length > 0;
+    const hasResumeText = !!resumeText && resumeText.trim().length > 0;
     
     console.log(`[${requestId}] [TEMPLATE_GENERATE] Parsed request`, {
       templateType,
@@ -45,13 +56,15 @@ export async function POST(request: NextRequest) {
       jobId,
       jobTitle,
       jobCompany,
-      hasReferenceResumeId: !!referenceResumeId,
+      hasReferenceResumeId: hasReferenceResume,
+      hasResumePdf,
+      hasResumeText,
     });
 
-    // Reference resume is only required for resume generation
-    if (templateType === 'resume' && !referenceResumeId) {
+    // For resume: need one of referenceResumeId, resumePdf, or resumeText
+    if (templateType === 'resume' && !hasReferenceResume && !hasResumePdf && !hasResumeText) {
       return NextResponse.json(
-        { success: false, error: 'Reference resume ID is required for resume generation' },
+        { success: false, error: 'Provide a reference resume, upload a PDF, or paste resume text' },
         { status: 400 }
       );
     }
@@ -73,29 +86,56 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch reference resume from Convex (only for resume generation)
-    let referenceResume = null;
-    if (templateType === 'resume' && referenceResumeId) {
-      try {
-        console.log(`[${requestId}] [TEMPLATE_GENERATE] Fetching reference resume`, { referenceResumeId });
-        referenceResume = await convexClient.query(api.documents.getResume, {
-          resumeId: referenceResumeId as any,
-        });
-        console.log(`[${requestId}] [TEMPLATE_GENERATE] Reference resume fetched`, { 
-          hasResume: !!referenceResume,
-          resumeName: referenceResume?.name 
-        });
-
-        if (!referenceResume) {
-          console.error(`[${requestId}] [TEMPLATE_GENERATE] Reference resume not found`);
+    // Get reference resume content (only for resume generation)
+    // Source: Convex reference, uploaded PDF, or pasted text
+    let referenceResume: { name: string; content: any } | null = null;
+    
+    if (templateType === 'resume') {
+      if (hasReferenceResume && referenceResumeId) {
+        try {
+          console.log(`[${requestId}] [TEMPLATE_GENERATE] Fetching reference resume`, { referenceResumeId });
+          const fetched = await convexClient.query(api.documents.getResume, {
+            resumeId: referenceResumeId as any,
+          });
+          if (fetched) {
+            referenceResume = {
+              name: fetched.name || 'Reference Resume',
+              content: fetched.content || {},
+            };
+            console.log(`[${requestId}] [TEMPLATE_GENERATE] Reference resume fetched`);
+          } else {
+            return NextResponse.json(
+              { success: false, error: 'Reference resume not found' },
+              { status: 404 }
+            );
+          }
+        } catch (e) {
+          console.error(`[${requestId}] [TEMPLATE_GENERATE] Error fetching reference resume:`, e);
+          throw e;
+        }
+      } else if (hasResumePdf || hasResumeText) {
+        try {
+          const currentUser = await convexClient.query(api.auth.currentUser, {});
+          const fallbackEmail = (currentUser as any)?.email || '';
+          console.log(`[${requestId}] [TEMPLATE_GENERATE] Extracting resume from PDF/text`);
+          const parsed = await extractResumeContent({
+            resumePdf: hasResumePdf ? resumePdf : undefined,
+            resumeText: hasResumeText ? resumeText : undefined,
+            fallbackEmail,
+          });
+          referenceResume = {
+            name: 'Uploaded/Pasted Resume',
+            content: parsed,
+          };
+          console.log(`[${requestId}] [TEMPLATE_GENERATE] Resume extracted successfully`);
+        } catch (extractErr) {
+          const errMsg = extractErr instanceof Error ? extractErr.message : String(extractErr);
+          console.error(`[${requestId}] [TEMPLATE_GENERATE] Extract error:`, extractErr);
           return NextResponse.json(
-            { success: false, error: 'Reference resume not found' },
-            { status: 404 }
+            { success: false, error: 'Failed to parse resume. Please try again.', details: errMsg },
+            { status: 502 }
           );
         }
-      } catch (e) {
-        console.error(`[${requestId}] [TEMPLATE_GENERATE] Error fetching reference resume:`, e);
-        throw e;
       }
     }
 
@@ -154,7 +194,7 @@ export async function POST(request: NextRequest) {
     // Build instructions using reference resume content (for resumes) or job info (for cover letters)
     let instructions = `You are a professional ${templateType === 'resume' ? 'resume' : 'cover letter'} generator. Generate a ${templateType === 'resume' ? 'professional, ATS-optimized resume' : 'tailored cover letter'} using the ${templateId} template. This is not a conversation, it is a single task.
 
-${templateType === 'resume' && referenceResume ? `REFERENCE RESUME DATA:
+${templateType === 'resume' && referenceResume?.content ? `REFERENCE RESUME DATA:
 - Resume name: ${referenceResume?.name || 'N/A'}
 - Resume content: ${JSON.stringify(referenceResume?.content || {}, null, 2)}
 
@@ -163,7 +203,7 @@ TASK:
 - Use the reference resume content as the primary source for all user information (personal info, experience, education, skills, etc.).
 - Tailor the content for that specific position.
 - Apply any resume preferences provided.
-- IMPORTANT: When calling createResumeJakeTemplate, include the "targetCompany" parameter with the company name so the document name includes the company name.
+- IMPORTANT: When calling createResumeJakeTemplate, include "targetCompany" with the company name AND "templateId" with "${templateId}" (the template the user selected).
 - Call createResumeJakeTemplate ONCE to generate and auto-save the document.` : `COVER LETTER GENERATION:
 ${jobTitle && jobCompany ? `TARGET POSITION: ${jobTitle} at ${jobCompany}` : ''}
 ${jobDetails ? `JOB DETAILS:\n${JSON.stringify(jobDetails, null, 2)}` : ''}
@@ -206,6 +246,9 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
     if (jobTitle && jobCompany) {
       userMessage += ` This is for the position: ${jobTitle} at ${jobCompany}.`;
       userMessage += ` Make sure to ${templateType === 'resume' ? 'include targetCompany parameter with "' + jobCompany + '"' : 'set jobInfo.company to "' + jobCompany + '"'} so the document name includes the company name.`;
+    }
+    if (templateType === 'resume' && promptText && promptText.trim()) {
+      userMessage += `\n\nAdditional instructions from the user: ${promptText.trim()}`;
     }
     userMessage += ` Use the provided context to fill details. Then call the generation tool once to produce and save the document.`;
 

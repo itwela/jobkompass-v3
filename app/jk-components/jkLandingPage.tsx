@@ -6,12 +6,14 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
 import { mainAssets } from "../lib/constants";
-import { useMutation } from "convex/react";
+import { AI_MODELS } from "@/lib/aiModels";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useMutation, useQuery } from "convex/react";
 import JkPublicHeader from "./jkPublicHeader";
 import JkGetStartedButton from "./jkGetStartedButton";
 import { api } from "@/convex/_generated/api";
 import { toast } from "@/lib/toast";
-import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info, Sparkles, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useMotionTemplate } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -27,7 +29,7 @@ const faqData: FAQItem[] = [
   },
   {
     question: "How do I get started?",
-    answer: "Simply click Get started to begin. You can paste your resume into Chat and ask the AI to tweak or create one for you, add your first job in My Jobs, and the platform will guide you through the rest. Document uploads are coming soon."
+    answer: "Simply click Get started to begin. You can upload a PDF resume in My Documents and we'll extract it, or paste your resume into Chat and ask the AI to tweak or create one for you. Add your first job in My Jobs and the platform will guide you through the rest."
   },
   {
     question: "Is my data secure?",
@@ -162,6 +164,137 @@ function FAQItem({ item, isOpen, onToggle, index }: { item: FAQItem; isOpen: boo
           )}
         </AnimatePresence>
       </div>
+    </motion.div>
+  );
+}
+
+// Animated number that counts up when in view
+function AnimatedNumber({ value, suffix = "" }: { value: number; suffix?: string }) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    if (hasAnimated.current || value === 0) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && !hasAnimated.current) {
+          hasAnimated.current = true;
+          const duration = 1500;
+          const start = 0;
+          const startTime = performance.now();
+          const step = (now: number) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            setDisplay(Math.floor(start + (value - start) * eased));
+            if (progress < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value]);
+
+  return (
+    <span ref={ref}>{display.toLocaleString()}{suffix}</span>
+  );
+}
+
+// Stats section - under the 3 cards, styled like other sections
+function FreeResumeStats() {
+  const stats = useQuery(api.freeResumeStats.getStats);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      className="mt-24 text-center"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6"
+      >
+        <FileText className="h-4 w-4" />
+        <span>Free Resume Generator</span>
+      </motion.div>
+      <h3 className="text-3xl md:text-4xl font-semibold tracking-tight mb-4">
+        {stats && stats.totalGenerations > 0 ? (
+          <>
+            <AnimatedNumber value={stats.totalGenerations} /> resumes generated
+          </>
+        ) : (
+          <>Try it free — no signup required</>
+        )}
+      </h3>
+      <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
+        JobKompass has helped users create over {stats?.totalGenerations} free resumes. Enter your text or upload a PDF and we will extract and format it instantly. Go try it out for yourself today!
+      </p>
+      <Link href="/free-resume-generator">
+        <Button size="lg" className="gap-2">
+          Try Now
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </Link>
+    </motion.div>
+  );
+}
+
+// Models we use - cute avatar badges (e.g. above Features)
+function ModelsWeUse() {
+  const models = AI_MODELS;
+  if (models.length === 0) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="mb-12"
+    >
+      <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Powered by
+        </span>
+      </div>
+      <TooltipProvider>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2">
+          {models.map((model) => (
+            <Tooltip key={model.id}>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5">
+                  <Avatar className="h-5 w-5">
+                    {model.logoUrl ? (
+                      <AvatarImage src={model.logoUrl} alt="" />
+                    ) : null}
+                    <AvatarFallback className="text-xs">
+                      {model.provider.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {model.name}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs">
+                <p className="font-medium">{model.name}</p>
+                <p className="text-muted-foreground text-xs">{model.provider}</p>
+                {model.description ? (
+                  <p className="text-muted-foreground text-xs mt-1">{model.description}</p>
+                ) : null}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+      </TooltipProvider>
     </motion.div>
   );
 }
@@ -398,11 +531,15 @@ export default function JkLandingPage() {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   
-  const addToWaitlist = useMutation(api.waitlist.add);
+  const addToEmailList = useMutation(api.emailList.add);
 
   const handleWaitlistSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
     if (!email) {
       toast.error("Please enter your email address");
       return;
@@ -416,7 +553,11 @@ export default function JkLandingPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await addToWaitlist({ email, name: name || undefined });
+      const result = await addToEmailList({
+        email,
+        name: name.trim(),
+        submissionType: "waitlist",
+      });
       
       if (result.success) {
         setEmail("");
@@ -628,13 +769,14 @@ export default function JkLandingPage() {
         <HeroSection scrollToWaitlist={scrollToWaitlist} />
 
         {/* Capabilities Section */}
-        <section className="relative py-32 px-6" aria-labelledby="capabilities-heading">
+        <section className="relative pt-12 pb-32 px-6" aria-labelledby="capabilities-heading">
           {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-primary/5 to-transparent rounded-full blur-3xl" />
           </div>
 
           <div className="max-w-6xl mx-auto relative">
+            <ModelsWeUse />
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -693,6 +835,8 @@ export default function JkLandingPage() {
                 <CapabilityCard key={index} capability={capability} index={index} />
               ))}
             </div>
+
+            <FreeResumeStats />
           </div>
         </section>
 
@@ -780,9 +924,9 @@ export default function JkLandingPage() {
               </div>
               
               <div className="flex items-center gap-8 text-sm text-muted-foreground">
-                <Link href="#" className="hover:text-foreground transition-colors">Privacy</Link>
-                <Link href="#" className="hover:text-foreground transition-colors">Terms</Link>
-                <Link href="#" className="hover:text-foreground transition-colors">Contact</Link>
+                <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+                <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+                <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
               </div>
 
               <p className="text-sm text-muted-foreground">
@@ -866,6 +1010,27 @@ export default function JkLandingPage() {
             </>
           )}
         </AnimatePresence>
+
+        {/* Sticky free resume CTA - bottom right */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed bottom-6 right-6 z-40"
+        >
+          <Link
+            href="/free-resume-generator"
+            className="flex items-center gap-3 px-4 py-3 rounded-full shadow-lg border border-border bg-card/95 backdrop-blur-sm hover:border-primary/40 hover:shadow-xl transition-all duration-300 group"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <div className="pr-1">
+              <p className="text-sm font-semibold text-foreground leading-tight">Free Resume Generator</p>
+              <p className="text-xs text-muted-foreground">Try it now — no signup required</p>
+            </div>
+          </Link>
+        </motion.div>
       </main>
     </>
   );

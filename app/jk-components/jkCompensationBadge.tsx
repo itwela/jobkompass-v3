@@ -119,6 +119,6 @@ export default function JkCompensationBadge({ compensation, className = "" }: Jk
   );
 }
 
-// Export the parser for testing/reuse
+// Export the generator for testing/reuse
 export { parseCompensation, getDollarTier };
 

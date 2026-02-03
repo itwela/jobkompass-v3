@@ -15,6 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Hand } from "lucide-react";
 import { mainAssets } from "@/app/lib/constants";
 import Image from "next/image";
+import { getModelForChat } from "@/lib/aiModels";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ChatMessage {
   id: string;
@@ -237,6 +240,7 @@ export default function JkCW_ChatMode() {
                     username: user?.username || user?.email || undefined,
                     contextResumeIds: attachedResumeIds.length > 0 ? attachedResumeIds : undefined,
                     contextJobIds: attachedJobIds.length > 0 ? attachedJobIds : undefined,
+                    contextResumeTemplateId: selectedResumeTemplateId ?? undefined,
                 })
             })
             
@@ -459,7 +463,7 @@ export default function JkCW_ChatMode() {
                         <motion.div className="text-2xl font-semibold mb-3 flex items-start gap-1 justify-center" variants={introChildVariants}>
                             <Hand className="hidden sm:inline-block h-8 w-8 mr-2" /> Hi! I'm JobKompass, your AI career assistant
                         </motion.div>
-                        <motion.div className="text-muted-foreground mb-8" variants={introChildVariants}>
+                        <motion.div className="text-muted-foreground mb-4" variants={introChildVariants}>
                             I can help you create resumes, analyze your career, and provide job search guidance.
                         </motion.div>
                         <motion.div 

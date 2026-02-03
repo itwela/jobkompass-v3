@@ -26,8 +26,8 @@ export default function Jk_AutoFill({ onSelect }: AutoFillProps = {}) {
                 >
                     <span className="text-sm font-medium text-foreground">{mode.name}</span>
                     {mode.id === '/performance' && (
-                      <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                        Coming soon
+                      <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
+                        New
                       </span>
                     )}
                 </motion.div>

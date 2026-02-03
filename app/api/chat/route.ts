@@ -36,6 +36,7 @@ const ChatRequestSchema = z.object({
   username: z.string().optional(),
   contextResumeIds: z.array(z.string()).optional(),
   contextJobIds: z.array(z.string()).optional(),
+  contextResumeTemplateId: z.string().optional(),
 });
 
 const ChatResponseSchema = z.object({
@@ -54,7 +55,7 @@ const ChatResponseSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, file, history = [], agentId, userId, username, contextResumeIds, contextJobIds } = ChatRequestSchema.parse(body);
+    const { message, file, history = [], agentId, userId, username, contextResumeIds, contextJobIds, contextResumeTemplateId } = ChatRequestSchema.parse(body);
 
     const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
     if (!convexUrl) {
@@ -96,9 +97,18 @@ export async function POST(request: NextRequest) {
     // Full instructions on first turn (history length <= 2) or when context is attached
     const isFirstTurn = history.length <= 2;
     const hasContextAttachments = contextResumeIds?.length || contextJobIds?.length;
+    const hasResumeTemplateSelected = !!contextResumeTemplateId;
     
     // Build context-aware instructions
     let contextInstructions = isFirstTurn ? jobKompassInstructions : jobKompassInstructionsMinimal;
+    
+    // Resume template preference - CRITICAL for resume creation
+    contextInstructions += "\n\n[[RESUME_TEMPLATE_PREFERENCE]]";
+    if (hasResumeTemplateSelected) {
+      contextInstructions += `\nThe user has selected resume template "jake" (JobKompass Jake) in the Context panel. When creating resumes, you MUST call createResumeJakeTemplate with templateId: "jake".`;
+    } else {
+      contextInstructions += "\nThe user has NOT selected a resume template in the Context panel. If the user asks to create a resume, you MUST first ask them to open the Context panel (above the input) and select the JobKompass Jake template before creating. Do NOT call createResumeJakeTemplate until the user has selected a template.";
+    }
     
     if (hasContextAttachments) {
       contextInstructions += "\n\n[[CONTEXT_ATTACHMENTS]]";

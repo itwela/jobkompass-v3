@@ -6,6 +6,7 @@ import { Plus, ExternalLink, Trash2, X, LogIn, Filter, Tag, CheckCircle2, Circle
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Id } from "@/convex/_generated/dataModel";
+import { BlurFade } from "@/components/ui/blur-fade";
 import { useResources } from "@/providers/jkResourcesProvider";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
@@ -163,19 +164,14 @@ function StickyNote({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.8, rotate: -5 + Math.random() * 10 }}
+      initial={{ opacity: 1, scale: 1, rotate: -2 + (index % 3) * 2 }}
       animate={{ 
         opacity: 1, 
         scale: 1, 
-        rotate: isEditing ? 0 : -2 + Math.random() * 4,
+        rotate: isEditing ? 0 : -2 + (index % 3) * 2,
       }}
       exit={{ opacity: 0, scale: 0.8, rotate: -10 }}
-      transition={{ 
-        type: "spring",
-        stiffness: 300,
-        damping: 25,
-        delay: index * 0.03,
-      }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
       whileHover={!isEditing ? { 
         scale: 1.05, 
         rotate: 0,
@@ -650,8 +646,8 @@ export default function JkCW_ResourcesMode() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <AnimatePresence mode="popLayout">
             {filteredResources.map((resource, index) => (
+              <BlurFade key={resource._id} delay={0.0618 + index * 0.05} inView={false}>
               <StickyNote
-                key={resource._id}
                 resource={resource}
                 isEditing={editingId === resource._id}
                 onStartEdit={() => {
@@ -666,6 +662,7 @@ export default function JkCW_ResourcesMode() {
                 isSelected={selectedResourceIds.includes(resource._id)}
                 onToggleSelection={() => toggleResourceSelection(resource._id)}
               />
+              </BlurFade>
             ))}
           </AnimatePresence>
         </div>

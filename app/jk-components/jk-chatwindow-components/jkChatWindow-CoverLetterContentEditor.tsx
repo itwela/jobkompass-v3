@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { getCoverLetterExportRoute, getDefaultCoverLetterTemplateId } from "@/lib/templates";
 import { X, Plus, Trash2, Save, ChevronDown, ChevronUp, Search, Download, Loader2, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import JkSlideModalGlass from "../jkSlideModalGlass";
@@ -67,6 +68,7 @@ export default function JkCW_CoverLetterContentEditor({
     contentRef
 }: CoverLetterContentEditorProps) {
     const coverLetter = useQuery(api.documents.getCoverLetter, { coverLetterId });
+    const template = coverLetter?.template || getDefaultCoverLetterTemplateId();
     const generateUploadUrl = useMutation(api.documents.generateUploadUrl);
     const replaceCoverLetterFile = useMutation(api.documents.replaceCoverLetterFile);
     
@@ -228,7 +230,8 @@ export default function JkCW_CoverLetterContentEditor({
             }
             
             // Step 1: Generate PDF from the edited content
-            const pdfResponse = await fetch("/api/coverletter/export/jake", {
+            const apiRoute = getCoverLetterExportRoute(template);
+            const pdfResponse = await fetch(apiRoute, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -309,7 +312,8 @@ export default function JkCW_CoverLetterContentEditor({
                 return;
             }
 
-            const response = await fetch("/api/coverletter/export/jake", {
+            const apiRoute = getCoverLetterExportRoute(template);
+            const response = await fetch(apiRoute, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
