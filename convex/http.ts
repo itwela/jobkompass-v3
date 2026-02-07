@@ -60,14 +60,18 @@ http.route({
       }
 
       // Run the parse + save action
-      const result = await ctx.runAction(internal.extensionSaveJob.parseAndSave, {
+      // Build args - only include status if explicitly provided (Convex doesn't accept undefined for optional fields)
+      const parseArgs: Record<string, any> = {
         userId: keyRecord.userId,
         apiKeyId: keyRecord._id,
         pageText: pageText,
         pageUrl: pageUrl || "",
         pageTitle: pageTitle || "",
-        status: status || undefined,
-      });
+      };
+      if (status && typeof status === "string") {
+        parseArgs.status = status;
+      }
+      const result = await ctx.runAction(internal.extensionSaveJob.parseAndSave, parseArgs);
 
       return new Response(
         JSON.stringify({

@@ -40,7 +40,7 @@ function getFormattedTime() {
   return `${date} ${time}`;
 }
 
-const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverLetter/jakeCoverLetter.tex');
+const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverletter/jakeCoverLetter.tex');
 
  const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
    name: 'createResumeJakeTemplate',

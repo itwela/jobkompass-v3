@@ -12,6 +12,13 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'openai.com', pathname: '/**' },
     ],
   },
+  // Include template files in serverless function bundles for Vercel deployment
+  outputFileTracingIncludes: {
+    '/api/chat': ['./templates/**/*'],
+    '/api/template/generate': ['./templates/**/*'],
+    '/api/coverletter/export/jake': ['./templates/coverletter/**/*'],
+    '/api/resume/export/*': ['./templates/resume/**/*'],
+  },
 };
 
 export default nextConfig;
