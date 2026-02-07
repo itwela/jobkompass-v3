@@ -9,6 +9,8 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { getCoverLetterExportRoute, getDefaultCoverLetterTemplateId } from "@/lib/templates";
 import { X, Plus, Trash2, Save, ChevronDown, ChevronUp, Search, Download, Loader2, CheckCircle } from "lucide-react";
+import { Reorder } from "framer-motion";
+import JkReorderableItem from "./jkReorderableItem";
 import { cn } from "@/lib/utils";
 import JkSlideModalGlass from "../jkSlideModalGlass";
 
@@ -212,6 +214,17 @@ export default function JkCW_CoverLetterContentEditor({
             letterContent: {
                 ...prev.letterContent,
                 bodyParagraphs: prev.letterContent.bodyParagraphs.filter((_, i) => i !== index)
+            }
+        }));
+        setHasChanges(true);
+    };
+
+    const reorderBodyParagraphs = (newOrder: string[]) => {
+        setContent(prev => ({
+            ...prev,
+            letterContent: {
+                ...prev.letterContent,
+                bodyParagraphs: newOrder,
             }
         }));
         setHasChanges(true);
@@ -601,8 +614,9 @@ export default function JkCW_CoverLetterContentEditor({
                                                 Add Paragraph
                                             </Button>
                                         </div>
+                                        <Reorder.Group axis="y" values={content.letterContent.bodyParagraphs} onReorder={reorderBodyParagraphs} as="div" className="space-y-3">
                                         {content.letterContent.bodyParagraphs.map((para, index) => (
-                                            <div key={index} className="mb-3">
+                                            <JkReorderableItem key={`para-${index}`} value={para} className="p-3 border rounded-lg bg-muted/20">
                                                 <div className="flex items-start gap-2">
                                                     <Textarea
                                                         value={para}
@@ -621,8 +635,9 @@ export default function JkCW_CoverLetterContentEditor({
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
                                                 </div>
-                                            </div>
+                                            </JkReorderableItem>
                                         ))}
+                                        </Reorder.Group>
                                     </div>
 
                                     <div>

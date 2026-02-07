@@ -35,7 +35,7 @@ export function sanitizeInput(input: string): string {
   sanitized = sanitized.replace(/javascript:/gi, '');
   sanitized = sanitized.replace(/on\w+\s*=/gi, ''); // Remove event handlers like onclick=
 
-  return sanitized.trim();
+  return sanitized;
 }
 
 /**
@@ -48,21 +48,21 @@ export function sanitizeRichText(input: string): string {
   }
 
   let sanitized = input.replace(/\0/g, '');
-  
+
   // Remove script tags and their content
   sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
+
   // Remove javascript: protocols
   sanitized = sanitized.replace(/javascript:/gi, '');
-  
+
   // Remove dangerous event handlers
   sanitized = sanitized.replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
   sanitized = sanitized.replace(/\son\w+\s*=\s*[^\s>]*/gi, '');
-  
+
   // Remove iframe, embed, object tags
   sanitized = sanitized.replace(/<(iframe|embed|object)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, '');
-  
-  return sanitized.trim();
+
+  return sanitized;
 }
 
 /**

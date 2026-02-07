@@ -8,6 +8,8 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X, Plus, Trash2, Save, ChevronDown, ChevronUp, Search, Sparkles } from "lucide-react";
+import { Reorder } from "framer-motion";
+import JkReorderableItem from "./jkReorderableItem";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 
@@ -306,9 +308,25 @@ export default function JkCW_ResumeContentEditor({
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            // Clean empty lines from detail arrays before saving
+            const cleanedContent = {
+                ...content,
+                experience: content.experience.map(exp => ({
+                    ...exp,
+                    details: exp.details?.filter(d => d.trim() !== ""),
+                })),
+                education: content.education.map(edu => ({
+                    ...edu,
+                    details: edu.details?.filter(d => d.trim() !== ""),
+                })),
+                projects: (content.projects || []).map(proj => ({
+                    ...proj,
+                    details: proj.details?.filter(d => d.trim() !== ""),
+                })),
+            };
             await updateResume({
                 resumeId,
-                content,
+                content: cleanedContent,
             });
             setHasChanges(false);
         } catch (error) {
@@ -492,6 +510,33 @@ export default function JkCW_ResumeContentEditor({
         setHasChanges(true);
     };
 
+    // Reorder handlers for drag-and-drop
+    const reorderExperience = (newOrder: ResumeContent['experience']) => {
+        setContent(prev => ({ ...prev, experience: newOrder }));
+        setHasChanges(true);
+    };
+
+    const reorderEducation = (newOrder: ResumeContent['education']) => {
+        setContent(prev => ({ ...prev, education: newOrder }));
+        setHasChanges(true);
+    };
+
+    const reorderProjects = (newOrder: NonNullable<ResumeContent['projects']>) => {
+        setContent(prev => ({ ...prev, projects: newOrder }));
+        setHasChanges(true);
+    };
+
+    const reorderLanguages = (newOrder: NonNullable<NonNullable<ResumeContent['additionalInfo']>['languages']>) => {
+        setContent(prev => ({
+            ...prev,
+            additionalInfo: {
+                ...(prev.additionalInfo || {}),
+                languages: newOrder,
+            }
+        }));
+        setHasChanges(true);
+    };
+
     return (
         <div className="flex flex-col bg-background max-h-[85vh]">
             {/* Search and Template bar */}
@@ -623,8 +668,9 @@ export default function JkCW_ResumeContentEditor({
                     </button>
                     {expandedSections.has("experience") && (
                         <div className="p-4 space-y-4 border-t">
+                            <Reorder.Group axis="y" values={content.experience} onReorder={reorderExperience} as="div" className="space-y-4">
                             {content.experience.map((exp, index) => (
-                                <div key={index} className="p-4 border rounded-lg space-y-3 bg-muted/20">
+                                <JkReorderableItem key={`exp-${index}`} value={exp}>
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium text-muted-foreground">
                                             Experience #{index + 1}
@@ -678,21 +724,22 @@ export default function JkCW_ResumeContentEditor({
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="text-sm font-medium">Details (one per line)</label>
+                                            <label className="text-sm font-medium">Details (press Enter for a new bullet)</label>
                                             <AiButton />
                                     </div>
                                         <Textarea
                                             value={exp.details?.join("\n") || ""}
-                                            onChange={(e) => updateExperience(index, "details", 
-                                                e.target.value.split('\n').filter(Boolean)
+                                            onChange={(e) => updateExperience(index, "details",
+                                                e.target.value.split('\n')
                                             )}
                                             placeholder="Built internal AI platform used by 3 managers...&#10;Created APIs granting agents instant access..."
                                             rows={5}
                                             showBorder
                                         />
                                     </div>
-                                </div>
+                                </JkReorderableItem>
                             ))}
+                            </Reorder.Group>
                             <Button
                                 onClick={addExperience}
                                 variant="outline"
@@ -720,8 +767,9 @@ export default function JkCW_ResumeContentEditor({
                     </button>
                     {expandedSections.has("education") && (
                         <div className="p-4 space-y-4 border-t">
+                            <Reorder.Group axis="y" values={content.education} onReorder={reorderEducation} as="div" className="space-y-4">
                             {content.education.map((edu, index) => (
-                                <div key={index} className="p-4 border rounded-lg space-y-3 bg-muted/20">
+                                <JkReorderableItem key={`edu-${index}`} value={edu}>
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium text-muted-foreground">
                                             Education #{index + 1}
@@ -794,19 +842,20 @@ export default function JkCW_ResumeContentEditor({
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-sm font-medium">Details (one per line)</label>
+                                        <label className="text-sm font-medium">Details (press Enter for a new bullet)</label>
                                         <Textarea
                                             value={edu.details?.join("\n") || ""}
                                             onChange={(e) => updateEducation(index, "details", 
-                                                e.target.value.split('\n').filter(Boolean)
+                                                e.target.value.split('\n')
                                             )}
                                             placeholder="Relevant coursework: Data Structures & Algorithms; Python...&#10;Dean's List, GPA: 3.8"
                                             rows={3}
                                             showBorder
                                         />
                                     </div>
-                                </div>
+                                </JkReorderableItem>
                             ))}
+                            </Reorder.Group>
                             <Button
                                 onClick={addEducation}
                                 variant="outline"
@@ -879,8 +928,9 @@ export default function JkCW_ResumeContentEditor({
                     </button>
                     {expandedSections.has("projects") && (
                         <div className="p-4 space-y-4 border-t">
+                            <Reorder.Group axis="y" values={content.projects || []} onReorder={reorderProjects} as="div" className="space-y-4">
                             {(content.projects || []).map((proj, index) => (
-                                <div key={index} className="p-4 border rounded-lg space-y-3 bg-muted/20">
+                                <JkReorderableItem key={`proj-${index}`} value={proj}>
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm font-medium text-muted-foreground">
                                             Project #{index + 1}
@@ -943,21 +993,22 @@ export default function JkCW_ResumeContentEditor({
                                     </div>
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="text-sm font-medium">Details (one per line)</label>
+                                            <label className="text-sm font-medium">Details (press Enter for a new bullet)</label>
                                             <AiButton />
                                         </div>
                                         <Textarea
                                             value={proj.details?.join("\n") || ""}
                                             onChange={(e) => updateProject(index, "details", 
-                                                e.target.value.split('\n').filter(Boolean)
+                                                e.target.value.split('\n')
                                             )}
                                             placeholder="Built an API-driven agent pipeline to orchestrate LLMs...&#10;Developed a monetization and pricing strategy..."
                                             rows={4}
                                             showBorder
                                         />
                                     </div>
-                                </div>
+                                </JkReorderableItem>
                             ))}
+                            </Reorder.Group>
                             <Button
                                 onClick={addProject}
                                 variant="outline"
@@ -988,8 +1039,9 @@ export default function JkCW_ResumeContentEditor({
                             {/* Languages */}
                             <div className="space-y-3">
                                 <h4 className="text-sm font-semibold">Languages</h4>
+                                <Reorder.Group axis="y" values={content.additionalInfo?.languages || []} onReorder={reorderLanguages} as="div" className="space-y-3">
                                 {(content.additionalInfo?.languages || []).map((lang, index) => (
-                                    <div key={index} className="p-3 border rounded-lg space-y-3 bg-muted/20">
+                                    <JkReorderableItem key={`lang-${index}`} value={lang} className="p-3 border rounded-lg space-y-3 bg-muted/20">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm font-medium text-muted-foreground">
                                                 Language #{index + 1}
@@ -1006,23 +1058,24 @@ export default function JkCW_ResumeContentEditor({
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label className="text-sm font-medium">Language</label>
-                                        <Input
+                                                <Input
                                                     value={lang.language}
                                                     onChange={(e) => updateLanguage(index, "language", e.target.value)}
                                                     placeholder="English"
-                                        />
-                                    </div>
-                                    <div>
+                                                />
+                                            </div>
+                                            <div>
                                                 <label className="text-sm font-medium">Proficiency</label>
-                                        <Input
+                                                <Input
                                                     value={lang.proficiency}
                                                     onChange={(e) => updateLanguage(index, "proficiency", e.target.value)}
                                                     placeholder="Native"
                                                 />
                                             </div>
-                                    </div>
-                                </div>
-                            ))}
+                                        </div>
+                                    </JkReorderableItem>
+                                ))}
+                                </Reorder.Group>
                             <Button
                                     onClick={addLanguage}
                                 variant="outline"

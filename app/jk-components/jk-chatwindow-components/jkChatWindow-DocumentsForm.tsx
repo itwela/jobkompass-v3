@@ -432,7 +432,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     resumeId: docId as Id<"resumes">,
                     name: editingName || undefined,
                     label: editingLabel || undefined,
-                    tags: editingTags.length > 0 ? editingTags : undefined,
+                    tags: editingTags,
                     template: editingTemplate || undefined,
                 });
             } else {
@@ -440,7 +440,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     coverLetterId: docId as Id<"coverLetters">,
                     name: editingName || undefined,
                     label: editingLabel || undefined,
-                    tags: editingTags.length > 0 ? editingTags : undefined,
+                    tags: editingTags,
                     template: editingTemplate || undefined,
                 });
             }
@@ -736,13 +736,28 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         </>
                     )}
                 </div>
-                <Input
-                    type="search"
-                    placeholder="Search by name, label, or tags..."
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    className="w-full min-w-0 max-w-sm"
-                />
+                <div className="relative w-full min-w-0 max-w-sm">
+                    <Input
+                        type="text"
+                        placeholder="Search by name, label, or tags..."
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        className="w-full pr-8"
+                    />
+                    {searchTerm && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearchTerm("");
+                                setEditingContentResumeId(null);
+                                setEditingContentCoverLetterId(null);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {isUploading && (
@@ -858,6 +873,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                 tabIndex={0}
                                 onClick={() => handleDocumentClick(resumeId, documentType)}
                                 onKeyDown={(event) => {
+                                    const target = event.target as HTMLElement;
+                                    const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+                                    if (isInput) return;
                                     if (event.key === "Enter" || event.key === " ") {
                                         event.preventDefault();
                                         handleDocumentClick(resumeId, documentType);
@@ -1370,7 +1388,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 <div className="mt-6 rounded-xl border border-border bg-card overflow-hidden">
                     <JkCW_DynamicJSONEditor
                         resumeId={editingContentResumeId}
-                        onClose={() => setEditingContentResumeId(null)}
+                        onClose={() => { setEditingContentResumeId(null); setSearchTerm(""); }}
                     />
                 </div>
             )}
@@ -1379,7 +1397,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 <div className="mt-6 rounded-xl border border-border bg-card overflow-hidden">
                     <JkCW_CoverLetterContentEditor
                         coverLetterId={editingContentCoverLetterId}
-                        onClose={() => setEditingContentCoverLetterId(null)}
+                        onClose={() => { setEditingContentCoverLetterId(null); setSearchTerm(""); }}
                     />
                 </div>
             )}
