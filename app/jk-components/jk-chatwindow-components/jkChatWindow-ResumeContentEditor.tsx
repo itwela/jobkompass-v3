@@ -105,6 +105,8 @@ export default function JkCW_ResumeContentEditor({
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["personalInfo"]));
     const [hasChanges, setHasChanges] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [technicalSkillsText, setTechnicalSkillsText] = useState("");
+    const [additionalSkillsText, setAdditionalSkillsText] = useState("");
 
     // AI Button Component - Shows "coming soon" toast
     const AiButton = ({ position = "top-right" }: { position?: "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right" }) => {
@@ -248,18 +250,30 @@ export default function JkCW_ResumeContentEditor({
         if (hasLoadedRef.current) return;
         
         if (initialContent) {
-            setContent(normalizeContent(initialContent));
+            const normalized = normalizeContent(initialContent);
+            setContent(normalized);
+            setTechnicalSkillsText(normalized.skills.technical.join(", "));
+            setAdditionalSkillsText(normalized.skills.additional?.join(", ") || "");
             hasLoadedRef.current = true;
         } else if (resume?.content) {
-            setContent(normalizeContent(resume.content));
+            const normalized = normalizeContent(resume.content);
+            setContent(normalized);
+            setTechnicalSkillsText(normalized.skills.technical.join(", "));
+            setAdditionalSkillsText(normalized.skills.additional?.join(", ") || "");
             hasLoadedRef.current = true;
         }
     }, [resume, initialContent]);
 
-    // Keep the ref updated with current content (no state changes, just ref)
+    // Keep the ref updated with current content including skills text
     useEffect(() => {
         if (contentRef) {
-            contentRef.current = content;
+            contentRef.current = {
+                ...content,
+                skills: {
+                    technical: technicalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
+                    additional: additionalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
+                },
+            };
         }
     });
 
@@ -308,7 +322,7 @@ export default function JkCW_ResumeContentEditor({
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            // Clean empty lines from detail arrays before saving
+            // Clean empty lines and whitespace-only entries before saving
             const cleanedContent = {
                 ...content,
                 experience: content.experience.map(exp => ({
@@ -323,6 +337,10 @@ export default function JkCW_ResumeContentEditor({
                     ...proj,
                     details: proj.details?.filter(d => d.trim() !== ""),
                 })),
+                skills: {
+                    technical: technicalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
+                    additional: additionalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
+                },
             };
             await updateResume({
                 resumeId,
@@ -419,24 +437,12 @@ export default function JkCW_ResumeContentEditor({
     };
 
     const updateTechnicalSkills = (value: string) => {
-        setContent(prev => ({
-            ...prev,
-            skills: {
-                ...prev.skills,
-                technical: value.split(',').map(s => s.trim()).filter(Boolean)
-            }
-        }));
+        setTechnicalSkillsText(value);
         setHasChanges(true);
     };
 
     const updateAdditionalSkills = (value: string) => {
-        setContent(prev => ({
-            ...prev,
-            skills: {
-                ...prev.skills,
-                additional: value.split(',').map(s => s.trim()).filter(Boolean)
-            }
-        }));
+        setAdditionalSkillsText(value);
         setHasChanges(true);
     };
 
@@ -889,7 +895,7 @@ export default function JkCW_ResumeContentEditor({
                                     <AiButton />
                                 </div>
                             <Textarea
-                                    value={content.skills.technical.join(", ")}
+                                    value={technicalSkillsText}
                                     onChange={(e) => updateTechnicalSkills(e.target.value)}
                                     placeholder="Python, JavaScript, TypeScript, React, Next.js, Node.js"
                                 rows={3}
@@ -902,7 +908,7 @@ export default function JkCW_ResumeContentEditor({
                                     <AiButton />
                                 </div>
                                 <Textarea
-                                    value={content.skills.additional?.join(", ") || ""}
+                                    value={additionalSkillsText}
                                     onChange={(e) => updateAdditionalSkills(e.target.value)}
                                     placeholder="UI/UX Design, Product Development, Agile, Leadership"
                                     rows={2}
