@@ -6,7 +6,7 @@ import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check } from "lucide-react"
+import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check, Key, Copy, RefreshCw, Eye, EyeOff, Puzzle } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,14 @@ export default function JkCW_SettingsMode() {
   const updateResumePreferences = useMutation(api.auth.updateResumePreferences)
   const resumePreferences = useQuery(api.auth.getResumePreferences)
   
+  // Extension API key
+  const extensionApiKey = useQuery(api.extensionApiKeys.get, isAuthenticated ? {} : "skip")
+  const generateApiKey = useMutation(api.extensionApiKeys.generate)
+  const revokeApiKey = useMutation(api.extensionApiKeys.revoke)
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false)
+  const [isRevokingKey, setIsRevokingKey] = useState(false)
+  const [showApiKey, setShowApiKey] = useState(false)
+
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
   const [username, setUsername] = useState(user?.username || "")
@@ -222,6 +230,60 @@ export default function JkCW_SettingsMode() {
       })
       // Revert on error
       setPreferences(preferences)
+    }
+  }
+
+  const handleGenerateApiKey = async () => {
+    setIsGeneratingKey(true)
+    try {
+      const key = await generateApiKey()
+      setShowApiKey(true)
+      toast.success('API Key Generated', {
+        description: 'Copy it now — you won\'t be able to see it again after leaving this page.',
+        duration: 5000,
+      })
+    } catch (error) {
+      toast.error('Failed to Generate Key', {
+        description: error instanceof Error ? error.message : 'Something went wrong',
+        duration: 3000,
+      })
+    } finally {
+      setIsGeneratingKey(false)
+    }
+  }
+
+  const handleRevokeApiKey = async () => {
+    setIsRevokingKey(true)
+    try {
+      await revokeApiKey()
+      setShowApiKey(false)
+      toast.success('API Key Revoked', {
+        description: 'Your extension API key has been deactivated.',
+        duration: 3000,
+      })
+    } catch (error) {
+      toast.error('Failed to Revoke Key', {
+        description: error instanceof Error ? error.message : 'Something went wrong',
+        duration: 3000,
+      })
+    } finally {
+      setIsRevokingKey(false)
+    }
+  }
+
+  const handleCopyApiKey = async () => {
+    if (!extensionApiKey?.key) return
+    try {
+      await navigator.clipboard.writeText(extensionApiKey.key)
+      toast.success('Copied!', {
+        description: 'API key copied to clipboard',
+        duration: 2000,
+      })
+    } catch {
+      toast.error('Copy Failed', {
+        description: 'Could not copy to clipboard',
+        duration: 2000,
+      })
     }
   }
 
@@ -512,6 +574,98 @@ export default function JkCW_SettingsMode() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Chrome Extension API Key Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Puzzle className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold">Chrome Extension</h2>
+            </div>
+            <div className="pl-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Save job listings from any website with the JobKompass Chrome Extension.
+                Generate an API key to connect the extension to your account.
+              </p>
+
+              {extensionApiKey ? (
+                // Key exists — show it
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
+                    <Key className="h-4 w-4 text-primary flex-shrink-0" />
+                    <code className="flex-1 text-sm font-mono break-all">
+                      {showApiKey
+                        ? extensionApiKey.key
+                        : extensionApiKey.key.substring(0, 6) + '•'.repeat(20) + extensionApiKey.key.substring(extensionApiKey.key.length - 4)
+                      }
+                    </code>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="p-1.5 hover:bg-muted rounded transition-colors"
+                        title={showApiKey ? 'Hide key' : 'Show key'}
+                      >
+                        {showApiKey
+                          ? <EyeOff className="h-4 w-4 text-muted-foreground" />
+                          : <Eye className="h-4 w-4 text-muted-foreground" />
+                        }
+                      </button>
+                      <button
+                        onClick={handleCopyApiKey}
+                        className="p-1.5 hover:bg-muted rounded transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        <Copy className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Last used: {new Date(extensionApiKey.lastUsedAt).toLocaleDateString()}
+                  </p>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateApiKey}
+                      disabled={isGeneratingKey}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${isGeneratingKey ? 'animate-spin' : ''}`} />
+                      {isGeneratingKey ? 'Regenerating...' : 'Regenerate Key'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRevokeApiKey}
+                      disabled={isRevokingKey}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      {isRevokingKey ? 'Revoking...' : 'Revoke Key'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // No key — show generate button
+                <div className="space-y-3">
+                  <Button
+                    onClick={handleGenerateApiKey}
+                    disabled={isGeneratingKey}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Key className="h-4 w-4" />
+                    {isGeneratingKey ? 'Generating...' : 'Generate API Key'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    After generating, paste the key into the extension settings to connect your account.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

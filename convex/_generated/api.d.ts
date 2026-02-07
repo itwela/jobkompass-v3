@@ -13,6 +13,8 @@ import type * as contacts from "../contacts.js";
 import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
 import type * as emailList from "../emailList.js";
+import type * as extensionApiKeys from "../extensionApiKeys.js";
+import type * as extensionSaveJob from "../extensionSaveJob.js";
 import type * as freeResumeStats from "../freeResumeStats.js";
 import type * as http from "../http.js";
 import type * as inputSanitizer from "../inputSanitizer.js";
@@ -43,6 +45,8 @@ declare const fullApi: ApiFromModules<{
   documents: typeof documents;
   dopeAgents: typeof dopeAgents;
   emailList: typeof emailList;
+  extensionApiKeys: typeof extensionApiKeys;
+  extensionSaveJob: typeof extensionSaveJob;
   freeResumeStats: typeof freeResumeStats;
   http: typeof http;
   inputSanitizer: typeof inputSanitizer;

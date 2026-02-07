@@ -109,6 +109,16 @@ const documentsTables = {
   }).index("by_user", ["userId"])
     .index("by_username", ["username"]),
 
+  // Chrome extension API keys for saving job listings
+  extensionApiKeys: defineTable({
+    userId: v.string(), // convex_user_id
+    key: v.string(), // The API key string (jk_...)
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    lastUsedAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_key", ["key"]),
+
   threads: defineTable({
     userId: v.optional(v.string()), // Use convex_user_id as the sole identifier
     username: v.string(), // Keep for backward compatibility
