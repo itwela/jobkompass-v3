@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from "react"
-import { useCallback, useRef, useEffect } from "react"
+import { useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { sanitizeByType, type InputType as SanitizerInputType } from "@/lib/inputSanitizer"
 
@@ -75,15 +75,8 @@ function Textarea({
     onBlur?.(e)
   }, [sanitize, sanitizeType, onChange, onBlur])
 
-  // Sync external value changes
-  useEffect(() => {
-    if (textareaRef.current && value !== undefined && sanitize) {
-      const sanitized = sanitizeByType(String(value), sanitizeType)
-      if (textareaRef.current.value !== sanitized) {
-        textareaRef.current.value = sanitized
-      }
-    }
-  }, [value, sanitize, sanitizeType])
+  // No manual DOM sync needed - React handles controlled component value binding.
+  // The previous useEffect was sanitizing on every value change, which reset cursor position.
 
   return (
     <textarea

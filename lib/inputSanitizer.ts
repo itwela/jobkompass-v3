@@ -23,14 +23,9 @@ export function sanitizeInput(input: string): string {
   // Remove control characters except newlines, tabs, and carriage returns
   sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
-  // Encode HTML entities to prevent XSS
-  sanitized = sanitized
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+  // Remove HTML tags to prevent XSS (React already escapes output,
+  // so HTML entity encoding is unnecessary and corrupts user input)
+  sanitized = sanitized.replace(/<[^>]*>/g, '');
 
   // Remove potential NoSQL injection patterns
   sanitized = sanitized.replace(/\$[a-zA-Z_][a-zA-Z0-9_]*/g, '');
@@ -176,7 +171,7 @@ export function sanitizeByType(input: string, type: InputType = 'text'): string 
       return sanitizeRichText(input);
     case 'textarea':
       // For textarea, we sanitize but preserve newlines
-      return sanitizeInput(input).replace(/&#x27;/g, "'").replace(/&#x2F;/g, '/');
+      return sanitizeInput(input);
     case 'text':
     default:
       return sanitizeInput(input);

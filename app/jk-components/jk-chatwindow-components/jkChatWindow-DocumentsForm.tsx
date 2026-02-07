@@ -1019,6 +1019,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             onClick={async (event) => {
                                                                 event.stopPropagation();
                                                                 await markDocumentAsSeen(resumeId, documentType);
+                                                                setSearchTerm(title);
                                                                 if (documentType === "resume") {
                                                                     selectDocument(resumeId, "resume");
                                                                     setEditingContentResumeId(resume._id);
