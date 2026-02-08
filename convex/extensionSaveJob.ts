@@ -90,12 +90,14 @@ export const parseAndSave = internalAction({
     const keywords = Array.isArray(parsed?.keywords) ? parsed.keywords.slice(0, 8) : undefined;
 
     // Save to database using the internal mutation
+    const finalStatus = args.status || "Interested";
+    console.log("Extension save - status received:", args.status, "final status:", finalStatus);
     const jobId: string = await ctx.runMutation(internal.jobs.addInternal, {
       userId: args.userId,
       company,
       title,
       link: args.pageUrl,
-      status: args.status || "Interested",
+      status: finalStatus,
       description,
       skills,
       keywords,

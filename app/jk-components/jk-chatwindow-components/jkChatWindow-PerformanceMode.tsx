@@ -19,7 +19,8 @@ import {
   Loader2,
   TrendingDown,
   CheckCircle2,
-  CreditCard
+  CreditCard,
+  RefreshCw
 } from 'lucide-react'
 import { BlurFade } from '@/components/ui/blur-fade'
 
@@ -344,11 +345,12 @@ export default function JkCW_PerformanceMode() {
                     <span className="text-sm">Analyzing your job hunt...</span>
                   </div>
                 ) : summaryError ? (
-                  <div className="text-sm text-muted-foreground">
-                    <p className="text-red-600 mb-2">{summaryError}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm text-muted-foreground">There was a hiccup generating your AI summary.</p>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="shrink-0 gap-1.5"
                       onClick={() => {
                         setIsLoadingSummary(true);
                         setSummaryError(null);
@@ -369,6 +371,7 @@ export default function JkCW_PerformanceMode() {
                           .finally(() => setIsLoadingSummary(false));
                       }}
                     >
+                      <RefreshCw className="h-3.5 w-3.5" />
                       Try Again
                     </Button>
                   </div>

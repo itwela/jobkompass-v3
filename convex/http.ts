@@ -60,18 +60,15 @@ http.route({
       }
 
       // Run the parse + save action
-      // Build args - only include status if explicitly provided (Convex doesn't accept undefined for optional fields)
-      const parseArgs: Record<string, any> = {
+      console.log("Extension HTTP - status from body:", status, "type:", typeof status);
+      const result = await ctx.runAction(internal.extensionSaveJob.parseAndSave, {
         userId: keyRecord.userId,
         apiKeyId: keyRecord._id,
         pageText: pageText,
         pageUrl: pageUrl || "",
         pageTitle: pageTitle || "",
-      };
-      if (status && typeof status === "string") {
-        parseArgs.status = status;
-      }
-      const result = await ctx.runAction(internal.extensionSaveJob.parseAndSave, parseArgs);
+        ...(status && typeof status === "string" ? { status } : {}),
+      });
 
       return new Response(
         JSON.stringify({

@@ -14,6 +14,12 @@ import JkReorderableItem from "./jkReorderableItem";
 import { cn } from "@/lib/utils";
 import JkSlideModalGlass from "../jkSlideModalGlass";
 
+// Convert literal \n sequences (from AI-generated text) into real newlines for textarea display
+function cleanNewlines(text: string): string {
+    if (!text) return text;
+    return text.replace(/\\n/g, '\n');
+}
+
 type CoverLetterContent = {
     personalInfo: {
         firstName: string;
@@ -111,9 +117,9 @@ export default function JkCW_CoverLetterContentEditor({
                         companyAddress: coverLetterContent.jobInfo?.companyAddress || "",
                     },
                     letterContent: {
-                        openingParagraph: coverLetterContent.letterContent?.openingParagraph || "",
-                        bodyParagraphs: coverLetterContent.letterContent?.bodyParagraphs || [],
-                        closingParagraph: coverLetterContent.letterContent?.closingParagraph || "",
+                        openingParagraph: cleanNewlines(coverLetterContent.letterContent?.openingParagraph || ""),
+                        bodyParagraphs: (coverLetterContent.letterContent?.bodyParagraphs || []).map((p: string) => cleanNewlines(p)),
+                        closingParagraph: cleanNewlines(coverLetterContent.letterContent?.closingParagraph || ""),
                     },
                 };
                 setContent(formattedContent);
@@ -134,8 +140,16 @@ export default function JkCW_CoverLetterContentEditor({
     // Sync initial content if provided
     useEffect(() => {
         if (initialContent && !hasLoadedRef.current) {
-            setContent(initialContent);
-            setInitialFormContent(initialContent);
+            const cleaned = {
+                ...initialContent,
+                letterContent: {
+                    openingParagraph: cleanNewlines(initialContent.letterContent.openingParagraph),
+                    bodyParagraphs: initialContent.letterContent.bodyParagraphs.map((p: string) => cleanNewlines(p)),
+                    closingParagraph: cleanNewlines(initialContent.letterContent.closingParagraph),
+                },
+            };
+            setContent(cleaned);
+            setInitialFormContent(cleaned);
             hasLoadedRef.current = true;
         }
     }, [initialContent]);
