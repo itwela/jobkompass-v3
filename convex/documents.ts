@@ -1047,3 +1047,62 @@ export const createTestResumes = mutation({
     return testResumes;
   },
 });
+
+// Duplicate a resume
+export const duplicateResume = mutation({
+  args: {
+    resumeId: v.id("resumes"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || resume.userId !== userId) {
+      throw new Error("Resume not found or access denied");
+    }
+
+    const now = Date.now();
+
+    return await ctx.db.insert("resumes", {
+      userId: userId,
+      name: `${resume.name} (Copy)`,
+      createdAt: now,
+      updatedAt: now,
+      isActive: resume.isActive ?? true,
+      content: resume.content,
+      label: resume.label,
+      tags: resume.tags,
+      template: resume.template,
+    });
+  },
+});
+
+// Duplicate a cover letter
+export const duplicateCoverLetter = mutation({
+  args: {
+    coverLetterId: v.id("coverLetters"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const coverLetter = await ctx.db.get(args.coverLetterId);
+    if (!coverLetter || coverLetter.userId !== userId) {
+      throw new Error("Cover letter not found or access denied");
+    }
+
+    const now = Date.now();
+
+    return await ctx.db.insert("coverLetters", {
+      userId: userId,
+      name: `${coverLetter.name} (Copy)`,
+      createdAt: now,
+      updatedAt: now,
+      content: coverLetter.content,
+      label: coverLetter.label,
+      tags: coverLetter.tags,
+      template: coverLetter.template,
+    });
+  },
+});

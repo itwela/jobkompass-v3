@@ -8,7 +8,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
@@ -158,6 +158,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const updateResumeFileMetadata = useMutation(api.documents.updateResumeFileMetadata);
     const updateCoverLetterMetadata = useMutation(api.documents.updateCoverLetterMetadata);
     const deleteCoverLetterMutation = useMutation(api.documents.deleteCoverLetter);
+    const duplicateResumeMutation = useMutation(api.documents.duplicateResume);
+    const duplicateCoverLetterMutation = useMutation(api.documents.duplicateCoverLetter);
 
     // Track which document type is being edited for metadata
     const [editingDocType, setEditingDocType] = useState<"resume" | "cover-letter" | null>(null);
@@ -1074,6 +1076,25 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                                 <span>Download PDF</span>
                                                             </DropdownMenuItem>
                                                         )}
+                                                        <DropdownMenuItem
+                                                            onClick={async (event) => {
+                                                                event.stopPropagation();
+                                                                try {
+                                                                    if (documentType === "resume") {
+                                                                        await duplicateResumeMutation({ resumeId: resume._id });
+                                                                    } else {
+                                                                        await duplicateCoverLetterMutation({ coverLetterId: resume._id as Id<"coverLetters"> });
+                                                                    }
+                                                                    toast.success(`Duplicated "${title}"`);
+                                                                } catch (error) {
+                                                                    console.error("Failed to duplicate:", error);
+                                                                    toast.error("Failed to duplicate document");
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Copy className="h-4 w-4" />
+                                                            <span>Duplicate</span>
+                                                        </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             variant="destructive"
