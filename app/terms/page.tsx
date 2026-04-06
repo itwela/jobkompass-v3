@@ -1,3 +1,111 @@
+import JkPublicHeader from "@/app/jk-components/jkPublicHeader";
+import JkFooter from "@/app/jk-components/jkFooter";
+
+export const metadata = {
+  title: "Terms of Service | JobKompass",
+  description:
+    "Read the terms and conditions for using JobKompass and its career tools.",
+};
+
+export default function TermsPage() {
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <JkPublicHeader showPricing showSignIn />
+      <main className="flex-1">
+        <section className="py-12 px-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-4">Terms of Service</h1>
+            <p className="text-muted-foreground mb-6">
+              These Terms of Service (&quot;Terms&quot;) govern your access to and use
+              of JobKompass. By using JobKompass, you agree to be bound by these Terms.
+            </p>
+
+            <div className="space-y-6 text-sm leading-relaxed">
+              <section>
+                <h2 className="text-xl font-semibold mb-2">1. Use of the Service</h2>
+                <p className="text-muted-foreground">
+                  JobKompass is provided to help you manage your job search, create
+                  resumes and cover letters, and organize your career information. You
+                  agree to use the service only for lawful purposes and in accordance
+                  with these Terms.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">2. Accounts &amp; Security</h2>
+                <p className="text-muted-foreground">
+                  You are responsible for maintaining the confidentiality of your
+                  account and for all activities that occur under your account. Please
+                  notify us promptly if you believe your account has been compromised.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">3. Content &amp; Ownership</h2>
+                <p className="text-muted-foreground">
+                  You retain ownership of the content you upload or create in
+                  JobKompass. By using the service, you grant us a limited license to
+                  process your content as needed to operate and improve the product
+                  (including AI-powered features), in line with our Privacy Policy.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">4. No Guarantees</h2>
+                <p className="text-muted-foreground">
+                  JobKompass is a tool to help you with your job search and career
+                  materials, but we do not guarantee job offers, interview requests, or
+                  specific outcomes. You are responsible for evaluating and using any
+                  recommendations or generated content.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">5. AI &amp; Third-Party Services</h2>
+                <p className="text-muted-foreground">
+                  Some features rely on AI models and third-party infrastructure. You
+                  understand that generated content may occasionally be inaccurate or
+                  incomplete and should be reviewed before use. Third-party services are
+                  subject to their own terms and policies.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">6. Termination</h2>
+                <p className="text-muted-foreground">
+                  We may suspend or terminate access to JobKompass if you violate these
+                  Terms, misuse the service, or engage in behavior that harms other
+                  users or the platform. You may stop using JobKompass at any time.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">7. Changes to These Terms</h2>
+                <p className="text-muted-foreground">
+                  We may update these Terms from time to time. If we make material
+                  changes, we&apos;ll update the &quot;last updated&quot; date and, where
+                  appropriate, notify you in the app or by email. Continued use of
+                  JobKompass after changes are effective constitutes acceptance of the
+                  updated Terms.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">8. Contact</h2>
+                <p className="text-muted-foreground">
+                  If you have questions about these Terms, please reach out via the
+                  Contact page.
+                </p>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+      <JkFooter />
+    </div>
+  );
+}
+
 'use client'
 
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"

@@ -29,6 +29,11 @@ interface CoverLetterContent {
     };
 }
 
+function getLatexServiceUrl() {
+    if (process.env.NODE_ENV === 'development') return 'http://127.0.0.1:8080';
+    return process.env.LATEX_SERVICE_URL ?? null;
+}
+
 export async function POST(req: Request) {
     try {
         const { content } = (await req.json()) as { content: CoverLetterContent };
@@ -37,7 +42,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing cover letter content' }, { status: 400 });
         }
 
-        const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+        const LATEX_SERVICE_URL = getLatexServiceUrl();
         if (!LATEX_SERVICE_URL) {
             return NextResponse.json(
                 { error: 'LaTeX service not configured', message: 'LATEX_SERVICE_URL environment variable is not set' },

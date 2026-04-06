@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, FileText, FileCheck, Sparkles, Check, Upload } from 'lucide-react'
+import { X, FileText, FileCheck, Sparkles, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -69,13 +69,11 @@ export default function JkTemplateSelector({
     const [descriptionExpanded, setDescriptionExpanded] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const DESC_TRUNCATE = 70
-
-    const selectedTemplate = templates.find(t => t.id === selectedTemplateId)
-
-    // Clear selection when modal closes
+    // Auto-select the only available template and reset input state when modal opens/closes
     useEffect(() => {
-        if (!isOpen) {
+        if (isOpen) {
+            if (templates.length > 0) setSelectedTemplateId(templates[0].id)
+        } else {
             setSelectedTemplateId(null)
             setResumeInputMode('reference')
             setResumePdf(null)
@@ -85,18 +83,6 @@ export default function JkTemplateSelector({
             setDescriptionExpanded(false)
         }
     }, [isOpen])
-
-    useEffect(() => {
-        setDescriptionExpanded(false)
-    }, [selectedTemplateId])
-
-    const handleTemplateClick = (templateId: string) => {
-        if (selectedTemplateId === templateId) {
-            setSelectedTemplateId(null)
-        } else {
-            setSelectedTemplateId(templateId)
-        }
-    }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -190,239 +176,126 @@ export default function JkTemplateSelector({
                             </Button>
                         </div>
 
-                        {/* Templates Grid */}
-                        <div className="p-5 w-full h-full overflow-x-auto !no-scrollbar">
-                            <div className="flex gap-4 h-full w-max !no-scrollbar">
-                                {templates.map((template) => {
-                                    const isSelected = selectedTemplateId === template.id
-
-                                    return (
-                                        <motion.div
-                                            key={template.id}
-                                            layout
-                                            onClick={() => handleTemplateClick(template.id)}
-                                            className={`place-self-center flex h-full relative rounded-lg overflow-hidden cursor-pointer transition-all ${isSelected
-                                                    ? 'ring-2 ring-primary/20'
-                                                    : 'border-2 border-border hover:border-muted-foreground/40'
-                                                }`}
+                        {/* Resume Input */}
+                        <div className="p-6 w-full h-full overflow-y-auto !no-scrollbar flex flex-col gap-5">
+                            {type === 'resume' && (
+                                <div className="space-y-4">
+                                    <label className="text-sm font-medium block">
+                                        How would you like to provide your resume?
+                                    </label>
+                                    <div className="flex gap-2 flex-wrap">
+                                        <Button
+                                            type="button"
+                                            variant={resumeInputMode === 'reference' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setResumeInputMode('reference')}
                                         >
-                                            <div className="flex h-full !no-scrollbar">
-                                                
-                                                {/* Preview Image and Info */}
-                                                <div className="relative !no-scrollbar flex  h-full">
-                                                    <img
-                                                        src={template.previewImage}
-                                                        alt={template.name}
-                                                        style={{ objectFit: 'contain' }}
-                                                        className=" h-full object-top z-1"
-                                                    />
+                                            Reference resume
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={resumeInputMode === 'upload' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setResumeInputMode('upload')}
+                                        >
+                                            Upload PDF
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={resumeInputMode === 'paste' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setResumeInputMode('paste')}
+                                        >
+                                            Paste text
+                                        </Button>
+                                    </div>
 
-                                                    {/* Info - Always visible */}
-                                                    <div className="p-2 bg-background w-full flex-shrink-0 flex flex-col z-10 absolute bottom-0 ">
-                                                        <h3 className="font-medium text-sm mb-2 text-center">{template.name}</h3>
-                                                        <div className="flex flex-wrap gap-1 justify-center">
-                                                            {template.tags?.slice(0, 2).map((tag) => (
-                                                                <span
-                                                                    key={tag}
-                                                                    className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground"
-                                                                >
-                                                                    {tag}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
+                                    {resumeInputMode === 'reference' && (
+                                        <div>
+                                            {referenceResumes.length > 0 ? (
+                                                <Select
+                                                    value={selectedReferenceResumeId ?? undefined}
+                                                    onValueChange={(v) => onSelectReferenceResume?.(v)}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Select a resume" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {referenceResumes.map((r) => (
+                                                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">No resumes in your documents yet. Use upload or paste instead.</p>
+                                            )}
+                                        </div>
+                                    )}
 
-                                                    {/* Selected Check */}
-                                                    {isSelected && (
-                                                        <motion.div
-                                                            initial={{ scale: 0 }}
-                                                            animate={{ scale: 1 }}
-                                                            className="absolute !no-scrollbar top-2 left-2 p-1 bg-primary rounded-full shadow-lg"
-                                                        >
-                                                            <Check className="h-3 w-3 text-primary-foreground" />
-                                                        </motion.div>
-                                                    )}
+                                    {resumeInputMode === 'upload' && (
+                                        <div className="space-y-2">
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".pdf,application/pdf"
+                                                onChange={handleFileChange}
+                                                className="hidden"
+                                            />
+                                            {resumePdf ? (
+                                                <div className="flex items-center gap-2 p-2 rounded-lg border bg-background">
+                                                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                                                    <span className="text-sm truncate flex-1">{resumePdfName || 'resume.pdf'}</span>
+                                                    <Button type="button" variant="ghost" size="sm" onClick={clearPdf}>Remove</Button>
                                                 </div>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full gap-2"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                >
+                                                    <Upload className="h-4 w-4" />
+                                                    Choose PDF file
+                                                </Button>
+                                            )}
+                                            <p className="text-[10px] text-muted-foreground">We&apos;ll extract content with AI and tailor it to the job.</p>
+                                        </div>
+                                    )}
 
-                                                {/* Expanded Details - Slides in from right */}
-                                                <AnimatePresence>
-                                                    {isSelected && (
-                                                        <motion.div
-                                                            initial={{ width: 0, opacity: 0 }}
-                                                            animate={{ width: "400px", opacity: 1 }}
-                                                            exit={{ width: 0, opacity: 0 }}
-                                                            transition={{ duration: 0.2 }}
-                                                            className="overflow-hidden border-l"
-                                                        >
-                                                            <div className="p-5 bg-muted/30 h-full flex flex-col min-w-[280px]">
-                                                                <h3 className="font-semibold mb-2">{template.name}</h3>
-                                                                <div className="text-sm text-muted-foreground mb-3">
-                                                                    <p>
-                                                                        {descriptionExpanded || (template.description?.length ?? 0) <= DESC_TRUNCATE
-                                                                            ? template.description
-                                                                            : `${template.description?.slice(0, DESC_TRUNCATE).trim()}...`}
-                                                                    </p>
-                                                                    {descriptionExpanded && (template.features?.length ?? 0) > 0 && (
-                                                                        <ul className="space-y-1 mt-2">
-                                                                            {template.features?.map((feature, index) => (
-                                                                                <li key={index} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                                    <div className="w-1 h-1 rounded-full bg-primary shrink-0" />
-                                                                                    {feature}
-                                                                                </li>
-                                                                            ))}
-                                                                        </ul>
-                                                                    )}
-                                                                    {((template.description?.length ?? 0) > DESC_TRUNCATE || (template.features?.length ?? 0) > 0) && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => { e.stopPropagation(); setDescriptionExpanded((v) => !v); }}
-                                                                            className="text-primary hover:underline text-xs mt-0.5 font-medium"
-                                                                        >
-                                                                            {descriptionExpanded ? 'See less' : 'See more'}
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                                {/* Resume input + Use Template - justified to bottom */}
-                                                                <div className="mt-auto space-y-4 pt-4">
-                                                                {type === 'resume' && (
-                                                                    <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                                                                        <label className="text-xs font-medium text-muted-foreground block">
-                                                                            How would you like to provide the reference content?
-                                                                        </label>
-                                                                        <div className="flex gap-2 flex-wrap">
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant={resumeInputMode === 'reference' ? 'default' : 'outline'}
-                                                                                size="sm"
-                                                                                onClick={() => setResumeInputMode('reference')}
-                                                                            >
-                                                                                1. Reference resume
-                                                                            </Button>
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant={resumeInputMode === 'upload' ? 'default' : 'outline'}
-                                                                                size="sm"
-                                                                                onClick={() => setResumeInputMode('upload')}
-                                                                            >
-                                                                                2. Upload new
-                                                                            </Button>
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant={resumeInputMode === 'paste' ? 'default' : 'outline'}
-                                                                                size="sm"
-                                                                                onClick={() => setResumeInputMode('paste')}
-                                                                            >
-                                                                                3. Paste text
-                                                                            </Button>
-                                                                        </div>
-
-                                                                        {resumeInputMode === 'reference' && (
-                                                                            <div>
-                                                                                {referenceResumes.length > 0 ? (
-                                                                                    <Select
-                                                                                        value={selectedReferenceResumeId ?? undefined}
-                                                                                        onValueChange={(v) => onSelectReferenceResume?.(v)}
-                                                                                    >
-                                                                                        <SelectTrigger className="w-full">
-                                                                                            <SelectValue placeholder="Select a resume" />
-                                                                                        </SelectTrigger>
-                                                                                        <SelectContent>
-                                                                                            {referenceResumes.map((r) => (
-                                                                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                                                                            ))}
-                                                                                        </SelectContent>
-                                                                                    </Select>
-                                                                                ) : (
-                                                                                    <p className="text-xs text-muted-foreground">No resumes in your documents yet. Use upload or paste instead.</p>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-
-                                                                        {resumeInputMode === 'upload' && (
-                                                                            <div className="space-y-2">
-                                                                                <input
-                                                                                    ref={fileInputRef}
-                                                                                    type="file"
-                                                                                    accept=".pdf,application/pdf"
-                                                                                    onChange={handleFileChange}
-                                                                                    className="hidden"
-                                                                                />
-                                                                                {resumePdf ? (
-                                                                                    <div className="flex items-center gap-2 p-2 rounded-lg border bg-background">
-                                                                                        <FileText className="h-4 w-4 text-primary shrink-0" />
-                                                                                        <span className="text-sm truncate flex-1">{resumePdfName || 'resume.pdf'}</span>
-                                                                                        <Button type="button" variant="ghost" size="sm" onClick={clearPdf}>Remove</Button>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="outline"
-                                                                                        className="w-full gap-2"
-                                                                                        onClick={() => fileInputRef.current?.click()}
-                                                                                    >
-                                                                                        <Upload className="h-4 w-4" />
-                                                                                        Choose PDF file
-                                                                                    </Button>
-                                                                                )}
-                                                                                <p className="text-[10px] text-muted-foreground">We&apos;ll extract content with AI and format it in this template.</p>
-                                                                            </div>
-                                                                        )}
-
-                                                                        {resumeInputMode === 'paste' && (
-                                                                            <div className="space-y-2">
-                                                                                <Textarea
-                                                                                    placeholder="Paste your resume text here..."
-                                                                                    value={resumeText}
-                                                                                    onChange={(e) => setResumeText(e.target.value)}
-                                                                                    className="min-h-[80px] text-sm resize-none"
-                                                                                    sanitize={false}
-                                                                                />
-                                                                                <Input
-                                                                                    placeholder="Optional: Add instructions (e.g. emphasize leadership, make it concise)"
-                                                                                    value={promptText}
-                                                                                    onChange={(e) => setPromptText(e.target.value)}
-                                                                                    className="text-sm"
-                                                                                    sanitize={false}
-                                                                                />
-                                                                                <p className="text-[10px] text-muted-foreground">Tip: You can add instructions in the box above to tailor the output (e.g. &quot;emphasize leadership&quot;, &quot;make it more concise&quot;).</p>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-
-                                                                <Button
-                                                                    disabled={isGenerating || (type === 'resume' && !hasResumeInput)}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation()
-                                                                        handleUseTemplate()
-                                                                    }}
-                                                                    className="gap-2 w-full"
-                                                                >
-                                                                    <Sparkles className="h-4 w-4" />
-                                                                    {isGenerating ? 'Generating...' : 'Use Template'}
-                                                                </Button>
-                                                                </div>
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-
-                                            </div>
-                                        </motion.div>
-                                    )
-                                })}
-                                {/* small spacing container */}
-                                <div className="w-2 h-full"></div>
-                            </div>
+                                    {resumeInputMode === 'paste' && (
+                                        <div className="space-y-2">
+                                            <Textarea
+                                                placeholder="Paste your resume text here..."
+                                                value={resumeText}
+                                                onChange={(e) => setResumeText(e.target.value)}
+                                                className="min-h-[120px] text-sm resize-none"
+                                                sanitize={false}
+                                            />
+                                            <Input
+                                                placeholder="Optional: Add instructions (e.g. emphasize leadership, make it concise)"
+                                                value={promptText}
+                                                onChange={(e) => setPromptText(e.target.value)}
+                                                className="text-sm"
+                                                sanitize={false}
+                                            />
+                                            <p className="text-[10px] text-muted-foreground">Tip: Add instructions above to further customize the output.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}
                         <div className="border-t bg-muted/20">
                             <div className="p-5 flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                    <Sparkles className="h-3 w-3" />
-                                    <p className="text-xs">More templates coming soon</p>
-                                </div>
+                                <Button
+                                    disabled={isGenerating || (type === 'resume' && !hasResumeInput)}
+                                    onClick={handleUseTemplate}
+                                    className="gap-2"
+                                >
+                                    <Sparkles className="h-4 w-4" />
+                                    {isGenerating ? 'Generating...' : 'Generate'}
+                                </Button>
                                 <TooltipProvider>
                                     {(() => {
                                         const model = getModelForTemplateGeneration();

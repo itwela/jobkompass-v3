@@ -84,7 +84,7 @@ function Textarea({
       data-slot="textarea"
       data-size={size}
       className={cn(
-        "placeholder:text-muted-foreground no-scrollbar dark:aria-invalid:ring-destructive/40 aria-invalid:ring-destructive/20 aria-invalid:border-destructive dark:bg-input/30 field-sizing-content w-full rounded-md bg-transparent transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "placeholder:text-muted-foreground no-scrollbar dark:aria-invalid:ring-destructive/40 aria-invalid:ring-destructive/20 aria-invalid:border-destructive field-sizing-content w-full rounded-md bg-transparent transition-[color,box-shadow] outline-none disabled:cursor-not-allowed disabled:opacity-50",
         sizeClasses[size],
         showBorder && "border border-input focus-visible:border-ring",
         // Removed focus-visible:ring and focus-visible:border

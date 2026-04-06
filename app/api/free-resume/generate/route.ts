@@ -8,6 +8,21 @@ import { extractResumeContent } from '@/lib/resume/extractFromPdf';
 
 const MAX_PDF_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
+function getLatexServiceUrl(request: NextRequest) {
+  const envUrl = process.env.LATEX_SERVICE_URL;
+  if (envUrl) return envUrl;
+
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1') {
+    // When running locally without LATEX_SERVICE_URL configured,
+    // assume the Dockerized LaTeX service is running on localhost:3000.
+    return 'http://127.0.0.1:3000';
+  }
+
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -125,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate LaTeX and compile to PDF
-    const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+    const LATEX_SERVICE_URL = getLatexServiceUrl(request);
     if (!LATEX_SERVICE_URL) {
       return NextResponse.json(
         { error: 'LaTeX service not configured' },

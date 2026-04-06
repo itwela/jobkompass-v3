@@ -31,7 +31,7 @@ function formatUrl(url: string | null | undefined) {
     const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
     return formattedUrl;
 };
-
+ 
 // Helper function to get the current time in a human readable format
 function getFormattedTime() {
   const now = new Date();
@@ -90,7 +90,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       references: z.array(z.string()).optional().nullable().describe('References'),
     }).optional().nullable(),
     targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
-    templateId: z.enum(['jake']).describe('REQUIRED: Use "jake" (JobKompass Jake) - the only template currently available.'),
+    templateId: z.enum(['jake']).default('jake').describe('Template to use. Always use "jake" — it is the only template available.'),
   }),
   execute: async (input) => {
     const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -108,7 +108,10 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
     });
     
     try {
-      const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+      const LATEX_SERVICE_URL =
+        process.env.NODE_ENV === 'development'
+          ? 'http://127.0.0.1:8080'
+          : process.env.LATEX_SERVICE_URL;
       if (!LATEX_SERVICE_URL) {
         return {
           success: false,
@@ -422,7 +425,10 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
 
       /// SECTION PDF GENERATION (LaTeX service)
       
-      const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+      const LATEX_SERVICE_URL =
+        process.env.NODE_ENV === 'development'
+          ? 'http://127.0.0.1:8080'
+          : process.env.LATEX_SERVICE_URL;
       if (!LATEX_SERVICE_URL) {
         return {
           success: false,

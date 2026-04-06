@@ -5,16 +5,20 @@ import { internal } from "./_generated/api";
 const OPENROUTER_PARSE_PROMPT = `You are a job listing parser. Extract structured information from the following webpage text that contains a job listing.
 
 Return a JSON object with these fields:
-- company: string (the company name)
+- company: string (the hiring company name — NOT a job board like LinkedIn, Indeed, or Glassdoor)
 - title: string (the job title/position)
 - compensation: string or null (salary range if mentioned, e.g. "$100k-$150k")
 - location: string or null (job location, include remote if mentioned)
-- description: string (a concise 2-3 sentence summary of the role)
-- skills: string[] (key skills/requirements, max 10)
-- keywords: string[] (relevant keywords for this job, max 8)
+- description: string (the FULL job description text — copy it completely, do NOT summarize or shorten it; only omit boilerplate site UI text like navigation menus and footers)
+- skills: string[] (every skill, tool, technology, and qualification explicitly mentioned — be exhaustive, not selective)
+- keywords: string[] (ATS-relevant keywords from the posting: role-specific terms, methodologies, certifications, seniority level)
 
-If you cannot determine a field, use null for optional fields or "Unknown" for required string fields.
-Respond with ONLY valid JSON, no explanation or markdown.`;
+Rules:
+- For company: extract the actual employer, not the platform hosting the listing
+- For description: preserve the complete posting text including responsibilities, requirements, and nice-to-haves
+- For skills: include ALL technical and soft skills mentioned, no arbitrary cap
+- If you cannot determine a field, use null for optional fields or "Unknown" for required string fields
+- Respond with ONLY valid JSON, no explanation or markdown`;
 
 // Internal action: parse job listing text with OpenRouter and save to database
 export const parseAndSave = internalAction({
@@ -50,7 +54,7 @@ export const parseAndSave = internalAction({
             { role: "user", content: args.pageText.substring(0, 12000) },
           ],
           temperature: 0.1,
-          max_tokens: 1000,
+          max_tokens: 4000,
         }),
       });
 
@@ -85,9 +89,9 @@ export const parseAndSave = internalAction({
     const company = parsed?.company || extractCompanyFromTitle(args.pageTitle) || "Unknown";
     const title = parsed?.title || extractJobTitleFromTitle(args.pageTitle) || "Job Listing";
     const compensation = parsed?.compensation || undefined;
-    const description = parsed?.description || args.pageText.substring(0, 500);
-    const skills = Array.isArray(parsed?.skills) ? parsed.skills.slice(0, 10) : undefined;
-    const keywords = Array.isArray(parsed?.keywords) ? parsed.keywords.slice(0, 8) : undefined;
+    const description = parsed?.description || args.pageText.substring(0, 8000);
+    const skills = Array.isArray(parsed?.skills) ? parsed.skills : undefined;
+    const keywords = Array.isArray(parsed?.keywords) ? parsed.keywords : undefined;
 
     // Save to database using the internal mutation
     const finalStatus = args.status || "Interested";
@@ -98,6 +102,7 @@ export const parseAndSave = internalAction({
       title,
       link: args.pageUrl,
       status: finalStatus,
+      compensation,
       description,
       skills,
       keywords,

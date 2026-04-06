@@ -1,13 +1,16 @@
 "use client"
 
 import { Toaster as Sonner } from "sonner"
+import { useJobKompassTheme } from "@/providers/jkThemeProvider"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ position = "top-right", ...props }: ToasterProps) => {
+  const { theme } = useJobKompassTheme()
+
   return (
     <Sonner
-      theme="light"
+      theme={theme}
       position={position}
       className="toaster group"
       toastOptions={{

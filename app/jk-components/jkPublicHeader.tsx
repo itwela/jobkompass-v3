@@ -9,10 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { Settings, LogOut, User, DollarSign } from 'lucide-react'
+import { Settings, LogOut, User, DollarSign, Moon, Sun } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { mainAssets } from '@/app/lib/constants'
 import JkGetStartedButton from './jkGetStartedButton'
+import { useJobKompassTheme } from '@/providers/jkThemeProvider'
 
 interface JkPublicHeaderProps {
   showPricing?: boolean
@@ -28,6 +29,7 @@ export default function JkPublicHeader({
   const { signOut } = useAuthActions()
   const router = useRouter()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const { theme, toggleTheme } = useJobKompassTheme()
 
   const handleSignOut = async () => {
     await signOut()
@@ -73,6 +75,28 @@ export default function JkPublicHeader({
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="flex items-center gap-2 sm:gap-4"
         >
+          {/* Theme toggle always visible on public header */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full border border-border/60 bg-background/60 hover:bg-accent/70 transition-colors"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            <motion.span
+              key={theme}
+              initial={{ opacity: 0, rotate: -15, y: -4 }}
+              animate={{ opacity: 1, rotate: 0, y: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-4 w-4 text-amber-300" />
+              ) : (
+                <Moon className="h-4 w-4 text-slate-700" />
+              )}
+            </motion.span>
+          </Button>
+
           {isAuthenticated && user ? (
             <>
               {showPricing && (

@@ -91,7 +91,7 @@ function JobCard({
   };
 
   const statusColors: Record<string, string> = {
-    Interested: 'bg-blue-100 text-blue-800 border-blue-200',
+    Interested: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-600 dark:text-white dark:border-blue-500',
     Applied: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     Callback: 'bg-cyan-100 text-cyan-800 border-cyan-200',
     Interviewing: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -139,7 +139,7 @@ const handleGenerateResume = (event: MouseEvent) => {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-xs text-blue-800 hover:text-blue-900 hover:underline shrink-0"
+            className="flex items-center gap-1 text-xs text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-400 hover:underline shrink-0"
           >
             View Job <ExternalLink className="h-3 w-3" />
           </a>
@@ -148,7 +148,7 @@ const handleGenerateResume = (event: MouseEvent) => {
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
             >
               <Sparkles className="h-3 w-3" />
               Generate

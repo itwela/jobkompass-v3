@@ -3,6 +3,11 @@ import crypto from 'crypto';
 import { generateResumeLatex, isValidResumeTemplateId } from '@/lib/resume/generators';
 import type { ResumeContent } from '@/lib/resume/types';
 
+function getLatexServiceUrl() {
+  if (process.env.NODE_ENV === 'development') return 'http://127.0.0.1:8080';
+  return process.env.LATEX_SERVICE_URL ?? null;
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ templateId: string }> }
@@ -21,7 +26,7 @@ export async function POST(
       return NextResponse.json({ error: 'Missing resume content' }, { status: 400 });
     }
 
-    const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+    const LATEX_SERVICE_URL = getLatexServiceUrl();
     if (!LATEX_SERVICE_URL) {
       return NextResponse.json(
         { error: 'LaTeX service not configured', message: 'LATEX_SERVICE_URL environment variable is not set' },

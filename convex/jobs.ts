@@ -305,6 +305,7 @@ export const addInternal = internalMutation({
     title: v.string(),
     link: v.string(),
     status: v.string(),
+    compensation: v.optional(v.string()),
     keywords: v.optional(v.array(v.string())),
     skills: v.optional(v.array(v.string())),
     description: v.optional(v.string()),

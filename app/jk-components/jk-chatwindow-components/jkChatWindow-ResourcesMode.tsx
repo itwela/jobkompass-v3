@@ -39,6 +39,7 @@ const CATEGORIES = [
   { value: 'networking', label: 'Networking', color: '#D1FAE5', bgColor: 'bg-green-100', textColor: 'text-green-800', borderColor: 'border-green-200', emoji: '🤝' }, // Offered
   { value: 'learning', label: 'Learning', color: '#FEE2E2', bgColor: 'bg-red-100', textColor: 'text-red-800', borderColor: 'border-red-200', emoji: '📚' }, // Rejected
   { value: 'tools', label: 'Tools', color: '#DBEAFE', bgColor: 'bg-blue-100', textColor: 'text-blue-800', borderColor: 'border-blue-200', emoji: '🔧' }, // Interested
+  { value: 'job-questions', label: 'Job Questions', color: '#ECFDF5', bgColor: 'bg-emerald-100', textColor: 'text-emerald-800', borderColor: 'border-emerald-200', emoji: '❓' },
   { value: 'other', label: 'Other', color: '#FEF3C7', bgColor: 'bg-yellow-100', textColor: 'text-yellow-800', borderColor: 'border-yellow-200', emoji: '📌' }, // Applied
 ] as const;
 
@@ -180,7 +181,7 @@ function StickyNote({
       className="relative h-full"
     >
       <div
-        className={`relative flex h-full min-h-[200px] max-h-[400px] flex-col rounded-tl-xl rounded-br-xl rounded-bl-xl p-5 cursor-pointer transition-transform duration-200 ${
+        className={`relative flex h-full min-h-[200px] max-h-[400px] flex-col rounded-tl-xl rounded-br-xl rounded-bl-xl p-5 cursor-pointer transition-transform duration-200 text-black ${
           selectionMode && isSelected ? "outline outline-2 outline-blue-400 shadow-[0_0_0_4px_rgba(37,99,235,0.15)]" : ""
         }`}
         style={{
@@ -209,11 +210,11 @@ function StickyNote({
               event.stopPropagation();
               onToggleSelection();
             }}
-            className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-black/70 shadow-sm transition-colors hover:text-blue-600"
+            className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-foreground/80 shadow-sm transition-colors hover:text-blue-500"
             aria-pressed={isSelected}
           >
             {isSelected ? (
-              <CheckCircle2 className="h-4 w-4 text-blue-600" />
+              <CheckCircle2 className="h-4 w-4 text-blue-500" />
             ) : (
               <Circle className="h-4 w-4" />
             )}
@@ -228,13 +229,13 @@ function StickyNote({
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, 'title')}
               placeholder="Title..."
-              className="w-full font-semibold text-lg bg-transparent border-none outline-none placeholder:text-black/30"
+              className="w-full font-semibold text-lg bg-transparent border-none outline-none placeholder:text-muted-foreground/60"
             />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Notes..."
-              className="w-full text-sm bg-transparent border-none outline-none resize-none placeholder:text-black/30 min-h-[100px] max-h-[180px] overflow-y-auto no-scrollbar break-words"
+              className="w-full text-sm bg-transparent border-none outline-none resize-none placeholder:text-muted-foreground/60 min-h-[100px] max-h-[180px] overflow-y-auto no-scrollbar break-words"
               rows={4}
             />
             <input
@@ -243,16 +244,16 @@ function StickyNote({
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, 'url')}
               placeholder="https://..."
-              className="w-full text-xs bg-transparent border-none outline-none placeholder:text-black/30 underline break-all"
+              className="w-full text-xs bg-transparent border-none outline-none placeholder:text-muted-foreground/60 underline break-all"
             />
             
             {/* Category Selector */}
             <div className="pt-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-black/70 mb-2">
+              <label className="flex items-center gap-2 text-xs font-medium text-foreground/80 mb-2">
                 <Tag className="h-3 w-3" />
                 Category (optional)
               </label>
-              <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat.value}
@@ -262,8 +263,8 @@ function StickyNote({
                     }}
                     className={`text-xs px-2 py-1 rounded transition-all flex items-center justify-center gap-1 ${
                       category === cat.value
-                        ? 'bg-black/20 font-semibold shadow-sm'
-                        : 'bg-black/5 hover:bg-black/10'
+                        ? 'bg-background/60 font-semibold shadow-sm'
+                        : 'bg-background/40 hover:bg-background/60'
                     }`}
                     style={
                       category === cat.value
@@ -349,9 +350,13 @@ function StickyNote({
               )}
               
               {resource.title ? (
-                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">{resource.title}</h3>
+                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words text-black">
+                  {resource.title}
+                </h3>
               ) : (
-                <h3 className="font-semibold text-lg leading-tight text-black/30 italic">Untitled</h3>
+                <h3 className="font-semibold text-lg leading-tight text-black/60 italic">
+                  Untitled
+                </h3>
               )}
               {resource.url && (
                 <div className="space-y-1">
@@ -360,11 +365,13 @@ function StickyNote({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm underline text-blue-800 hover:text-blue-900 flex items-center gap-1"
+                    className="text-sm underline text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-400 flex items-center gap-1"
                   >
                     Visit <ExternalLink className="h-3 w-3 flex-shrink-0" />
                   </a>
-                  <p className="text-xs text-black/50 break-all line-clamp-2">{resource.url}</p>
+                  <p className="text-xs text-black/70 break-all line-clamp-2">
+                    {resource.url}
+                  </p>
                 </div>
               )}
               {resource.description && (
@@ -373,15 +380,19 @@ function StickyNote({
                     isEditing ? "max-h-[210px]" : "max-h-[180px]"
                   }`}
                 >
-                  <p className="text-sm text-black/70 leading-relaxed whitespace-pre-wrap break-words">{resource.description}</p>
+                  <p className="text-sm text-black leading-relaxed whitespace-pre-wrap break-words">
+                    {resource.description}
+                  </p>
                 </div>
               )}
               {!resource.title && !resource.url && !resource.description && (
-                <p className="text-sm text-black/30 italic">Click to edit...</p>
+                <p className="text-sm text-black/60 italic">
+                  Click to edit...
+                </p>
               )}
             </div>
-            <div className="mt-auto pt-3 border-t border-black/10 flex-shrink-0">
-              <p className="text-xs text-black/50 truncate">
+            <div className="mt-auto pt-3 border-t border-border/40 flex-shrink-0">
+              <p className="text-xs text-black/70 truncate">
                 Last edited {formatDate(resource.updatedAt)}
               </p>
             </div>
@@ -499,7 +510,7 @@ export default function JkCW_ResourcesMode() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={() => { void handleAddNew(); }}
-              className="gap-2 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100"
+              className="gap-2 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500"
               disabled={selectionMode}
             >
               <Plus className="h-4 w-4" />
@@ -594,7 +605,7 @@ export default function JkCW_ResourcesMode() {
               variant={selectedCategory === null ? "outline" : "outline"}
               size="sm"
               onClick={() => setSelectedCategory(null)}
-              className={`gap-2 ${selectedCategory === null ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100' : ''}`}
+              className={`gap-2 ${selectedCategory === null ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500' : ''}`}
             >
               All ({allResources.length})
             </Button>
@@ -695,7 +706,7 @@ export default function JkCW_ResourcesMode() {
             <p className="text-muted-foreground mb-6">
               Click "New Note" to add your first resource
             </p>
-            <Button onClick={handleAddNew} size="lg" className="gap-2 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
+            <Button onClick={handleAddNew} size="lg" className="gap-2 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500">
               <Plus className="h-4 w-4" />
               Create Your First Note
             </Button>

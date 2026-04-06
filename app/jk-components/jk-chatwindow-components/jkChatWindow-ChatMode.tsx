@@ -93,6 +93,11 @@ export default function JkCW_ChatMode() {
     const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
     const [contextExceeded, setContextExceeded] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const [isUserNearBottom, setIsUserNearBottom] = useState(true)
+    const [hasNewMessages, setHasNewMessages] = useState(false)
+    const lastThreadIdRef = useRef<string | null>(null)
+    const pendingScrollRef = useRef(false)
 
     // Convex mutations
     const createThread = useMutation(api.threads.create)
@@ -118,6 +123,20 @@ export default function JkCW_ChatMode() {
             setMessages(loadedMessages)
             // Set context exceeded state from thread data
             setContextExceeded(threadData.thread?.contextWindowExceeded ?? false)
+
+            // If we're switching to a new thread, scroll to bottom once messages are loaded
+            if (pendingScrollRef.current) {
+                pendingScrollRef.current = false
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        if (messagesEndRef.current) {
+                            messagesEndRef.current.scrollIntoView({ behavior: 'instant' })
+                            setIsUserNearBottom(true)
+                            setHasNewMessages(false)
+                        }
+                    })
+                })
+            }
         } else if (!currentThreadId) {
             // Clear messages when no thread is selected (shows new chat interface)
             setMessages([])
@@ -125,10 +144,27 @@ export default function JkCW_ChatMode() {
         }
     }, [threadData, currentThreadId])
 
-    // Auto-scroll to bottom when new messages arrive
+    // Mark that a scroll is pending when switching threads
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
+        if (!currentThreadId) return
+        if (lastThreadIdRef.current !== currentThreadId) {
+            lastThreadIdRef.current = currentThreadId
+            pendingScrollRef.current = true
+        }
+    }, [currentThreadId])
+
+    const handleMessagesScroll = () => {
+        const container = messagesContainerRef.current
+        if (!container) return
+
+        const threshold = 80 // px from bottom to still count as "at bottom"
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+        const nearBottom = distanceFromBottom <= threshold
+        setIsUserNearBottom(nearBottom)
+        if (nearBottom) {
+            setHasNewMessages(false)
+        }
+    }
 
     // Send message function
     const sendMessage = async () => {
@@ -311,6 +347,10 @@ export default function JkCW_ChatMode() {
                                     ? { ...msg, content: fullContent }
                                     : msg
                             ))
+                            // If user is not at bottom, show a "new message" indicator instead of auto-scrolling
+                            if (!isUserNearBottom) {
+                                setHasNewMessages(true)
+                            }
                         } else if (data.type === 'done') {
                             // Stream complete - save assistant message to database
                             setIsLoading(false)
@@ -452,7 +492,11 @@ export default function JkCW_ChatMode() {
             />
 
             {/* Messages Container */}
-            <div className="flex-1 overflow-y-auto chat-scroll">
+            <div
+                className="flex-1 overflow-y-auto chat-scroll"
+                ref={messagesContainerRef}
+                onScroll={handleMessagesScroll}
+            >
                 <div className="max-w-3xl mx-auto px-6 py-6 w-full">
                 {messages.length === 0 ? (
                     <motion.div
@@ -536,8 +580,8 @@ export default function JkCW_ChatMode() {
                                 <div className={`
                                     max-w-[85%]
                                     ${message.type === 'user' 
-                                        ? 'bg-primary text-primary-foreground border border-primary rounded-2xl px-4 py-3' 
-                                        : 'bg-card px-6 py-4'
+                                        ? 'bg-primary text-white border border-primary rounded-2xl px-4 py-3' 
+                                        : 'bg-card dark:bg-transparent px-6 py-4'
                                     }
                                 `}>
                                     {/* File Indicator for User Messages */}
@@ -718,7 +762,7 @@ export default function JkCW_ChatMode() {
                                                                                 }
                                                                             }}
                                                                             id={`copy-latex-${message.id}-${idx}`}
-                                                                            className="bg-secondary text-black px-4 py-2 rounded-lg text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                                                                            className="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
                                                                         >
                                                                             Copy LaTeX
                                                                         </button>
@@ -805,6 +849,23 @@ export default function JkCW_ChatMode() {
                     {error && (
                         <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 text-sm">
                             ❌ {error}
+                        </div>
+                    )}
+
+                    {/* New message indicator when user has scrolled up */}
+                    {hasNewMessages && !isUserNearBottom && (
+                        <div className="sticky bottom-4 flex justify-center z-10 pointer-events-none">
+                            <button
+                                type="button"
+                                className="pointer-events-auto px-3 py-1.5 rounded-full bg-card border border-border shadow-sm text-xs text-foreground hover:bg-accent transition-colors"
+                                onClick={() => {
+                                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+                                    setHasNewMessages(false)
+                                    setIsUserNearBottom(true)
+                                }}
+                            >
+                                New message • Click to jump
+                            </button>
                         </div>
                     )}
                     

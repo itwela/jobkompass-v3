@@ -143,8 +143,11 @@ export default function JkCW_MyJobsMode() {
 
       toast.dismiss(toastId);
       const documentType = templateSelectorType === 'resume' ? 'Resume' : 'Cover letter';
+      const keywordsNote = data.keywords?.length
+        ? `Keywords used: ${data.keywords.join(', ')}`
+        : `Check your documents to view it.`;
       toast.success(`${documentType} for ${selectedJobForGeneration.company} generated!`, {
-        description: `Your ${typeLabel} is ready. Check your documents to see your new ${typeLabel} for ${selectedJobForGeneration.title} at ${selectedJobForGeneration.company}.`
+        description: keywordsNote,
       });
       
       setIsTemplateModalOpen(false);
@@ -316,7 +319,7 @@ export default function JkCW_MyJobsMode() {
                 variant={selectedStatus === null ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedStatus(null)}
-                className={`gap-2 ${selectedStatus === null ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100' : ''}`}
+                className={`gap-2 ${selectedStatus === null ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500' : ''}`}
               >
                 All ({allJobs.length})
               </Button>

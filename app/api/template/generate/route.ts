@@ -187,9 +187,54 @@ export async function POST(request: NextRequest) {
     // Get current user info (needed for cover letter name generation)
     const currentUser = await convexClient.query(api.auth.currentUser, {});
 
+    // ── Keyword Extraction Agent (resume only, when job data exists) ──────────
+    let extractedKeywords: string[] = [];
+    if (templateType === 'resume' && jobDetails) {
+      const keywordAgent = new Agent({
+        name: 'KeywordExtractor',
+        instructions: `You are an ATS keyword extraction specialist. Analyze the job posting and extract the most important keywords and phrases that must appear in a tailored resume to pass ATS screening.
+
+Extract keywords across these categories:
+1. Technical skills, tools, and technologies (exact names matter — "React.js" not just "React")
+2. Soft skills explicitly stated in the posting
+3. Role-specific action verbs (e.g. "architected", "spearheaded", "optimized")
+4. Industry terms, methodologies, and certifications
+5. Key responsibilities reframed as resume-ready competencies
+
+Rules:
+- Output ONLY a raw JSON array of strings. No markdown, no explanation, no code fences.
+- Format: ["keyword1", "keyword2", ...]
+- Limit to the 15–20 highest-impact keywords.
+- Prefer exact phrasing from the job posting.`,
+        model: "gpt-4o-mini",
+      });
+
+      const keywordUserMessage = `Extract ATS keywords from this job posting:
+Title: ${jobTitle || (jobDetails as any)?.title || 'N/A'}
+Company: ${jobCompany || (jobDetails as any)?.company || 'N/A'}
+Full job data: ${JSON.stringify(jobDetails)}`;
+
+      try {
+        const keywordResult = await run(keywordAgent, [user(keywordUserMessage)], { maxTurns: 1 });
+        const output = (keywordResult.finalOutput || '').trim();
+        const match = output.match(/\[[\s\S]*\]/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          if (Array.isArray(parsed)) extractedKeywords = parsed.filter((k: any) => typeof k === 'string');
+        }
+        console.log(`[${requestId}] [KEYWORD_EXTRACTOR] Extracted ${extractedKeywords.length} keywords`);
+      } catch (e) {
+        console.warn(`[${requestId}] [KEYWORD_EXTRACTOR] Extraction failed (non-fatal):`, e);
+      }
+    }
+
     // Create tool instances (only the generation tool is needed)
     const resumeTool = createResumeJakeTemplateTool(convexClient);
     const coverLetterTool = createCoverLetterJakeTemplateTool(convexClient);
+
+    const keywordsBlock = extractedKeywords.length > 0
+      ? `\nEXTRACTED JOB KEYWORDS — MUST integrate these naturally into the resume:\n${extractedKeywords.join(', ')}\n\nCRITICAL: These keywords were pulled directly from the job posting. Weave them into bullet points, the skills section, and any summary. Do NOT list them verbatim — incorporate them where genuinely applicable to the candidate's background.\n`
+      : '';
 
     // Build instructions using reference resume content (for resumes) or job info (for cover letters)
     let instructions = `You are a professional ${templateType === 'resume' ? 'resume' : 'cover letter'} generator. Generate a ${templateType === 'resume' ? 'professional, ATS-optimized resume' : 'tailored cover letter'} using the ${templateId} template. This is not a conversation, it is a single task.
@@ -198,12 +243,12 @@ ${templateType === 'resume' && referenceResume?.content ? `REFERENCE RESUME DATA
 - Resume name: ${referenceResume?.name || 'N/A'}
 - Resume content: ${JSON.stringify(referenceResume?.content || {}, null, 2)}
 
-
+${keywordsBlock}
 TASK:
 - Use the reference resume content as the primary source for all user information (personal info, experience, education, skills, etc.).
-- Tailor the content for that specific position.
+- Tailor the content for the target position by incorporating the extracted keywords above.
 - Apply any resume preferences provided.
-- IMPORTANT: When calling createResumeJakeTemplate, include "targetCompany" with the company name AND "templateId" with "${templateId}" (the template the user selected).
+- IMPORTANT: When calling createResumeJakeTemplate, include "targetCompany" with the company name AND "templateId" with "${templateId}".
 - Call createResumeJakeTemplate ONCE to generate and auto-save the document.` : `COVER LETTER GENERATION:
 ${jobTitle && jobCompany ? `TARGET POSITION: ${jobTitle} at ${jobCompany}` : ''}
 ${jobDetails ? `JOB DETAILS:\n${JSON.stringify(jobDetails, null, 2)}` : ''}
@@ -219,7 +264,7 @@ TASK:
   - Set jobInfo.company to "${jobCompany || 'the company name'}" so the document name includes the company name.
   - Set jobInfo.position to "${jobTitle || 'the job title'}"
   ${jobCompany ? `- Set targetCompany to "${jobCompany}" so the document name includes the company name.` : ''}
-  
+
 - Call createCoverLetterJakeTemplate ONCE to generate and auto-save the document.`}
 
 ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFERENCES (MUST APPLY):\n${resumePreferences.join('\n')}` : ''}
@@ -350,6 +395,7 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
     return NextResponse.json({
       success: true,
       message: `${templateType === 'resume' ? 'Resume' : 'Cover letter'} generated and saved successfully`,
+      keywords: extractedKeywords,
     });
   } catch (error) {
     console.error('Template generation error:', error);

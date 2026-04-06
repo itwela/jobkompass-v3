@@ -509,8 +509,7 @@ export function JobKompassThemeProvider({ children }: { children: React.ReactNod
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
     if (savedTheme) {
-      // setTheme(savedTheme);
-      setTheme('light');
+      setTheme(savedTheme);
     } else {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(prefersDark ? 'dark' : 'light');
@@ -519,6 +518,16 @@ export function JobKompassThemeProvider({ children }: { children: React.ReactNod
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
   }, [theme]);
 
   const value = {
@@ -530,9 +539,7 @@ export function JobKompassThemeProvider({ children }: { children: React.ReactNod
 
   return (
     <JobKompassThemeContext.Provider value={value}>
-      {/* <div className={`transition-colors duration-300 ${theme === 'dark' ? 'dark' : ''}`}> */}
-        {children}
-      {/* </div> */}
+      {children}
     </JobKompassThemeContext.Provider>
   );
 }

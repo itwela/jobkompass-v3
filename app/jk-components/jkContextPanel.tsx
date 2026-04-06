@@ -5,17 +5,9 @@ import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
-import { ChevronDown, ChevronUp, Radar, FileText, Briefcase, X, Check, Mail, Layout } from "lucide-react";
+import { ChevronDown, ChevronUp, Radar, FileText, Briefcase, X, Check, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getAppResumeTemplateOptions } from "@/lib/templates";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export default function JkContextPanel() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -26,15 +18,13 @@ export default function JkContextPanel() {
   const { 
     attachedResumeIds, 
     attachedCoverLetterIds,
-    attachedJobIds, 
-    addResumeAttachment, 
+    attachedJobIds,
+    addResumeAttachment,
     removeResumeAttachment,
     addCoverLetterAttachment,
     removeCoverLetterAttachment,
     addJobAttachment,
     removeJobAttachment,
-    selectedResumeTemplateId,
-    setSelectedResumeTemplateId,
   } = useJobKompassChatWindow();
 
   // Close context panel when message is sent
@@ -105,32 +95,6 @@ export default function JkContextPanel() {
         >
           <ChevronUp className="h-4 w-4" />
         </Button>
-      </div>
-
-      {/* Resume template for creation */}
-      <div className="px-4 py-2 border-b border-border bg-muted/20">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Layout className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">Resume template for AI creation</span>
-        </div>
-        <Select
-          value={selectedResumeTemplateId ?? ''}
-          onValueChange={(v) => setSelectedResumeTemplateId(v || null)}
-        >
-          <SelectTrigger className="h-8 text-sm">
-            <SelectValue placeholder="Select template (required for resume creation)" />
-          </SelectTrigger>
-          <SelectContent>
-            {getAppResumeTemplateOptions().map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-[10px] text-muted-foreground mt-1">
-          The AI will use this template when creating resumes. Select before asking to create.
-        </p>
       </div>
 
       {/* Tabs */}

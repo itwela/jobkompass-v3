@@ -1,3 +1,106 @@
+import JkPublicHeader from "@/app/jk-components/jkPublicHeader";
+import JkFooter from "@/app/jk-components/jkFooter";
+
+export const metadata = {
+  title: "Privacy Policy | JobKompass",
+  description:
+    "Learn how JobKompass collects, uses, and protects your data while helping you manage your career.",
+};
+
+export default function PrivacyPage() {
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <JkPublicHeader showPricing showSignIn />
+      <main className="flex-1">
+        <section className="py-12 px-6">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
+            <p className="text-muted-foreground mb-6">
+              This Privacy Policy explains how JobKompass (&quot;we&quot;, &quot;us&quot;,
+              &quot;our&quot;) collects, uses, and protects your information when you
+              use our products and services.
+            </p>
+
+            <div className="space-y-6 text-sm leading-relaxed">
+              <section>
+                <h2 className="text-xl font-semibold mb-2">1. Information We Collect</h2>
+                <p className="text-muted-foreground">
+                  We collect information you provide directly to us (such as account
+                  details, resumes, cover letters, job applications, and feedback) as
+                  well as usage data generated as you interact with the app. Some
+                  features may also process documents you upload (for example resumes
+                  and job descriptions) to provide AI-powered assistance.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">
+                  2. How We Use Your Information
+                </h2>
+                <p className="text-muted-foreground">
+                  We use your information to operate and improve JobKompass, personalize
+                  your experience, generate resumes and cover letters, help you track
+                  jobs, and communicate with you about updates, tips, and support. We may
+                  also use aggregated, anonymized data to improve our products and
+                  models.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">3. Data Sharing</h2>
+                <p className="text-muted-foreground">
+                  We do not sell your personal information. We may share data with
+                  service providers and infrastructure partners strictly as needed to
+                  run the app (for example, hosting, storage, analytics, or AI
+                  providers), subject to appropriate data protection safeguards.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">4. Data Retention &amp; Security</h2>
+                <p className="text-muted-foreground">
+                  We keep your data only as long as necessary to provide JobKompass or as
+                  required by law. We use reasonable technical and organizational
+                  measures to protect your information, but no system can be guaranteed
+                  100% secure.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">5. Your Choices</h2>
+                <p className="text-muted-foreground">
+                  You can update or delete certain information from within the app.
+                  Depending on your region, you may have additional rights over your
+                  personal data (such as access, correction, or deletion). To exercise
+                  these rights, please contact us via the Contact page.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">6. Changes to This Policy</h2>
+                <p className="text-muted-foreground">
+                  We may update this Privacy Policy from time to time. If we make
+                  material changes, we&apos;ll update the &quot;last updated&quot; date
+                  and, where appropriate, notify you in the app or by email.
+                </p>
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-2">7. Contact</h2>
+                <p className="text-muted-foreground">
+                  If you have questions about this Privacy Policy or how we handle your
+                  data, please reach out through the Contact page.
+                </p>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+      <JkFooter />
+    </div>
+  );
+}
+
 'use client'
 
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"

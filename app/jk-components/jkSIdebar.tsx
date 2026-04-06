@@ -7,7 +7,7 @@ import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
-import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home } from "lucide-react"
+import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home, Moon, Sun } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -19,6 +19,7 @@ import Link from "next/link"
 import JkGap from './jkGap'
 import JkSearchModal from './jkSearchModal'
 import JkUpgradeModal from './jkUpgradeModal'
+import { useJobKompassTheme } from '@/providers/jkThemeProvider'
 
 export default function JkSidebar() {
   const { user, isAuthenticated } = useAuth()
@@ -31,6 +32,7 @@ export default function JkSidebar() {
   const [threadToDelete, setThreadToDelete] = useState<any>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
+  const { theme, toggleTheme } = useJobKompassTheme()
 
   const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
   const deleteThread = useMutation(api.threads.remove)
@@ -216,7 +218,7 @@ export default function JkSidebar() {
                 </div>
                 <div className="flex items-center gap-2">
                   {newJobsCount > 0 && (
-                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                    <span className="bg-primary text-white text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
                       {newJobsCount}
                     </span>
                   )}
@@ -237,7 +239,7 @@ export default function JkSidebar() {
                 </div>
                 <div className="flex items-center gap-2">
                   {newDocumentsCount > 0 && (
-                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                    <span className="bg-primary text-white text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
                       {newDocumentsCount}
                     </span>
                   )}
@@ -471,6 +473,24 @@ export default function JkSidebar() {
                     <span className="text-sm font-medium text-foreground">Landing Page</span>
                   </motion.div>
                 </Link>
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.02 }}
+                  onClick={() => {
+                    toggleTheme()
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border"
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="h-4 w-4 text-amber-300" />
+                  ) : (
+                    <Moon className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="text-sm font-medium text-foreground">
+                    {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                  </span>
+                </motion.div>
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}

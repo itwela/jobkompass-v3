@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,6 +22,7 @@ import Link from "next/link";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import JkGap from "./jkGap";
 import { toast } from "@/lib/toast";
+import { useJobKompassTheme } from "@/providers/jkThemeProvider";
 
 interface JkConsoleHeaderProps {
     sidebarOpen: boolean;
@@ -99,6 +100,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
     const [isModeMenuOpen, setIsModeMenuOpen] = useState(false)
     const { currentMode, setCurrentMode, allModes, currentThreadId, setCurrentThreadId } = useJobKompassChatWindow()
     const { signIn, signOut } = useAuthActions()
+    const { theme, toggleTheme } = useJobKompassTheme()
     
     // Data for titles, conversations, and notification badges
     const threadData = useQuery(api.threads.get, currentThreadId ? { threadId: currentThreadId } : "skip")
@@ -224,30 +226,45 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                     </DropdownMenu>
                 </div>
                 
-                {/* Actions dropdown - only show in chat mode with active thread */}
-                {currentMode.id === '/chat' && currentThreadId && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="p-0 hover:opacity-70 transition-opacity" disabled={retitling}>
-                                {retitling ? (
-                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                ) : (
-                                    <MoreVertical className="h-5 w-5" />
-                                )}
-                                <span className="sr-only">{retitling ? "Retitling..." : "More options"}</span>
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
-                                onClick={handleRetitle}
-                                disabled={retitling}
-                            >
-                                <Type className="h-4 w-4 mr-2" />
-                                {retitling ? 'Retitling...' : 'Retitle'}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-full border border-border/60 bg-background/60 hover:bg-accent/70 transition-colors"
+                        onClick={toggleTheme}
+                        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                        {theme === 'dark' ? (
+                            <Sun className="h-4 w-4 text-amber-300" />
+                        ) : (
+                            <Moon className="h-4 w-4 text-slate-700" />
+                        )}
+                    </Button>
+                    {/* Actions dropdown - only show in chat mode with active thread */}
+                    {currentMode.id === '/chat' && currentThreadId && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="p-0 hover:opacity-70 transition-opacity" disabled={retitling}>
+                                    {retitling ? (
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <MoreVertical className="h-5 w-5" />
+                                    )}
+                                    <span className="sr-only">{retitling ? "Retitling..." : "More options"}</span>
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                    onClick={handleRetitle}
+                                    disabled={retitling}
+                                >
+                                    <Type className="h-4 w-4 mr-2" />
+                                    {retitling ? 'Retitling...' : 'Retitle'}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
+                </div>
             </header>
             
             {/* Mobile header with menu */}

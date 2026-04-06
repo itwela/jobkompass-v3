@@ -233,7 +233,7 @@ export default function JkInputSection({
             aria-label="Send message"
             disabled={inputValue.trim().length <= 2}
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-4 w-4 text-white" />
           </Button>
           )}
         </div>

@@ -606,6 +606,11 @@ textarea[aria-label="Message input"]:focus-visible {
   [data-sonner-toast][data-type="error"] > div:first-child {
     background-color: #fee2e2 !important;
   }
+
+  .dark [data-sonner-toast][data-type="error"] [data-icon],
+  .dark [data-sonner-toast][data-type="error"] > div:first-child {
+    background-color: #450a0a !important;
+  }
   
   /* Override any green colors on error toasts */
   [data-sonner-toast][data-type="error"] * {
@@ -620,12 +625,19 @@ textarea[aria-label="Message input"]:focus-visible {
     fill: #22c55e !important;
   }
 
-  /* Loading toast icon - black */
+  /* Loading toast icon - black in light, white in dark */
   [data-sonner-toast][data-type="loading"] [data-icon],
   [data-sonner-toast][data-type="loading"] [data-icon] svg,
   [data-sonner-toast][data-type="loading"] > div:first-child svg {
     color: #0b0c0f !important;
     fill: #0b0c0f !important;
+  }
+
+  .dark [data-sonner-toast][data-type="loading"] [data-icon],
+  .dark [data-sonner-toast][data-type="loading"] [data-icon] svg,
+  .dark [data-sonner-toast][data-type="loading"] > div:first-child svg {
+    color: #F3F4F6 !important;
+    fill: #F3F4F6 !important;
   }
 
   /* Promise toast icon - green (same as success) */

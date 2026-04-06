@@ -3,7 +3,13 @@
     "allow": [
       "Bash(npx next build)",
       "Bash(dir:*)",
-      "Bash(npx framer-motion:*)"
+      "Bash(npx framer-motion:*)",
+      "Bash(ls C:\\\\Users\\\\itwel\\\\Documents\\\\Github\\\\jobkompass-v3\\\\.env* 2>/dev/null || echo \"No .env files\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://jobkompass-latex-service-production.up.railway.app/compile\" -X POST -H \"Content-Type: application/json\" -d '{\"latex\":\"test\",\"filename\":\"test\"}' 2>&1)",
+      "Bash(curl -s -w \"\\\\n%{http_code}\" \"https://jobkompass-latex-service-production.up.railway.app/\" 2>&1)",
+      "Bash(cat \"/c/Users/itwel/Documents/Github/jobkompass-v3/docker-compose.yml\" 2>/dev/null || find \"/c/Users/itwel/Documents/Github/jobkompass-v3\" -name \"docker-compose*\" 2>/dev/null | head -5)",
+      "Bash(find \"/c/Users/itwel/Documents/Github\" -name \"server.js\" -path \"*latex*\" 2>/dev/null; docker images 2>/dev/null | grep -i latex)",
+      "Bash(cd \"/c/Users/itwel/Documents/Github/jobkompass-v3\" && docker compose build latex-service 2>&1)"
     ]
   }
 }

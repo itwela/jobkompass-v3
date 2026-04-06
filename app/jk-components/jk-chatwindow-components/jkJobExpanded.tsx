@@ -396,7 +396,7 @@ export default function JkJobExpanded() {
                     href={formState.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-blue-800 hover:text-blue-900 hover:underline text-sm"
+                    className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-400 hover:underline text-sm"
                   >
                     Visit <ExternalLink className="h-4 w-4" />
                   </a>
@@ -583,7 +583,7 @@ export default function JkJobExpanded() {
                     key={keyword}
                     type="button"
                     onClick={() => removeKeyword(keyword)}
-                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-1 hover:bg-blue-200 transition"
+                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-1 hover:bg-blue-200 transition dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500"
                   >
                     {keyword}
                     <X className="h-3 w-3" />
