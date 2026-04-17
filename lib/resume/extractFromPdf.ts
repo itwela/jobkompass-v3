@@ -4,6 +4,10 @@
  */
 
 import type { ResumeContentForJake } from './generateJakeLatex';
+import { FREE_RESUME_MODEL_IDS } from '@/lib/aiModels';
+
+const OPENROUTER_MODEL_PRIMARY = FREE_RESUME_MODEL_IDS[0];
+const OPENROUTER_MODEL_FALLBACK = FREE_RESUME_MODEL_IDS[1];
 
 export const EXTRACTION_SYSTEM_PROMPT = `You are a resume parsing expert. Extract all information from the provided resume text and output a valid JSON object that matches this exact structure. Return ONLY valid JSON, no markdown or extra text.
 
@@ -66,9 +70,6 @@ Rules:
 - Extract bullet points into details arrays.
 - For skills, put programming languages/tools in technical, soft skills in additional.
 - CRITICAL: Never include empty, blank, or whitespace-only items in any details arrays. Each bullet must have real content. Omit any bullet that would be empty—do not add placeholder bullets.`;
-
-export const OPENROUTER_MODEL_PRIMARY = 'arcee-ai/trinity-mini:free';
-export const OPENROUTER_MODEL_FALLBACK = 'google/gemma-3-27b-it:free';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -170,6 +171,10 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
   if (!res.ok && [502, 429, 503].includes(res.status)) {
     await sleep(2000);
     res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
+  }
+  if (!res.ok) {
+    await sleep(1000);
+    res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
   }
   if (!res.ok && [502, 429, 503].includes(res.status)) {
     await sleep(1000);

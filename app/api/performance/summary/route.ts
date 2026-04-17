@@ -120,14 +120,17 @@ ${stats.documentsGeneratedThisMonth ? `Documents Generated This Month: ${stats.d
       return res;
     };
 
-    // Try primary model with retry
+    let modelUsed: string = OPENROUTER_MODEL_PRIMARY;
     let res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
     if (!res.ok && [502, 429, 503].includes(res.status)) {
       await sleep(2000);
       res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
     }
-
-    // Fall back to secondary model if primary fails
+    if (!res.ok) {
+      await sleep(1000);
+      modelUsed = OPENROUTER_MODEL_FALLBACK;
+      res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
+    }
     if (!res.ok && [502, 429, 503].includes(res.status)) {
       await sleep(1000);
       res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
@@ -170,7 +173,7 @@ ${stats.documentsGeneratedThisMonth ? `Documents Generated This Month: ${stats.d
     return NextResponse.json({
       success: true,
       summary,
-      modelUsed: res.status === 200 ? OPENROUTER_MODEL_PRIMARY : OPENROUTER_MODEL_FALLBACK
+      modelUsed,
     });
 
   } catch (error) {

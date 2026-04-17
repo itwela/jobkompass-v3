@@ -4,7 +4,7 @@
  */
 
 export interface AIModelInfo {
-  /** OpenRouter model id (e.g. arcee-ai/trinity-mini:free) */
+  /** OpenRouter model id (e.g. google/gemma-3-27b-it:free) */
   id: string;
   /** Display name */
   name: string;
@@ -19,18 +19,18 @@ export interface AIModelInfo {
 /** All known AI models we use. Add new entries when adding new models. */
 export const AI_MODELS: AIModelInfo[] = [
   {
-    id: 'arcee-ai/trinity-mini:free',
-    name: 'Trinity Mini',
-    provider: 'Arcee AI',
-    logoUrl: 'https://openrouter.ai/favicon.ico',
-    description: '26B-parameter sparse MoE, 131k context',
-  },
-  {
     id: 'google/gemma-3-27b-it:free',
     name: 'Gemma 3 27B',
     provider: 'Google',
     logoUrl: 'https://www.google.com/favicon.ico',
     description: '27B parameter instruction-tuned model',
+  },
+  {
+    id: 'google/gemma-3-12b-it:free',
+    name: 'Gemma 3 12B',
+    provider: 'Google',
+    logoUrl: 'https://www.google.com/favicon.ico',
+    description: 'Mid-size Gemma 3, multimodal, strong for extraction',
   },
   {
     id: 'gpt-5-mini',
@@ -50,8 +50,8 @@ export const AI_MODELS: AIModelInfo[] = [
 
 /** OpenRouter model ids used by the free resume generator (primary + fallback). */
 export const FREE_RESUME_MODEL_IDS = [
-  'arcee-ai/trinity-mini:free',
   'google/gemma-3-27b-it:free',
+  'google/gemma-3-12b-it:free',
 ] as const;
 
 /** Models used for the free resume generator (for badges / "powered by" UI). */
