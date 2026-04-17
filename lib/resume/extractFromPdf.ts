@@ -5,6 +5,7 @@
 
 import type { ResumeContentForJake } from './generateJakeLatex';
 import { FREE_RESUME_MODEL_IDS } from '@/lib/aiModels';
+import { extractTextFromPdfBase64, isLikelyReadableResumeText } from './pdfToText';
 
 const OPENROUTER_MODEL_PRIMARY = FREE_RESUME_MODEL_IDS[0];
 const OPENROUTER_MODEL_FALLBACK = FREE_RESUME_MODEL_IDS[1];
@@ -109,7 +110,9 @@ export interface ExtractOptions {
 
 export async function extractResumeContent(options: ExtractOptions): Promise<ResumeContentForJake> {
   const { resumePdf, resumeText, fallbackEmail } = options;
-  const hasText = resumeText && typeof resumeText === 'string' && resumeText.trim().length > 0;
+  const trimmedUserText =
+    resumeText && typeof resumeText === 'string' ? resumeText.trim() : '';
+  const hasText = trimmedUserText.length > 0;
   const hasPdf = resumePdf && typeof resumePdf === 'string' && resumePdf.length > 0;
 
   if (!hasText && !hasPdf) {
@@ -121,8 +124,30 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
     throw new Error('OpenRouter not configured');
   }
 
+  /** When the user pasted text, use it only (no OpenRouter file upload). */
+  let textForLlm = hasText ? trimmedUserText : '';
+  /** Send PDF + file-parser only if we could not get enough text locally (OpenRouter often 400s on scans / odd PDFs). */
+  let sendPdfFile = false;
+  /** Full local extract (may be short); used to retry as text if OpenRouter file-parser returns 400. */
+  let weakLocalText = '';
+
+  if (!hasText && hasPdf) {
+    weakLocalText = await extractTextFromPdfBase64(resumePdf!);
+    if (isLikelyReadableResumeText(weakLocalText)) {
+      textForLlm = weakLocalText;
+    } else {
+      sendPdfFile = true;
+    }
+  }
+
+  if (!textForLlm && !sendPdfFile) {
+    throw new Error(
+      'Could not read text from this PDF. If it is a scan or image-only file, paste your resume text instead, or export a PDF with selectable text from Word or Google Docs.',
+    );
+  }
+
   const buildOpenRouterBody = (model: string) => {
-    if (hasPdf) {
+    if (sendPdfFile) {
       const fileData = resumePdf!.startsWith('data:') ? resumePdf! : `data:application/pdf;base64,${resumePdf!}`;
       return {
         model,
@@ -145,7 +170,7 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
       model,
       messages: [
         { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
-        { role: 'user', content: `Extract and format this resume:\n\n${(resumeText as string).trim()}` },
+        { role: 'user', content: `Extract and format this resume:\n\n${textForLlm}` },
       ],
       temperature: 0.2,
       max_tokens: 4096,
@@ -154,7 +179,6 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
 
   const callOpenRouter = async (model: string) => {
     const body = buildOpenRouterBody(model);
-    if (!hasPdf) (body as any).model = model;
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -167,22 +191,46 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
     return res;
   };
 
-  let res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
-  if (!res.ok && [502, 429, 503].includes(res.status)) {
-    await sleep(2000);
-    res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
-  }
-  if (!res.ok) {
-    await sleep(1000);
-    res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
-  }
-  if (!res.ok && [502, 429, 503].includes(res.status)) {
-    await sleep(1000);
-    res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
+  const runExtractionRound = async (): Promise<Response> => {
+    let r = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
+    if (!r.ok && [502, 429, 503].includes(r.status)) {
+      await sleep(2000);
+      r = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
+    }
+    if (!r.ok) {
+      await sleep(1000);
+      r = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
+    }
+    if (!r.ok && [502, 429, 503].includes(r.status)) {
+      await sleep(1000);
+      r = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
+    }
+    return r;
+  };
+
+  let res = await runExtractionRound();
+
+  if (
+    !res.ok &&
+    sendPdfFile &&
+    res.status === 400 &&
+    weakLocalText.length >= 10
+  ) {
+    const errPeek = await res.clone().text();
+    if (/parse|pdf|file/i.test(errPeek)) {
+      textForLlm = weakLocalText;
+      sendPdfFile = false;
+      res = await runExtractionRound();
+    }
   }
 
   if (!res.ok) {
     const errText = await res.text();
+    if (sendPdfFile && res.status === 400 && /parse|pdf|file/i.test(errText)) {
+      throw new Error(
+        'Could not read text from this PDF on the server. Scanned or image-only PDFs are not supported. Copy the text from your resume and paste it into the text field, or export a new PDF with selectable text.',
+      );
+    }
     throw new Error(`AI extraction failed: ${res.status} ${errText}`);
   }
 
