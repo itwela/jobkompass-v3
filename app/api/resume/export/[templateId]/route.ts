@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { generateResumeLatex, isValidResumeTemplateId } from '@/lib/resume/generators';
 import type { ResumeContent } from '@/lib/resume/types';
 
+export const maxDuration = 300;
+
 function getLatexServiceUrl() {
   if (process.env.NODE_ENV === 'development') return 'http://127.0.0.1:8080';
   return process.env.LATEX_SERVICE_URL ?? null;

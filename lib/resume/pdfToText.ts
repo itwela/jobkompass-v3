@@ -16,15 +16,34 @@ function decodePdfToUint8Array(resumePdf: string): Uint8Array | null {
   }
 }
 
+const PDF_PARSE_TIMEOUT_MS = 45_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(id);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(id);
+        reject(e);
+      },
+    );
+  });
+}
+
 /**
  * Extract plain text from a PDF (data URL or raw base64).
  * Returns empty string if the file is invalid, has no text layer, or extraction throws.
+ * Times out so pathological PDFs cannot hang the upload pipeline indefinitely.
  */
 export async function extractTextFromPdfBase64(resumePdf: string): Promise<string> {
   const bytes = decodePdfToUint8Array(resumePdf);
   if (!bytes) return '';
   try {
-    const { text } = await extractText(bytes, { mergePages: true });
+    const { text } = await withTimeout(extractText(bytes, { mergePages: true }), PDF_PARSE_TIMEOUT_MS);
     if (typeof text !== 'string') return '';
     return text
       .replace(/\u00a0/g, ' ')

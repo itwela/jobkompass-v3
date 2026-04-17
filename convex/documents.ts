@@ -268,13 +268,13 @@ export const uploadResumeFile = mutation({
   },
 });
 
-// Save generated resume with PDF (called by AI tools during generation)
+// Save resume with structured content; file is optional (e.g. paste-only import)
 export const saveGeneratedResumeWithFile = mutation({
   args: {
     name: v.string(),
-    fileId: v.id("_storage"),
-    fileName: v.string(),
-    fileSize: v.number(),
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
     content: v.any(), // Structured content (the input used to generate the resume)
     template: v.optional(v.string()),
     label: v.optional(v.string()),
@@ -286,13 +286,12 @@ export const saveGeneratedResumeWithFile = mutation({
     
     const now = Date.now();
     
-    // Save resume document with all metadata
     return await ctx.db.insert("resumes", {
       userId: userId,
       name: args.name,
       fileId: args.fileId,
       fileName: args.fileName,
-      fileType: 'application/pdf',
+      fileType: args.fileId ? "application/pdf" : undefined,
       fileSize: args.fileSize,
       content: args.content,
       template: args.template || 'jake',

@@ -4,11 +4,20 @@
  */
 
 import type { ResumeContentForJake } from './generateJakeLatex';
-import { FREE_RESUME_MODEL_IDS } from '@/lib/aiModels';
+import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from '@/lib/aiModels';
 import { extractTextFromPdfBase64, isLikelyReadableResumeText } from './pdfToText';
+import { normalizeExtractedContent } from './normalizeResumeContent';
 
-const OPENROUTER_MODEL_PRIMARY = FREE_RESUME_MODEL_IDS[0];
-const OPENROUTER_MODEL_FALLBACK = FREE_RESUME_MODEL_IDS[1];
+/** Per-request cap so a stuck provider does not block resume upload for unbounded time. */
+const OPENROUTER_REQUEST_TIMEOUT_MS = 120_000;
+
+function getExtractionModelIds(): [string, string] {
+  const primary =
+    process.env.OPENROUTER_RESUME_MODEL_PRIMARY?.trim() || DEFAULT_RESUME_EXTRACTION_MODEL_IDS[0];
+  const fallback =
+    process.env.OPENROUTER_RESUME_MODEL_FALLBACK?.trim() || DEFAULT_RESUME_EXTRACTION_MODEL_IDS[1];
+  return [primary, fallback];
+}
 
 export const EXTRACTION_SYSTEM_PROMPT = `You are a resume parsing expert. Extract all information from the provided resume text and output a valid JSON object that matches this exact structure. Return ONLY valid JSON, no markdown or extra text.
 
@@ -74,34 +83,6 @@ Rules:
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function filterEmptyBullets(arr: string[] | null | undefined): string[] {
-  return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string' && s.trim().length > 0) : [];
-}
-
-export function normalizeExtractedContent(parsed: Partial<ResumeContentForJake>, fallbackEmail?: string): ResumeContentForJake {
-  if (!parsed.personalInfo) parsed.personalInfo = { email: fallbackEmail || '', firstName: '', lastName: '' };
-  if (!parsed.personalInfo!.email && fallbackEmail) parsed.personalInfo!.email = fallbackEmail;
-  parsed.experience = parsed.experience || [];
-  parsed.education = parsed.education || [];
-  parsed.projects = parsed.projects || null;
-  parsed.skills = parsed.skills || { technical: [], additional: null };
-  if (!Array.isArray(parsed.skills!.technical)) parsed.skills!.technical = [];
-
-  parsed.experience!.forEach((e) => {
-    if (e.details) e.details = filterEmptyBullets(e.details);
-  });
-  parsed.education!.forEach((e) => {
-    if (e.details) e.details = filterEmptyBullets(e.details);
-  });
-  if (parsed.projects) {
-    parsed.projects.forEach((p) => {
-      if (p.details) p.details = filterEmptyBullets(p.details);
-    });
-  }
-
-  return parsed as ResumeContentForJake;
-}
-
 export interface ExtractOptions {
   resumePdf?: string; // base64, optionally with data:application/pdf;base64, prefix
   resumeText?: string;
@@ -123,6 +104,8 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
   if (!openRouterKey) {
     throw new Error('OpenRouter not configured');
   }
+
+  const [OPENROUTER_MODEL_PRIMARY, OPENROUTER_MODEL_FALLBACK] = getExtractionModelIds();
 
   /** When the user pasted text, use it only (no OpenRouter file upload). */
   let textForLlm = hasText ? trimmedUserText : '';
@@ -179,16 +162,31 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
 
   const callOpenRouter = async (model: string) => {
     const body = buildOpenRouterBody(model);
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openRouterKey}`,
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://jobkompass.com',
-      },
-      body: JSON.stringify(body),
-    });
-    return res;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openRouterKey}`,
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://jobkompass.com',
+        },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      return res;
+    } catch (e) {
+      const name = e instanceof Error ? e.name : '';
+      if (name === 'AbortError' || name === 'TimeoutError') {
+        throw new Error(
+          'AI extraction timed out. Try a smaller PDF, or paste your resume text instead of uploading.',
+        );
+      }
+      throw e;
+    } finally {
+      clearTimeout(tid);
+    }
   };
 
   const runExtractionRound = async (): Promise<Response> => {
