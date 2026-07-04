@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { auth } from "./auth";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { registerAgentRoutes } from "./agent/dispatch";
 
 const http = httpRouter();
 
@@ -91,5 +92,7 @@ http.route({
     }
   }),
 });
+
+registerAgentRoutes(http);
 
 export default http;

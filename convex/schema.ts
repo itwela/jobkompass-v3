@@ -241,6 +241,17 @@ const schema = defineSchema({
     .index("by_created_at", ["createdAt"])
     .index("by_input_type", ["inputType"])
     .index("by_email", ["email"]),
+
+  agentApiKeys: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    keyHash: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_hash", ["keyHash"])
+    .index("by_user", ["userId"]),
 });
 
 export default schema;
