@@ -23,6 +23,7 @@ type ResumeContent = {
         github?: string;
         portfolio?: string;
         citizenship?: string;
+        summary?: string;
     };
     experience: Array<{
         company: string;
@@ -70,6 +71,7 @@ const emptyContent: ResumeContent = {
         github: "",
         portfolio: "",
         citizenship: "",
+        summary: "",
     },
     experience: [],
     education: [],
@@ -222,6 +224,7 @@ export default function JkCW_ResumeContentEditor({
                 github: decodeString(parsedContent?.personalInfo?.github),
                 portfolio: decodeString(parsedContent?.personalInfo?.portfolio),
                 citizenship: decodeString(parsedContent?.personalInfo?.citizenship),
+                summary: decodeString(parsedContent?.personalInfo?.summary),
             },
             experience: normalizedExperience,
             education: normalizedEducation,
@@ -584,6 +587,19 @@ export default function JkCW_ResumeContentEditor({
                     </button>
                     {expandedSections.has("personalInfo") && (
                         <div className="p-4 space-y-3 border-t">
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="text-sm font-medium">Professional Summary</label>
+                                    <AiButton />
+                                </div>
+                                <Textarea
+                                    value={content.personalInfo.summary || ""}
+                                    onChange={(e) => updatePersonalInfo("summary", e.target.value)}
+                                    placeholder="Software engineer with production experience in..."
+                                    rows={4}
+                                    showBorder
+                                />
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <div className="flex items-center justify-between mb-1">

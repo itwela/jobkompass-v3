@@ -19,6 +19,7 @@ export interface ResumeContent {
     linkedin?: string | null;
     github?: string | null;
     portfolio?: string | null;
+    summary?: string | null;
   };
   experience?: Array<{
     company: string;

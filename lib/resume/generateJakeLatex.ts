@@ -16,6 +16,7 @@ export interface ResumeContentForJake {
         linkedin?: string | null;
         github?: string | null;
         portfolio?: string | null;
+        summary?: string | null;
     };
     experience?: Array<{
         company: string;
@@ -110,6 +111,15 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
     latexTemplate = latexTemplate.replace(
         /\\begin{center}[\s\S]*?\\end{center}/,
         headerContent
+    );
+
+    // Generate professional summary content - omit section entirely if empty
+    const summaryText = (content.personalInfo.summary || '').trim();
+    latexTemplate = latexTemplate.replace(
+        /\\section{Professional Summary}[\s\S]*?\\end{itemize}/,
+        summaryText
+            ? `\\section{Professional Summary}\n  \\begin{itemize}[leftmargin=0.15in, label={}]\n    \\small{\\item{\n        ${escapeLatex(summaryText)}\n    }}\n  \\end{itemize}`
+            : ''
     );
 
     // Generate education content - filter empty bullets
