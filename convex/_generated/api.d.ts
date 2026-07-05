@@ -8,6 +8,11 @@
  * @module
  */
 
+import type * as agent_auth from "../agent/auth.js";
+import type * as agent_dispatch from "../agent/dispatch.js";
+import type * as agent_fns from "../agent/fns.js";
+import type * as agent_keys from "../agent/keys.js";
+import type * as agent_routes from "../agent/routes.js";
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as documents from "../documents.js";
@@ -40,6 +45,11 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  "agent/auth": typeof agent_auth;
+  "agent/dispatch": typeof agent_dispatch;
+  "agent/fns": typeof agent_fns;
+  "agent/keys": typeof agent_keys;
+  "agent/routes": typeof agent_routes;
   auth: typeof auth;
   contacts: typeof contacts;
   documents: typeof documents;
