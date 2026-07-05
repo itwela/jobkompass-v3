@@ -68,11 +68,13 @@ export async function POST(req: Request) {
             contactParts.push(escapeLatex(content.personalInfo.location));
         }
 
-        // Replace header placeholders
+        // Replace header placeholders - the contact line is built from contactParts so
+        // missing phone/location don't leave a stray "$|$ $|$" in the header
         latexTemplate = latexTemplate.replace('{{YOUR NAME}}', fullName);
-        latexTemplate = latexTemplate.replace('{{YOUR-EMAIL}}', escapeLatex(content.personalInfo.email));
-        latexTemplate = latexTemplate.replace('{{YOUR-PHONE}}', content.personalInfo.phone ? escapeLatex(content.personalInfo.phone) : '');
-        latexTemplate = latexTemplate.replace('{{YOUR-LOCATION}}', content.personalInfo.location ? escapeLatex(content.personalInfo.location) : '');
+        latexTemplate = latexTemplate.replace(
+            '{{YOUR-EMAIL}} $|$ {{YOUR-PHONE}} $|$ {{YOUR-LOCATION}}',
+            contactParts.join(' $|$ ')
+        );
 
         // Replace date
         const today = new Date().toLocaleDateString('en-US', {
