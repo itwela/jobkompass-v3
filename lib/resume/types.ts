@@ -68,7 +68,12 @@ export function escapeLatex(text: string | null | undefined): string {
     .replace(/\{/g, '\\{')
     .replace(/\}/g, '\\}')
     .replace(/~/g, '\\textasciitilde{}')
-    .replace(/\^/g, '\\textasciicircum{}');
+    .replace(/\^/g, '\\textasciicircum{}')
+    // Unicode symbols the default pdfLaTeX fonts can't render - they get silently
+    // dropped rather than erroring, so swap in LaTeX-safe equivalents.
+    .replace(/→/g, '$\\rightarrow$')
+    .replace(/←/g, '$\\leftarrow$')
+    .replace(/[–—]/g, '--');
 }
 
 export function getFullName(content: ResumeContent): { firstName: string; lastName: string; fullName: string } {

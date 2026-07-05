@@ -44,7 +44,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
 
  const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
    name: 'createResumeJakeTemplate',
-   description: 'Generate a professional resume using the JobKompass Jake template. The user selects the template in the Context panel. Do NOT call this tool until the user has selected a template - if they ask to create a resume without a selection, ask them to select one first. Automatically saves the resume to the user\'s documents.',
+   description: 'Generate a professional resume using the JobKompass Jake template (the only template available - always use it, no need to ask the user to select one). Automatically saves the resume to the user\'s documents.',
    parameters: z.object({
     personalInfo: z.object({
       firstName: z.string().describe('First name of the person'),
@@ -55,6 +55,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       linkedin: z.string().optional().nullable().describe('LinkedIn profile URL'),
       github: z.string().optional().nullable().describe('GitHub profile URL'),
       portfolio: z.string().optional().nullable().describe('Portfolio website URL'),
+      summary: z.string().optional().nullable().describe('Professional summary/objective - 3-5 sentences rendered in a dedicated Professional Summary section at the top of the resume, right under the header'),
     }),
     experience: z.array(z.object({
       company: z.string().describe('Company name'),

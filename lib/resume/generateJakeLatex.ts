@@ -104,7 +104,14 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
             .replace(/\/$/, ''); // Remove trailing slash
         contactParts.push(`\\href{https://github.com/${escapeLatex(githubHandle)}}{\\underline{github.com/${escapeLatex(githubHandle)}}}`);
     }
-    
+
+    if (content.personalInfo.portfolio) {
+        let portfolioUrl = content.personalInfo.portfolio.trim();
+        if (!/^https?:\/\//i.test(portfolioUrl)) portfolioUrl = 'https://' + portfolioUrl;
+        const portfolioDisplay = portfolioUrl.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
+        contactParts.push(`\\href{${escapeLatex(portfolioUrl)}}{\\underline{${escapeLatex(portfolioDisplay)}}}`);
+    }
+
     const headerContent = `\\begin{center}\n    \\textbf{\\Huge \\scshape ${fullName}} \\\\ \\vspace{1pt}\n    \\small ${contactParts.join(' $|$ ')}\n\\end{center}`;
     
     // Replace the header block in template
@@ -161,18 +168,23 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
     );
 
     // Generate projects content - only include non-empty bullets, skip projects with no content
+    // Note: technologies render as their own bullet rather than sharing the heading's
+    // table row with the project name - a long tech list in that row runs off the page
+    // width silently (LaTeX table cells don't wrap), truncating the line invisibly.
     const projectsContent = Array.isArray(content.projects) && content.projects.length > 0
         ? content.projects
             .map((proj) => {
-                const projectName = proj.technologies && proj.technologies.length
-                    ? `\\textbf{${escapeLatex(proj.name)}} $|$ \\emph{${escapeLatex(proj.technologies.join(', '))}}`
-                    : `\\textbf{${escapeLatex(proj.name)}}`;
+                const projectName = `\\textbf{${escapeLatex(proj.name)}}`;
                 const desc = (proj.description || '').trim();
                 const detailList = (Array.isArray(proj.details) ? proj.details : [])
                     .filter((d) => typeof d === 'string' && d.trim().length > 0);
-                const allBullets = desc ? [desc, ...detailList] : detailList;
-                if (allBullets.length === 0) return null;
-                const items = `\n    \\resumeItemListStart\n${allBullets.map((b) => `      \\resumeItem{${escapeLatex(b)}}`).join('\n')}\n    \\resumeItemListEnd`;
+                const textBullets = desc ? [desc, ...detailList] : detailList;
+                const bulletLines = textBullets.map((b) => `      \\resumeItem{${escapeLatex(b)}}`);
+                if (proj.technologies && proj.technologies.length) {
+                    bulletLines.unshift(`      \\resumeItem{\\textit{Technologies: ${escapeLatex(proj.technologies.join(', '))}}}`);
+                }
+                if (bulletLines.length === 0) return null;
+                const items = `\n    \\resumeItemListStart\n${bulletLines.join('\n')}\n    \\resumeItemListEnd`;
                 return `    \\resumeProjectHeading\n      {${projectName}}{${escapeLatex(proj.date || '')}}${items}`;
             })
             .filter(Boolean)

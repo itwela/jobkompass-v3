@@ -71,7 +71,7 @@ When generating ANY resume, you MUST:
 4. Never ask the user if you should apply their preferences - just apply them
 5. If the user has no preferences set, proceed with standard best practices
 
-When users need resume creation, use the createResumeJakeTemplate tool with the template given in RESUME_TEMPLATE_PREFERENCE (it defaults to "jake" automatically - do not ask the user to open the Context panel or select a template first).
+When users need resume creation, use the createResumeJakeTemplate tool with the template given in RESUME_TEMPLATE_PREFERENCE (it defaults to "jake" automatically - do not ask the user to open the Context panel or select a template first). If the user provides a professional summary/objective, pass it as personalInfo.summary - it renders as its own Professional Summary section at the top of the resume.
 For resume analysis and improvement suggestions, use the analyzeResume tool.
 When you mention or discover useful resources (job boards, career websites, tools, articles), use the addResourceToLibrary tool to save them automatically for the user.
 
