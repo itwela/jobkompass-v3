@@ -311,6 +311,100 @@ export const resumesGenerate = internalAction({
   },
 });
 
+export const coverLettersInsertGenerated = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(),
+    template: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    return await ctx.db.insert("coverLetters", {
+      userId: args.userId,
+      name: args.name,
+      fileId: args.fileId,
+      fileName: args.fileName,
+      fileSize: args.fileSize,
+      fileType: "application/pdf",
+      content: args.content,
+      template: args.template,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const coverLettersGenerate = internalAction({
+  args: {
+    userId: v.string(),
+    personalInfo: v.any(),
+    jobInfo: v.any(),
+    letterContent: v.any(),
+  },
+  handler: async (ctx, args): Promise<{ id: Id<"coverLetters">; name: string; fileUrl: string | null }> => {
+    const canGenerate = await ctx.runQuery(internal.agent.fns.resumesCanGenerate, { userId: args.userId });
+    if (!canGenerate.allowed) {
+      throw new AgentError(
+        403,
+        "limit_reached",
+        `You've reached your limit of ${canGenerate.limit} documents this month.`,
+        "Upgrade your plan to continue generating documents."
+      );
+    }
+
+    const content = {
+      personalInfo: args.personalInfo,
+      jobInfo: args.jobInfo,
+      letterContent: args.letterContent,
+    };
+
+    const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
+    const exportResponse = await fetch(`${appBaseUrl}/api/coverletter/export/jake`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!exportResponse.ok) {
+      const errorBody = await exportResponse.json().catch(() => ({}));
+      throw new AgentError(
+        502,
+        "generation_failed",
+        `Cover letter PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
+        errorBody.details
+      );
+    }
+    const pdfArrayBuffer = await exportResponse.arrayBuffer();
+    const pdfBlob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
+
+    const fileId = await ctx.storage.store(pdfBlob);
+    const fileUrl = await ctx.storage.getUrl(fileId);
+
+    const firstName = args.personalInfo?.firstName || "";
+    const lastName = args.personalInfo?.lastName || "";
+    const formattedTime = formattedTimestamp();
+    const companySuffix = args.jobInfo?.company ? ` - ${args.jobInfo.company}` : "";
+    const name = `${firstName} ${lastName} Cover Letter${companySuffix} (${formattedTime})`;
+    const fileName = `coverletter-${firstName}-${lastName}-${formattedTime}.pdf`;
+
+    const id: Id<"coverLetters"> = await ctx.runMutation(internal.agent.fns.coverLettersInsertGenerated, {
+      userId: args.userId,
+      name,
+      fileId,
+      fileName,
+      fileSize: pdfBlob.size,
+      content,
+      template: "jake",
+    });
+
+    return { id, name, fileUrl };
+  },
+});
+
 // ---- cover letters ----
 export const coverLettersList = internalQuery({
   args: { userId: v.string() },

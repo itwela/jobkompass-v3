@@ -98,6 +98,12 @@ export const commands: CommandSpec[] = [
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
   { name: "coverletters delete", desc: "Delete a cover letter + stored file", method: "DELETE", path: "/agent/coverletters", confirm: true,
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
+  { name: "coverletters add", desc: "Generate a cover letter PDF (Jake template) and save it", method: "POST", path: "/agent/coverletters/generate",
+    opts: [
+      { flag: "--personal-info <json>", api: "personalInfo", type: "json", required: true, desc: '{"firstName","lastName","email","phone"?,"location"?}' },
+      { flag: "--job-info <json>", api: "jobInfo", type: "json", required: true, desc: '{"company","position","hiringManagerName"?,"companyAddress"?}' },
+      { flag: "--letter-content <json>", api: "letterContent", type: "json", required: true, desc: '{"openingParagraph","bodyParagraphs":[...],"closingParagraph"}' },
+    ] },
 
   // emailtemplates
   { name: "emailtemplates list", desc: "List email templates", method: "GET", path: "/agent/emailtemplates", opts: [] },

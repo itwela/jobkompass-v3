@@ -132,6 +132,15 @@ export const agentRoutes: AgentRoute[] = [
     params: [{ name: "id", type: "string", required: true }],
     description: "Duplicate a cover letter",
   },
+  {
+    method: "POST", path: "/agent/coverletters/generate", fn: internal.agent.fns.coverLettersGenerate, kind: "action",
+    params: [
+      { name: "personalInfo", type: "json", required: true, description: '{"firstName","lastName","email","phone"?,"location"?}' },
+      { name: "jobInfo", type: "json", required: true, description: '{"company","position","hiringManagerName"?,"companyAddress"?}' },
+      { name: "letterContent", type: "json", required: true, description: '{"openingParagraph","bodyParagraphs":[...],"closingParagraph"}' },
+    ],
+    description: "Generate a cover letter PDF using the Jake template and save it to the user's documents",
+  },
 
   // ---- email templates ----
   { method: "GET", path: "/agent/emailtemplates", fn: internal.agent.fns.emailTemplatesList, kind: "query", params: [], description: "List email templates" },
