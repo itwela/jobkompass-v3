@@ -97,18 +97,16 @@ export async function POST(request: NextRequest) {
     // Full instructions on first turn (history length <= 2) or when context is attached
     const isFirstTurn = history.length <= 2;
     const hasContextAttachments = contextResumeIds?.length || contextJobIds?.length;
-    const hasResumeTemplateSelected = !!contextResumeTemplateId;
-    
+    // "jake" is the only template in active use, so default to it instead of
+    // blocking resume creation on a manual Context panel selection.
+    const effectiveResumeTemplateId = contextResumeTemplateId || 'jake';
+
     // Build context-aware instructions
     let contextInstructions = isFirstTurn ? jobKompassInstructions : jobKompassInstructionsMinimal;
-    
+
     // Resume template preference - CRITICAL for resume creation
     contextInstructions += "\n\n[[RESUME_TEMPLATE_PREFERENCE]]";
-    if (hasResumeTemplateSelected) {
-      contextInstructions += `\nThe user has selected resume template "jake" (JobKompass Jake) in the Context panel. When creating resumes, you MUST call createResumeJakeTemplate with templateId: "jake".`;
-    } else {
-      contextInstructions += "\nThe user has NOT selected a resume template in the Context panel. If the user asks to create a resume, you MUST first ask them to open the Context panel (above the input) and select the JobKompass Jake template before creating. Do NOT call createResumeJakeTemplate until the user has selected a template.";
-    }
+    contextInstructions += `\nThe resume template is "${effectiveResumeTemplateId}" (JobKompass Jake). When creating resumes, you MUST call createResumeJakeTemplate with templateId: "${effectiveResumeTemplateId}". Do not ask the user to open the Context panel or select a template first - it already defaults to Jake.`;
     
     if (hasContextAttachments) {
       contextInstructions += "\n\n[[CONTEXT_ATTACHMENTS]]";
