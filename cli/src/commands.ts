@@ -77,6 +77,18 @@ export const commands: CommandSpec[] = [
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
   { name: "resumes delete", desc: "Delete a resume + stored file", method: "DELETE", path: "/agent/resumes", confirm: true,
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
+  { name: "resumes add", desc: "Generate a resume PDF (Jake template) and save it", method: "POST", path: "/agent/resumes/generate",
+    opts: [
+      { flag: "--personal-info <json>", api: "personalInfo", type: "json", required: true,
+        desc: '{"firstName","lastName","email","citizenship"?,"location"?,"linkedin"?,"github"?,"portfolio"?,"summary"?}' },
+      { flag: "--education <json>", api: "education", type: "json", desc: "[{name,degree,field?,location?,startDate?,endDate,details?}]" },
+      { flag: "--experience <json>", api: "experience", type: "json", desc: "[{company,title,location?,date,details}]" },
+      { flag: "--projects <json>", api: "projects", type: "json", desc: "[{name,description,date?,technologies?,details?}]" },
+      { flag: "--skills <json>", api: "skills", type: "json", desc: '{"technical":[...],"additional"?:[...]}' },
+      { flag: "--certifications <json>", api: "certifications", type: "json", desc: "[{name,issuer?,date?,credentialId?}]" },
+      { flag: "--additional-info <json>", api: "additionalInfo", type: "json", desc: '{"languages"?:[...],"references"?}' },
+      { flag: "--target-company <name>", api: "targetCompany", type: "str", desc: "Included in the saved resume's name" },
+    ] },
 
   // coverletters
   { name: "coverletters list", desc: "List cover letters (metadata)", method: "GET", path: "/agent/coverletters", opts: [] },

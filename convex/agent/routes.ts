@@ -16,7 +16,7 @@ export type AgentRoute = {
   path: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fn: any; // internal.agent.fns.* reference; every fn takes an injected userId
-  kind: "query" | "mutation";
+  kind: "query" | "mutation" | "action";
   params: ParamSpec[];
   description: string;
 };
@@ -91,6 +91,20 @@ export const agentRoutes: AgentRoute[] = [
     method: "POST", path: "/agent/resumes/duplicate", fn: internal.agent.fns.resumesDuplicate, kind: "mutation",
     params: [{ name: "id", type: "string", required: true }],
     description: "Duplicate a resume",
+  },
+  {
+    method: "POST", path: "/agent/resumes/generate", fn: internal.agent.fns.resumesGenerate, kind: "action",
+    params: [
+      { name: "personalInfo", type: "json", required: true, description: '{"firstName","lastName","email","citizenship"?,"location"?,"linkedin"?,"github"?,"portfolio"?,"summary"?}' },
+      { name: "education", type: "json", description: "Array of {name,degree,field?,location?,startDate?,endDate,details?}" },
+      { name: "experience", type: "json", description: "Array of {company,title,location?,date,details}" },
+      { name: "projects", type: "json", description: "Array of {name,description,date?,technologies?,details?}" },
+      { name: "skills", type: "json", description: '{"technical":[...],"additional"?:[...]}' },
+      { name: "certifications", type: "json", description: "Array of {name,issuer?,date?,credentialId?}" },
+      { name: "additionalInfo", type: "json", description: '{"languages"?:[...],"references"?}' },
+      { name: "targetCompany", type: "string", description: "Included in the saved resume's name" },
+    ],
+    description: "Generate a resume PDF using the Jake template and save it to the user's documents",
   },
   {
     method: "PATCH", path: "/agent/resumes", fn: internal.agent.fns.resumesRename, kind: "mutation",

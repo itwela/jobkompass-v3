@@ -48,6 +48,12 @@ export interface ResumeContent {
     technical?: string[] | null;
     additional?: string[] | null;
   } | null;
+  certifications?: Array<{
+    name: string;
+    issuer?: string | null;
+    date?: string | null;
+    credentialId?: string | null;
+  }> | null;
   additionalInfo?: {
     interests?: string[] | null;
     hobbies?: string[] | null;

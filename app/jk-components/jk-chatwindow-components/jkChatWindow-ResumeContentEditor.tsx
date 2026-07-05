@@ -52,6 +52,12 @@ type ResumeContent = {
         details?: string[];
         date?: string;
     }>;
+    certifications?: Array<{
+        name: string;
+        issuer?: string;
+        date?: string;
+        credentialId?: string;
+    }>;
     additionalInfo?: {
     languages?: Array<{
         language: string;
@@ -80,6 +86,7 @@ const emptyContent: ResumeContent = {
         additional: [],
     },
     projects: [],
+    certifications: [],
     additionalInfo: {
     languages: [],
         references: "",
@@ -213,7 +220,15 @@ export default function JkCW_ResumeContentEditor({
             technologies: decodeStringArray(proj?.technologies),
             details: decodeStringArray(proj?.details),
         }));
-        
+
+        // Normalize and decode certifications
+        const normalizedCertifications = (parsedContent?.certifications || []).map((cert: any) => ({
+            name: decodeString(cert?.name),
+            issuer: decodeString(cert?.issuer),
+            date: decodeString(cert?.date),
+            credentialId: decodeString(cert?.credentialId),
+        }));
+
         return {
             personalInfo: {
                 firstName: decodeString(parsedContent?.personalInfo?.firstName),
@@ -233,6 +248,7 @@ export default function JkCW_ResumeContentEditor({
                 additional: decodeStringArray(parsedContent?.skills?.additional),
             },
             projects: normalizedProjects,
+            certifications: normalizedCertifications,
             additionalInfo: {
                 languages: (parsedContent?.additionalInfo?.languages || []).map((lang: any) => ({
                     language: decodeString(lang?.language),
@@ -310,6 +326,7 @@ export default function JkCW_ResumeContentEditor({
         if (JSON.stringify(c.education).toLowerCase().includes(q)) sectionsToExpand.add("education");
         if (JSON.stringify(c.skills).toLowerCase().includes(q)) sectionsToExpand.add("skills");
         if (JSON.stringify(c.projects).toLowerCase().includes(q)) sectionsToExpand.add("projects");
+        if (JSON.stringify(c.certifications).toLowerCase().includes(q)) sectionsToExpand.add("certifications");
         if (JSON.stringify(c.additionalInfo).toLowerCase().includes(q)) sectionsToExpand.add("additionalInfo");
         
         setExpandedSections(sectionsToExpand);
@@ -519,6 +536,37 @@ export default function JkCW_ResumeContentEditor({
         setHasChanges(true);
     };
 
+    const addCertification = () => {
+        setContent(prev => ({
+            ...prev,
+            certifications: [...(prev.certifications || []), {
+                name: "",
+                issuer: "",
+                date: "",
+                credentialId: "",
+            }]
+        }));
+        setHasChanges(true);
+    };
+
+    const updateCertification = (index: number, field: string, value: any) => {
+        setContent(prev => ({
+            ...prev,
+            certifications: (prev.certifications || []).map((cert, i) =>
+                i === index ? { ...cert, [field]: value } : cert
+            )
+        }));
+        setHasChanges(true);
+    };
+
+    const removeCertification = (index: number) => {
+        setContent(prev => ({
+            ...prev,
+            certifications: (prev.certifications || []).filter((_, i) => i !== index)
+        }));
+        setHasChanges(true);
+    };
+
     // Reorder handlers for drag-and-drop
     const reorderExperience = (newOrder: ResumeContent['experience']) => {
         setContent(prev => ({ ...prev, experience: newOrder }));
@@ -532,6 +580,11 @@ export default function JkCW_ResumeContentEditor({
 
     const reorderProjects = (newOrder: NonNullable<ResumeContent['projects']>) => {
         setContent(prev => ({ ...prev, projects: newOrder }));
+        setHasChanges(true);
+    };
+
+    const reorderCertifications = (newOrder: NonNullable<ResumeContent['certifications']>) => {
+        setContent(prev => ({ ...prev, certifications: newOrder }));
         setHasChanges(true);
     };
 
@@ -1038,6 +1091,91 @@ export default function JkCW_ResumeContentEditor({
                             >
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Project
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Certifications Section */}
+                <div className="border rounded-lg">
+                    <button
+                        onClick={() => toggleSection("certifications")}
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                    >
+                        <h3 className="text-lg font-semibold">Certifications</h3>
+                        {expandedSections.has("certifications") ? (
+                            <ChevronUp className="h-5 w-5" />
+                        ) : (
+                            <ChevronDown className="h-5 w-5" />
+                        )}
+                    </button>
+                    {expandedSections.has("certifications") && (
+                        <div className="p-4 space-y-4 border-t">
+                            <Reorder.Group axis="y" values={content.certifications || []} onReorder={reorderCertifications} as="div" className="space-y-4">
+                            {(content.certifications || []).map((cert, index) => (
+                                <JkReorderableItem key={`cert-${index}`} value={cert}>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            Certification #{index + 1}
+                                        </span>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeCertification(index)}
+                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="col-span-2">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="text-sm font-medium">Certification Name</label>
+                                                <AiButton />
+                                            </div>
+                                            <Input
+                                                value={cert.name}
+                                                onChange={(e) => updateCertification(index, "name", e.target.value)}
+                                                placeholder="J.P. Morgan Software Engineering Job Simulation"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">Date (optional)</label>
+                                            <Input
+                                                value={cert.date || ""}
+                                                onChange={(e) => updateCertification(index, "date", e.target.value)}
+                                                placeholder="Jan 2024"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-sm font-medium">Issuer (optional)</label>
+                                            <Input
+                                                value={cert.issuer || ""}
+                                                onChange={(e) => updateCertification(index, "issuer", e.target.value)}
+                                                placeholder="Forage"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">Credential ID (optional)</label>
+                                            <Input
+                                                value={cert.credentialId || ""}
+                                                onChange={(e) => updateCertification(index, "credentialId", e.target.value)}
+                                                placeholder="dnnD3p8wzQnuFPuB7"
+                                            />
+                                        </div>
+                                    </div>
+                                </JkReorderableItem>
+                            ))}
+                            </Reorder.Group>
+                            <Button
+                                onClick={addCertification}
+                                variant="outline"
+                                className="w-full"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Certification
                             </Button>
                         </div>
                     )}

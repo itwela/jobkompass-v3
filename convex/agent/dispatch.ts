@@ -92,6 +92,8 @@ function makeHandler(route: AgentRoute) {
       const result =
         route.kind === "query"
           ? await ctx.runQuery(route.fn, args)
+          : route.kind === "action"
+          ? await ctx.runAction(route.fn, args)
           : await ctx.runMutation(route.fn, args);
       return ok(result);
     } catch (err) {

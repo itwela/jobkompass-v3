@@ -45,6 +45,12 @@ export interface ResumeContentForJake {
         technical?: string[] | null;
         additional?: string[] | null;
     } | null;
+    certifications?: Array<{
+        name: string;
+        issuer?: string | null;
+        date?: string | null;
+        credentialId?: string | null;
+    }> | null;
     additionalInfo?: {
         interests?: string[] | null;
         hobbies?: string[] | null;
@@ -214,6 +220,27 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
     latexTemplate = latexTemplate.replace(
         /\\section{Technical Skills}[\s\S]*?\\end{itemize}/,
         `\\section{Technical Skills}\n \\begin{itemize}[leftmargin=0.15in, label={}]\n    \\small{\\item{\n${skillsSectionContent}\n    }}\n \\end{itemize}`
+    );
+
+    // Generate certifications content - omit section entirely if none
+    const certificationsContent = Array.isArray(content.certifications) && content.certifications.length > 0
+        ? content.certifications
+            .map((cert) => {
+                if (!cert || !cert.name) return null;
+                const metaParts = [cert.issuer, cert.date].filter((p): p is string => Boolean(p && p.trim()));
+                const meta = metaParts.length ? ` --- ${escapeLatex(metaParts.join(', '))}` : '';
+                const credential = cert.credentialId ? ` (Credential ID: ${escapeLatex(cert.credentialId)})` : '';
+                return `      \\resumeItem{\\textbf{${escapeLatex(cert.name)}}${meta}${credential}}`;
+            })
+            .filter(Boolean)
+            .join('\n')
+        : '';
+
+    latexTemplate = latexTemplate.replace(
+        /\\section{Certifications}[\s\S]*?\\resumeItemListEnd/,
+        certificationsContent
+            ? `\\section{Certifications}\n  \\resumeItemListStart\n${certificationsContent}\n  \\resumeItemListEnd`
+            : ''
     );
 
     return latexTemplate;

@@ -1,7 +1,9 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery, internalAction } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
+import { AgentError } from "./auth";
 
 const jobFields = {
   company: v.string(),
@@ -152,6 +154,160 @@ export const resumesRename = internalMutation({
   handler: async (ctx, { userId, id, name }) => {
     await owned(ctx, id, userId, "Resume");
     await ctx.db.patch(id, { name, updatedAt: Date.now() });
+  },
+});
+
+const DOCUMENT_PLAN_LIMITS: Record<string, number> = {
+  free: 3,
+  starter: 10,
+  plus: 60,
+  "plus-annual": 60,
+  pro: 180,
+  "pro-annual": 180,
+};
+
+export const resumesCanGenerate = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const planKey = ((subscription as any)?.planId || "free").toLowerCase();
+    const limit = DOCUMENT_PLAN_LIMITS[planKey] || DOCUMENT_PLAN_LIMITS.free;
+
+    const now = Date.now();
+    const currentMonth = new Date(now);
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+    const monthStart = currentMonth.getTime();
+
+    const resumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const coverLetters = await ctx.db
+      .query("coverLetters")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const used =
+      resumes.filter((r) => r.fileId && r.createdAt >= monthStart).length +
+      coverLetters.filter((c) => c.fileId && c.createdAt >= monthStart).length;
+
+    return { allowed: used < limit, limit, used };
+  },
+});
+
+export const resumesInsertGenerated = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(),
+    template: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    return await ctx.db.insert("resumes", {
+      userId: args.userId,
+      name: args.name,
+      fileId: args.fileId,
+      fileName: args.fileName,
+      fileSize: args.fileSize,
+      fileType: "application/pdf",
+      content: args.content,
+      template: args.template,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+function formattedTimestamp(): string {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const d = new Date();
+  const hours24 = d.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const ampm = hours24 < 12 ? "AM" : "PM";
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${hours12}:${minutes} ${ampm}`;
+}
+
+export const resumesGenerate = internalAction({
+  args: {
+    userId: v.string(),
+    personalInfo: v.any(),
+    education: v.optional(v.any()),
+    experience: v.optional(v.any()),
+    projects: v.optional(v.any()),
+    skills: v.optional(v.any()),
+    certifications: v.optional(v.any()),
+    additionalInfo: v.optional(v.any()),
+    targetCompany: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null }> => {
+    const canGenerate = await ctx.runQuery(internal.agent.fns.resumesCanGenerate, { userId: args.userId });
+    if (!canGenerate.allowed) {
+      throw new AgentError(
+        403,
+        "limit_reached",
+        `You've reached your limit of ${canGenerate.limit} documents this month.`,
+        "Upgrade your plan to continue generating documents."
+      );
+    }
+
+    const content = {
+      personalInfo: args.personalInfo,
+      education: args.education ?? [],
+      experience: args.experience ?? [],
+      projects: args.projects ?? [],
+      skills: args.skills ?? null,
+      certifications: args.certifications ?? [],
+      additionalInfo: args.additionalInfo ?? null,
+    };
+
+    const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
+    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/jake`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!exportResponse.ok) {
+      const errorBody = await exportResponse.json().catch(() => ({}));
+      throw new AgentError(
+        502,
+        "generation_failed",
+        `Resume PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
+        errorBody.details
+      );
+    }
+    const pdfArrayBuffer = await exportResponse.arrayBuffer();
+    const pdfBlob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
+
+    const fileId = await ctx.storage.store(pdfBlob);
+    const fileUrl = await ctx.storage.getUrl(fileId);
+
+    const firstName = args.personalInfo?.firstName || "";
+    const lastName = args.personalInfo?.lastName || "";
+    const formattedTime = formattedTimestamp();
+    const companySuffix = args.targetCompany ? ` - ${args.targetCompany}` : "";
+    const name = `${firstName} ${lastName} Resume${companySuffix} (${formattedTime})`;
+    const fileName = `resume-${firstName}-${lastName}-${formattedTime}.pdf`;
+
+    const id: Id<"resumes"> = await ctx.runMutation(internal.agent.fns.resumesInsertGenerated, {
+      userId: args.userId,
+      name,
+      fileId,
+      fileName,
+      fileSize: pdfBlob.size,
+      content,
+      template: "jake",
+    });
+
+    return { id, name, fileUrl };
   },
 });
 

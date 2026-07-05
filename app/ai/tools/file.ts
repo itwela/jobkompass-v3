@@ -84,6 +84,12 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       technical: z.array(z.string()).optional().nullable().describe('Technical skills'),
       additional: z.array(z.string()).optional().nullable().describe('Additional skills'),
     }).optional().nullable(),
+    certifications: z.array(z.object({
+      name: z.string().describe('Certification name'),
+      issuer: z.string().optional().nullable().describe('Issuing organization'),
+      date: z.string().optional().nullable().describe('Date issued'),
+      credentialId: z.string().optional().nullable().describe('Credential ID, if any'),
+    })).optional().nullable().default([]).describe('Certifications - rendered in a dedicated Certifications section'),
     additionalInfo: z.object({
       interests: z.array(z.string()).optional().nullable().describe('Professional interests'),
       hobbies: z.array(z.string()).optional().nullable().describe('Relevant hobbies'),
