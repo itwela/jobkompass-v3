@@ -30,18 +30,14 @@ export async function GET(request: NextRequest) {
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
   if (!convexUrl) {
-    throw new Error("CONVEX_URL not configured");
+    return NextResponse.redirect(new URL("/profile?gmail_error=config_error", request.url));
   }
 
-  // Resolve the signed-in JobKompass user's convex_user_id the same way the rest of
-  // this app authenticates server-side Convex calls from a Next.js route handler (see
+  // Resolve the signed-in JobKompass user's identity the same way the rest of this app
+  // authenticates server-side Convex calls from a Next.js route handler (see
   // app/api/jobs/add/route.ts, app/api/documents/generate-resume-pdf/route.ts):
   // convexAuthNextjsToken() reads the Convex Auth session for the current request, and
   // that token is attached to a ConvexHttpClient so subsequent calls run as that user.
-  // auth.getConvexUserId (convex/auth.ts) is the existing query that resolves
-  // getAuthUserId(ctx) -> users row -> convex_user_id, falling back to the raw userId
-  // if convex_user_id hasn't been backfilled yet - the same fallback used throughout
-  // convex/auth.ts and convex/extensionApiKeys.ts.
   const convexToken = await convexAuthNextjsToken();
   if (!convexToken) {
     return NextResponse.redirect(new URL("/auth?redirect=/profile", request.url));
@@ -50,17 +46,13 @@ export async function GET(request: NextRequest) {
   const convexClient = new ConvexHttpClient(convexUrl);
   convexClient.setAuth(convexToken);
 
-  const convexUserId = await convexClient.query(api.auth.getConvexUserId, {});
-  if (!convexUserId) {
-    return NextResponse.redirect(new URL("/auth?redirect=/profile", request.url));
-  }
-
   // saveTokens (convex/emailAccounts.ts) is an internalMutation and cannot be invoked
   // directly from an external Convex client. connectAccount is a thin public action
-  // that runs it via ctx.runMutation, now that the caller's identity has been verified
-  // above via the user's own Convex Auth token.
+  // that runs it via ctx.runMutation. connectAccount resolves the acting user's own
+  // convex_user_id itself (via api.auth.getConvexUserId, using the auth token set on
+  // this ConvexHttpClient above) - it does not take a userId argument, so there is no
+  // client-supplied identity to trust or forge here.
   await convexClient.action(api.emailAccounts.connectAccount, {
-    userId: convexUserId as string,
     email: userInfo.email,
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery, action } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 export const list = query({
@@ -88,20 +88,34 @@ export const saveTokens = internalMutation({
 // runs OUTSIDE Convex and talks to the deployment only over the public HTTP client -
 // Convex rejects any attempt to invoke an internalMutation/internalQuery/internalAction
 // that way ("Internal functions can only be called by other Convex functions"). This
-// thin action is the sanctioned bridge for that one trusted caller: the callback route
-// first resolves and verifies the signed-in user's convex_user_id via
-// api.auth.getConvexUserId (using the request's Convex Auth JWT), then calls this action
-// to persist the tokens under that verified id.
+// thin action is the sanctioned bridge for that one trusted caller.
+//
+// connectAccount must never trust a caller-supplied userId: unlike the earlier version
+// of this action, it no longer accepts a userId argument at all. Instead it resolves the
+// acting user's identity itself, the same way list/disconnect above do (getAuthUserId ->
+// users row -> convex_user_id fallback) - here via api.auth.getConvexUserId, which
+// performs that exact resolution and is already the source of truth the callback route
+// used to verify the caller before this fix. ctx.runQuery propagates the action's own
+// auth context, so this reflects only the identity of whoever is actually calling this
+// action, never a client-supplied value. Without this, any caller could pass an
+// arbitrary userId and overwrite another user's stored Gmail tokens via saveTokens'
+// existing-row lookup. This also matches convex/jobs.ts's add mutation, which never
+// accepts a client-supplied userId either.
 export const connectAccount = action({
   args: {
-    userId: v.string(),
     email: v.string(),
     accessToken: v.string(),
     refreshToken: v.string(),
     tokenExpiresAt: v.number(),
   },
   handler: async (ctx, args): Promise<Id<"emailAccounts">> => {
-    return await ctx.runMutation(internal.emailAccounts.saveTokens, args);
+    const convexUserId = await ctx.runQuery(api.auth.getConvexUserId, {});
+    if (!convexUserId) throw new Error("Not authenticated");
+
+    return await ctx.runMutation(internal.emailAccounts.saveTokens, {
+      ...args,
+      userId: convexUserId,
+    });
   },
 });
 
