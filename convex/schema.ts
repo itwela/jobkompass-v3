@@ -151,6 +151,53 @@ const documentsTables = {
 const schema = defineSchema({
   ...authTables,
   ...documentsTables,
+  emailAccounts: defineTable({
+    userId: v.string(), // convex_user_id
+    email: v.string(),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    tokenExpiresAt: v.number(),
+    historyId: v.optional(v.string()), // Gmail checkpoint cursor; unset until first poll
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    connectedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  jobLeads: defineTable({
+    userId: v.string(), // convex_user_id
+    sourceAccountId: v.id("emailAccounts"),
+    sourceType: v.union(v.literal("personal_outreach"), v.literal("digest_listing")),
+    company: v.string(),
+    role: v.string(),
+    senderEmail: v.optional(v.string()),
+    rawSnippet: v.string(),
+    originalMessageId: v.string(), // Gmail internal message id
+    rfcMessageId: v.optional(v.string()), // RFC Message-ID header, needed for In-Reply-To/References
+    threadId: v.string(),
+    status: v.union(
+      v.literal("new"),
+      v.literal("pending_approval"),
+      v.literal("sent"),
+      v.literal("followed_up"),
+      v.literal("replied"),
+      v.literal("closed"),
+      v.literal("extracted"),
+      v.literal("promoted")
+    ),
+    draftResumeId: v.optional(v.id("resumes")),
+    draftMessage: v.optional(v.string()),
+    isFollowUp: v.optional(v.boolean()),
+    approvedAt: v.optional(v.number()),
+    sentAt: v.optional(v.number()),
+    followUpSentAt: v.optional(v.number()),
+    promotedAt: v.optional(v.number()),
+    classificationError: v.optional(v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_user_and_status", ["userId", "status"]),
+
   // Extend users table with custom fields
   users: defineTable({
     name: v.optional(v.string()),
