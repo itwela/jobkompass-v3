@@ -17,6 +17,7 @@ import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
+import type * as emailAccounts from "../emailAccounts.js";
 import type * as emailList from "../emailList.js";
 import type * as extensionApiKeys from "../extensionApiKeys.js";
 import type * as extensionSaveJob from "../extensionSaveJob.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   contacts: typeof contacts;
   documents: typeof documents;
   dopeAgents: typeof dopeAgents;
+  emailAccounts: typeof emailAccounts;
   emailList: typeof emailList;
   extensionApiKeys: typeof extensionApiKeys;
   extensionSaveJob: typeof extensionSaveJob;
