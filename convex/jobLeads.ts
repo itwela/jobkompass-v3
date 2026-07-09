@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 async function resolveConvexUserId(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -152,5 +153,27 @@ export const markSendError = internalMutation({
     // Stays pending_approval; leaves approvedAt set so a distinct "approved but failed to send"
     // state is visible if a UI wants to show a retry affordance later.
     await ctx.db.patch(args.leadId, { updatedAt: Date.now() });
+  },
+});
+
+export const promoteToJob = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args): Promise<Id<"jobs">> => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
+    if (lead.status === "promoted") throw new Error("Lead already promoted");
+
+    const jobId: Id<"jobs"> = await ctx.runMutation(internal.jobs.addInternal, {
+      userId: convexUserId,
+      company: lead.company,
+      title: lead.role,
+      link: lead.rawSnippet.startsWith("http") ? lead.rawSnippet : "",
+      status: "Interested",
+      resumeUsed: lead.draftResumeId ? String(lead.draftResumeId) : undefined,
+    });
+
+    await ctx.db.patch(args.leadId, { status: "promoted" as const, promotedAt: Date.now(), updatedAt: Date.now() });
+    return jobId;
   },
 });

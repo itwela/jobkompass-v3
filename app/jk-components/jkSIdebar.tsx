@@ -7,7 +7,7 @@ import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
-import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home, Moon, Sun } from "lucide-react"
+import { ChevronRight, ChevronDown, MessageSquare, Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home, Moon, Sun, Mail } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -246,6 +246,18 @@ export default function JkSidebar() {
                   <ChevronRight className="h-3.5 w-3.5" />
                 </div>
               </button>
+
+              {/* Job Leads Section (real route, not a console mode) */}
+              <Link
+                href="/leads"
+                className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors text-foreground/80 hover:text-foreground hover:bg-accent"
+              >
+                <div className="flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>Job Leads</span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
 
               {/* Performance Section */}
               <button
