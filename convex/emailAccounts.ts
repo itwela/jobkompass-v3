@@ -156,3 +156,10 @@ export const markRevoked = internalMutation({
     await ctx.db.patch(args.accountId, { status: "revoked" as const });
   },
 });
+
+export const getById = internalQuery({
+  args: { accountId: v.id("emailAccounts") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.accountId);
+  },
+});

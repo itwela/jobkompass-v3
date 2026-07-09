@@ -491,6 +491,24 @@ export const getFileUrlById = query({
   },
 });
 
+// Internal counterpart to getFileUrlById for server-side callers (e.g. the email
+// agent's send action) that have no authenticated user session. Safe because
+// internal functions can't be called externally - same reasoning as the other
+// internal wrappers in this file. Returns the resume's file URL and file name so
+// the caller can attach it to an outbound email without needing its own auth.
+export const getResumeFileInternal = internalQuery({
+  args: { resumeId: v.id("resumes") },
+  handler: async (ctx, args) => {
+    const resume = await ctx.db.get(args.resumeId);
+    if (!resume || !resume.fileId) return null;
+
+    const url = await ctx.storage.getUrl(resume.fileId);
+    if (!url) return null;
+
+    return { url, fileName: resume.fileName || "resume.pdf" };
+  },
+});
+
 // Resume IR (Intermediate Representation) functions
 export const saveResumeIR = mutation({
   args: {

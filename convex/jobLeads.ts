@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 async function resolveConvexUserId(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -97,4 +98,59 @@ export const attachDraft = internalMutation({
 export const getById = internalQuery({
   args: { leadId: v.id("jobLeads") },
   handler: async (ctx, args) => await ctx.db.get(args.leadId),
+});
+
+export const approve = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
+    if (lead.status !== "pending_approval") throw new Error("Lead is not pending approval");
+
+    await ctx.db.patch(args.leadId, { approvedAt: Date.now(), updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.send.sendApprovedLead, { leadId: args.leadId });
+  },
+});
+
+export const reject = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
+    await ctx.db.patch(args.leadId, { status: "closed" as const, updatedAt: Date.now() });
+  },
+});
+
+export const editDraft = mutation({
+  args: { leadId: v.id("jobLeads"), draftMessage: v.string() },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
+    await ctx.db.patch(args.leadId, { draftMessage: args.draftMessage, updatedAt: Date.now() });
+  },
+});
+
+export const markSent = internalMutation({
+  args: { leadId: v.id("jobLeads"), isFollowUp: v.boolean() },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    await ctx.db.patch(args.leadId, {
+      status: args.isFollowUp ? ("followed_up" as const) : ("sent" as const),
+      sentAt: now,
+      followUpSentAt: args.isFollowUp ? now : undefined,
+      updatedAt: now,
+    });
+  },
+});
+
+export const markSendError = internalMutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    // Stays pending_approval; leaves approvedAt set so a distinct "approved but failed to send"
+    // state is visible if a UI wants to show a retry affordance later.
+    await ctx.db.patch(args.leadId, { updatedAt: Date.now() });
+  },
 });
