@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { Auth } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -297,6 +297,67 @@ export const saveGeneratedResumeWithFile = mutation({
       template: args.template || 'jake',
       label: args.label,
       tags: args.tags,
+      createdAt: now,
+      updatedAt: now,
+      isActive: true,
+    });
+  },
+});
+
+// Internal counterpart to listResumes for server-side callers (e.g. the email
+// agent's poll/draft cron) that have no authenticated user session and must pass
+// userId explicitly. Only ever invoked from other trusted Convex code.
+export const listResumesInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    const resumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    return resumes.sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+});
+
+// Internal counterpart to generateUploadUrl for server-side callers with no
+// authenticated user session.
+export const generateUploadUrlInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Internal counterpart to saveGeneratedResumeWithFile for server-side callers
+// (e.g. the email agent's draft action) that have no authenticated user session
+// and must pass userId explicitly, matching the addInternal pattern in convex/jobs.ts.
+export const saveGeneratedResumeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    name: v.string(),
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
+    fileSize: v.optional(v.number()),
+    content: v.any(),
+    template: v.optional(v.string()),
+    label: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const { userId, ...resumeData } = args;
+    const now = Date.now();
+
+    return await ctx.db.insert("resumes", {
+      userId,
+      name: resumeData.name,
+      fileId: resumeData.fileId,
+      fileName: resumeData.fileName,
+      fileType: resumeData.fileId ? "application/pdf" : undefined,
+      fileSize: resumeData.fileSize,
+      content: resumeData.content,
+      template: resumeData.template || 'jake',
+      label: resumeData.label,
+      tags: resumeData.tags,
       createdAt: now,
       updatedAt: now,
       isActive: true,
