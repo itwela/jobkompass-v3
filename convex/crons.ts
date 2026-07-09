@@ -9,4 +9,10 @@ crons.interval(
   internal.emailAgent.poll.pollAllAccounts
 );
 
+crons.daily(
+  "check job leads for follow-up",
+  { hourUTC: 14, minuteUTC: 0 }, // ~9am Eastern
+  internal.emailAgent.followUp.checkFollowUps
+);
+
 export default crons;

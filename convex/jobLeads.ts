@@ -60,6 +60,16 @@ export const markClassificationError = internalMutation({
   },
 });
 
+export const getSentLeads = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("jobLeads")
+      .withIndex("by_status", (q) => q.eq("status", "sent"))
+      .collect();
+  },
+});
+
 export const findSentLeadByThreadId = internalQuery({
   args: { userId: v.string(), threadId: v.string() },
   handler: async (ctx, args) => {

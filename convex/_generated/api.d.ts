@@ -20,6 +20,7 @@ import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
 import type * as emailAccounts from "../emailAccounts.js";
 import type * as emailAgent_draft from "../emailAgent/draft.js";
+import type * as emailAgent_followUp from "../emailAgent/followUp.js";
 import type * as emailAgent_gmailClient from "../emailAgent/gmailClient.js";
 import type * as emailAgent_poll from "../emailAgent/poll.js";
 import type * as emailAgent_send from "../emailAgent/send.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   dopeAgents: typeof dopeAgents;
   emailAccounts: typeof emailAccounts;
   "emailAgent/draft": typeof emailAgent_draft;
+  "emailAgent/followUp": typeof emailAgent_followUp;
   "emailAgent/gmailClient": typeof emailAgent_gmailClient;
   "emailAgent/poll": typeof emailAgent_poll;
   "emailAgent/send": typeof emailAgent_send;
