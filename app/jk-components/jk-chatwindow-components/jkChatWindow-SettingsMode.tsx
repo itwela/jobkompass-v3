@@ -27,6 +27,10 @@ export default function JkCW_SettingsMode() {
   const extensionApiKey = useQuery(api.extensionApiKeys.get, isAuthenticated ? {} : "skip")
   const generateApiKey = useMutation(api.extensionApiKeys.generate)
   const revokeApiKey = useMutation(api.extensionApiKeys.revoke)
+
+  // Gmail accounts
+  const gmailAccounts = useQuery(api.emailAccounts.list, isAuthenticated ? {} : "skip")
+  const disconnectGmailAccount = useMutation(api.emailAccounts.disconnect)
   const [isGeneratingKey, setIsGeneratingKey] = useState(false)
   const [isRevokingKey, setIsRevokingKey] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
@@ -666,6 +670,61 @@ export default function JkCW_SettingsMode() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Gmail Accounts Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold">Connected Gmail Accounts</h2>
+            </div>
+            <div className="pl-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Connect a Gmail account so the job lead agent can watch it for recruiter outreach and job digests. Connect at least two accounts for full coverage.
+              </p>
+
+              {gmailAccounts === undefined ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : gmailAccounts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No Gmail accounts connected yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {gmailAccounts.map((account) => (
+                    <div
+                      key={account._id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{account.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {account.status === "active" ? "Connected" : "Revoked"} · since{" "}
+                          {new Date(account.connectedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {account.status === "active" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => disconnectGmailAccount({ accountId: account._id })}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          Disconnect
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button asChild variant="outline" className="gap-2">
+                <a href="/api/gmail/oauth/start">
+                  <Mail className="h-4 w-4" />
+                  Connect Gmail Account
+                </a>
+              </Button>
             </div>
           </div>
 

@@ -129,6 +129,13 @@ export default function JkSidebar() {
     }
   }
 
+  const handleJobLeadsClick = () => {
+    const leadsMode = allModes.find(mode => mode.id === '/leads')
+    if (leadsMode) {
+      setCurrentMode(leadsMode)
+    }
+  }
+
   const handleChatToggle = () => {
     const chatMode = allModes.find(mode => mode.id === '/chat')
     if (chatMode) {
@@ -247,17 +254,20 @@ export default function JkSidebar() {
                 </div>
               </button>
 
-              {/* Job Leads Section (real route, not a console mode) */}
-              <Link
-                href="/leads"
-                className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors text-foreground/80 hover:text-foreground hover:bg-accent"
+              {/* Job Leads Section */}
+              <button
+                onClick={handleJobLeadsClick}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/leads'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5" />
                   <span>Job Leads</span>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
+              </button>
 
               {/* Performance Section */}
               <button
