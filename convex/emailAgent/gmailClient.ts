@@ -39,30 +39,47 @@ export async function listNewMessageIds(
   const profile = await gmail.users.getProfile({ userId: "me" });
   const newHistoryId = String(profile.data.historyId);
 
-  if (!sinceHistoryId) {
-    // First poll for this account: just grab recent inbox mail (last 14 days),
-    // don't backfill from the dawn of time.
+  const firstPollFallback = async () => {
+    // First poll for this account (or re-seed after a stale/expired historyId): just grab
+    // recent inbox mail (last 14 days), don't backfill from the dawn of time.
     const list = await gmail.users.messages.list({
       userId: "me",
       q: "in:inbox newer_than:14d",
       maxResults: 50,
     });
     return { messageIds: (list.data.messages || []).map((m) => m.id!), newHistoryId };
+  };
+
+  if (!sinceHistoryId) {
+    return firstPollFallback();
   }
 
-  const history = await gmail.users.history.list({
-    userId: "me",
-    startHistoryId: sinceHistoryId,
-    historyTypes: ["messageAdded"],
-  });
+  try {
+    const history = await gmail.users.history.list({
+      userId: "me",
+      startHistoryId: sinceHistoryId,
+      historyTypes: ["messageAdded"],
+    });
 
-  const ids = new Set<string>();
-  for (const record of history.data.history || []) {
-    for (const added of record.messagesAdded || []) {
-      if (added.message?.id) ids.add(added.message.id);
+    const ids = new Set<string>();
+    for (const record of history.data.history || []) {
+      for (const added of record.messagesAdded || []) {
+        if (added.message?.id) ids.add(added.message.id);
+      }
     }
+    return { messageIds: Array.from(ids), newHistoryId };
+  } catch (error: any) {
+    // Gmail expires historyId after ~1 week (sooner for very active mailboxes) and returns
+    // 404 for a too-old startHistoryId. Re-seed by falling back to the same "first poll"
+    // path, so the caller persists a fresh historyId and doesn't hit the same 404 forever.
+    if (error?.code === 404) {
+      console.warn(
+        `Stale historyId (${sinceHistoryId}) for Gmail account; re-seeding via full list.`
+      );
+      return firstPollFallback();
+    }
+    throw error;
   }
-  return { messageIds: Array.from(ids), newHistoryId };
 }
 
 export async function getMessage(gmail: gmail_v1.Gmail, messageId: string) {

@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 
 export function ApprovalQueue() {
@@ -12,6 +13,22 @@ export function ApprovalQueue() {
   const editDraft = useMutation(api.jobLeads.editDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
+  const [approvingIds, setApprovingIds] = useState<Set<Id<"jobLeads">>>(new Set());
+
+  const handleApprove = async (leadId: Id<"jobLeads">) => {
+    setApprovingIds((prev) => new Set(prev).add(leadId));
+    try {
+      await approve({ leadId });
+    } catch (error) {
+      // Re-enable on failure so the user can retry (e.g. lead was already approved elsewhere).
+      setApprovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(leadId);
+        return next;
+      });
+      throw error;
+    }
+  };
 
   if (leads === undefined) return <div>Loading...</div>;
   if (leads.length === 0) return <div className="text-sm text-muted-foreground">No drafts waiting for approval.</div>;
@@ -57,10 +74,11 @@ export function ApprovalQueue() {
               </button>
             )}
             <button
-              className="text-sm px-3 py-1 rounded bg-green-600 text-white"
-              onClick={() => approve({ leadId: lead._id })}
+              className="text-sm px-3 py-1 rounded bg-green-600 text-white disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={approvingIds.has(lead._id)}
+              onClick={() => handleApprove(lead._id)}
             >
-              Approve & Send
+              {approvingIds.has(lead._id) ? "Sending..." : "Approve & Send"}
             </button>
             <button
               className="text-sm px-3 py-1 rounded bg-red-600 text-white"

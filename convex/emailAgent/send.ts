@@ -12,6 +12,17 @@ export const sendApprovedLead = internalAction({
     const lead: any = await ctx.runQuery(internal.jobLeads.getById, { leadId: args.leadId });
     if (!lead) return;
 
+    // Defense-in-depth: `approve` sets status to "sending" synchronously before scheduling
+    // this action, so a lead reaching here should always be "sending". If it isn't (already
+    // "sent"/"followed_up" from a prior run, or reverted to "pending_approval" after a failed
+    // send), bail out instead of sending a possible duplicate.
+    if (lead.status !== "sending") {
+      console.log(
+        `Skipping send for lead ${args.leadId}: status is "${lead.status}", expected "sending" (already sent or duplicate schedule).`
+      );
+      return;
+    }
+
     try {
       const account: any = await ctx.runQuery(internal.emailAccounts.getById, {
         accountId: lead.sourceAccountId,

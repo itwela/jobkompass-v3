@@ -122,7 +122,14 @@ export const approve = mutation({
     if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
     if (lead.status !== "pending_approval") throw new Error("Lead is not pending approval");
 
-    await ctx.db.patch(args.leadId, { approvedAt: Date.now(), updatedAt: Date.now() });
+    // Flip to "sending" synchronously, in the same mutation, before scheduling the send
+    // action. This closes the double-approve window: a second concurrent `approve` call
+    // will now fail the status check above instead of scheduling a duplicate send.
+    await ctx.db.patch(args.leadId, {
+      status: "sending" as const,
+      approvedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
     await ctx.scheduler.runAfter(0, internal.emailAgent.send.sendApprovedLead, { leadId: args.leadId });
   },
 });
@@ -165,9 +172,10 @@ export const markSent = internalMutation({
 export const markSendError = internalMutation({
   args: { leadId: v.id("jobLeads") },
   handler: async (ctx, args) => {
-    // Stays pending_approval; leaves approvedAt set so a distinct "approved but failed to send"
-    // state is visible if a UI wants to show a retry affordance later.
-    await ctx.db.patch(args.leadId, { updatedAt: Date.now() });
+    // Revert "sending" back to "pending_approval" so the lead reappears in the approval
+    // queue and can be retried. approvedAt is left set so a distinct "approved but failed
+    // to send" state is visible if a UI wants to show a retry affordance later.
+    await ctx.db.patch(args.leadId, { status: "pending_approval" as const, updatedAt: Date.now() });
   },
 });
 

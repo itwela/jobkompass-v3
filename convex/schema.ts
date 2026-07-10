@@ -176,6 +176,7 @@ const schema = defineSchema({
     status: v.union(
       v.literal("new"),
       v.literal("pending_approval"),
+      v.literal("sending"),
       v.literal("sent"),
       v.literal("followed_up"),
       v.literal("replied"),
