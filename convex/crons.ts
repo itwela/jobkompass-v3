@@ -15,4 +15,10 @@ crons.daily(
   internal.emailAgent.followUp.checkFollowUps
 );
 
+crons.interval(
+  "reconcile stuck sending leads",
+  { minutes: 20 },
+  internal.jobLeads.reconcileStuckSends
+);
+
 export default crons;

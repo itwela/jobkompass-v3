@@ -7,30 +7,42 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
 
 export function ApprovalQueue() {
-  const leads = useQuery(api.jobLeads.list, { status: "pending_approval" });
+  // Query both statuses: `pending_approval` is the normal queue, and `sending` is the brief
+  // (or, if stuck, not-so-brief) window while `sendApprovedLead` runs. Including `sending`
+  // leads means a lead reverted by `markSendError` (back to `pending_approval`) or by the
+  // `reconcileStuckSends` cron reappears with a real, server-driven "Sending..." state in
+  // between, instead of vanishing from the list entirely while the local component still
+  // thinks it's in flight.
+  const pendingLeads = useQuery(api.jobLeads.list, { status: "pending_approval" });
+  const sendingLeads = useQuery(api.jobLeads.list, { status: "sending" });
   const approve = useMutation(api.jobLeads.approve);
   const reject = useMutation(api.jobLeads.reject);
   const editDraft = useMutation(api.jobLeads.editDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
+  // Only tracks the brief window between click and the `approve` mutation call resolving or
+  // rejecting. Once `approve` resolves, the server's own `lead.status === "sending"` (from
+  // `sendingLeads` above) is the source of truth for "is this lead currently sending" — so
+  // this set is always cleared right after the mutation settles, on both success and failure,
+  // and never persists across a later `markSendError` revert.
   const [approvingIds, setApprovingIds] = useState<Set<Id<"jobLeads">>>(new Set());
 
   const handleApprove = async (leadId: Id<"jobLeads">) => {
     setApprovingIds((prev) => new Set(prev).add(leadId));
     try {
       await approve({ leadId });
-    } catch (error) {
-      // Re-enable on failure so the user can retry (e.g. lead was already approved elsewhere).
+    } finally {
       setApprovingIds((prev) => {
+        if (!prev.has(leadId)) return prev;
         const next = new Set(prev);
         next.delete(leadId);
         return next;
       });
-      throw error;
     }
   };
 
-  if (leads === undefined) return <div>Loading...</div>;
+  if (pendingLeads === undefined || sendingLeads === undefined) return <div>Loading...</div>;
+  const leads = [...pendingLeads, ...sendingLeads].sort((a, b) => b.createdAt - a.createdAt);
   if (leads.length === 0) return <div className="text-sm text-muted-foreground">No drafts waiting for approval.</div>;
 
   return (
@@ -75,10 +87,10 @@ export function ApprovalQueue() {
             )}
             <button
               className="text-sm px-3 py-1 rounded bg-green-600 text-white disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={approvingIds.has(lead._id)}
+              disabled={lead.status === "sending" || approvingIds.has(lead._id)}
               onClick={() => handleApprove(lead._id)}
             >
-              {approvingIds.has(lead._id) ? "Sending..." : "Approve & Send"}
+              {lead.status === "sending" || approvingIds.has(lead._id) ? "Sending..." : "Approve & Send"}
             </button>
             <button
               className="text-sm px-3 py-1 rounded bg-red-600 text-white"

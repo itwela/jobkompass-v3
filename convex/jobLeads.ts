@@ -179,6 +179,42 @@ export const markSendError = internalMutation({
   },
 });
 
+// A send should never legitimately take this long — `sendApprovedLead` involves at most an
+// OpenRouter call, a LaTeX compile, and a Gmail API call, all of which complete in seconds.
+// This is generous headroom above that so a normal, merely-slow send is never falsely
+// reconciled while it's still genuinely in progress.
+const STUCK_SENDING_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+// Reconciles `jobLeads` rows wedged in `"sending"` with no in-progress action left to finish
+// them — e.g. the scheduled `sendApprovedLead` action crashed or was killed before its own
+// try/catch could run `markSendError`. Without this, such a lead is invisible to
+// `ApprovalQueue`'s `pending_approval`-scoped query and can never pass `approve`'s
+// `status !== "pending_approval"` guard again, so it's stuck forever. Run periodically via
+// `crons.ts` rather than relied upon as the primary safety net — `sendApprovedLead`'s own
+// try/catch (which now wraps its entire body, including the initial fetch and guard) already
+// handles any catchable failure; this only catches the residual "action never ran to
+// completion at all" case.
+export const reconcileStuckSends = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - STUCK_SENDING_TIMEOUT_MS;
+    const stuckLeads = await ctx.db
+      .query("jobLeads")
+      .withIndex("by_status", (q) => q.eq("status", "sending"))
+      .filter((q) => q.lt(q.field("approvedAt"), cutoff))
+      .collect();
+
+    for (const lead of stuckLeads) {
+      console.warn(
+        `reconcileStuckSends: lead ${lead._id} stuck in "sending" since approvedAt=${lead.approvedAt}, reverting to "pending_approval".`
+      );
+      await ctx.db.patch(lead._id, { status: "pending_approval" as const, updatedAt: Date.now() });
+    }
+
+    return { reconciled: stuckLeads.length };
+  },
+});
+
 export const promoteToJob = mutation({
   args: { leadId: v.id("jobLeads") },
   handler: async (ctx, args): Promise<Id<"jobs">> => {
