@@ -22,6 +22,7 @@ import type * as emailAccounts from "../emailAccounts.js";
 import type * as emailAgent_draft from "../emailAgent/draft.js";
 import type * as emailAgent_followUp from "../emailAgent/followUp.js";
 import type * as emailAgent_gmailClient from "../emailAgent/gmailClient.js";
+import type * as emailAgent_mirror from "../emailAgent/mirror.js";
 import type * as emailAgent_poll from "../emailAgent/poll.js";
 import type * as emailAgent_send from "../emailAgent/send.js";
 import type * as emailList from "../emailList.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "emailAgent/draft": typeof emailAgent_draft;
   "emailAgent/followUp": typeof emailAgent_followUp;
   "emailAgent/gmailClient": typeof emailAgent_gmailClient;
+  "emailAgent/mirror": typeof emailAgent_mirror;
   "emailAgent/poll": typeof emailAgent_poll;
   "emailAgent/send": typeof emailAgent_send;
   emailList: typeof emailList;

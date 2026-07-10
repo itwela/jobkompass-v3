@@ -27,7 +27,9 @@ export const insertLead = internalMutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    return await ctx.db.insert("jobLeads", { ...args, createdAt: now, updatedAt: now });
+    const leadId = await ctx.db.insert("jobLeads", { ...args, createdAt: now, updatedAt: now });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId });
+    return leadId;
   },
 });
 
@@ -103,6 +105,7 @@ export const attachDraft = internalMutation({
       status: "pending_approval" as const,
       updatedAt: Date.now(),
     });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
   },
 });
 
@@ -131,6 +134,7 @@ export const reject = mutation({
     const lead = await ctx.db.get(args.leadId);
     if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
     await ctx.db.patch(args.leadId, { status: "closed" as const, updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
   },
 });
 
@@ -154,6 +158,7 @@ export const markSent = internalMutation({
       followUpSentAt: args.isFollowUp ? now : undefined,
       updatedAt: now,
     });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
   },
 });
 
@@ -184,6 +189,7 @@ export const promoteToJob = mutation({
     });
 
     await ctx.db.patch(args.leadId, { status: "promoted" as const, promotedAt: Date.now(), updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
     return jobId;
   },
 });
