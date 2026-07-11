@@ -4,7 +4,6 @@ import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { tailorResumeContent, draftReplyMessage } from "../../lib/emailAgent/draftMessage";
-import { generateResumeLatex } from "../../lib/resume/generators";
 
 export const draftForLead = internalAction({
   args: { leadId: v.id("jobLeads"), isFollowUp: v.optional(v.boolean()) },
@@ -37,52 +36,31 @@ export const draftForLead = internalAction({
           console.error(`draftForLead ${args.leadId}: resume tailoring returned null, no resume will be attached`);
         }
         if (tailored) {
-          const latexTemplate = generateResumeLatex(tailored, baseResume.template || "jake");
-          // Convex actions always run in Convex's cloud, never on a dev machine, so
-          // there is no NODE_ENV=development localhost fallback here (127.0.0.1 would
-          // just be an unreachable host that crashes the draft).
-          const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
+          // PDF generation goes through the app's own export endpoint (same pattern as
+          // agent/fns.resumesGenerate): the LaTeX template lives on the Next.js side and
+          // is NOT bundled into the Convex deployment, so generateResumeLatex + a raw
+          // LaTeX-service call can never work from here.
+          const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
+          const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/jake`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: tailored }),
+          });
 
-          if (!LATEX_SERVICE_URL) {
-            console.error(`draftForLead ${args.leadId}: LATEX_SERVICE_URL not set, skipping resume PDF`);
-          }
-          if (LATEX_SERVICE_URL) {
-            const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ latex: latexTemplate, filename: `resume-${lead._id}` }),
+          if (!exportResponse.ok) {
+            console.error(`draftForLead ${args.leadId}: resume PDF export failed (${exportResponse.status})`);
+          } else {
+            const pdfBlob = new Blob([await exportResponse.arrayBuffer()], { type: "application/pdf" });
+            const fileId = await ctx.storage.store(pdfBlob);
+            draftResumeId = await ctx.runMutation(internal.documents.saveGeneratedResumeInternal, {
+              userId: lead.userId,
+              name: `${lead.company} - ${lead.role} (tailored)`,
+              fileId,
+              fileName: `resume-${lead.company}-${Date.now()}.pdf`,
+              fileSize: pdfBlob.size,
+              content: tailored,
+              template: baseResume.template || "jake",
             });
-
-            if (!compileResponse.ok) {
-              console.error(`draftForLead ${args.leadId}: LaTeX compile failed (${compileResponse.status})`);
-            }
-            if (compileResponse.ok) {
-              const { pdfBase64 } = await compileResponse.json();
-              if (!pdfBase64) {
-                console.error(`draftForLead ${args.leadId}: LaTeX compile returned no pdfBase64`);
-              }
-              if (pdfBase64) {
-                const pdfBuffer = Buffer.from(pdfBase64, "base64");
-                const uploadUrl: string = await ctx.runMutation(internal.documents.generateUploadUrlInternal, {});
-                const uploadResponse = await fetch(uploadUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/pdf" },
-                  body: new Uint8Array(pdfBuffer),
-                });
-                if (uploadResponse.ok) {
-                  const { storageId } = await uploadResponse.json();
-                  draftResumeId = await ctx.runMutation(internal.documents.saveGeneratedResumeInternal, {
-                    userId: lead.userId,
-                    name: `${lead.company} - ${lead.role} (tailored)`,
-                    fileId: storageId,
-                    fileName: `resume-${lead.company}-${Date.now()}.pdf`,
-                    fileSize: pdfBuffer.length,
-                    content: tailored,
-                    template: baseResume.template || "jake",
-                  });
-                }
-              }
-            }
           }
         }
       }
