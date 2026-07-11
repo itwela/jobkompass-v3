@@ -21,6 +21,7 @@ export function ApprovalQueue() {
   const approve = useMutation(api.jobLeads.approve);
   const reject = useMutation(api.jobLeads.reject);
   const editDraft = useMutation(api.jobLeads.editDraft);
+  const markSeen = useMutation(api.jobLeads.markSeen);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   // Only tracks the brief window between click and the `approve` mutation call resolving or
@@ -57,10 +58,19 @@ export function ApprovalQueue() {
   return (
     <div className="space-y-4">
       {leads.map((lead) => (
-        <div key={lead._id} className="border rounded-lg p-4 space-y-2">
+        <div
+          key={lead._id}
+          className="border rounded-lg p-4 space-y-2"
+          onClick={() => { if (!lead.seenAt) markSeen({ leadId: lead._id }); }}
+        >
           <div className="flex items-baseline justify-between gap-3">
-            <div className="font-medium">
-              {lead.company} — {lead.role} {lead.isFollowUp && <span className="text-xs text-muted-foreground">(follow-up)</span>}
+            <div className="font-medium flex items-center gap-2">
+              {!lead.seenAt && (
+                <span className="shrink-0 inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-primary-foreground" title="New — you haven't opened this yet">
+                  New
+                </span>
+              )}
+              <span>{lead.company} — {lead.role} {lead.isFollowUp && <span className="text-xs text-muted-foreground">(follow-up)</span>}</span>
             </div>
             <div className="text-xs text-muted-foreground whitespace-nowrap">
               {new Date(lead.emailReceivedAt ?? lead.createdAt).toLocaleDateString("en-US", {

@@ -193,6 +193,7 @@ const schema = defineSchema({
     promotedAt: v.optional(v.number()),
     classificationError: v.optional(v.boolean()),
     emailReceivedAt: v.optional(v.number()), // Gmail internalDate — when the email arrived
+    seenAt: v.optional(v.number()), // when the user first opened/clicked the lead (unset = new)
     createdAt: v.number(),
     updatedAt: v.number(),
   })

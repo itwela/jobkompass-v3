@@ -49,10 +49,23 @@ export const list = query({
   args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const convexUserId = await resolveConvexUserId(ctx);
-    let q = ctx.db.query("jobLeads").withIndex("by_user_and_status", (idx) =>
+    const q = ctx.db.query("jobLeads").withIndex("by_user_and_status", (idx) =>
       args.status ? idx.eq("userId", convexUserId).eq("status", args.status as any) : idx.eq("userId", convexUserId)
     );
-    return await q.order("desc").collect();
+    const leads = await q.collect();
+    // Newest first by when the email actually arrived (fall back to ingest time).
+    return leads.sort((a, b) => (b.emailReceivedAt ?? b.createdAt) - (a.emailReceivedAt ?? a.createdAt));
+  },
+});
+
+// Mark a lead as seen (clears its "New" badge). Idempotent; only stamps the first time.
+export const markSeen = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId || lead.seenAt) return;
+    await ctx.db.patch(args.leadId, { seenAt: Date.now() });
   },
 });
 

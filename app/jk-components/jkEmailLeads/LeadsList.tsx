@@ -60,6 +60,7 @@ export function LeadsList() {
   const promote = useMutation(api.jobLeads.promoteToJob);
   const deleteLead = useMutation(api.jobLeads.deleteLead);
   const requestDraft = useMutation(api.jobLeads.requestDraft);
+  const markSeen = useMutation(api.jobLeads.markSeen);
   const [leadToDelete, setLeadToDelete] = useState<Doc<"jobLeads"> | null>(null);
   const [deleting, setDeleting] = useState(false);
   // Leads whose tailored resume was requested this session; cleared implicitly when
@@ -106,21 +107,35 @@ export function LeadsList() {
             const inbox = accountEmailById.get(lead.sourceAccountId);
             const link = leadLink(lead, inbox);
             return (
-              <tr key={lead._id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
+              <tr
+                key={lead._id}
+                className="border-b last:border-b-0 hover:bg-muted/30 transition-colors"
+                onClick={() => { if (!lead.seenAt) markSeen({ leadId: lead._id }); }}
+              >
                 <td className="px-3 py-2.5 font-medium whitespace-nowrap" title={lead.company}>
-                  {link ? (
-                    <a
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block max-w-56 truncate hover:underline"
-                      title={lead.sourceType === "digest_listing" ? "Open the job listing" : "Open the email in Gmail"}
-                    >
-                      {lead.company} <span className="text-muted-foreground">↗</span>
-                    </a>
-                  ) : (
-                    <span className="block max-w-56 truncate">{lead.company}</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!lead.seenAt && (
+                      <span
+                        className="shrink-0 inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary text-primary-foreground"
+                        title="New — you haven't opened this yet"
+                      >
+                        New
+                      </span>
+                    )}
+                    {link ? (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block max-w-56 truncate hover:underline"
+                        title={lead.sourceType === "digest_listing" ? "Open the job listing" : "Open the email in Gmail"}
+                      >
+                        {lead.company} <span className="text-muted-foreground">↗</span>
+                      </a>
+                    ) : (
+                      <span className="block max-w-56 truncate">{lead.company}</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap" title={lead.role}>
                   <span className="block max-w-80 truncate">{lead.role}</span>
