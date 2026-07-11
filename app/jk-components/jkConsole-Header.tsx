@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun, Mail } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -357,7 +357,6 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                     }`}
                                 >
                                     <span className="flex items-center gap-2">
-                                        <Mail className="h-4 w-4" />
                                         <span>Job Leads</span>
                                     </span>
                                     {pendingLeadsCount > 0 && (
