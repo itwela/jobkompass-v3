@@ -43,17 +43,10 @@ export function LeadsList() {
   const accountEmailById = new Map((accounts ?? []).map((a) => [a._id, a.email]));
 
   return (
+    // Natural column widths + nowrap cells: the table grows to fit its content and the
+    // wrapper scrolls horizontally, so cells can never overlap at any window width.
     <div className="border rounded-lg overflow-x-auto">
-      <table className="w-full text-sm table-fixed min-w-[860px]">
-        <colgroup>
-          <col className="w-[16%]" />
-          <col className="w-[24%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
-          <col className="w-[10%]" />
-          <col className="w-[8%]" />
-          <col className="w-[16%]" />
-        </colgroup>
+      <table className="w-full min-w-max text-sm">
         <thead>
           <tr className="text-left border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <th className="px-3 py-2.5 font-medium">Company</th>
@@ -71,17 +64,17 @@ export function LeadsList() {
             const inbox = accountEmailById.get(lead.sourceAccountId);
             return (
               <tr key={lead._id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
-                <td className="px-3 py-2.5 font-medium truncate" title={lead.company}>
-                  {lead.company}
+                <td className="px-3 py-2.5 font-medium whitespace-nowrap" title={lead.company}>
+                  <span className="block max-w-56 truncate">{lead.company}</span>
                 </td>
-                <td className="px-3 py-2.5 truncate" title={lead.role}>
-                  {lead.role}
+                <td className="px-3 py-2.5 whitespace-nowrap" title={lead.role}>
+                  <span className="block max-w-80 truncate">{lead.role}</span>
                 </td>
-                <td className="px-3 py-2.5 text-muted-foreground truncate" title={lead.senderEmail || undefined}>
-                  {sender ?? <span className="opacity-50">—</span>}
+                <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap" title={lead.senderEmail || undefined}>
+                  <span className="block max-w-48 truncate">{sender ?? <span className="opacity-50">—</span>}</span>
                 </td>
-                <td className="px-3 py-2.5 text-muted-foreground truncate" title={inbox}>
-                  {inbox || <span className="opacity-50">—</span>}
+                <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap" title={inbox}>
+                  <span className="block max-w-56 truncate">{inbox || <span className="opacity-50">—</span>}</span>
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   <span
