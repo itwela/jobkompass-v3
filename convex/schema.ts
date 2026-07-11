@@ -192,6 +192,7 @@ const schema = defineSchema({
     followUpSentAt: v.optional(v.number()),
     promotedAt: v.optional(v.number()),
     classificationError: v.optional(v.boolean()),
+    emailReceivedAt: v.optional(v.number()), // Gmail internalDate — when the email arrived
     createdAt: v.number(),
     updatedAt: v.number(),
   })

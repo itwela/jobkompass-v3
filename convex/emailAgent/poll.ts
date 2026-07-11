@@ -51,19 +51,13 @@ export const pollAllAccounts = internalAction({
           });
 
           if (!classification) {
-            await ctx.runMutation(internal.jobLeads.insertLead, {
-              userId: account.userId,
-              sourceAccountId: account._id,
-              sourceType: "personal_outreach",
-              company: "Unknown",
-              role: "Unknown",
-              senderEmail: message.from,
-              rawSnippet: message.snippet,
-              originalMessageId: message.id,
-              rfcMessageId: message.rfcMessageId,
-              threadId: message.threadId,
-              status: "new",
-            }).then((leadId) => ctx.runMutation(internal.jobLeads.markClassificationError, { leadId }));
+            // Don't surface classification failures as "Unknown/Unknown" leads — that
+            // floods the UI with junk. Log and skip; classify.ts already retried
+            // transient errors, and a re-seed (resetClassificationErrorLeads) can
+            // re-ingest anything genuinely missed.
+            console.error(
+              `Classification failed for message ${message.id} (from: ${message.from}, subject: ${message.subject}); skipping.`
+            );
             continue;
           }
 
@@ -82,6 +76,7 @@ export const pollAllAccounts = internalAction({
               rfcMessageId: message.rfcMessageId,
               threadId: message.threadId,
               status: "new",
+              emailReceivedAt: message.receivedAt,
             });
             await ctx.scheduler.runAfter(0, internal.emailAgent.draft.draftForLead, { leadId });
           }
@@ -99,6 +94,7 @@ export const pollAllAccounts = internalAction({
                 rfcMessageId: message.rfcMessageId,
                 threadId: message.threadId,
                 status: "extracted",
+                emailReceivedAt: message.receivedAt,
               });
             }
           }

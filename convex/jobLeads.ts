@@ -24,6 +24,7 @@ export const insertLead = internalMutation({
     rfcMessageId: v.optional(v.string()),
     threadId: v.string(),
     status: v.union(v.literal("new"), v.literal("extracted")),
+    emailReceivedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -62,24 +63,19 @@ export const markClassificationError = internalMutation({
   },
 });
 
-// Recovery helper (run via `npx convex run jobLeads:resetClassificationErrorLeads` after
-// fixing whatever broke classification): deletes leads that failed classification and
-// never got a draft, then clears each affected account's Gmail historyId cursor so the
-// next poll re-ingests the same recent mail through the fixed classifier. Poll dedupes
-// by originalMessageId, so leads that classified fine are never duplicated.
-export const resetClassificationErrorLeads = internalMutation({
+// Recovery helper (run via `npx convex run jobLeads:resetUntriagedLeads` after fixing
+// whatever broke ingestion): deletes every lead still sitting untriaged — anything the
+// user has drafted, approved, or otherwise moved along stays — then clears each active
+// account's Gmail historyId cursor so the next poll re-ingests recent mail from scratch.
+// Poll dedupes by originalMessageId, so surviving leads are never duplicated.
+export const resetUntriagedLeads = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const errorLeads = await ctx.db
-      .query("jobLeads")
-      .filter((q) => q.eq(q.field("classificationError"), true))
-      .collect();
+    const leads = await ctx.db.query("jobLeads").collect();
 
     const accountIds = new Set<Id<"emailAccounts">>();
     let deleted = 0;
-    for (const lead of errorLeads) {
-      // Only touch leads still sitting untriaged from the failed run; anything the user
-      // has drafted, approved, or otherwise moved along stays.
+    for (const lead of leads) {
       if (lead.status !== "new" && lead.status !== "extracted") continue;
       if (lead.draftMessage) continue;
       accountIds.add(lead.sourceAccountId);

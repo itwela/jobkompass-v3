@@ -18,6 +18,7 @@ export function LeadsList() {
           <th>Role</th>
           <th>Source</th>
           <th>Status</th>
+          <th>Date</th>
           <th></th>
         </tr>
       </thead>
@@ -28,6 +29,12 @@ export function LeadsList() {
             <td>{lead.role}</td>
             <td>{lead.sourceType === "digest_listing" ? "Digest" : "Direct outreach"}</td>
             <td>{lead.status}</td>
+            <td className="whitespace-nowrap">
+              {new Date(lead.emailReceivedAt ?? lead.createdAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })}
+            </td>
             <td>
               {lead.status !== "promoted" && (
                 <button

@@ -103,6 +103,9 @@ export async function getMessage(gmail: gmail_v1.Gmail, messageId: string) {
     subject: header("Subject"),
     snippet: res.data.snippet || "",
     bodyText,
+    // Gmail's receive timestamp (epoch ms) — when the email actually arrived,
+    // as opposed to jobLeads.createdAt which is when the poll ingested it.
+    receivedAt: res.data.internalDate ? Number(res.data.internalDate) : undefined,
   };
 }
 

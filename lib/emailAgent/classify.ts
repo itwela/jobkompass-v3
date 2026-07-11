@@ -72,30 +72,47 @@ export async function classifyEmail(input: {
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterKey) throw new Error("OpenRouter API key not configured on server");
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openRouterKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://myjobkompass.com",
-      "X-Title": "JobKompass Email Agent",
-    },
-    body: JSON.stringify({
-      model: "google/gemma-3-27b-it",
-      messages: [
-        { role: "system", content: CLASSIFICATION_PROMPT },
-        {
-          role: "user",
-          content: `Subject: ${input.subject}\nFrom: ${input.from}\n\n${input.bodyText.substring(0, 8000)}`,
-        },
-      ],
-      temperature: 0.1,
-      max_tokens: 1000,
-    }),
-  });
+  // The poll cron classifies bursts of up to ~100 backlogged emails, which trips
+  // OpenRouter rate limits — retry transient failures (429/5xx) with backoff instead
+  // of surfacing them as classification errors.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://myjobkompass.com",
+        "X-Title": "JobKompass Email Agent",
+      },
+      body: JSON.stringify({
+        model: "google/gemma-3-27b-it",
+        messages: [
+          { role: "system", content: CLASSIFICATION_PROMPT },
+          {
+            role: "user",
+            content: `Subject: ${input.subject}\nFrom: ${input.from}\n\n${input.bodyText.substring(0, 8000)}`,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 1000,
+      }),
+    });
 
-  if (!response.ok) return null;
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  return parseClassificationResponse(content);
+    if (response.ok) {
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || "";
+      return parseClassificationResponse(content);
+    }
+
+    const retryable = response.status === 429 || response.status >= 500;
+    console.error(
+      `OpenRouter classification failed (status ${response.status}, attempt ${attempt}/${maxAttempts})${retryable && attempt < maxAttempts ? ", retrying" : ""}`
+    );
+    if (!retryable) return null;
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    }
+  }
+  return null;
 }
