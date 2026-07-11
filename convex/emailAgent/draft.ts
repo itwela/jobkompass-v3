@@ -5,6 +5,65 @@ import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { tailorResumeContent, draftReplyMessage } from "../../lib/emailAgent/draftMessage";
 
+// Resume-only generation for digest listings ("extracted" leads): there is no sender
+// to draft a reply to, but the user still wants a tailored resume PDF to apply with.
+// Same tailor -> export-endpoint -> storage pipeline as draftForLead, without touching
+// the lead's status or draftMessage.
+export const tailorResumeOnly = internalAction({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const lead: any = await ctx.runQuery(internal.jobLeads.getById, { leadId: args.leadId });
+    if (!lead || lead.draftResumeId) return;
+
+    const resumes: any[] = await ctx.runQuery(internal.documents.listResumesInternal, {
+      userId: lead.userId,
+    });
+    const baseResume = resumes.find((r) => r.isActive) || resumes[0];
+    if (!baseResume?.content) {
+      console.error(`tailorResumeOnly ${args.leadId}: user has no base resume with content`);
+      return;
+    }
+
+    const tailored = await tailorResumeContent({
+      baseContent: baseResume.content,
+      company: lead.company,
+      role: lead.role,
+    });
+    if (!tailored) {
+      console.error(`tailorResumeOnly ${args.leadId}: resume tailoring returned null`);
+      return;
+    }
+
+    const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
+    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/jake`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: tailored }),
+    });
+    if (!exportResponse.ok) {
+      console.error(`tailorResumeOnly ${args.leadId}: resume PDF export failed (${exportResponse.status})`);
+      return;
+    }
+
+    const pdfBlob = new Blob([await exportResponse.arrayBuffer()], { type: "application/pdf" });
+    const fileId = await ctx.storage.store(pdfBlob);
+    const draftResumeId = await ctx.runMutation(internal.documents.saveGeneratedResumeInternal, {
+      userId: lead.userId,
+      name: `${lead.company} - ${lead.role} (tailored)`,
+      fileId,
+      fileName: `resume-${lead.company}-${Date.now()}.pdf`,
+      fileSize: pdfBlob.size,
+      content: tailored,
+      template: baseResume.template || "jake",
+    });
+
+    await ctx.runMutation(internal.jobLeads.attachResumeOnly, {
+      leadId: args.leadId,
+      draftResumeId: draftResumeId as any,
+    });
+  },
+});
+
 export const draftForLead = internalAction({
   args: { leadId: v.id("jobLeads"), isFollowUp: v.optional(v.boolean()) },
   handler: async (ctx, args) => {

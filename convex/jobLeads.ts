@@ -108,6 +108,29 @@ export const findDigestDuplicate = internalQuery({
   },
 });
 
+export const attachResumeOnly = internalMutation({
+  args: { leadId: v.id("jobLeads"), draftResumeId: v.id("resumes") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.leadId, { draftResumeId: args.draftResumeId, updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
+  },
+});
+
+// User-facing: generate a tailored resume PDF for a digest listing so it can be
+// applied to (extracted leads have no sender, so there's no reply to draft).
+export const requestTailoredResume = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
+    if (lead.draftResumeId) return; // already has one
+    await ctx.scheduler.runAfter(0, internal.emailAgent.draft.tailorResumeOnly, {
+      leadId: args.leadId,
+    });
+  },
+});
+
 // User-facing delete for a single lead (junk classification, stale listing, etc).
 // Removes the Life Dashboard mirror row too.
 export const deleteLead = mutation({

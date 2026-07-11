@@ -44,8 +44,12 @@ export function LeadsList() {
   const accounts = useQuery(api.emailAccounts.list, {});
   const promote = useMutation(api.jobLeads.promoteToJob);
   const deleteLead = useMutation(api.jobLeads.deleteLead);
+  const requestResume = useMutation(api.jobLeads.requestTailoredResume);
   const [leadToDelete, setLeadToDelete] = useState<Doc<"jobLeads"> | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Leads whose tailored resume was requested this session; cleared implicitly when
+  // the lead's draftResumeId appears via the reactive query.
+  const [tailoringIds, setTailoringIds] = useState<Set<string>>(new Set());
 
   const confirmDelete = async () => {
     if (!leadToDelete) return;
@@ -110,7 +114,23 @@ export function LeadsList() {
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{formatLeadDate(lead)}</td>
                 <td className="px-3 py-2.5">
-                  <div className="flex gap-1.5 justify-end whitespace-nowrap">
+                  <div className="flex gap-1.5 justify-end items-center whitespace-nowrap">
+                    {lead.draftResumeId ? (
+                      <span className="text-xs text-muted-foreground" title="Tailored resume PDF generated — find it in My Documents">
+                        📎 resume
+                      </span>
+                    ) : lead.sourceType === "digest_listing" ? (
+                      <button
+                        className="text-xs px-2 py-1 rounded border hover:bg-accent transition-colors disabled:opacity-60"
+                        disabled={tailoringIds.has(lead._id)}
+                        onClick={() => {
+                          setTailoringIds((prev) => new Set(prev).add(lead._id));
+                          requestResume({ leadId: lead._id });
+                        }}
+                      >
+                        {tailoringIds.has(lead._id) ? "Tailoring…" : "Tailor Resume"}
+                      </button>
+                    ) : null}
                     {lead.status !== "promoted" && (
                       <button
                         className="text-xs px-2 py-1 rounded border hover:bg-accent transition-colors"
