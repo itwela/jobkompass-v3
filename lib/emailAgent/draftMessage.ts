@@ -14,9 +14,14 @@ export function parseDraftMessageResponse(raw: string): string | null {
     trimmed = trimmed.slice(0, leak).trim();
   }
   // Drop placeholder signature lines; the user signs when they review the draft.
-  trimmed = trimmed
-    .replace(/\n\s*\[(Your name|Your Name|Itwela|Name)\]\s*$/g, "")
-    .trim();
+  // Covers "[Your name]"-style brackets with ANY content, plus a bare trailing
+  // signature line (a few words, no sentence punctuation — e.g. "Mairtri").
+  trimmed = trimmed.replace(/\n\s*\[[^\]\n]{1,40}\]\s*$/g, "").trim();
+  const lines = trimmed.split("\n");
+  const last = lines[lines.length - 1].trim();
+  if (lines.length > 1 && last.split(/\s+/).length <= 3 && !/[.!?,]$/.test(last)) {
+    trimmed = lines.slice(0, -1).join("\n").trim();
+  }
   return trimmed || null;
 }
 
@@ -32,7 +37,7 @@ export async function draftReplyMessage(input: {
 
   const systemPrompt = input.isFollowUp
     ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. No subject line, no greeting formatting beyond "Hi <name>,", no sign-off beyond a first name. Reference the role and company naturally. Respond with ONLY the message text.`
-    : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
+    : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know (the resume is attached, so don't enumerate skills). Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
 
   const userPrompt = `Sender: ${input.senderName}\nCompany: ${input.company}\nRole: ${input.role}\nOriginal message snippet: ${input.originalSnippet}`;
 
