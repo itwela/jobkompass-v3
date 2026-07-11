@@ -5,6 +5,13 @@ import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { api } from "@/convex/_generated/api";
 
 export async function GET(request: NextRequest) {
+  const googleError = request.nextUrl.searchParams.get("error");
+  if (googleError) {
+    return NextResponse.redirect(
+      new URL(`/app?mode=settings&gmail_error=google_${googleError}`, request.url)
+    );
+  }
+
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
     return NextResponse.redirect(new URL("/app?mode=settings&gmail_error=missing_code", request.url));

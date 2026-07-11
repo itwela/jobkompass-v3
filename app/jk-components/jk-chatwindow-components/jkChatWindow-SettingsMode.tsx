@@ -705,7 +705,10 @@ export default function JkCW_SettingsMode() {
               {gmailError && (
                 <div className="p-3 rounded-lg border bg-red-50 border-red-200">
                   <p className="text-sm font-medium text-red-800">
-                    {GMAIL_ERROR_MESSAGES[gmailError] ?? "Something went wrong connecting Gmail. Please try again."}
+                    {GMAIL_ERROR_MESSAGES[gmailError]
+                      ?? (gmailError.startsWith("google_")
+                        ? `Google declined the connection (${gmailError.slice("google_".length)}). If this is a test/unverified app, make sure this Gmail address is added as a test user in the Google Cloud OAuth consent screen.`
+                        : "Something went wrong connecting Gmail. Please try again.")}
                   </p>
                 </div>
               )}
