@@ -1,8 +1,18 @@
 // app/jk-components/jkEmailLeads/LeadsList.tsx
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/convex/_generated/dataModel";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function formatLeadDate(lead: { emailReceivedAt?: number; createdAt: number }) {
   return new Date(lead.emailReceivedAt ?? lead.createdAt).toLocaleDateString("en-US", {
@@ -34,6 +44,19 @@ export function LeadsList() {
   const accounts = useQuery(api.emailAccounts.list, {});
   const promote = useMutation(api.jobLeads.promoteToJob);
   const deleteLead = useMutation(api.jobLeads.deleteLead);
+  const [leadToDelete, setLeadToDelete] = useState<Doc<"jobLeads"> | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    if (!leadToDelete) return;
+    setDeleting(true);
+    try {
+      await deleteLead({ leadId: leadToDelete._id });
+      setLeadToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (leads === undefined) return <div>Loading...</div>;
   if (leads.length === 0) {
@@ -98,7 +121,7 @@ export function LeadsList() {
                     )}
                     <button
                       className="text-xs px-2 py-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
-                      onClick={() => deleteLead({ leadId: lead._id })}
+                      onClick={() => setLeadToDelete(lead)}
                     >
                       Delete
                     </button>
@@ -109,6 +132,39 @@ export function LeadsList() {
           })}
         </tbody>
       </table>
+
+      <Dialog open={leadToDelete !== null} onOpenChange={(open) => { if (!open) setLeadToDelete(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete this lead?</DialogTitle>
+            <DialogDescription>
+              {leadToDelete && (
+                <>
+                  <span className="font-medium text-foreground">{leadToDelete.company}</span>
+                  {" — "}{leadToDelete.role}. This removes it from JobKompass and the Life
+                  Dashboard. It can&apos;t be undone.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <button
+              className="text-sm px-3 py-1.5 rounded border hover:bg-accent transition-colors"
+              onClick={() => setLeadToDelete(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </button>
+            <button
+              className="text-sm px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-70"
+              onClick={confirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Yes, delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
