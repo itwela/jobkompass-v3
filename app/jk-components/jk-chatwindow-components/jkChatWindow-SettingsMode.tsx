@@ -20,12 +20,16 @@ const GMAIL_ERROR_MESSAGES: Record<string, string> = {
   no_refresh_token: "Google didn't grant offline access. Try disconnecting the app's access in your Google Account settings, then reconnect.",
   no_email: "Couldn't read your Gmail address from Google. Please try again.",
   config_error: "Gmail connection isn't configured on the server yet.",
+  no_session: "Your JobKompass session wasn't recognized when Google redirected back. Please make sure you're signed in, then try connecting again.",
+  token_exchange_failed: "Google's token exchange failed.",
+  connect_failed: "Saving the connected account failed.",
 }
 
 export default function JkCW_SettingsMode() {
   const searchParams = useSearchParams()
   const gmailConnected = searchParams.get("gmail_connected")
   const gmailError = searchParams.get("gmail_error")
+  const gmailErrorDetail = searchParams.get("detail")
   const { user, isAuthenticated } = useAuth()
   const { subscription, planId, isFree, isStarter, isPlus, isPro, isPlusAnnual, isProAnnual } = useSubscription()
   const { getUsageStats } = useFeatureAccess()
@@ -703,13 +707,16 @@ export default function JkCW_SettingsMode() {
                 </div>
               )}
               {gmailError && (
-                <div className="p-3 rounded-lg border bg-red-50 border-red-200">
+                <div className="p-3 rounded-lg border bg-red-50 border-red-200 space-y-1">
                   <p className="text-sm font-medium text-red-800">
                     {GMAIL_ERROR_MESSAGES[gmailError]
                       ?? (gmailError.startsWith("google_")
                         ? `Google declined the connection (${gmailError.slice("google_".length)}). If this is a test/unverified app, make sure this Gmail address is added as a test user in the Google Cloud OAuth consent screen.`
                         : "Something went wrong connecting Gmail. Please try again.")}
                   </p>
+                  {gmailErrorDetail && (
+                    <p className="text-xs font-mono text-red-700 break-all">{gmailErrorDetail}</p>
+                  )}
                 </div>
               )}
 
