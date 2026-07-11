@@ -131,6 +131,22 @@ export const requestTailoredResume = mutation({
   },
 });
 
+// User-facing "Make Draft" for digest listings: full pipeline — tailored resume PDF +
+// application message — landing the lead in Pending Approval. There it gets Copy
+// Draft / Open Listing instead of Approve & Send (no sender to reply to).
+export const requestDraft = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
+    if (lead.draftMessage) return; // already drafted
+    await ctx.scheduler.runAfter(0, internal.emailAgent.draft.draftForLead, {
+      leadId: args.leadId,
+    });
+  },
+});
+
 // User-facing delete for a single lead (junk classification, stale listing, etc).
 // Removes the Life Dashboard mirror row too.
 export const deleteLead = mutation({
@@ -263,6 +279,9 @@ export const approve = mutation({
     const lead = await ctx.db.get(args.leadId);
     if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
     if (lead.status !== "pending_approval") throw new Error("Lead is not pending approval");
+    // Digest listings have no sender — there is nothing to send a reply to. Their
+    // drafts are for copy-pasting into applications (the UI hides Approve & Send).
+    if (!lead.senderEmail) throw new Error("This lead has no sender to reply to");
 
     // Flip to "sending" synchronously, in the same mutation, before scheduling the send
     // action. This closes the double-approve window: a second concurrent `approve` call

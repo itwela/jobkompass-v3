@@ -28,6 +28,21 @@ function senderDisplayName(senderEmail?: string) {
   return name || senderEmail;
 }
 
+// Where clicking a lead should take you: the job posting itself for digest listings
+// (poll stores the listing link in rawSnippet), otherwise the original email in Gmail.
+export function leadLink(
+  lead: { sourceType: string; rawSnippet: string; originalMessageId?: string },
+  inboxEmail?: string
+): string | null {
+  if (lead.sourceType === "digest_listing" && /^https?:\/\//i.test(lead.rawSnippet.trim())) {
+    return lead.rawSnippet.trim();
+  }
+  if (lead.originalMessageId && inboxEmail) {
+    return `https://mail.google.com/mail/?authuser=${encodeURIComponent(inboxEmail)}#all/${lead.originalMessageId}`;
+  }
+  return null;
+}
+
 const STATUS_STYLES: Record<string, string> = {
   pending_approval: "bg-amber-500/15 text-amber-600",
   sending: "bg-blue-500/15 text-blue-600",
@@ -44,7 +59,7 @@ export function LeadsList() {
   const accounts = useQuery(api.emailAccounts.list, {});
   const promote = useMutation(api.jobLeads.promoteToJob);
   const deleteLead = useMutation(api.jobLeads.deleteLead);
-  const requestResume = useMutation(api.jobLeads.requestTailoredResume);
+  const requestDraft = useMutation(api.jobLeads.requestDraft);
   const [leadToDelete, setLeadToDelete] = useState<Doc<"jobLeads"> | null>(null);
   const [deleting, setDeleting] = useState(false);
   // Leads whose tailored resume was requested this session; cleared implicitly when
@@ -89,10 +104,23 @@ export function LeadsList() {
           {leads.map((lead) => {
             const sender = senderDisplayName(lead.senderEmail);
             const inbox = accountEmailById.get(lead.sourceAccountId);
+            const link = leadLink(lead, inbox);
             return (
               <tr key={lead._id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
                 <td className="px-3 py-2.5 font-medium whitespace-nowrap" title={lead.company}>
-                  <span className="block max-w-56 truncate">{lead.company}</span>
+                  {link ? (
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block max-w-56 truncate hover:underline"
+                      title={lead.sourceType === "digest_listing" ? "Open the job listing" : "Open the email in Gmail"}
+                    >
+                      {lead.company} <span className="text-muted-foreground">↗</span>
+                    </a>
+                  ) : (
+                    <span className="block max-w-56 truncate">{lead.company}</span>
+                  )}
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap" title={lead.role}>
                   <span className="block max-w-80 truncate">{lead.role}</span>
@@ -115,22 +143,24 @@ export function LeadsList() {
                 <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">{formatLeadDate(lead)}</td>
                 <td className="px-3 py-2.5">
                   <div className="flex gap-1.5 justify-end items-center whitespace-nowrap">
-                    {lead.draftResumeId ? (
+                    {lead.draftResumeId && (
                       <span className="text-xs text-muted-foreground" title="Tailored resume PDF generated — find it in My Documents">
-                        📎 resume
+                        📎
                       </span>
-                    ) : lead.sourceType === "digest_listing" ? (
+                    )}
+                    {lead.sourceType === "digest_listing" && !lead.draftMessage && (
                       <button
                         className="text-xs px-2 py-1 rounded border hover:bg-accent transition-colors disabled:opacity-60"
                         disabled={tailoringIds.has(lead._id)}
+                        title="Tailor a resume + write an application draft; lands in Pending Approval"
                         onClick={() => {
                           setTailoringIds((prev) => new Set(prev).add(lead._id));
-                          requestResume({ leadId: lead._id });
+                          requestDraft({ leadId: lead._id });
                         }}
                       >
-                        {tailoringIds.has(lead._id) ? "Tailoring…" : "Tailor Resume"}
+                        {tailoringIds.has(lead._id) ? "Drafting…" : "Make Draft"}
                       </button>
-                    ) : null}
+                    )}
                     {lead.status !== "promoted" && (
                       <button
                         className="text-xs px-2 py-1 rounded border hover:bg-accent transition-colors"

@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
+import { leadLink } from "./LeadsList";
 
 export function ApprovalQueue() {
   // Query both statuses: `pending_approval` is the normal queue, and `sending` is the brief
@@ -28,6 +29,7 @@ export function ApprovalQueue() {
   // this set is always cleared right after the mutation settles, on both success and failure,
   // and never persists across a later `markSendError` revert.
   const [approvingIds, setApprovingIds] = useState<Set<Id<"jobLeads">>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleApprove = async (leadId: Id<"jobLeads">) => {
     setApprovingIds((prev) => new Set(prev).add(leadId));
@@ -68,9 +70,22 @@ export function ApprovalQueue() {
             </div>
           </div>
           <div className="text-xs text-muted-foreground">
-            {lead.senderEmail}
+            {lead.senderEmail || "Job-board listing (no sender)"}
             {accountEmailById.get(lead.sourceAccountId) && (
               <> · to {accountEmailById.get(lead.sourceAccountId)}</>
+            )}
+            {leadLink(lead, accountEmailById.get(lead.sourceAccountId)) && (
+              <>
+                {" · "}
+                <a
+                  href={leadLink(lead, accountEmailById.get(lead.sourceAccountId))!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-foreground"
+                >
+                  {lead.sourceType === "digest_listing" ? "open listing ↗" : "view email ↗"}
+                </a>
+              </>
             )}
           </div>
           {lead.draftResumeId ? (
@@ -115,13 +130,28 @@ export function ApprovalQueue() {
                 Edit
               </button>
             )}
-            <button
-              className="text-sm px-3 py-1 rounded bg-green-600 text-white disabled:cursor-not-allowed disabled:opacity-70"
-              disabled={lead.status === "sending" || approvingIds.has(lead._id)}
-              onClick={() => handleApprove(lead._id)}
-            >
-              {lead.status === "sending" || approvingIds.has(lead._id) ? "Sending..." : "Approve & Send"}
-            </button>
+            {lead.senderEmail ? (
+              <button
+                className="text-sm px-3 py-1 rounded bg-green-600 text-white disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={lead.status === "sending" || approvingIds.has(lead._id)}
+                onClick={() => handleApprove(lead._id)}
+              >
+                {lead.status === "sending" || approvingIds.has(lead._id) ? "Sending..." : "Approve & Send"}
+              </button>
+            ) : (
+              // Job-board listing: nothing to send a reply to — the draft is for
+              // pasting into the application (open listing link is in the header).
+              <button
+                className="text-sm px-3 py-1 rounded bg-green-600 text-white"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(lead.draftMessage || "");
+                  setCopiedId(lead._id);
+                  setTimeout(() => setCopiedId((prev) => (prev === lead._id ? null : prev)), 1500);
+                }}
+              >
+                {copiedId === lead._id ? "Copied ✓" : "Copy Draft"}
+              </button>
+            )}
             <button
               className="text-sm px-3 py-1 rounded bg-red-600 text-white"
               onClick={() => reject({ leadId: lead._id })}

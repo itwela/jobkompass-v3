@@ -71,14 +71,16 @@ export const draftForLead = internalAction({
     if (!lead) return;
 
     const isFollowUp = args.isFollowUp ?? false;
-    let draftResumeId: string | undefined;
+    // Keep an already-generated tailored resume (e.g. from an earlier "Tailor Resume"
+    // click) instead of regenerating it — and never clear it via attachDraft below.
+    let draftResumeId: string | undefined = lead.draftResumeId ?? undefined;
 
     // The tailored-resume PDF is a nice-to-have: any failure in this block (LaTeX service
     // down/unconfigured, tailoring model error) must not prevent the reply draft below
     // from being attached — a lead with a plain draft is actionable, a lead stuck in
     // "new" with no draft is invisible to the approval queue.
     try {
-    if (!isFollowUp) {
+    if (!isFollowUp && !draftResumeId) {
       const resumes: any[] = await ctx.runQuery(internal.documents.listResumesInternal, {
         userId: lead.userId,
       });
@@ -134,6 +136,8 @@ export const draftForLead = internalAction({
       role: lead.role,
       originalSnippet: lead.rawSnippet,
       isFollowUp,
+      // Digest listings have no sender — draft an application message, not a reply.
+      isListing: lead.sourceType === "digest_listing",
     });
 
     await ctx.runMutation(internal.jobLeads.attachDraft, {

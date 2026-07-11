@@ -31,13 +31,16 @@ export async function draftReplyMessage(input: {
   role: string;
   originalSnippet: string;
   isFollowUp: boolean;
+  isListing?: boolean;
 }): Promise<string | null> {
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterKey) throw new Error("OpenRouter API key not configured on server");
 
   const systemPrompt = input.isFollowUp
     ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. No subject line, no greeting formatting beyond "Hi <name>,", no sign-off beyond a first name. Reference the role and company naturally. Respond with ONLY the message text.`
-    : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know (the resume is attached, so don't enumerate skills). Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
+    : input.isListing
+      ? `You write brief, warm, one-paragraph application messages from a job seeker for a specific job listing found on a job board — suitable to paste into an application form or a cold email to the company. Express genuine interest in the role and company and mention the attached tailored resume. No subject line, no greeting to a specific person (there isn't one), no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know. Write exactly ONE message and nothing else. Respond with ONLY the message text.`
+      : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know (the resume is attached, so don't enumerate skills). Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
 
   const userPrompt = `Sender: ${input.senderName}\nCompany: ${input.company}\nRole: ${input.role}\nOriginal message snippet: ${input.originalSnippet}`;
 
