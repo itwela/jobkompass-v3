@@ -34,7 +34,7 @@ export async function draftReplyMessage(input: {
       "X-Title": "JobKompass Email Agent",
     },
     body: JSON.stringify({
-      model: "google/gemma-3-27b-it:free",
+      model: "google/gemma-3-27b-it",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -75,7 +75,7 @@ Respond with ONLY the JSON object, no explanation or markdown.`;
       "X-Title": "JobKompass Email Agent",
     },
     body: JSON.stringify({
-      model: "google/gemma-3-27b-it:free",
+      model: "google/gemma-3-27b-it",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
