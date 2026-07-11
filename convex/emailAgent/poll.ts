@@ -5,6 +5,45 @@ import { internal } from "../_generated/api";
 import { getGmailClient, listNewMessageIds, getMessage } from "./gmailClient";
 import { classifyEmail } from "../../lib/emailAgent/classify";
 
+// One-shot backfill for leads ingested before emailReceivedAt was captured: re-fetch
+// each dateless lead's Gmail message for its internalDate, patch the lead, and re-mirror
+// it to the Life Dashboard. Safe to re-run; skips anything already dated.
+export const backfillEmailDates = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const leads: any[] = await ctx.runQuery(internal.jobLeads.listAllInternal, {});
+    const missing = leads.filter((lead) => !lead.emailReceivedAt);
+
+    const gmailByAccount = new Map<string, any>();
+    let patched = 0;
+    for (const lead of missing) {
+      try {
+        let gmail = gmailByAccount.get(lead.sourceAccountId);
+        if (!gmail) {
+          const account = await ctx.runQuery(internal.emailAccounts.getById, {
+            accountId: lead.sourceAccountId,
+          });
+          if (!account) continue;
+          gmail = (await getGmailClient(account)).gmail;
+          gmailByAccount.set(lead.sourceAccountId, gmail);
+        }
+        const message = await getMessage(gmail, lead.originalMessageId);
+        if (message.receivedAt) {
+          await ctx.runMutation(internal.jobLeads.setEmailReceivedAt, {
+            leadId: lead._id,
+            emailReceivedAt: message.receivedAt,
+          });
+          await ctx.runAction(internal.emailAgent.mirror.pushLead, { leadId: lead._id });
+          patched++;
+        }
+      } catch (error) {
+        console.error(`Backfill failed for lead ${lead._id}:`, error);
+      }
+    }
+    return { missing: missing.length, patched };
+  },
+});
+
 export const pollAllAccounts = internalAction({
   args: {},
   handler: async (ctx) => {

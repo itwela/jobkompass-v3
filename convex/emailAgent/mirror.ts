@@ -27,10 +27,25 @@ export const pushLead = internalAction({
           sourceType: lead.sourceType,
           status: lead.status,
           isFollowUp: lead.isFollowUp,
+          emailReceivedAt: lead.emailReceivedAt,
         }),
       });
     } catch (error) {
       console.error(`Failed to mirror lead ${args.leadId} to Life Dashboard:`, error);
     }
+  },
+});
+
+// Re-mirror every current lead. Run after the dashboard's mirror table has been purged
+// (its rows are keyed by sourceLeadId, so leads deleted here leave orphans there):
+// `npx convex run emailAgent/mirror:pushAllLeads`
+export const pushAllLeads = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const leads: any[] = await ctx.runQuery(internal.jobLeads.listAllInternal, {});
+    for (const lead of leads) {
+      await ctx.runAction(internal.emailAgent.mirror.pushLead, { leadId: lead._id });
+    }
+    return { pushed: leads.length };
   },
 });

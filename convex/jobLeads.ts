@@ -91,6 +91,20 @@ export const resetUntriagedLeads = internalMutation({
   },
 });
 
+export const setEmailReceivedAt = internalMutation({
+  args: { leadId: v.id("jobLeads"), emailReceivedAt: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.leadId, { emailReceivedAt: args.emailReceivedAt, updatedAt: Date.now() });
+  },
+});
+
+export const listAllInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("jobLeads").collect();
+  },
+});
+
 export const getSentLeads = internalQuery({
   args: {},
   handler: async (ctx) => {
