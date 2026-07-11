@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun, Mail } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -107,6 +107,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
     const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
     const newJobsCount = useQuery(api.jobs.countNewJobs, isAuthenticated ? {} : "skip") || 0
     const newDocumentsCount = useQuery(api.documents.countNewDocuments, isAuthenticated ? {} : "skip") || 0
+    const pendingLeadsCount = (useQuery(api.jobLeads.list, isAuthenticated ? { status: "pending_approval" } : "skip") || []).length
     const updateTitle = useMutation(api.threads.updateTitle)
     
     // Retitle function
@@ -340,6 +341,28 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                     {newDocumentsCount > 0 && (
                                         <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
                                             {newDocumentsCount}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const leadsMode = allModes.find(mode => mode.id === '/leads');
+                                        if (leadsMode) setCurrentMode(leadsMode);
+                                        setSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/leads'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Mail className="h-4 w-4" />
+                                        <span>Job Leads</span>
+                                    </span>
+                                    {pendingLeadsCount > 0 && (
+                                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                                            {pendingLeadsCount}
                                         </span>
                                     )}
                                 </button>
