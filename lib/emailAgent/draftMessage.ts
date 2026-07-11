@@ -69,6 +69,30 @@ export async function draftReplyMessage(input: {
   return parseDraftMessageResponse(content);
 }
 
+// The model's JSON is imperfect often enough to matter (stray prose before the
+// object, trailing commentary), so parse defensively: strip fences, then fall back
+// to the outermost {...} slice.
+export function parseTailoredResumeResponse(raw: string): any | null {
+  let jsonStr = raw.trim();
+  if (jsonStr.startsWith("```")) {
+    jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    const start = jsonStr.indexOf("{");
+    const end = jsonStr.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(jsonStr.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
 export async function tailorResumeContent(input: {
   baseContent: any;
   company: string;
@@ -85,35 +109,39 @@ Respond with ONLY the JSON object, no explanation or markdown.`;
 
   const userPrompt = `Target company: ${input.company}\nTarget role: ${input.role}\n\nBase resume JSON:\n${JSON.stringify(input.baseContent)}`;
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openRouterKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://myjobkompass.com",
-      "X-Title": "JobKompass Email Agent",
-    },
-    body: JSON.stringify({
-      model: "google/gemma-3-27b-it",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 6000,
-    }),
-  });
+  // Model output is nondeterministic; a malformed-JSON response on the first try
+  // often parses fine on a retry.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://myjobkompass.com",
+        "X-Title": "JobKompass Email Agent",
+      },
+      body: JSON.stringify({
+        model: "google/gemma-3-27b-it",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 6000,
+      }),
+    });
 
-  if (!response.ok) return null;
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  let jsonStr = content.trim();
-  if (jsonStr.startsWith("```")) {
-    jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    if (!response.ok) {
+      console.error(`tailorResumeContent: OpenRouter returned ${response.status} (attempt ${attempt}/2)`);
+      continue;
+    }
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    const parsed = parseTailoredResumeResponse(content);
+    if (parsed) return parsed;
+    console.error(
+      `tailorResumeContent: model output was not valid JSON (finish_reason=${data.choices?.[0]?.finish_reason}, length=${content.length}, attempt ${attempt}/2, head=${JSON.stringify(content.slice(0, 120))})`
+    );
   }
-  try {
-    return JSON.parse(jsonStr);
-  } catch {
-    return null;
-  }
+  return null;
 }

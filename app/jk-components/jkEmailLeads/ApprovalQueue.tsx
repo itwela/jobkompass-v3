@@ -16,6 +16,7 @@ export function ApprovalQueue() {
   const pendingLeads = useQuery(api.jobLeads.list, { status: "pending_approval" });
   const sendingLeads = useQuery(api.jobLeads.list, { status: "sending" });
   const accounts = useQuery(api.emailAccounts.list, {});
+  const resumes = useQuery(api.documents.listResumes);
   const approve = useMutation(api.jobLeads.approve);
   const reject = useMutation(api.jobLeads.reject);
   const editDraft = useMutation(api.jobLeads.editDraft);
@@ -49,6 +50,7 @@ export function ApprovalQueue() {
   if (leads.length === 0) return <div className="text-sm text-muted-foreground">No drafts waiting for approval.</div>;
 
   const accountEmailById = new Map((accounts ?? []).map((a) => [a._id, a.email]));
+  const resumeNameById = new Map((resumes ?? []).map((r: any) => [String(r._id), r.name]));
 
   return (
     <div className="space-y-4">
@@ -71,6 +73,16 @@ export function ApprovalQueue() {
               <> · to {accountEmailById.get(lead.sourceAccountId)}</>
             )}
           </div>
+          {lead.draftResumeId ? (
+            <div className="text-xs text-muted-foreground">
+              📎 {resumeNameById.get(String(lead.draftResumeId)) ?? "Tailored resume"}{" "}
+              <span className="opacity-70">(attached as PDF — view it in My Documents)</span>
+            </div>
+          ) : (
+            <div className="text-xs text-amber-600">
+              ⚠ No resume attached — this reply will send as text only.
+            </div>
+          )}
           {editingId === lead._id ? (
             <textarea
               className="w-full border rounded p-2 text-sm"

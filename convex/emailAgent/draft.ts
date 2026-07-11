@@ -33,6 +33,9 @@ export const draftForLead = internalAction({
           role: lead.role,
         });
 
+        if (!tailored) {
+          console.error(`draftForLead ${args.leadId}: resume tailoring returned null, no resume will be attached`);
+        }
         if (tailored) {
           const latexTemplate = generateResumeLatex(tailored, baseResume.template || "jake");
           // Convex actions always run in Convex's cloud, never on a dev machine, so
@@ -40,6 +43,9 @@ export const draftForLead = internalAction({
           // just be an unreachable host that crashes the draft).
           const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL;
 
+          if (!LATEX_SERVICE_URL) {
+            console.error(`draftForLead ${args.leadId}: LATEX_SERVICE_URL not set, skipping resume PDF`);
+          }
           if (LATEX_SERVICE_URL) {
             const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
               method: "POST",
@@ -47,8 +53,14 @@ export const draftForLead = internalAction({
               body: JSON.stringify({ latex: latexTemplate, filename: `resume-${lead._id}` }),
             });
 
+            if (!compileResponse.ok) {
+              console.error(`draftForLead ${args.leadId}: LaTeX compile failed (${compileResponse.status})`);
+            }
             if (compileResponse.ok) {
               const { pdfBase64 } = await compileResponse.json();
+              if (!pdfBase64) {
+                console.error(`draftForLead ${args.leadId}: LaTeX compile returned no pdfBase64`);
+              }
               if (pdfBase64) {
                 const pdfBuffer = Buffer.from(pdfBase64, "base64");
                 const uploadUrl: string = await ctx.runMutation(internal.documents.generateUploadUrlInternal, {});
