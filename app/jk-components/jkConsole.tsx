@@ -5,14 +5,16 @@ import JkChatWindow from "./jkChatWindow";
 import JkSidebar from "./jkSIdebar";
 import JkConsoleHeader from "./jkConsole-Header";
 import JkFileUploadModal from "./jkFileUploadModal";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 
 export default function JkConsole() {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const { 
-        currentMode, 
-        isFileModalOpen, 
+    const searchParams = useSearchParams()
+    const {
+        currentMode,
+        isFileModalOpen,
         setIsFileModalOpen,
         setDroppedFile,
         setFileName,
@@ -20,9 +22,21 @@ export default function JkConsole() {
         setCurrentMode,
         allModes
     } = useJobKompassChatWindow()
-    
+
     // Only show input in chat mode
     const shouldShowInput = currentMode.id === '/chat'
+
+    // Land in a specific mode on load, e.g. after a redirect like the Gmail
+    // OAuth callback (/app?mode=settings&gmail_connected=1)
+    useEffect(() => {
+        const modeParam = searchParams.get('mode')
+        if (!modeParam) return
+        const targetMode = allModes.find(mode => mode.id === `/${modeParam}`)
+        if (targetMode) {
+            setCurrentMode(targetMode)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams])
 
     const handleFileSelect = useCallback((file: File) => {
         setDroppedFile(file);

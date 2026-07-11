@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) {
-    return NextResponse.redirect(new URL("/profile?gmail_error=missing_code", request.url));
+    return NextResponse.redirect(new URL("/app?mode=settings&gmail_error=missing_code", request.url));
   }
 
   const oauth2Client = new google.auth.OAuth2(
@@ -18,19 +18,19 @@ export async function GET(request: NextRequest) {
 
   const { tokens } = await oauth2Client.getToken(code);
   if (!tokens.access_token || !tokens.refresh_token) {
-    return NextResponse.redirect(new URL("/profile?gmail_error=no_refresh_token", request.url));
+    return NextResponse.redirect(new URL("/app?mode=settings&gmail_error=no_refresh_token", request.url));
   }
   oauth2Client.setCredentials(tokens);
 
   const oauth2 = google.oauth2({ auth: oauth2Client, version: "v2" });
   const { data: userInfo } = await oauth2.userinfo.get();
   if (!userInfo.email) {
-    return NextResponse.redirect(new URL("/profile?gmail_error=no_email", request.url));
+    return NextResponse.redirect(new URL("/app?mode=settings&gmail_error=no_email", request.url));
   }
 
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
   if (!convexUrl) {
-    return NextResponse.redirect(new URL("/profile?gmail_error=config_error", request.url));
+    return NextResponse.redirect(new URL("/app?mode=settings&gmail_error=config_error", request.url));
   }
 
   // Resolve the signed-in JobKompass user's identity the same way the rest of this app
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   // that token is attached to a ConvexHttpClient so subsequent calls run as that user.
   const convexToken = await convexAuthNextjsToken();
   if (!convexToken) {
-    return NextResponse.redirect(new URL("/auth?redirect=/profile", request.url));
+    return NextResponse.redirect(new URL("/auth?redirect=/app", request.url));
   }
 
   const convexClient = new ConvexHttpClient(convexUrl);
@@ -59,5 +59,5 @@ export async function GET(request: NextRequest) {
     tokenExpiresAt: tokens.expiry_date || Date.now() + 3600_000,
   });
 
-  return NextResponse.redirect(new URL("/profile?gmail_connected=1", request.url));
+  return NextResponse.redirect(new URL("/app?mode=settings&gmail_connected=1", request.url));
 }

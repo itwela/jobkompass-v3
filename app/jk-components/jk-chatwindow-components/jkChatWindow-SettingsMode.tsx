@@ -13,8 +13,19 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+
+const GMAIL_ERROR_MESSAGES: Record<string, string> = {
+  missing_code: "Google didn't return an authorization code. Please try connecting again.",
+  no_refresh_token: "Google didn't grant offline access. Try disconnecting the app's access in your Google Account settings, then reconnect.",
+  no_email: "Couldn't read your Gmail address from Google. Please try again.",
+  config_error: "Gmail connection isn't configured on the server yet.",
+}
 
 export default function JkCW_SettingsMode() {
+  const searchParams = useSearchParams()
+  const gmailConnected = searchParams.get("gmail_connected")
+  const gmailError = searchParams.get("gmail_error")
   const { user, isAuthenticated } = useAuth()
   const { subscription, planId, isFree, isStarter, isPlus, isPro, isPlusAnnual, isProAnnual } = useSubscription()
   const { getUsageStats } = useFeatureAccess()
@@ -685,6 +696,19 @@ export default function JkCW_SettingsMode() {
               <p className="text-sm text-muted-foreground">
                 Connect a Gmail account so the job lead agent can watch it for recruiter outreach and job digests. Connect at least two accounts for full coverage.
               </p>
+
+              {gmailConnected === "1" && (
+                <div className="p-3 rounded-lg border bg-green-50 border-green-200">
+                  <p className="text-sm font-medium text-green-800">Gmail account connected successfully.</p>
+                </div>
+              )}
+              {gmailError && (
+                <div className="p-3 rounded-lg border bg-red-50 border-red-200">
+                  <p className="text-sm font-medium text-red-800">
+                    {GMAIL_ERROR_MESSAGES[gmailError] ?? "Something went wrong connecting Gmail. Please try again."}
+                  </p>
+                </div>
+              )}
 
               {gmailAccounts === undefined ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>

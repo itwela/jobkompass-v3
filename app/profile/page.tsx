@@ -4,21 +4,9 @@ import { useJobKompassTheme } from "@/providers/jkThemeProvider";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { ConnectedAccounts } from "@/app/jk-components/jkEmailLeads/ConnectedAccounts";
-
-const GMAIL_ERROR_MESSAGES: Record<string, string> = {
-  missing_code: "Google didn't return an authorization code. Please try connecting again.",
-  no_refresh_token: "Google didn't grant offline access. Try disconnecting the app's access in your Google Account settings, then reconnect.",
-  no_email: "Couldn't read your Gmail address from Google. Please try again.",
-  config_error: "Gmail connection isn't configured on the server yet.",
-};
 
 export default function ProfilePage() {
   const { theme, styles } = useJobKompassTheme();
-  const searchParams = useSearchParams();
-  const gmailConnected = searchParams.get("gmail_connected");
-  const gmailError = searchParams.get("gmail_error");
   const migrateUserIds = useMutation(api.documents.migrateUserIds);
   const [migrationStatus, setMigrationStatus] = useState<{
     loading: boolean;
@@ -58,28 +46,6 @@ export default function ProfilePage() {
               <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
                 Once logged in, you'll be able to see your saved job applications and track your progress.
               </p>
-            </div>
-
-            <div className="p-6 rounded-lg border" style={{ background: 'var(--card)', color: 'var(--card-foreground)', borderColor: 'var(--border)' }}>
-              <h2 className="text-xl font-semibold mb-4">Connected Gmail Accounts</h2>
-              <p className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>
-                Connect a Gmail account so the job lead agent can watch it for recruiter outreach and job digests. Connect at least two accounts for full coverage.
-              </p>
-
-              {gmailConnected === "1" && (
-                <div className="mb-4 p-4 rounded-md border bg-green-50 border-green-200">
-                  <p className="text-sm font-medium text-green-800">Gmail account connected successfully.</p>
-                </div>
-              )}
-              {gmailError && (
-                <div className="mb-4 p-4 rounded-md border bg-red-50 border-red-200">
-                  <p className="text-sm font-medium text-red-800">
-                    {GMAIL_ERROR_MESSAGES[gmailError] ?? "Something went wrong connecting Gmail. Please try again."}
-                  </p>
-                </div>
-              )}
-
-              <ConnectedAccounts />
             </div>
 
             <div className="p-6 rounded-lg border" style={{ background: 'var(--card)', color: 'var(--card-foreground)', borderColor: 'var(--border)' }}>
