@@ -9,6 +9,10 @@ export const pushLead = internalAction({
     const lead: any = await ctx.runQuery(internal.jobLeads.getById, { leadId: args.leadId });
     if (!lead) return;
 
+    const account: any = await ctx.runQuery(internal.emailAccounts.getById, {
+      accountId: lead.sourceAccountId,
+    });
+
     const syncUrl = process.env.LIFE_DASHBOARD_SYNC_URL;
     const syncKey = process.env.LIFE_DASHBOARD_SYNC_KEY;
     if (!syncUrl || !syncKey) {
@@ -28,10 +32,34 @@ export const pushLead = internalAction({
           status: lead.status,
           isFollowUp: lead.isFollowUp,
           emailReceivedAt: lead.emailReceivedAt,
+          accountEmail: account?.email,
         }),
       });
     } catch (error) {
       console.error(`Failed to mirror lead ${args.leadId} to Life Dashboard:`, error);
+    }
+  },
+});
+
+// Tell the Life Dashboard to drop a mirror row for a lead deleted here. Takes the raw
+// id string (not v.id) because the lead is already gone by the time this runs.
+export const removeLead = internalAction({
+  args: { sourceLeadId: v.string() },
+  handler: async (_ctx, args) => {
+    const syncUrl = process.env.LIFE_DASHBOARD_SYNC_URL;
+    const syncKey = process.env.LIFE_DASHBOARD_SYNC_KEY;
+    if (!syncUrl || !syncKey) {
+      console.error("Life Dashboard sync not configured (missing LIFE_DASHBOARD_SYNC_URL/KEY)");
+      return;
+    }
+    try {
+      await fetch(syncUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sync-Key": syncKey },
+        body: JSON.stringify({ action: "delete", sourceLeadId: args.sourceLeadId }),
+      });
+    } catch (error) {
+      console.error(`Failed to remove mirrored lead ${args.sourceLeadId} from Life Dashboard:`, error);
     }
   },
 });

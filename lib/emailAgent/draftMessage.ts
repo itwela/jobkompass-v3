@@ -1,12 +1,23 @@
 // lib/emailAgent/draftMessage.ts
 
 export function parseDraftMessageResponse(raw: string): string | null {
-  const trimmed = raw.trim();
+  let trimmed = raw.trim();
   if (!trimmed) return null;
   if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length > 1) {
-    return trimmed.slice(1, -1);
+    trimmed = trimmed.slice(1, -1);
   }
-  return trimmed;
+  // gemma sometimes keeps generating past the reply, hallucinating additional
+  // "Sender: ... / Company: ..." example exchanges in the same shape as our user
+  // prompt — cut everything from the first such continuation.
+  const leak = trimmed.search(/\n\s*Sender:/);
+  if (leak !== -1) {
+    trimmed = trimmed.slice(0, leak).trim();
+  }
+  // Drop placeholder signature lines; the user signs when they review the draft.
+  trimmed = trimmed
+    .replace(/\n\s*\[(Your name|Your Name|Itwela|Name)\]\s*$/g, "")
+    .trim();
+  return trimmed || null;
 }
 
 export async function draftReplyMessage(input: {
@@ -21,7 +32,7 @@ export async function draftReplyMessage(input: {
 
   const systemPrompt = input.isFollowUp
     ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. No subject line, no greeting formatting beyond "Hi <name>,", no sign-off beyond a first name. Reference the role and company naturally. Respond with ONLY the message text.`
-    : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, sign off with just a first name placeholder "[Your name]". Respond with ONLY the message text.`;
+    : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
 
   const userPrompt = `Sender: ${input.senderName}\nCompany: ${input.company}\nRole: ${input.role}\nOriginal message snippet: ${input.originalSnippet}`;
 
@@ -41,6 +52,9 @@ export async function draftReplyMessage(input: {
       ],
       temperature: 0.4,
       max_tokens: 400,
+      // Hard stop if the model starts hallucinating another example exchange
+      // shaped like our user prompt (see parseDraftMessageResponse).
+      stop: ["\nSender:"],
     }),
   });
 

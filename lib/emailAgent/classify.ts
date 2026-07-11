@@ -11,7 +11,7 @@ Return ONLY valid JSON matching exactly one of these shapes:
 1. A direct, personal message from a specific person (recruiter, founder, hiring manager) about a specific role at a specific company:
 {"type": "personal_outreach", "company": string, "role": string, "senderName": string}
 
-2. An automated digest/alert bundling multiple job listings (e.g. LinkedIn or Indeed job alerts):
+2. An automated JOB alert/digest bundling multiple job listings (e.g. LinkedIn, Indeed, Handshake job alerts):
 {"type": "digest", "listings": [{"company": string, "role": string, "link": string}, ...]}
 
 3. Anything else (newsletters, receipts, unrelated mail, application status updates):
@@ -19,7 +19,9 @@ Return ONLY valid JSON matching exactly one of these shapes:
 
 Rules:
 - Only use "personal_outreach" for a message that reads like it was written by/for one specific person about one specific opportunity.
-- For "digest", extract every listing you can find with its direct link.
+- "digest" is ONLY for emails whose purpose is to list open job positions. A listing must be an actual job posting: a specific role title a person could apply for at a specific employer.
+- NEVER extract products, services, courses, events, artworks, crypto/NFT/token announcements, investment offers, store categories, or feature announcements as listings. A marketing or content newsletter is "neither" even if it lists many items.
+- If an email is promotional and contains no real job postings, return {"type": "neither"} — do not force listings out of it.
 - Respond with ONLY the JSON object, no explanation or markdown.`;
 
 export function parseClassificationResponse(raw: string): ClassificationResult | null {

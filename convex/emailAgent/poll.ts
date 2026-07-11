@@ -122,6 +122,14 @@ export const pollAllAccounts = internalAction({
 
           if (classification.type === "digest") {
             for (const listing of classification.listings) {
+              // Job boards resend the same listing across daily digests — skip exact
+              // company+role repeats instead of stacking duplicates.
+              const dup = await ctx.runQuery(internal.jobLeads.findDigestDuplicate, {
+                userId: account.userId,
+                company: listing.company,
+                role: listing.role,
+              });
+              if (dup) continue;
               await ctx.runMutation(internal.jobLeads.insertLead, {
                 userId: account.userId,
                 sourceAccountId: account._id,

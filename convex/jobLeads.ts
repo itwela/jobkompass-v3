@@ -91,6 +91,58 @@ export const resetUntriagedLeads = internalMutation({
   },
 });
 
+export const findDigestDuplicate = internalQuery({
+  args: { userId: v.string(), company: v.string(), role: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("jobLeads")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("sourceType"), "digest_listing"),
+          q.eq(q.field("company"), args.company),
+          q.eq(q.field("role"), args.role)
+        )
+      )
+      .first();
+  },
+});
+
+// User-facing delete for a single lead (junk classification, stale listing, etc).
+// Removes the Life Dashboard mirror row too.
+export const deleteLead = mutation({
+  args: { leadId: v.id("jobLeads") },
+  handler: async (ctx, args) => {
+    const convexUserId = await resolveConvexUserId(ctx);
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead) return;
+    if (lead.userId !== convexUserId) throw new Error("Not your lead");
+    await ctx.db.delete(args.leadId);
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.removeLead, {
+      sourceLeadId: String(args.leadId),
+    });
+  },
+});
+
+// Bulk cleanup for junk rows identified out-of-band (CLI):
+// `npx convex run jobLeads:deleteLeadsByIds '{"leadIds":[...]}'`
+export const deleteLeadsByIds = internalMutation({
+  args: { leadIds: v.array(v.id("jobLeads")) },
+  handler: async (ctx, args) => {
+    let deleted = 0;
+    for (const leadId of args.leadIds) {
+      const lead = await ctx.db.get(leadId);
+      if (!lead) continue;
+      await ctx.db.delete(leadId);
+      await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.removeLead, {
+        sourceLeadId: String(leadId),
+      });
+      deleted++;
+    }
+    return { deleted };
+  },
+});
+
 export const setEmailReceivedAt = internalMutation({
   args: { leadId: v.id("jobLeads"), emailReceivedAt: v.number() },
   handler: async (ctx, args) => {

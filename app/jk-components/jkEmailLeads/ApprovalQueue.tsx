@@ -15,6 +15,7 @@ export function ApprovalQueue() {
   // thinks it's in flight.
   const pendingLeads = useQuery(api.jobLeads.list, { status: "pending_approval" });
   const sendingLeads = useQuery(api.jobLeads.list, { status: "sending" });
+  const accounts = useQuery(api.emailAccounts.list, {});
   const approve = useMutation(api.jobLeads.approve);
   const reject = useMutation(api.jobLeads.reject);
   const editDraft = useMutation(api.jobLeads.editDraft);
@@ -42,17 +43,34 @@ export function ApprovalQueue() {
   };
 
   if (pendingLeads === undefined || sendingLeads === undefined) return <div>Loading...</div>;
-  const leads = [...pendingLeads, ...sendingLeads].sort((a, b) => b.createdAt - a.createdAt);
+  const leads = [...pendingLeads, ...sendingLeads].sort(
+    (a, b) => (b.emailReceivedAt ?? b.createdAt) - (a.emailReceivedAt ?? a.createdAt)
+  );
   if (leads.length === 0) return <div className="text-sm text-muted-foreground">No drafts waiting for approval.</div>;
+
+  const accountEmailById = new Map((accounts ?? []).map((a) => [a._id, a.email]));
 
   return (
     <div className="space-y-4">
       {leads.map((lead) => (
         <div key={lead._id} className="border rounded-lg p-4 space-y-2">
-          <div className="font-medium">
-            {lead.company} — {lead.role} {lead.isFollowUp && <span className="text-xs text-muted-foreground">(follow-up)</span>}
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="font-medium">
+              {lead.company} — {lead.role} {lead.isFollowUp && <span className="text-xs text-muted-foreground">(follow-up)</span>}
+            </div>
+            <div className="text-xs text-muted-foreground whitespace-nowrap">
+              {new Date(lead.emailReceivedAt ?? lead.createdAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })}
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">{lead.senderEmail}</div>
+          <div className="text-xs text-muted-foreground">
+            {lead.senderEmail}
+            {accountEmailById.get(lead.sourceAccountId) && (
+              <> · to {accountEmailById.get(lead.sourceAccountId)}</>
+            )}
+          </div>
           {editingId === lead._id ? (
             <textarea
               className="w-full border rounded p-2 text-sm"
