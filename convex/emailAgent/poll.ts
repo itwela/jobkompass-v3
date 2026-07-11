@@ -71,6 +71,14 @@ export const pollAllAccounts = internalAction({
 
           const message = await getMessage(gmail, messageId);
 
+          // Gmail's history feed includes messages this account SENT (our own approved
+          // replies land in it a moment after sending). Skip anything authored by the
+          // account itself — otherwise our own reply matches the thread check below and
+          // falsely marks the lead "replied" before the recruiter ever answers.
+          if (message.from.toLowerCase().includes(account.email.toLowerCase())) {
+            continue;
+          }
+
           // If this message landed in a thread we already sent a reply on, it's the
           // sender responding — mark that lead replied (so it's excluded from
           // follow-up eligibility) instead of treating it as a brand-new lead.

@@ -182,6 +182,30 @@ export const markReplied = internalMutation({
   args: { leadId: v.id("jobLeads") },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.leadId, { status: "replied" as const, updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
+  },
+});
+
+// Admin/CLI repair helper: force a lead to a specific status (e.g. reverting leads
+// falsely marked "replied" by the account's own sent messages) and re-mirror it.
+export const setStatusInternal = internalMutation({
+  args: {
+    leadId: v.id("jobLeads"),
+    status: v.union(
+      v.literal("new"),
+      v.literal("pending_approval"),
+      v.literal("sending"),
+      v.literal("sent"),
+      v.literal("followed_up"),
+      v.literal("replied"),
+      v.literal("closed"),
+      v.literal("extracted"),
+      v.literal("promoted")
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.leadId, { status: args.status, updatedAt: Date.now() });
+    await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
   },
 });
 
