@@ -360,8 +360,35 @@ export const saveGeneratedResumeInternal = internalMutation({
       tags: resumeData.tags,
       createdAt: now,
       updatedAt: now,
-      isActive: true,
+      // Generated/tailored resumes are OUTPUTS, not the master base — leaving them
+      // inactive keeps the email agent's `resumes.find(isActive)` base selection stable
+      // (it should tailor from the user's one real master, not a prior tailored resume).
+      isActive: false,
     });
+  },
+});
+
+// One-shot: make `resumeId` the user's SOLE active resume (deactivate all others).
+// Cleans up the "every resume is active" state so the email agent tailors from one real
+// master base. Reusable later for a "Make this my base resume" button.
+export const setSoleActiveResume = internalMutation({
+  args: { userId: v.string(), resumeId: v.id("resumes") },
+  handler: async (ctx, { userId, resumeId }) => {
+    const resumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    let activated = 0;
+    let deactivated = 0;
+    for (const r of resumes) {
+      const shouldBeActive = r._id === resumeId;
+      if ((r.isActive ?? false) !== shouldBeActive) {
+        await ctx.db.patch(r._id, { isActive: shouldBeActive });
+        if (shouldBeActive) activated++;
+        else deactivated++;
+      }
+    }
+    return { total: resumes.length, activated, deactivated };
   },
 });
 

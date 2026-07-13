@@ -22,6 +22,7 @@ export function ApprovalQueue() {
   const reject = useMutation(api.jobLeads.reject);
   const editDraft = useMutation(api.jobLeads.editDraft);
   const markSeen = useMutation(api.jobLeads.markSeen);
+  const requestTailoredResume = useMutation(api.jobLeads.requestTailoredResume);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   // Only tracks the brief window between click and the `approve` mutation call resolving or
@@ -31,6 +32,7 @@ export function ApprovalQueue() {
   // and never persists across a later `markSendError` revert.
   const [approvingIds, setApprovingIds] = useState<Set<Id<"jobLeads">>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
 
   const handleApprove = async (leadId: Id<"jobLeads">) => {
     setApprovingIds((prev) => new Set(prev).add(leadId));
@@ -44,6 +46,22 @@ export function ApprovalQueue() {
         return next;
       });
     }
+  };
+
+  const handleGenerateResume = async (leadId: Id<"jobLeads">) => {
+    const key = String(leadId);
+    setGeneratingIds((prev) => new Set(prev).add(key));
+    try {
+      await requestTailoredResume({ leadId });
+    } catch {
+      setGeneratingIds((prev) => { const next = new Set(prev); next.delete(key); return next; });
+      return;
+    }
+    // The PDF is generated + attached asynchronously (a scheduled action); the card flips to
+    // the "📎 attached" view reactively when it lands. Clear the spinner after a fallback window.
+    setTimeout(() => {
+      setGeneratingIds((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    }, 20000);
   };
 
   if (pendingLeads === undefined || sendingLeads === undefined) return <div>Loading...</div>;
@@ -104,8 +122,15 @@ export function ApprovalQueue() {
               <span className="opacity-70">(attached as PDF — view it in My Documents)</span>
             </div>
           ) : (
-            <div className="text-xs text-amber-600">
-              ⚠ No resume attached — this reply will send as text only.
+            <div className="text-xs text-amber-600 flex items-center gap-2 flex-wrap">
+              <span>⚠ No resume attached — this reply will send as text only.</span>
+              <button
+                className="px-2 py-0.5 rounded border border-amber-600/50 text-amber-700 hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={generatingIds.has(String(lead._id))}
+                onClick={() => handleGenerateResume(lead._id)}
+              >
+                {generatingIds.has(String(lead._id)) ? "Generating…" : "Generate résumé"}
+              </button>
             </div>
           )}
           {editingId === lead._id ? (
