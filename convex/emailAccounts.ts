@@ -129,6 +129,20 @@ export const getActiveAccounts = internalQuery({
   },
 });
 
+// Active accounts for ONE user only. Backs the manual "Scan now" button so a user
+// can trigger a poll of their own inboxes without kicking off a scan across every
+// account in the app (which is what the cron's getActiveAccounts does).
+export const getActiveAccountsForUser = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("emailAccounts")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+  },
+});
+
 export const updateTokens = internalMutation({
   args: {
     accountId: v.id("emailAccounts"),
