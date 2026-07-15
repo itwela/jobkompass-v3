@@ -392,6 +392,29 @@ export const setSoleActiveResume = internalMutation({
   },
 });
 
+// Add a certification to a resume's content.certifications (dedupes by name).
+export const addCertificationInternal = internalMutation({
+  args: {
+    resumeId: v.id("resumes"),
+    certification: v.object({
+      name: v.string(),
+      issuer: v.optional(v.string()),
+      date: v.optional(v.string()),
+      credentialId: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { resumeId, certification }) => {
+    const r = await ctx.db.get(resumeId);
+    if (!r) throw new Error("Resume not found");
+    const content: any = { ...((r as any).content ?? {}) };
+    const certs = Array.isArray(content.certifications) ? content.certifications : [];
+    if (!certs.some((c: any) => c?.name === certification.name)) certs.push(certification);
+    content.certifications = certs;
+    await ctx.db.patch(resumeId, { content, updatedAt: Date.now() });
+    return { certifications: content.certifications };
+  },
+});
+
 // Replace resume file with new PDF and update content
 export const replaceResumeFile = mutation({
   args: {
