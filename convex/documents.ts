@@ -392,6 +392,34 @@ export const setSoleActiveResume = internalMutation({
   },
 });
 
+// Public: set `resumeId` as the caller's SOLE base resume (the one the email agent
+// tailors from for job leads). Auth'd + ownership-checked. Deactivating every other
+// resume on each switch also self-heals any lingering "multiple active" state.
+export const setBaseResume = mutation({
+  args: { resumeId: v.id("resumes") },
+  handler: async (ctx, { resumeId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const target = await ctx.db.get(resumeId);
+    if (!target || target.userId !== userId) {
+      throw new Error("Resume not found or access denied");
+    }
+
+    const resumes = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const r of resumes) {
+      const shouldBeActive = r._id === resumeId;
+      if ((r.isActive ?? false) !== shouldBeActive) {
+        await ctx.db.patch(r._id, { isActive: shouldBeActive });
+      }
+    }
+    return { resumeId };
+  },
+});
+
 // Add a certification to a resume's content.certifications (dedupes by name).
 export const addCertificationInternal = internalMutation({
   args: {

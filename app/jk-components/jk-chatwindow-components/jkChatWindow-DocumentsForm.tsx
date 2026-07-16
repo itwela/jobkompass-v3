@@ -111,6 +111,21 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     
     const markResumeAsSeen = useMutation(api.documents.markResumeAsSeen);
     const markCoverLetterAsSeen = useMutation(api.documents.markCoverLetterAsSeen);
+    const setBaseResume = useMutation(api.documents.setBaseResume);
+    const [settingBaseId, setSettingBaseId] = useState<string | null>(null);
+
+    const handleSetBaseResume = async (resumeId: string, event: React.MouseEvent) => {
+        event.stopPropagation();
+        setSettingBaseId(resumeId);
+        try {
+            await setBaseResume({ resumeId: resumeId as Id<"resumes"> });
+            toast.success("Base resume updated — job leads will tailor from this one.");
+        } catch {
+            toast.error("Could not set base resume. Please try again.");
+        } finally {
+            setSettingBaseId(null);
+        }
+    };
     
     // Helper function to mark document as seen
     const markDocumentAsSeen = async (id: string, documentType: "resume" | "cover-letter") => {
@@ -583,6 +598,20 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
 
     const hasDocuments = allDocuments.length > 0;
 
+    // The base resume is the one the email agent tailors from for job leads
+    // (resumes.isActive === true). If several are flagged, the most recently updated
+    // wins so the displayed base is deterministic even before setBaseResume heals it.
+    const baseResumeId = (() => {
+        const activeResumes = allDocuments.filter(
+            (doc: any) => (doc.documentType || "resume") === "resume" && doc?.isActive
+        );
+        if (activeResumes.length === 0) return null;
+        const winner = activeResumes.reduce((best: any, cur: any) =>
+            (cur?.updatedAt ?? 0) > (best?.updatedAt ?? 0) ? cur : best
+        );
+        return String(winner?._id ?? winner?.id);
+    })();
+
     // Filter documents by type and search term
     const filteredDocuments = allDocuments.filter((doc: any) => {
         // Filter by type
@@ -599,6 +628,15 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         if (!search) return true;
         return title.includes(search) || role.includes(search) || label.includes(search) || tags.includes(search);
     });
+
+    // Base resume always renders first (order of everything else preserved).
+    if (baseResumeId) {
+        filteredDocuments.sort((a: any, b: any) => {
+            const aBase = String(a?._id ?? a?.id) === baseResumeId ? 0 : 1;
+            const bBase = String(b?._id ?? b?.id) === baseResumeId ? 0 : 1;
+            return aBase - bBase;
+        });
+    }
 
 
     if (isLoading) {
@@ -1122,6 +1160,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         // Check if document is new (never seen)
                         const isNew = !resume?.seenAt;
 
+                        // The base resume feeding job leads (resumes.isActive === true)
+                        const isBaseResume = documentType === "resume" && baseResumeId != null && resumeId === baseResumeId;
+
                         return (
                             <BlurFade key={resumeId} delay={0.0618 + index * 0.05} inView>
                             <div
@@ -1139,8 +1180,10 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                 }}
                                 className={cn(
                                     "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 min-w-0 overflow-hidden",
+                                    !selectionMode && isNew && "border-primary border-2",
                                     selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200",
-                                    !selectionMode && isNew && "border-primary border-2"
+                                    // Base resume treatment wins over new/selected styling
+                                    isBaseResume && "border-amber-400 border-2 ring-1 ring-amber-300 hover:border-amber-400"
                                 )}
                             >
                                 {/* Document preview thumbnail with job count badge and type indicator */}
@@ -1179,6 +1222,11 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     <div className="flex min-w-0 items-start justify-between gap-2">
                                         <div className="min-w-0 flex-1 space-y-1.5">
                                             <div>
+                                                {isBaseResume && (
+                                                    <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-300">
+                                                        ⭐ Base resume · used for job leads
+                                                    </span>
+                                                )}
                                                 <p className="text-sm font-semibold text-foreground truncate">{title}</p>
                                                 {resume?.fileName && (
                                                     <p className="text-xs text-muted-foreground truncate">{resume.fileName}</p>
@@ -1505,6 +1553,17 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         )}
                                         </div>
                                     </div>
+
+                                    {documentType === "resume" && !isBaseResume && (
+                                        <button
+                                            type="button"
+                                            onClick={(event) => handleSetBaseResume(resumeId, event)}
+                                            disabled={settingBaseId === resumeId}
+                                            className="mt-1 inline-flex items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60"
+                                        >
+                                            {settingBaseId === resumeId ? "Setting…" : "⭐ Make this my base resume"}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             </BlurFade>
