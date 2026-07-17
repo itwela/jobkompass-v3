@@ -32,7 +32,12 @@ export function ApprovalQueue() {
   // and never persists across a later `markSendError` revert.
   const [approvingIds, setApprovingIds] = useState<Set<Id<"jobLeads">>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  // Bridges only the click → mutation-resolve gap; after that the server's
+  // lead.resumeStatus ("generating"/"error") drives the button, so there's no
+  // fake timer and the spinner lasts exactly as long as the real work.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"initial" | "followup">("initial");
 
   const handleApprove = async (leadId: Id<"jobLeads">) => {
     setApprovingIds((prev) => new Set(prev).add(leadId));
@@ -50,18 +55,16 @@ export function ApprovalQueue() {
 
   const handleGenerateResume = async (leadId: Id<"jobLeads">) => {
     const key = String(leadId);
-    setGeneratingIds((prev) => new Set(prev).add(key));
+    setExpandedErrorId((prev) => (prev === key ? null : prev)); // collapse any old error
+    setPendingIds((prev) => new Set(prev).add(key));
     try {
+      // The mutation flips the lead to resumeStatus="generating" and schedules the
+      // async action, which sets "error" (with a message) or attaches the PDF.
+      // Server state takes over from here — no local timer.
       await requestTailoredResume({ leadId });
-    } catch {
-      setGeneratingIds((prev) => { const next = new Set(prev); next.delete(key); return next; });
-      return;
+    } finally {
+      setPendingIds((prev) => { const next = new Set(prev); next.delete(key); return next; });
     }
-    // The PDF is generated + attached asynchronously (a scheduled action); the card flips to
-    // the "📎 attached" view reactively when it lands. Clear the spinner after a fallback window.
-    setTimeout(() => {
-      setGeneratingIds((prev) => { const next = new Set(prev); next.delete(key); return next; });
-    }, 20000);
   };
 
   if (pendingLeads === undefined || sendingLeads === undefined) return <div>Loading...</div>;
@@ -73,9 +76,38 @@ export function ApprovalQueue() {
   const accountEmailById = new Map((accounts ?? []).map((a) => [a._id, a.email]));
   const resumeNameById = new Map((resumes ?? []).map((r: any) => [String(r._id), r.name]));
 
+  // Split into two tabs: fresh replies/applications vs. week-later nudges. They read
+  // and behave differently, so keeping them apart makes the queue easier to work.
+  const initialLeads = leads.filter((l) => !l.isFollowUp);
+  const followUpLeads = leads.filter((l) => l.isFollowUp);
+  const visibleLeads = activeTab === "followup" ? followUpLeads : initialLeads;
+
+  const tab = (id: "initial" | "followup", label: string, count: number) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+        activeTab === id
+          ? "bg-primary text-primary-foreground font-medium"
+          : "text-muted-foreground hover:bg-muted"
+      }`}
+    >
+      {label}
+      <span className={`ml-1.5 text-xs ${activeTab === id ? "opacity-80" : "opacity-60"}`}>{count}</span>
+    </button>
+  );
+
   return (
     <div className="space-y-4">
-      {leads.map((lead) => (
+      <div className="flex items-center gap-1 border-b pb-2">
+        {tab("initial", "Initial messages", initialLeads.length)}
+        {tab("followup", "Follow-ups", followUpLeads.length)}
+      </div>
+      {visibleLeads.length === 0 ? (
+        <div className="text-sm text-muted-foreground">
+          {activeTab === "followup" ? "No follow-ups waiting for approval." : "No initial messages waiting for approval."}
+        </div>
+      ) : (
+      visibleLeads.map((lead) => (
         <div
           key={lead._id}
           className="border rounded-lg p-4 space-y-2"
@@ -121,18 +153,51 @@ export function ApprovalQueue() {
               📎 {resumeNameById.get(String(lead.draftResumeId)) ?? "Tailored resume"}{" "}
               <span className="opacity-70">(attached as PDF — view it in My Documents)</span>
             </div>
-          ) : (
-            <div className="text-xs text-amber-600 flex items-center gap-2 flex-wrap">
-              <span>⚠ No resume attached — this reply will send as text only.</span>
-              <button
-                className="px-2 py-0.5 rounded border border-amber-600/50 text-amber-700 hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed"
-                disabled={generatingIds.has(String(lead._id))}
-                onClick={() => handleGenerateResume(lead._id)}
-              >
-                {generatingIds.has(String(lead._id)) ? "Generating…" : "Generate résumé"}
-              </button>
-            </div>
-          )}
+          ) : (() => {
+            const key = String(lead._id);
+            const isGenerating = lead.resumeStatus === "generating" || pendingIds.has(key);
+            const isError = lead.resumeStatus === "error" && !pendingIds.has(key);
+            return (
+              <div className="text-xs flex flex-col gap-1">
+                <div className="text-amber-600 flex items-center gap-2 flex-wrap">
+                  <span>⚠ No resume attached — this reply will send as text only.</span>
+                  {isError ? (
+                    <>
+                      <button
+                        className="px-2 py-0.5 rounded border border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 font-medium"
+                        onClick={() => setExpandedErrorId((prev) => (prev === key ? null : key))}
+                        title="Click to see what went wrong"
+                      >
+                        ⚠ Error — {expandedErrorId === key ? "hide" : "details"}
+                      </button>
+                      <button
+                        className="px-2 py-0.5 rounded border border-amber-600/50 text-amber-700 hover:bg-amber-50"
+                        onClick={() => handleGenerateResume(lead._id)}
+                      >
+                        Try again
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="px-2 py-0.5 rounded border border-amber-600/50 text-amber-700 hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                      disabled={isGenerating}
+                      onClick={() => handleGenerateResume(lead._id)}
+                    >
+                      {isGenerating && (
+                        <span className="inline-block h-3 w-3 rounded-full border-2 border-amber-600/40 border-t-amber-700 animate-spin" />
+                      )}
+                      {isGenerating ? "Generating…" : "Generate résumé"}
+                    </button>
+                  )}
+                </div>
+                {isError && expandedErrorId === key && (
+                  <div className="rounded border border-red-500/40 bg-red-50 text-red-800 p-2 whitespace-pre-wrap break-words">
+                    {lead.resumeError || "No error detail was recorded."}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {editingId === lead._id ? (
             <textarea
               className="w-full border rounded p-2 text-sm"
@@ -195,7 +260,7 @@ export function ApprovalQueue() {
             </button>
           </div>
         </div>
-      ))}
+      )))}
     </div>
   );
 }

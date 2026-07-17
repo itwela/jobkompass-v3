@@ -185,6 +185,11 @@ const schema = defineSchema({
       v.literal("promoted")
     ),
     draftResumeId: v.optional(v.id("resumes")),
+    // Live status of the user-triggered "Generate résumé" action so the button can
+    // show a real spinner until the PDF actually lands, and surface failures instead
+    // of silently returning. Unset once a draftResumeId is attached (that = done).
+    resumeStatus: v.optional(v.union(v.literal("generating"), v.literal("error"))),
+    resumeError: v.optional(v.string()), // human-readable failure detail, shown on click
     draftMessage: v.optional(v.string()),
     isFollowUp: v.optional(v.boolean()),
     approvedAt: v.optional(v.number()),

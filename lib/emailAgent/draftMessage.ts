@@ -1,7 +1,39 @@
 // lib/emailAgent/draftMessage.ts
 
+// Pulls a clean, greetable first name out of a raw From header so the draft can open
+// "Hi Dhruv," instead of the model inventing one (or echoing a literal "<name>").
+// Examples:
+//   "Dhruv Edgeglobal <dhruv@edgeglobal.net>" -> "Dhruv"
+//   "Santosh <santosh@galacticmind.com>"      -> "Santosh"
+//   "prince@edgeglobal.net"                   -> "Prince"
+//   "" / undefined / a no-reply address       -> "there"
+export function recipientFirstName(sender: string | undefined | null): string {
+  if (!sender) return "there";
+  const raw = sender.trim();
+  // Display name is the part before the first "<"; if absent, use the local-part of
+  // the bare address.
+  const angle = raw.indexOf("<");
+  let candidate = angle > 0 ? raw.slice(0, angle).trim() : raw;
+  candidate = candidate.replace(/^["']|["']$/g, "").trim(); // strip wrapping quotes
+  if (!candidate || candidate.includes("@")) {
+    // No usable display name — derive from the email's local part.
+    const emailMatch = raw.match(/([^<\s@]+)@/);
+    candidate = emailMatch ? emailMatch[1].replace(/[._-]+/g, " ").trim() : "";
+  }
+  const first = candidate.split(/\s+/)[0] || "";
+  // Guard against role/no-reply inboxes that shouldn't be greeted by "name".
+  if (!first || /^(no|do|not|team|jobs|careers|recruit|hr|hello|hi|info|support|admin|noreply|no-reply)$/i.test(first)) {
+    return "there";
+  }
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
 export function parseDraftMessageResponse(raw: string): string | null {
   let trimmed = raw.trim();
+  if (!trimmed) return null;
+  // Some models (gemma among them) emit a short reasoning preamble like "thought"
+  // or "thinking" on its own line before the actual message — strip a leading one.
+  trimmed = trimmed.replace(/^(thought|thinking|reasoning|response|draft|here(?:'s| is)[^\n:]*)[:\s]*\n+/i, "").trim();
   if (!trimmed) return null;
   if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length > 1) {
     trimmed = trimmed.slice(1, -1);
@@ -37,7 +69,7 @@ export async function draftReplyMessage(input: {
   if (!openRouterKey) throw new Error("OpenRouter API key not configured on server");
 
   const systemPrompt = input.isFollowUp
-    ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. No subject line, no greeting formatting beyond "Hi <name>,", no sign-off beyond a first name. Reference the role and company naturally. Respond with ONLY the message text.`
+    ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. Open with exactly "Hi ${input.senderName}," — use that name verbatim and NEVER invent, change, or guess a different name. Reference ONLY the exact role and company given in the user prompt — never mention any other company. No subject line, no sign-off, no signature. Never use bracketed or angle-bracket fill-ins like "[Company Name]", "[mention something]", or "<name>" — write complete, ready-to-send sentences and simply omit specifics you don't know. Write exactly ONE message and nothing else. Respond with ONLY the message text.`
     : input.isListing
       ? `You write brief, warm, one-paragraph application messages from a job seeker for a specific job listing found on a job board — suitable to paste into an application form or a cold email to the company. Express genuine interest in the role and company and mention the attached tailored resume. No subject line, no greeting to a specific person (there isn't one), no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know. Write exactly ONE message and nothing else. Respond with ONLY the message text.`
       : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know (the resume is attached, so don't enumerate skills). Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;

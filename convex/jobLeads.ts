@@ -124,7 +124,12 @@ export const findDigestDuplicate = internalQuery({
 export const attachResumeOnly = internalMutation({
   args: { leadId: v.id("jobLeads"), draftResumeId: v.id("resumes") },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.leadId, { draftResumeId: args.draftResumeId, updatedAt: Date.now() });
+    await ctx.db.patch(args.leadId, {
+      draftResumeId: args.draftResumeId,
+      resumeStatus: undefined, // done — clear the spinner/error
+      resumeError: undefined,
+      updatedAt: Date.now(),
+    });
     await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
   },
 });
@@ -138,8 +143,34 @@ export const requestTailoredResume = mutation({
     const lead = await ctx.db.get(args.leadId);
     if (!lead || lead.userId !== convexUserId) throw new Error("Lead not found");
     if (lead.draftResumeId) return; // already has one
+    // Flip to "generating" now so the button spins immediately and stays spinning
+    // (server-driven) until the async action lands a PDF or records an error. Clear
+    // any prior error so a retry starts clean.
+    await ctx.db.patch(args.leadId, {
+      resumeStatus: "generating",
+      resumeError: undefined,
+      updatedAt: Date.now(),
+    });
     await ctx.scheduler.runAfter(0, internal.emailAgent.draft.tailorResumeOnly, {
       leadId: args.leadId,
+    });
+  },
+});
+
+// Records the outcome of tailorResumeOnly so the UI can show a real spinner / error
+// badge. On error we keep the message; on success the caller clears status (the
+// attached draftResumeId is the "done" signal).
+export const setResumeStatus = internalMutation({
+  args: {
+    leadId: v.id("jobLeads"),
+    status: v.optional(v.union(v.literal("generating"), v.literal("error"))),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.leadId, {
+      resumeStatus: args.status,
+      resumeError: args.error,
+      updatedAt: Date.now(),
     });
   },
 });
