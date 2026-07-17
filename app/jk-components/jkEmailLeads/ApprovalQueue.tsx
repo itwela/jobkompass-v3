@@ -148,7 +148,11 @@ export function ApprovalQueue() {
               </>
             )}
           </div>
-          {lead.draftResumeId ? (
+          {lead.isFollowUp ? (
+            <div className="text-xs text-muted-foreground italic">
+              No resume attached — follow-ups don&apos;t re-send it (you already sent it in the first email).
+            </div>
+          ) : lead.draftResumeId ? (
             <div className="text-xs text-muted-foreground">
               📎 {resumeNameById.get(String(lead.draftResumeId)) ?? "Tailored resume"}{" "}
               <span className="opacity-70">(attached as PDF — view it in My Documents)</span>

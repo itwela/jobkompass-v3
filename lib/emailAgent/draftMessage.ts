@@ -28,6 +28,36 @@ export function recipientFirstName(sender: string | undefined | null): string {
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
+// Builds a professional, human-readable title + filename for a generated resume so
+// documents read like "Itwela Ibomu — Google — Software Engineer" and download as
+// "Itwela-Ibomu-Google-Resume.pdf" instead of an id/timestamp blob. Pulls the name
+// from the resume content's personalInfo; falls back to a company/role title when no
+// name is present.
+export function tailoredResumeName(input: {
+  content: any;
+  company: string;
+  role: string;
+}): { displayName: string; fileName: string } {
+  const pi = input.content?.personalInfo ?? {};
+  let first = pi.firstName || "";
+  let last = pi.lastName || "";
+  if (!first && !last && pi.name) {
+    const parts = String(pi.name).trim().split(/\s+/);
+    first = parts[0] || "";
+    last = parts.slice(1).join(" ") || "";
+  }
+  const fullName = `${first} ${last}`.trim();
+  const slug = (s: string) =>
+    (s || "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const displayName = fullName
+    ? `${fullName} — ${input.company} — ${input.role}`
+    : `${input.company} - ${input.role} (tailored)`;
+  const namePart = fullName ? slug(fullName) : "resume";
+  const companyPart = slug(input.company);
+  const fileName = `${namePart}${companyPart ? `-${companyPart}` : ""}-Resume.pdf`;
+  return { displayName, fileName };
+}
+
 export function parseDraftMessageResponse(raw: string): string | null {
   let trimmed = raw.trim();
   if (!trimmed) return null;

@@ -39,7 +39,9 @@ export const sendApprovedLead = internalAction({
       const { gmail } = await getGmailClient(account);
 
       let attachment: { filename: string; content: Buffer; mimeType: string } | undefined;
-      if (lead.draftResumeId) {
+      // Follow-ups never re-attach the resume — the recipient already got it in the
+      // initial outreach, so a second copy is redundant.
+      if (lead.draftResumeId && !lead.isFollowUp) {
         const resumeFile: any = await ctx.runQuery(internal.documents.getResumeFileInternal, {
           resumeId: lead.draftResumeId,
         });

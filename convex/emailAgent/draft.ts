@@ -3,7 +3,7 @@
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { tailorResumeContent, draftReplyMessage, recipientFirstName } from "../../lib/emailAgent/draftMessage";
+import { tailorResumeContent, draftReplyMessage, recipientFirstName, tailoredResumeName } from "../../lib/emailAgent/draftMessage";
 
 // Resume-only generation for digest listings ("extracted" leads): there is no sender
 // to draft a reply to, but the user still wants a tailored resume PDF to apply with.
@@ -65,11 +65,12 @@ export const tailorResumeOnly = internalAction({
 
       const pdfBlob = new Blob([await exportResponse.arrayBuffer()], { type: "application/pdf" });
       const fileId = await ctx.storage.store(pdfBlob);
+      const { displayName, fileName } = tailoredResumeName({ content: tailored, company: lead.company, role: lead.role });
       const draftResumeId = await ctx.runMutation(internal.documents.saveGeneratedResumeInternal, {
         userId: lead.userId,
-        name: `${lead.company} - ${lead.role} (tailored)`,
+        name: displayName,
         fileId,
-        fileName: `resume-${lead.company}-${Date.now()}.pdf`,
+        fileName,
         fileSize: pdfBlob.size,
         content: tailored,
         template: baseResume.template || "jake",
@@ -94,7 +95,8 @@ export const draftForLead = internalAction({
     const isFollowUp = args.isFollowUp ?? false;
     // Keep an already-generated tailored resume (e.g. from an earlier "Tailor Resume"
     // click) instead of regenerating it — and never clear it via attachDraft below.
-    let draftResumeId: string | undefined = lead.draftResumeId ?? undefined;
+    // Follow-ups deliberately drop it: they don't attach a resume at all (redundant).
+    let draftResumeId: string | undefined = isFollowUp ? undefined : (lead.draftResumeId ?? undefined);
 
     // The tailored-resume PDF is a nice-to-have: any failure in this block (LaTeX service
     // down/unconfigured, tailoring model error) must not prevent the reply draft below
@@ -134,11 +136,12 @@ export const draftForLead = internalAction({
           } else {
             const pdfBlob = new Blob([await exportResponse.arrayBuffer()], { type: "application/pdf" });
             const fileId = await ctx.storage.store(pdfBlob);
+            const { displayName, fileName } = tailoredResumeName({ content: tailored, company: lead.company, role: lead.role });
             draftResumeId = await ctx.runMutation(internal.documents.saveGeneratedResumeInternal, {
               userId: lead.userId,
-              name: `${lead.company} - ${lead.role} (tailored)`,
+              name: displayName,
               fileId,
-              fileName: `resume-${lead.company}-${Date.now()}.pdf`,
+              fileName,
               fileSize: pdfBlob.size,
               content: tailored,
               template: baseResume.template || "jake",
