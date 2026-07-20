@@ -733,12 +733,19 @@ export default function JkCW_SettingsMode() {
                     >
                       <div>
                         <p className="text-sm font-medium">{account.email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {account.status === "active" ? "Connected" : "Revoked"} · since{" "}
-                          {new Date(account.connectedAt).toLocaleDateString()}
+                        <p className="text-xs">
+                          {account.status === "active" ? (
+                            <span className="text-muted-foreground">Connected</span>
+                          ) : (
+                            <span className="font-medium text-red-600">Disconnected — reconnect to keep sending</span>
+                          )}
+                          <span className="text-muted-foreground">
+                            {" · since "}
+                            {new Date(account.connectedAt).toLocaleDateString()}
+                          </span>
                         </p>
                       </div>
-                      {account.status === "active" && (
+                      {account.status === "active" ? (
                         <Button
                           variant="outline"
                           size="sm"
@@ -746,6 +753,13 @@ export default function JkCW_SettingsMode() {
                           className="text-destructive hover:text-destructive"
                         >
                           Disconnect
+                        </Button>
+                      ) : (
+                        <Button asChild size="sm" className="gap-2">
+                          <a href={`/api/gmail/oauth/start?login_hint=${encodeURIComponent(account.email)}`}>
+                            <Mail className="h-4 w-4" />
+                            Reconnect
+                          </a>
                         </Button>
                       )}
                     </div>
