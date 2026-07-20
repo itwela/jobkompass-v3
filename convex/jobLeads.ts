@@ -333,6 +333,8 @@ export const approve = mutation({
     await ctx.db.patch(args.leadId, {
       status: "sending" as const,
       approvedAt: Date.now(),
+      // Clear any prior failure so a retry starts clean and the old error stops showing.
+      sendError: undefined,
       updatedAt: Date.now(),
     });
     await ctx.scheduler.runAfter(0, internal.emailAgent.send.sendApprovedLead, { leadId: args.leadId });
@@ -375,12 +377,18 @@ export const markSent = internalMutation({
 });
 
 export const markSendError = internalMutation({
-  args: { leadId: v.id("jobLeads") },
+  args: { leadId: v.id("jobLeads"), error: v.optional(v.string()) },
   handler: async (ctx, args) => {
     // Revert "sending" back to "pending_approval" so the lead reappears in the approval
     // queue and can be retried. approvedAt is left set so a distinct "approved but failed
     // to send" state is visible if a UI wants to show a retry affordance later.
-    await ctx.db.patch(args.leadId, { status: "pending_approval" as const, updatedAt: Date.now() });
+    // `sendError` carries the human-readable reason so the approval queue can show WHY the
+    // send failed (e.g. "reconnect your inbox") instead of the lead just silently reappearing.
+    await ctx.db.patch(args.leadId, {
+      status: "pending_approval" as const,
+      sendError: args.error ?? "Sending failed. Please try again.",
+      updatedAt: Date.now(),
+    });
   },
 });
 

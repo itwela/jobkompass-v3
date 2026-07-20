@@ -18,8 +18,11 @@ export const sendApprovedLead = internalAction({
     // that gap. (The residual case — this action never running to completion at all, e.g. a
     // hard crash — is handled separately by `internal.jobLeads.reconcileStuckSends`, a cron
     // that reverts leads stuck in "sending" past a generous timeout.)
+    // Hoisted out of the try so the catch can still read the lead's sourceAccountId when
+    // deciding whether to mark the Gmail account revoked.
+    let lead: any;
     try {
-      const lead: any = await ctx.runQuery(internal.jobLeads.getById, { leadId: args.leadId });
+      lead = await ctx.runQuery(internal.jobLeads.getById, { leadId: args.leadId });
       if (!lead) return;
 
       // Defense-in-depth: `approve` sets status to "sending" synchronously before scheduling
@@ -65,9 +68,38 @@ export const sendApprovedLead = internalAction({
       });
 
       await ctx.runMutation(internal.jobLeads.markSent, { leadId: args.leadId, isFollowUp: !!lead.isFollowUp });
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to send lead ${args.leadId}:`, error);
-      await ctx.runMutation(internal.jobLeads.markSendError, { leadId: args.leadId });
+
+      // Distinguish "your Gmail access expired" from a generic send failure so the approval
+      // queue can tell the user exactly what to do. A revoked/expired OAuth token surfaces
+      // as invalid_grant (from the refresh) or a 401 from the send call — same signals the
+      // poll path uses. When we see one, mark the account revoked (mirrors pollAllAccounts)
+      // so Settings shows it as disconnected and the whole app stops silently retrying it.
+      const isAuthError =
+        error?.code === 401 ||
+        error?.response?.status === 401 ||
+        error?.message?.includes("invalid_grant") ||
+        error?.response?.data?.error === "invalid_grant";
+
+      let reason: string;
+      if (isAuthError) {
+        try {
+          if (lead?.sourceAccountId) {
+            await ctx.runMutation(internal.emailAccounts.markRevoked, {
+              accountId: lead.sourceAccountId,
+            });
+          }
+        } catch (markErr) {
+          console.error(`Failed to mark account revoked for lead ${args.leadId}:`, markErr);
+        }
+        reason =
+          "Gmail access has expired, so this couldn't be sent. Reconnect your inbox in Settings → Gmail accounts, then approve again.";
+      } else {
+        reason = `Couldn't send: ${error?.message ?? "unknown error"}. Please try again.`;
+      }
+
+      await ctx.runMutation(internal.jobLeads.markSendError, { leadId: args.leadId, error: reason });
     }
   },
 });

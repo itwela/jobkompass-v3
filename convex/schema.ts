@@ -190,6 +190,10 @@ const schema = defineSchema({
     // of silently returning. Unset once a draftResumeId is attached (that = done).
     resumeStatus: v.optional(v.union(v.literal("generating"), v.literal("error"))),
     resumeError: v.optional(v.string()), // human-readable failure detail, shown on click
+    // Human-readable reason the last "Approve & Send" failed. Set by markSendError when a
+    // send throws (e.g. the Gmail account's access was revoked), cleared by `approve` on the
+    // next attempt. Surfaced in the approval queue so a failed send is never silent.
+    sendError: v.optional(v.string()),
     draftMessage: v.optional(v.string()),
     isFollowUp: v.optional(v.boolean()),
     approvedAt: v.optional(v.number()),

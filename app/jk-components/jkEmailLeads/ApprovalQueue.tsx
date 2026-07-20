@@ -212,6 +212,11 @@ export function ApprovalQueue() {
           ) : (
             <p className="text-sm whitespace-pre-wrap">{lead.draftMessage}</p>
           )}
+          {lead.sendError && lead.status !== "sending" && !approvingIds.has(lead._id) && (
+            <div className="rounded border border-red-500/40 bg-red-50 text-red-800 text-xs p-2 whitespace-pre-wrap break-words">
+              ⚠ {lead.sendError}
+            </div>
+          )}
           <div className="flex gap-2">
             {editingId === lead._id ? (
               <button
