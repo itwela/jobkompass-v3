@@ -4,6 +4,7 @@ import { useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { ApprovalQueue } from "@/app/jk-components/jkEmailLeads/ApprovalQueue"
 import { LeadsList } from "@/app/jk-components/jkEmailLeads/LeadsList"
+import { ScanNowButton } from "@/app/jk-components/jkEmailLeads/ScanNowButton"
 
 export default function JkCW_LeadsMode() {
   // Same subscription the child components use — Convex dedupes it, and having the
@@ -33,9 +34,12 @@ export default function JkCW_LeadsMode() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-4">
-            All Leads{totalCount !== undefined && ` (${totalCount})`}
-          </h2>
+          <div className="flex items-center justify-between mb-4 gap-3">
+            <h2 className="text-lg font-semibold">
+              All Leads{totalCount !== undefined && ` (${totalCount})`}
+            </h2>
+            <ScanNowButton />
+          </div>
           <LeadsList />
         </section>
       </div>
