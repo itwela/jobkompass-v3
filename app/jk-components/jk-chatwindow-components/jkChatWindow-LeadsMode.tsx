@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api"
 import { ApprovalQueue } from "@/app/jk-components/jkEmailLeads/ApprovalQueue"
 import { LeadsList } from "@/app/jk-components/jkEmailLeads/LeadsList"
 import { ScanNowButton } from "@/app/jk-components/jkEmailLeads/ScanNowButton"
+import { AddLeadFromEmail } from "@/app/jk-components/jkEmailLeads/AddLeadFromEmail"
 
 export default function JkCW_LeadsMode() {
   // Same subscription the child components use — Convex dedupes it, and having the
@@ -25,6 +26,8 @@ export default function JkCW_LeadsMode() {
             Recruiter outreach and job-board digests picked up by the email agent.
           </p>
         </div>
+
+        <AddLeadFromEmail />
 
         <section>
           <h2 className="text-lg font-semibold mb-4">
