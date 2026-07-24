@@ -1,8 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+import { mutation, query, action, internalMutation, internalQuery } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import type { SenderHit } from "../lib/emailAgent/manualLead";
 
 async function resolveConvexUserId(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -448,5 +449,42 @@ export const promoteToJob = mutation({
     await ctx.db.patch(args.leadId, { status: "promoted" as const, promotedAt: Date.now(), updatedAt: Date.now() });
     await ctx.scheduler.runAfter(0, internal.emailAgent.mirror.pushLead, { leadId: args.leadId });
     return jobId;
+  },
+});
+
+// --- Manual "add lead from email" (sender-based, pick-from-3) ---
+
+// Resolve the calling user's convex_user_id from inside an action (actions have
+// no ctx.db, so they call this via ctx.runQuery; Convex propagates the caller's
+// auth identity into the query).
+export const resolveMeInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await resolveConvexUserId(ctx);
+  },
+});
+
+export const searchSenderForManualLead = action({
+  args: { senderEmail: v.string() },
+  handler: async (ctx, { senderEmail }): Promise<SenderHit[]> => {
+    const userId: string = await ctx.runQuery(internal.jobLeads.resolveMeInternal, {});
+    return await ctx.runAction(
+      internal.emailAgent.manualLead.searchSenderMessagesInternal,
+      { userId, senderEmail }
+    );
+  },
+});
+
+export const addManualLeadFromMessage = action({
+  args: { accountId: v.id("emailAccounts"), messageId: v.string() },
+  handler: async (
+    ctx,
+    { accountId, messageId }
+  ): Promise<{ leadId: string | null; duplicate: boolean }> => {
+    const userId: string = await ctx.runQuery(internal.jobLeads.resolveMeInternal, {});
+    return await ctx.runAction(
+      internal.emailAgent.manualLead.ingestSelectedMessageInternal,
+      { userId, accountId, messageId }
+    );
   },
 });
