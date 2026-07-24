@@ -124,6 +124,32 @@ function extractPlainText(payload: gmail_v1.Schema$MessagePart | undefined): str
   return "";
 }
 
+/**
+ * Search a mailbox for the most recent messages from a given sender and return
+ * lightweight metadata for each. Used by the manual "add lead from email" flow.
+ */
+export async function searchMessagesFromSender(
+  gmail: gmail_v1.Gmail,
+  senderEmail: string,
+  max = 3
+) {
+  const list = await gmail.users.messages.list({
+    userId: "me",
+    q: `from:${senderEmail}`,
+    maxResults: max,
+  });
+  const ids = (list.data.messages || []).map((m) => m.id!).filter(Boolean);
+  const full = await Promise.all(ids.map((id) => getMessage(gmail, id)));
+  return full.map((m) => ({
+    messageId: m.id,
+    threadId: m.threadId,
+    subject: m.subject,
+    snippet: m.snippet,
+    receivedAt: m.receivedAt ?? 0,
+    rfcMessageId: m.rfcMessageId,
+  }));
+}
+
 export async function sendReply(
   gmail: gmail_v1.Gmail,
   params: {
