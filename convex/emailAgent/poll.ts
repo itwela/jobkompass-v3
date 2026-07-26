@@ -2,7 +2,12 @@
 
 import { internalAction, action, type ActionCtx } from "../_generated/server";
 import { api, internal } from "../_generated/api";
-import { getGmailClient, listNewMessageIds, getMessage } from "./gmailClient";
+import {
+  getGmailClient,
+  listNewMessageIds,
+  getMessage,
+  getMessageIfExists,
+} from "./gmailClient";
 import { classifyEmail } from "../../lib/emailAgent/classify";
 
 // One-shot backfill for leads ingested before emailReceivedAt was captured: re-fetch
@@ -68,7 +73,10 @@ async function pollAccount(ctx: ActionCtx, account: any): Promise<number> {
     });
     if (existing) continue; // dedupe re-delivered mail
 
-    const message = await getMessage(gmail, messageId);
+    // Deleted-since-history messages come back 404; skip them rather than
+    // letting one dead id abort the scan before historyId is advanced.
+    const message = await getMessageIfExists(gmail, messageId);
+    if (!message) continue;
 
     // Gmail's history feed includes messages this account SENT (our own approved
     // replies land in it a moment after sending). Skip anything authored by the

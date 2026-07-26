@@ -109,6 +109,28 @@ export async function getMessage(gmail: gmail_v1.Gmail, messageId: string) {
   };
 }
 
+/**
+ * Same as getMessage, but returns null instead of throwing when Gmail says the
+ * message is gone (404 "Requested entity was not found").
+ *
+ * Gmail's history feed keeps listing messagesAdded for mail that was later
+ * permanently deleted, so a poll can be handed an id that messages.get refuses.
+ * Letting that throw aborts the whole account scan before its historyId is
+ * advanced, which wedges every later poll on the same dead message forever.
+ * A missing message can never be fetched, so skip it and keep going.
+ */
+export async function getMessageIfExists(gmail: gmail_v1.Gmail, messageId: string) {
+  try {
+    return await getMessage(gmail, messageId);
+  } catch (error: any) {
+    if (error?.code === 404 || error?.response?.status === 404) {
+      console.warn(`Gmail message ${messageId} no longer exists; skipping.`);
+      return null;
+    }
+    throw error;
+  }
+}
+
 function extractPlainText(payload: gmail_v1.Schema$MessagePart | undefined): string {
   if (!payload) return "";
   if (payload.mimeType === "text/plain" && payload.body?.data) {
