@@ -24,6 +24,30 @@ Rules:
 - If an email is promotional and contains no real job postings, return {"type": "neither"} — do not force listings out of it.
 - Respond with ONLY the JSON object, no explanation or markdown.`;
 
+/**
+ * Rescue a digest response that the model got cut off partway through.
+ *
+ * A job alert bundling 30+ listings can overrun max_tokens, so the response ends
+ * mid-listing and won't parse. Every job in that email would otherwise be thrown
+ * away. Trim back to the last listing that closed cleanly and shut the array, which
+ * keeps the listings that did arrive intact.
+ *
+ * Only complete objects survive: the partial one at the cut is discarded, and if
+ * nothing completed there is nothing to recover.
+ */
+function salvageTruncatedDigest(jsonStr: string): any | null {
+  if (!jsonStr.includes('"listings"')) return null;
+
+  const lastCompleteListing = jsonStr.lastIndexOf("}");
+  if (lastCompleteListing === -1) return null;
+
+  try {
+    return JSON.parse(jsonStr.slice(0, lastCompleteListing + 1) + "]}");
+  } catch {
+    return null;
+  }
+}
+
 export function parseClassificationResponse(raw: string): ClassificationResult | null {
   let jsonStr = raw.trim();
   if (jsonStr.startsWith("```")) {
@@ -34,7 +58,8 @@ export function parseClassificationResponse(raw: string): ClassificationResult |
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
-    return null;
+    parsed = salvageTruncatedDigest(jsonStr);
+    if (!parsed) return null;
   }
 
   if (parsed?.type === "personal_outreach" && parsed.company && parsed.role && parsed.senderName) {
@@ -97,14 +122,29 @@ export async function classifyEmail(input: {
           },
         ],
         temperature: 0.1,
-        max_tokens: 1000,
+        // A digest bundling 30+ jobs needs well over 1000 tokens of JSON. At 1000 the
+        // response was cut off mid-listing, failed to parse, and the entire email was
+        // dropped — every job in it lost. Give long digests room to finish;
+        // salvageTruncatedDigest only has to cover the extreme outliers now.
+        max_tokens: 4000,
       }),
     });
 
     if (response.ok) {
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
-      return parseClassificationResponse(content);
+      const choice = data.choices?.[0];
+      const content = choice?.message?.content || "";
+      const result = parseClassificationResponse(content);
+
+      if (!result) {
+        // Never fail silently here: without the raw output a dropped email is
+        // impossible to diagnose after the fact.
+        console.error(
+          `Unparseable classification response (finish_reason: ${choice?.finish_reason ?? "unknown"}, ` +
+            `length: ${content.length}). Raw: ${content.slice(0, 500)}`
+        );
+      }
+      return result;
     }
 
     const retryable = response.status === 429 || response.status >= 500;
