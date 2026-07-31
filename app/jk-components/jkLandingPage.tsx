@@ -13,7 +13,7 @@ import JkPublicHeader from "./jkPublicHeader";
 import JkGetStartedButton from "./jkGetStartedButton";
 import { api } from "@/convex/_generated/api";
 import { toast } from "@/lib/toast";
-import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info, Sparkles, ArrowRight } from "lucide-react";
+import { ChevronDown, ChevronUp, X, CheckCircle2, Briefcase, FileText, MessageSquare, Target, Zap, Info, Sparkles, ArrowRight, Terminal, Bot, Copy } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useMotionTemplate } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -42,6 +42,10 @@ const faqData: FAQItem[] = [
   {
     question: "How do I track my job applications?",
     answer: "You can add jobs to your dashboard and track their status. The platform helps you organize applications by company, position, and status, making it easy to stay on top of your job search."
+  },
+  {
+    question: "What is the JobKompass CLI, and do I need it?",
+    answer: "The jk CLI is an optional command-line tool that does everything the app does, so an AI agent like Claude Code or Cursor can manage your job search for you—adding jobs, generating tailored resumes, saving links. If you don't use a terminal, ignore it; the web app does everything on its own. If you do, install it with npm install -g jobkompass-cli and create a key in Settings under Command Line & AI Agents."
   },
   {
     question: "Is there a mobile app?",
@@ -363,6 +367,187 @@ function CapabilityCard({ capability, index }: { capability: { title: string; de
 }
 
 // Hero section with parallax and depth
+const CLI_STEPS: { label: string; command: string; note: string }[] = [
+  {
+    label: "Install it",
+    command: "npm install -g jobkompass-cli",
+    note: "Needs Node 18 or newer.",
+  },
+  {
+    label: "Connect your account",
+    command: "jk auth login <your-key>",
+    note: "Create a key in Settings → Command Line & AI Agents.",
+  },
+  {
+    label: "Let your agent take over",
+    command: "jk schema",
+    note: "Returns every command as JSON, so your agent knows how to use it.",
+  },
+];
+
+function CliSection() {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const handleCopy = async (command: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch {
+      toast.error("Couldn't copy", { description: "Copy the command manually.", duration: 2000 });
+    }
+  };
+
+  return (
+    <section className="relative py-32 px-6 overflow-hidden" aria-labelledby="cli-heading">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/20 to-transparent pointer-events-none" />
+
+      <div className="max-w-6xl mx-auto relative">
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center mb-16"
+        >
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6">
+            <Terminal className="h-4 w-4" />
+            <span>For developers &amp; AI agents</span>
+          </div>
+
+          <h2
+            id="cli-heading"
+            className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight mb-6"
+          >
+            Let your AI agent{" "}
+            <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+              run your job search
+            </span>
+          </h2>
+
+          <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto">
+            Your coding agent can already read a posting and write a resume. What it couldn&apos;t do
+            was save any of it. The <code className="font-mono text-base bg-muted px-1.5 py-0.5 rounded">jk</code> CLI
+            gives Claude Code, Cursor, or any agent direct access to your JobKompass account.
+          </p>
+        </motion.div>
+
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+          {/* Steps */}
+          <motion.ol
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
+            {CLI_STEPS.map((step, index) => (
+              <li key={step.command} className="flex gap-4">
+                <span className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                  {index + 1}
+                </span>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <h3 className="font-semibold text-lg">{step.label}</h3>
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2">
+                    <code className="flex-1 font-mono text-sm break-all">{step.command}</code>
+                    <button
+                      onClick={() => handleCopy(step.command, index)}
+                      className="p-1.5 hover:bg-muted rounded transition-colors flex-shrink-0"
+                      aria-label={`Copy command: ${step.command}`}
+                    >
+                      {copiedIndex === index ? (
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Copy className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{step.note}</p>
+                </div>
+              </li>
+            ))}
+          </motion.ol>
+
+          {/* Terminal preview */}
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            className="rounded-xl border border-border bg-card overflow-hidden shadow-lg"
+          >
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/50">
+              <span className="h-3 w-3 rounded-full bg-red-400" />
+              <span className="h-3 w-3 rounded-full bg-yellow-400" />
+              <span className="h-3 w-3 rounded-full bg-green-400" />
+              <span className="ml-2 text-xs text-muted-foreground font-mono">jk</span>
+            </div>
+
+            <div className="p-4 font-mono text-sm overflow-x-auto">
+              <div className="flex items-start gap-2 mb-4 text-muted-foreground">
+                <Bot className="h-4 w-4 flex-shrink-0 mt-0.5 text-primary" />
+                <span className="italic">
+                  &quot;Track this posting and tailor my resume for it.&quot;
+                </span>
+              </div>
+
+              <p className="whitespace-pre">
+                <span className="text-muted-foreground">$ </span>
+                jk jobs add --company &quot;Anthropic&quot; \
+              </p>
+              <p className="whitespace-pre pl-4">
+                --title &quot;Engineer&quot; --status Interested
+              </p>
+              <p className="text-primary mb-3">✓ job added · k97f05pq</p>
+
+              <p className="whitespace-pre">
+                <span className="text-muted-foreground">$ </span>
+                jk resumes add --job-id k97f05pq
+              </p>
+              <p className="text-primary mb-3">✓ resume generated · Anthropic — Engineer.pdf</p>
+
+              <p className="whitespace-pre">
+                <span className="text-muted-foreground">$ </span>
+                jk jobs list --status Interested
+              </p>
+              <p className="text-muted-foreground">[ 1 job ] Anthropic · Engineer · Interested</p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Reassurance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-12 grid sm:grid-cols-3 gap-4"
+        >
+          {[
+            {
+              title: "Deletes need a flag",
+              body: "Destructive commands refuse to run without --yes, so an agent can't quietly wipe your data.",
+            },
+            {
+              title: "Keys are hashed",
+              body: "We store only a hash of your key. Revoke any key from Settings and it stops working immediately.",
+            },
+            {
+              title: "Built for scripts",
+              body: "JSON output when piped, and exit codes that separate your mistakes from server errors.",
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-lg border border-border bg-card/50 p-4">
+              <h3 className="font-semibold mb-1 text-sm">{item.title}</h3>
+              <p className="text-sm text-muted-foreground">{item.body}</p>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEvent<HTMLAnchorElement>) => void }) {
   return (
     <section className="relative flex-1 flex items-center justify-center px-6 py-20 overflow-hidden">
@@ -839,6 +1024,9 @@ export default function JkLandingPage() {
             <FreeResumeStats />
           </div>
         </section>
+
+        {/* CLI / AI agent Section */}
+        <CliSection />
 
         {/* Waitlist Section - commented out
         <section id="waitlist" className="relative py-32 px-6 overflow-hidden" aria-labelledby="waitlist-heading">

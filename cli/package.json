@@ -1,16 +1,45 @@
 {
-  "name": "jk-cli",
+  "name": "jobkompass-cli",
   "version": "0.1.0",
-  "private": true,
-  "description": "Agent-first CLI for JobKompass",
+  "description": "Agent-first CLI for JobKompass — run your job search from the terminal, or let an AI agent run it for you.",
+  "license": "MIT",
   "type": "module",
-  "bin": { "jk": "./dist/index.js" },
+  "bin": {
+    "jk": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "jobkompass",
+    "cli",
+    "job-search",
+    "resume",
+    "ai-agent",
+    "claude-code"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/itwela/jobkompass-v3.git",
+    "directory": "cli"
+  },
+  "homepage": "https://www.myjobkompass.com",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "smoke": "bash smoke.sh"
+    "smoke": "bash smoke.sh",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "dependencies": { "commander": "^12.1.0" },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "tsup": "^8.1.0",

@@ -22,7 +22,7 @@ export async function apiRequest(method: string, path: string, opts: RequestOpts
     throw new CliError(
       "no_key",
       "No API key configured.",
-      "Run 'jk auth login <key>' or set JK_API_KEY. Generate a key with: npx convex run agent/keys:generate",
+      "Create a key at https://www.myjobkompass.com -> Settings -> Command Line & AI Agents, then run 'jk auth login <key>' (or set JK_API_KEY).",
       1
     );
   }

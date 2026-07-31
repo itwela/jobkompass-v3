@@ -25,7 +25,7 @@ export async function authenticate(
       401,
       "unauthorized",
       "Missing API key",
-      "Send header 'Authorization: Bearer <key>'. Generate a key with: npx convex run agent/keys:generate '{\"userId\":\"<you>\",\"name\":\"cli\"}'"
+      "Send header 'Authorization: Bearer <key>'. Create a key in JobKompass under Settings -> Command Line & AI Agents."
     );
   }
   const keyHash = await sha256Hex(key);

@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
-import { useMutation, useQuery } from "convex/react"
+import { useAction, useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check, Key, Copy, RefreshCw, Eye, EyeOff, Puzzle } from "lucide-react"
+import type { Id } from "@/convex/_generated/dataModel"
+import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check, Key, Copy, RefreshCw, Eye, EyeOff, Puzzle, Terminal, AlertTriangle } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,15 @@ export default function JkCW_SettingsMode() {
   const extensionApiKey = useQuery(api.extensionApiKeys.get, isAuthenticated ? {} : "skip")
   const generateApiKey = useMutation(api.extensionApiKeys.generate)
   const revokeApiKey = useMutation(api.extensionApiKeys.revoke)
+
+  // CLI / agent keys (hashed server-side — plaintext is shown once, at creation)
+  const cliKeys = useQuery(api.agent.keys.listMine, isAuthenticated ? {} : "skip")
+  const generateCliKey = useAction(api.agent.keys.generateMine)
+  const revokeCliKey = useMutation(api.agent.keys.revokeMine)
+  const [cliKeyName, setCliKeyName] = useState("")
+  const [freshCliKey, setFreshCliKey] = useState<string | null>(null)
+  const [isGeneratingCliKey, setIsGeneratingCliKey] = useState(false)
+  const [revokingCliKeyId, setRevokingCliKeyId] = useState<string | null>(null)
 
   // Gmail accounts
   const gmailAccounts = useQuery(api.emailAccounts.list, isAuthenticated ? {} : "skip")
@@ -296,6 +306,60 @@ export default function JkCW_SettingsMode() {
       await navigator.clipboard.writeText(extensionApiKey.key)
       toast.success('Copied!', {
         description: 'API key copied to clipboard',
+        duration: 2000,
+      })
+    } catch {
+      toast.error('Copy Failed', {
+        description: 'Could not copy to clipboard',
+        duration: 2000,
+      })
+    }
+  }
+
+  const handleGenerateCliKey = async () => {
+    setIsGeneratingCliKey(true)
+    try {
+      const result = await generateCliKey({ name: cliKeyName.trim() || undefined })
+      setFreshCliKey(result.key)
+      setCliKeyName("")
+      toast.success('CLI Key Created', {
+        description: 'Copy it now — it cannot be shown again.',
+        duration: 5000,
+      })
+    } catch (error) {
+      toast.error('Failed to Create Key', {
+        description: error instanceof Error ? error.message : 'Something went wrong',
+        duration: 3000,
+      })
+    } finally {
+      setIsGeneratingCliKey(false)
+    }
+  }
+
+  const handleRevokeCliKey = async (id: string) => {
+    setRevokingCliKeyId(id)
+    try {
+      await revokeCliKey({ id: id as Id<"agentApiKeys"> })
+      toast.success('Key Revoked', {
+        description: 'Any CLI or agent using that key is now locked out.',
+        duration: 3000,
+      })
+    } catch (error) {
+      toast.error('Failed to Revoke Key', {
+        description: error instanceof Error ? error.message : 'Something went wrong',
+        duration: 3000,
+      })
+    } finally {
+      setRevokingCliKeyId(null)
+    }
+  }
+
+  const handleCopyCliKey = async () => {
+    if (!freshCliKey) return
+    try {
+      await navigator.clipboard.writeText(freshCliKey)
+      toast.success('Copied!', {
+        description: 'CLI key copied to clipboard',
         duration: 2000,
       })
     } catch {
@@ -685,6 +749,121 @@ export default function JkCW_SettingsMode() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* CLI / AI Agent Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Terminal className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-lg font-semibold">Command Line &amp; AI Agents</h2>
+            </div>
+            <div className="pl-6 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                The <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">jk</code> CLI lets you
+                run your job search from the terminal — and lets an AI agent like Claude Code do it for you.
+                Create a key below, then connect it with <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">jk auth login</code>.
+              </p>
+
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Install
+                </p>
+                <code className="block text-sm font-mono">npm install -g jobkompass-cli</code>
+                <code className="block text-sm font-mono">jk auth login &lt;your-key&gt;</code>
+              </div>
+
+              {/* Freshly created key — shown exactly once */}
+              {freshCliKey && (
+                <div className="space-y-2 rounded-lg border-2 border-primary bg-primary/5 p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <p className="text-sm font-medium">
+                      Copy this key now. JobKompass only stores a hashed version, so it can never be shown again.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
+                    <Key className="h-4 w-4 text-primary flex-shrink-0" />
+                    <code className="flex-1 text-sm font-mono break-all">{freshCliKey}</code>
+                    <button
+                      onClick={handleCopyCliKey}
+                      className="p-1.5 hover:bg-muted rounded transition-colors flex-shrink-0"
+                      title="Copy to clipboard"
+                    >
+                      <Copy className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setFreshCliKey(null)}>
+                    I&apos;ve saved it
+                  </Button>
+                </div>
+              )}
+
+              {/* Existing keys */}
+              {cliKeys === undefined ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : cliKeys.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No CLI keys yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {cliKeys.map((key) => (
+                    <div
+                      key={key._id}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border border-border"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{key.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Created {new Date(key.createdAt).toLocaleDateString()}
+                          {key.lastUsedAt
+                            ? ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}`
+                            : " · Never used"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRevokeCliKey(key._id)}
+                        disabled={revokingCliKeyId === key._id}
+                        className="text-destructive hover:text-destructive flex-shrink-0"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        {revokingCliKeyId === key._id ? 'Revoking...' : 'Revoke'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Input
+                  value={cliKeyName}
+                  onChange={(e) => setCliKeyName(e.target.value)}
+                  placeholder="Key name (e.g., laptop, claude-code)"
+                  className="max-w-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleGenerateCliKey()
+                    }
+                  }}
+                />
+                <Button
+                  onClick={handleGenerateCliKey}
+                  disabled={isGeneratingCliKey}
+                  variant="outline"
+                  className="gap-2 flex-shrink-0"
+                >
+                  <Key className="h-4 w-4" />
+                  {isGeneratingCliKey ? 'Creating...' : 'Create CLI Key'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Name each key after where it lives, so you can revoke just that one later.
+                A revoked key stops working immediately.
+              </p>
             </div>
           </div>
 

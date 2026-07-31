@@ -451,6 +451,129 @@ const helpGuides: HelpGuide[] = [
       },
     ],
   },
+  {
+    id: 'cli',
+    title: 'CLI & AI Agents',
+    description: 'Run JobKompass from your terminal, or let an AI agent do it for you.',
+    icon: '⌨️',
+    sections: [
+      {
+        title: 'What Is the JobKompass CLI?',
+        type: 'text',
+        content: 'The jk command-line tool does everything the app does—add jobs, generate resumes and cover letters, save resources—without opening a browser. The real reason it exists: an AI coding agent like Claude Code, Cursor, or Codex can run these commands itself. You paste a job link into your agent and say "track this and tailor my resume," and it does the whole thing while you keep working.',
+      },
+      {
+        title: 'Why Use It',
+        type: 'list',
+        content: [
+          {
+            title: 'Your agent does the busywork',
+            description: 'Agents can already read job postings and write. What they could not do is save anything to your account. The CLI gives them that, so a job goes from link to tracked-and-tailored in one instruction.',
+          },
+          {
+            title: 'Batch instead of clicking',
+            description: 'Add ten jobs from a spreadsheet, re-tag a whole status column, or generate resumes for a list of roles in one pass.',
+          },
+          {
+            title: 'Built to be scripted',
+            description: 'Every command prints JSON when piped, so it drops straight into scripts and pipelines. Exit codes tell you whether a failure was your input (1) or the server (2).',
+          },
+          {
+            title: 'Nothing happens by surprise',
+            description: 'Deleting anything requires an explicit --yes flag, and the CLI never prompts. An agent cannot quietly wipe your data.',
+          },
+        ],
+      },
+      {
+        title: 'Setup',
+        type: 'steps',
+        content: [
+          {
+            description: 'Install it: npm install -g jobkompass-cli  (requires Node 18 or newer)',
+          },
+          {
+            description: 'Open Settings → Command Line & AI Agents and click "Create CLI Key." Copy it right then—only a hashed copy is stored, so it can never be shown again.',
+          },
+          {
+            description: 'Connect it: jk auth login <your-key>  (saved to ~/.config/jk/config.json)',
+          },
+          {
+            description: 'Check it works: jk jobs list — you should see the same jobs as My Jobs.',
+          },
+        ],
+      },
+      {
+        title: 'Everyday Commands',
+        type: 'list',
+        content: [
+          {
+            title: 'Track a job',
+            description: 'jk jobs add --company "Anthropic" --title "Engineer" --link "https://..." --status Interested',
+          },
+          {
+            title: 'See where things stand',
+            description: 'jk jobs list --status Applied',
+          },
+          {
+            title: 'Move a job forward',
+            description: 'jk jobs update --id <id> --status Interviewing --notes "phone screen Tue"',
+          },
+          {
+            title: 'Generate a tailored resume PDF',
+            description: 'jk resumes add --job-id <id> --name "Anthropic — Engineer"',
+          },
+          {
+            title: 'Save a link',
+            description: 'jk resources add --title "Salary guide" --url "https://..."',
+          },
+        ],
+      },
+      {
+        title: 'Pointing an AI Agent at It',
+        type: 'steps',
+        content: [
+          {
+            description: 'Install the CLI and run jk auth login in the same terminal your agent uses.',
+          },
+          {
+            description: 'Tell the agent to run jk schema once. That returns every command, parameter, and type as JSON—enough for it to use the CLI correctly without you explaining anything.',
+          },
+          {
+            description: 'Then just ask in plain language: "Add this posting to my jobs and tailor my resume for it." The agent picks the commands.',
+          },
+        ],
+      },
+      {
+        title: 'Keys & Safety',
+        type: 'tips',
+        content: [
+          {
+            description: 'A key gives full access to your JobKompass account. Treat it like a password—never paste one into a shared repo, issue, or chat.',
+          },
+          {
+            description: 'Name each key after where it lives (laptop, claude-code) so you can revoke just that one instead of all of them.',
+          },
+          {
+            description: 'Revoke anytime from Settings → Command Line & AI Agents. It stops working immediately.',
+          },
+          {
+            description: 'Lost a key? You cannot recover it—only the hash is stored. Revoke it and create a new one.',
+          },
+        ],
+      },
+      {
+        title: 'Get Your Key',
+        type: 'list',
+        content: [
+          {
+            title: 'Settings',
+            description: 'Create, name, and revoke CLI keys under Command Line & AI Agents.',
+            action: { label: 'Go to Settings', modeId: '/settings' },
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export function JkHelpProvider({ children }: { children: ReactNode }) {
