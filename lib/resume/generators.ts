@@ -3,28 +3,17 @@
  */
 
 import { generateJakeLatex } from './generateJakeLatex';
-import { generateVertexLatex } from './generateVertexLatex';
-import { generateMinimalLatex } from './generateMinimalLatex';
-import { generateExecutiveLatex } from './generateExecutiveLatex';
-import { generateMomentumLatex } from './generateMomentumLatex';
+import { generateMarLatex } from './generateMarLatex';
 import type { ResumeContent } from './types';
 
-export const RESUME_TEMPLATE_IDS = ['jake', 'vertex', 'minimal', 'executive', 'momentum'] as const;
+export const RESUME_TEMPLATE_IDS = ['jake', 'mar'] as const;
 
 export function generateResumeLatex(content: ResumeContent, templateId: string): string {
-  // Legacy: apex was replaced by vertex
-  const resolved = templateId === 'apex' ? 'vertex' : templateId;
-  switch (resolved) {
+  switch (templateId) {
     case 'jake':
       return generateJakeLatex(content as any);
-    case 'vertex':
-      return generateVertexLatex(content);
-    case 'minimal':
-      return generateMinimalLatex(content);
-    case 'executive':
-      return generateExecutiveLatex(content);
-    case 'momentum':
-      return generateMomentumLatex(content);
+    case 'mar':
+      return generateMarLatex(content);
     default:
       return generateJakeLatex(content as any);
   }

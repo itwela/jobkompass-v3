@@ -1,0 +1,65 @@
+%-------------------------
+% MAR - Calibri-style, trailing-rule section headings (JobKompass)
+% Reproduces the "Joseph Wilson" reference layout.
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[sfdefault]{carlito}   % Calibri-metric font
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{array}
+
+\geometry{top=0.5in, bottom=0.5in, left=0.6in, right=0.6in}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\raggedright
+
+% Thick rule, raised toward mid-cap height, that fills the rest of the line.
+\newcommand{\marrule}{\leavevmode\leaders\hrule height 3.2pt depth -2.1pt\hfill\kern0pt}
+
+% Section heading: bold uppercase text + trailing rule to the right margin.
+\newcommand{\marsection}[1]{%
+  \vspace{11pt}\par\noindent
+  {\large\bfseries\MakeUppercase{#1}}\hspace{8pt}\marrule%
+  \par\vspace{6pt}%
+}
+
+% Two-column header: #1 = name (big/bold), #2 = right-aligned contact lines (use \\ between lines).
+\newcommand{\marheader}[2]{%
+  \noindent
+  \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    {\Huge\bfseries #1} &
+    \begin{tabular}[b]{@{}r@{}} #2 \end{tabular} \\
+  \end{tabular*}%
+  \par\vspace{2pt}%
+}
+
+% Experience / education entry line: #1 title, #2 company, #3 right-aligned "Location (dates)".
+\newcommand{\marentry}[3]{%
+  \vspace{4pt}\noindent
+  \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    \textbf{#1 $|$ #2} & #3 \\
+  \end{tabular*}%
+  \par%
+}
+
+% Bulleted list for entry details.
+\newcommand{\marbullets}[1]{%
+  \begin{itemize}[leftmargin=1.6em, topsep=2pt, itemsep=1pt, parsep=0pt]
+  #1
+  \end{itemize}%
+}
+
+\begin{document}
+
+XXXMARBODYXXX
+
+\end{document}

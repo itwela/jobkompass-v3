@@ -12,6 +12,7 @@ export interface ResumeContentForJake {
         lastName?: string;
         citizenship?: string | null;
         email: string;
+        phone?: string | null;
         location?: string | null;
         linkedin?: string | null;
         github?: string | null;
@@ -50,6 +51,13 @@ export interface ResumeContentForJake {
         issuer?: string | null;
         date?: string | null;
         credentialId?: string | null;
+    }> | null;
+    coreCompetencies?: string[] | null;
+    earlyCareer?: Array<{
+        title: string;
+        company: string;
+        location?: string | null;
+        date: string;
     }> | null;
     additionalInfo?: {
         interests?: string[] | null;
@@ -92,7 +100,11 @@ export function generateJakeLatex(content: ResumeContentForJake): string {
     }
 
     contactParts.push(`\\href{mailto:${escapeLatex(content.personalInfo.email)}}{\\underline{${escapeLatex(content.personalInfo.email)}}}`);
-    
+
+    if (content.personalInfo.phone) {
+        contactParts.push(escapeLatex(content.personalInfo.phone));
+    }
+
     if (content.personalInfo.linkedin) {
         // Extract handle from URL - handle both full URLs and partial URLs
         let linkedinHandle = content.personalInfo.linkedin

@@ -15,6 +15,7 @@ export interface ResumeContent {
     lastName?: string;
     citizenship?: string | null;
     email: string;
+    phone?: string | null;
     location?: string | null;
     linkedin?: string | null;
     github?: string | null;
@@ -53,6 +54,15 @@ export interface ResumeContent {
     issuer?: string | null;
     date?: string | null;
     credentialId?: string | null;
+  }> | null;
+  /** Mar template only: pipe-separated core competencies list. */
+  coreCompetencies?: string[] | null;
+  /** Mar template only: compact early-career entries rendered without bullets. */
+  earlyCareer?: Array<{
+    title: string;
+    company: string;
+    location?: string | null;
+    date: string;
   }> | null;
   additionalInfo?: {
     interests?: string[] | null;

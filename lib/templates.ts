@@ -28,43 +28,13 @@ export const RESUME_TEMPLATES: Template[] = [
     freeResumeEligible: true,
   },
   {
-    id: 'vertex',
-    name: 'Vertex',
+    id: 'mar',
+    name: 'Mar',
     description:
-      'Clean single-column layout with accent headers. Professional and modern. Great for tech and creative roles.',
-    previewImage: '/images/jobkompass_preview_resume_jake.png',
-    tags: ['Professional', 'Clean', 'Modern'],
-    features: ['Single-column layout', 'Accent section headers', 'No blank page issues', 'Tech & design'],
-    freeResumeEligible: true,
-  },
-  {
-    id: 'minimal',
-    name: 'Minimal',
-    description:
-      'Ultra-clean single column with generous whitespace. Elegant and understated. Ideal for design, product, and senior roles.',
-    previewImage: '/images/jobkompass_preview_resume_jake.png',
-    tags: ['Clean', 'Elegant', 'Whitespace'],
-    features: ['Minimalist design', 'Easy to scan', 'Design-focused', 'Executive-ready'],
-    freeResumeEligible: true,
-  },
-  {
-    id: 'executive',
-    name: 'Executive',
-    description:
-      'Traditional serif typography with conservative structure. Timeless format for finance, law, and C-suite positions.',
-    previewImage: '/images/jobkompass_preview_resume_jake.png',
-    tags: ['Traditional', 'Serif', 'Formal'],
-    features: ['Classic typography', 'Conservative layout', 'Finance & law', 'Senior leadership'],
-    freeResumeEligible: true,
-  },
-  {
-    id: 'momentum',
-    name: 'Momentum',
-    description:
-      'Modern single column with blue accent bars. Startup-friendly and energetic. Great for product, growth, and tech roles.',
-    previewImage: '/images/jobkompass_preview_resume_jake.png',
-    tags: ['Modern', 'Accent Bars', 'Startup'],
-    features: ['Bold section headers', 'High-energy design', 'Product & growth', 'Tech startups'],
+      'Clean Calibri-style resume with bold section headings, a competencies-forward layout, and a merged education & development section. Great for experienced, multi-domain professionals.',
+    previewImage: '/images/jobkompass_preview_resume_mar.png',
+    tags: ['ATS-Friendly', 'Professional', 'Competencies'],
+    features: ['Calibri-style typography', 'Core competencies section', 'Early career summary', 'Merged education & development'],
     freeResumeEligible: true,
   },
 ];
@@ -110,7 +80,7 @@ export function isValidCoverLetterTemplateId(id: string): boolean {
 
 /** Templates available in the free resume generator. For now only Jake. */
 export function getFreeResumeTemplates(): Template[] {
-  return RESUME_TEMPLATES.filter((t) => t.id === 'jake');
+  return RESUME_TEMPLATES.filter((t) => t.id === 'jake' || t.id === 'mar');
   // vertex, minimal, executive, momentum - commented out for now
   // return RESUME_TEMPLATES.filter((t) => t.freeResumeEligible);
 }
