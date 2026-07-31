@@ -4,13 +4,14 @@ import { apiRequest, CliError } from "./client";
 import { emit } from "./output";
 import { resolveDate } from "./dates";
 import { configPath, deleteConfig, loadConfig, saveConfig } from "./config";
+import pkg from "../package.json";
 
 const program = new Command();
 program
   .name("jk")
   .description("Agent-first CLI for JobKompass. All output is JSON when piped; add --json to force it.")
   .option("--json", "Force JSON output")
-  .version("0.1.0");
+  .version(pkg.version);
 
 function coerceOpt(spec: OptSpec, raw: unknown): unknown {
   if (raw === undefined) return undefined;
