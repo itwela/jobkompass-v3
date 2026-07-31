@@ -18,9 +18,12 @@ Run your JobKompass job search from the terminal — or let an AI agent (Claude 
     jk jobs add --company "Anthropic" --title "Engineer" --link "https://..." --status Interested
     jk jobs list --status Applied
     jk jobs update --id <id> --status Interviewing --notes "phone screen Tue"
-    jk resumes add --job-id <id> --name "Anthropic — Engineer"
+    jk resumes add --personal-info '{"firstName":"Joseph","lastName":"Wilson","email":"j@x.com","phone":"555-123-4567"}' --experience '[...]'
+    jk resumes add --template mar --personal-info '{...}' --core-competencies '["Technical Support","Problem-Solving"]' --early-career '[{"title":"Process Engineer","company":"P&G","date":"2003 – 2007"}]'
     jk resumes list
     jk resources add --title "Salary guide" --url "https://..."
+
+Resume templates: `jake` (default) or `mar` (Calibri-style, competencies-forward — use `--core-competencies` and `--early-career`). Run `jk resumes add --help` for all fields.
 
 ## Keys
 A key carries full access to one account's data. Name each key after where it lives
