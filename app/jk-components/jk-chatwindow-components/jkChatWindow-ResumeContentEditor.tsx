@@ -18,6 +18,7 @@ type ResumeContent = {
         firstName: string;
         lastName: string;
         email: string;
+        phone?: string;
         location?: string;
         linkedin?: string;
         github?: string;
@@ -45,6 +46,13 @@ type ResumeContent = {
         technical: string[];
         additional?: string[];
     };
+    coreCompetencies?: string[];
+    earlyCareer?: Array<{
+        title: string;
+        company: string;
+        location?: string;
+        date: string;
+    }>;
     projects?: Array<{
         name: string;
         description: string;
@@ -85,6 +93,8 @@ const emptyContent: ResumeContent = {
         technical: [],
         additional: [],
     },
+    coreCompetencies: [],
+    earlyCareer: [],
     projects: [],
     certifications: [],
     additionalInfo: {
@@ -116,6 +126,7 @@ export default function JkCW_ResumeContentEditor({
     const [searchQuery, setSearchQuery] = useState("");
     const [technicalSkillsText, setTechnicalSkillsText] = useState("");
     const [additionalSkillsText, setAdditionalSkillsText] = useState("");
+    const [coreCompetenciesText, setCoreCompetenciesText] = useState("");
 
     // AI Button Component - Shows "coming soon" toast
     const AiButton = ({ position = "top-right" }: { position?: "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right" }) => {
@@ -239,6 +250,7 @@ export default function JkCW_ResumeContentEditor({
                 github: decodeString(parsedContent?.personalInfo?.github),
                 portfolio: decodeString(parsedContent?.personalInfo?.portfolio),
                 citizenship: decodeString(parsedContent?.personalInfo?.citizenship),
+                phone: decodeString(parsedContent?.personalInfo?.phone),
                 summary: decodeString(parsedContent?.personalInfo?.summary),
             },
             experience: normalizedExperience,
@@ -247,6 +259,13 @@ export default function JkCW_ResumeContentEditor({
                 technical: decodeStringArray(parsedContent?.skills?.technical),
                 additional: decodeStringArray(parsedContent?.skills?.additional),
             },
+            coreCompetencies: decodeStringArray(parsedContent?.coreCompetencies),
+            earlyCareer: (parsedContent?.earlyCareer || []).map((e: any) => ({
+                title: decodeString(e?.title),
+                company: decodeString(e?.company),
+                location: decodeString(e?.location),
+                date: decodeString(e?.date),
+            })),
             projects: normalizedProjects,
             certifications: normalizedCertifications,
             additionalInfo: {
@@ -273,12 +292,14 @@ export default function JkCW_ResumeContentEditor({
             setContent(normalized);
             setTechnicalSkillsText(normalized.skills.technical.join(", "));
             setAdditionalSkillsText(normalized.skills.additional?.join(", ") || "");
+            setCoreCompetenciesText(normalized.coreCompetencies?.join(", ") || "");
             hasLoadedRef.current = true;
         } else if (resume?.content) {
             const normalized = normalizeContent(resume.content);
             setContent(normalized);
             setTechnicalSkillsText(normalized.skills.technical.join(", "));
             setAdditionalSkillsText(normalized.skills.additional?.join(", ") || "");
+            setCoreCompetenciesText(normalized.coreCompetencies?.join(", ") || "");
             hasLoadedRef.current = true;
         }
     }, [resume, initialContent]);
@@ -292,6 +313,7 @@ export default function JkCW_ResumeContentEditor({
                     technical: technicalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
                     additional: additionalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
                 },
+                coreCompetencies: coreCompetenciesText.split(',').map(s => s.trim()).filter(Boolean),
             };
         }
     });
@@ -361,6 +383,8 @@ export default function JkCW_ResumeContentEditor({
                     technical: technicalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
                     additional: additionalSkillsText.split(',').map(s => s.trim()).filter(Boolean),
                 },
+                coreCompetencies: coreCompetenciesText.split(',').map(s => s.trim()).filter(Boolean),
+                earlyCareer: (content.earlyCareer || []).filter(e => (e.title || e.company || e.date)),
             };
             await updateResume({
                 resumeId,
@@ -418,6 +442,32 @@ export default function JkCW_ResumeContentEditor({
         setContent(prev => ({
             ...prev,
             experience: prev.experience.filter((_, i) => i !== index)
+        }));
+        setHasChanges(true);
+    };
+
+    const addEarlyCareer = () => {
+        setContent(prev => ({
+            ...prev,
+            earlyCareer: [...(prev.earlyCareer || []), { title: "", company: "", location: "", date: "" }]
+        }));
+        setHasChanges(true);
+    };
+
+    const updateEarlyCareer = (index: number, field: string, value: string) => {
+        setContent(prev => ({
+            ...prev,
+            earlyCareer: (prev.earlyCareer || []).map((e, i) =>
+                i === index ? { ...e, [field]: value } : e
+            )
+        }));
+        setHasChanges(true);
+    };
+
+    const removeEarlyCareer = (index: number) => {
+        setContent(prev => ({
+            ...prev,
+            earlyCareer: (prev.earlyCareer || []).filter((_, i) => i !== index)
         }));
         setHasChanges(true);
     };
@@ -685,6 +735,14 @@ export default function JkCW_ResumeContentEditor({
                                 />
                             </div>
                             <div>
+                                <label className="text-sm font-medium">Phone</label>
+                                <Input
+                                    value={content.personalInfo.phone || ""}
+                                    onChange={(e) => updatePersonalInfo("phone", e.target.value)}
+                                    placeholder="555-123-4567"
+                                />
+                            </div>
+                            <div>
                                 <label className="text-sm font-medium">Location</label>
                                 <Input
                                     value={content.personalInfo.location || ""}
@@ -723,6 +781,74 @@ export default function JkCW_ResumeContentEditor({
                                     onChange={(e) => updatePersonalInfo("citizenship", e.target.value)}
                                     placeholder="US Citizen"
                                 />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Mar Template Fields: Core Competencies + Early Career */}
+                <div className="border rounded-lg">
+                    <button
+                        onClick={() => toggleSection("marExtras")}
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                    >
+                        <div className="text-left">
+                            <h3 className="text-lg font-semibold">Core Competencies &amp; Early Career</h3>
+                            <p className="text-xs text-muted-foreground">Used by the Mar template</p>
+                        </div>
+                        {expandedSections.has("marExtras") ? (
+                            <ChevronUp className="h-5 w-5" />
+                        ) : (
+                            <ChevronDown className="h-5 w-5" />
+                        )}
+                    </button>
+                    {expandedSections.has("marExtras") && (
+                        <div className="p-4 space-y-4 border-t">
+                            <div>
+                                <label className="text-sm font-medium">Core Competencies</label>
+                                <p className="text-xs text-muted-foreground mb-1">Comma-separated; rendered as a pipe-separated list.</p>
+                                <Input
+                                    value={coreCompetenciesText}
+                                    onChange={(e) => { setCoreCompetenciesText(e.target.value); setHasChanges(true); }}
+                                    placeholder="Technical Support, Technical Documentation, Problem-Solving"
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium">Early Career Experience</label>
+                                {(content.earlyCareer || []).map((entry, index) => (
+                                    <div key={`early-${index}`} className="rounded-lg border p-3 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium text-muted-foreground">Entry #{index + 1}</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => removeEarlyCareer(index)}
+                                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">Title</label>
+                                            <Input value={entry.title} onChange={(ev) => updateEarlyCareer(index, "title", ev.target.value)} placeholder="Contract Process Engineer" />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">Company</label>
+                                            <Input value={entry.company} onChange={(ev) => updateEarlyCareer(index, "company", ev.target.value)} placeholder="Procter & Gamble" />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">Location</label>
+                                            <Input value={entry.location || ""} onChange={(ev) => updateEarlyCareer(index, "location", ev.target.value)} placeholder="Cincinnati, OH" />
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium">Dates</label>
+                                            <Input value={entry.date} onChange={(ev) => updateEarlyCareer(index, "date", ev.target.value)} placeholder="July 2003 – June 2007" />
+                                        </div>
+                                    </div>
+                                ))}
+                                <Button variant="outline" size="sm" onClick={addEarlyCareer} className="gap-1">
+                                    <Plus className="h-4 w-4" /> Add early career entry
+                                </Button>
                             </div>
                         </div>
                     )}
