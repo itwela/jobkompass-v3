@@ -24,7 +24,7 @@ import { api } from '@/convex/_generated/api';
 import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
 import JkFooter from '@/app/jk-components/jkFooter';
-import { getFreeResumeTemplates } from '@/lib/templates';
+import { getFreeResumeTemplates, getLockedFreeResumeTemplates } from '@/lib/templates';
 import { getModelsForFreeResume } from '@/lib/aiModels';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -41,6 +41,7 @@ import {
   Plus,
   Copy,
   ChevronDown,
+  Lock,
 } from 'lucide-react';
 import { COPY_TO_AI_OPTIONS, getCopyPromptForTemplate } from '@/lib/copyToAiPrompts';
 
@@ -378,6 +379,12 @@ export default function FreeResumeGeneratorPage() {
     setPdfBase64(null);
   };
 
+  const handleLockedTemplate = (templateName: string) => {
+    toast.info(`${templateName} is a premium template`, {
+      description: 'Subscribe to JobKompass to generate resumes with this design.',
+    });
+  };
+
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
@@ -648,6 +655,51 @@ export default function FreeResumeGeneratorPage() {
                           </div>
                           <div className="p-3 bg-background/95 backdrop-blur-sm flex-shrink-0 rounded-b-xl overflow-hidden">
                             <p className="font-medium text-sm truncate">{template.name}</p>
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {template.tags?.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.button>
+                      ))}
+                      {getLockedFreeResumeTemplates().map((template, index) => (
+                        <motion.button
+                          key={template.id}
+                          type="button"
+                          onClick={() => handleLockedTemplate(template.name)}
+                          className="relative flex flex-col flex-shrink-0 w-full max-w-[400px] h-full rounded-xl border-2 border-border overflow-hidden transition-colors duration-200 text-left group cursor-not-allowed"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.4, delay: 0.1 + (getFreeResumeTemplates().length + index) * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                        >
+                          <div className="flex-1 min-h-0 relative bg-muted/30 aspect-[3/4]">
+                            <Image
+                              src={template.previewImage}
+                              alt={template.name}
+                              fill
+                              className="object-cover object-top"
+                              sizes="280px"
+                            />
+                            <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2">
+                              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-foreground/90 text-background">
+                                <Lock className="h-5 w-5" />
+                              </div>
+                              <span className="px-2 py-1 rounded-full bg-foreground text-background text-[11px] font-semibold">
+                                Subscribe to use
+                              </span>
+                            </div>
+                          </div>
+                          <div className="p-3 bg-background/95 backdrop-blur-sm flex-shrink-0 rounded-b-xl overflow-hidden">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium text-sm truncate">{template.name}</p>
+                              <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
+                            </div>
                             <div className="flex flex-wrap gap-1 mt-1.5">
                               {template.tags?.map((tag) => (
                                 <span

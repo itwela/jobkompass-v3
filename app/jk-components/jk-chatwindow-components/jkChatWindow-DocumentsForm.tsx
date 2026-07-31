@@ -340,7 +340,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     fileName: storedFileName,
                     fileSize: storedFileSize,
                     content,
-                    template: "jake",
+                    template: editingTemplate || getDefaultResumeTemplateId(),
                     label: label || undefined,
                     tags: tags && tags.length > 0 ? tags : undefined,
                 });
@@ -404,7 +404,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
             const exportTid = setTimeout(() => exportCtrl.abort(), CLIENT_EXPORT_TIMEOUT_MS);
             let exportRes: Response;
             try {
-                exportRes = await fetch("/api/resume/export/jake", {
+                exportRes = await fetch(`/api/resume/export/${editingTemplate || getDefaultResumeTemplateId()}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ content }),
@@ -448,7 +448,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 fileName: pdfFileName,
                 fileSize: pdfBlob.size,
                 content,
-                template: "jake",
+                template: editingTemplate || getDefaultResumeTemplateId(),
                 label: label || undefined,
                 tags: tags && tags.length > 0 ? tags : undefined,
             });

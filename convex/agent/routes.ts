@@ -95,16 +95,19 @@ export const agentRoutes: AgentRoute[] = [
   {
     method: "POST", path: "/agent/resumes/generate", fn: internal.agent.fns.resumesGenerate, kind: "action",
     params: [
-      { name: "personalInfo", type: "json", required: true, description: '{"firstName","lastName","email","citizenship"?,"location"?,"linkedin"?,"github"?,"portfolio"?,"summary"?}' },
+      { name: "personalInfo", type: "json", required: true, description: '{"firstName","lastName","email","phone"?,"citizenship"?,"location"?,"linkedin"?,"github"?,"portfolio"?,"summary"?}' },
       { name: "education", type: "json", description: "Array of {name,degree,field?,location?,startDate?,endDate,details?}" },
       { name: "experience", type: "json", description: "Array of {company,title,location?,date,details}" },
       { name: "projects", type: "json", description: "Array of {name,description,date?,technologies?,details?}" },
       { name: "skills", type: "json", description: '{"technical":[...],"additional"?:[...]}' },
       { name: "certifications", type: "json", description: "Array of {name,issuer?,date?,credentialId?}" },
+      { name: "coreCompetencies", type: "json", description: 'Mar template only: ["Technical Support","Problem-Solving",...]' },
+      { name: "earlyCareer", type: "json", description: "Mar template only: Array of {title,company,location?,date}" },
       { name: "additionalInfo", type: "json", description: '{"languages"?:[...],"references"?}' },
       { name: "targetCompany", type: "string", description: "Included in the saved resume's name" },
+      { name: "template", type: "string", description: 'Template id: "jake" (default) or "mar"' },
     ],
-    description: "Generate a resume PDF using the Jake template and save it to the user's documents",
+    description: "Generate a resume PDF (template: jake or mar) and save it to the user's documents",
   },
   {
     method: "PATCH", path: "/agent/resumes", fn: internal.agent.fns.resumesRename, kind: "mutation",

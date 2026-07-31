@@ -245,8 +245,11 @@ export const resumesGenerate = internalAction({
     projects: v.optional(v.any()),
     skills: v.optional(v.any()),
     certifications: v.optional(v.any()),
+    coreCompetencies: v.optional(v.any()),
+    earlyCareer: v.optional(v.any()),
     additionalInfo: v.optional(v.any()),
     targetCompany: v.optional(v.string()),
+    template: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null }> => {
     const canGenerate = await ctx.runQuery(internal.agent.fns.resumesCanGenerate, { userId: args.userId });
@@ -266,11 +269,14 @@ export const resumesGenerate = internalAction({
       projects: args.projects ?? [],
       skills: args.skills ?? null,
       certifications: args.certifications ?? [],
+      coreCompetencies: args.coreCompetencies ?? null,
+      earlyCareer: args.earlyCareer ?? null,
       additionalInfo: args.additionalInfo ?? null,
     };
 
+    const template = args.template || "jake";
     const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/jake`, {
+    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${template}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
@@ -304,7 +310,7 @@ export const resumesGenerate = internalAction({
       fileName,
       fileSize: pdfBlob.size,
       content,
-      template: "jake",
+      template,
     });
 
     return { id, name, fileUrl };

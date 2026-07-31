@@ -35,7 +35,7 @@ export const RESUME_TEMPLATES: Template[] = [
     previewImage: '/images/jobkompass_preview_resume_mar.png',
     tags: ['ATS-Friendly', 'Professional', 'Competencies'],
     features: ['Calibri-style typography', 'Core competencies section', 'Early career summary', 'Merged education & development'],
-    freeResumeEligible: true,
+    freeResumeEligible: false,
   },
 ];
 
@@ -80,9 +80,12 @@ export function isValidCoverLetterTemplateId(id: string): boolean {
 
 /** Templates available in the free resume generator. For now only Jake. */
 export function getFreeResumeTemplates(): Template[] {
-  return RESUME_TEMPLATES.filter((t) => t.id === 'jake' || t.id === 'mar');
-  // vertex, minimal, executive, momentum - commented out for now
-  // return RESUME_TEMPLATES.filter((t) => t.freeResumeEligible);
+  return RESUME_TEMPLATES.filter((t) => t.freeResumeEligible);
+}
+
+/** Templates shown in the free generator but locked behind a subscription (preview only). */
+export function getLockedFreeResumeTemplates(): Template[] {
+  return RESUME_TEMPLATES.filter((t) => !t.freeResumeEligible);
 }
 
 /** Templates available only in the app (authenticated) */

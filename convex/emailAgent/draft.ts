@@ -51,7 +51,7 @@ export const tailorResumeOnly = internalAction({
       }
 
       const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-      const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/jake`, {
+      const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${baseResume.template || "jake"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: tailored }),
@@ -125,7 +125,7 @@ export const draftForLead = internalAction({
           // is NOT bundled into the Convex deployment, so generateResumeLatex + a raw
           // LaTeX-service call can never work from here.
           const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-          const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/jake`, {
+          const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${baseResume.template || "jake"}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content: tailored }),
