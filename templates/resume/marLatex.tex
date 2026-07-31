@@ -51,6 +51,21 @@
   \par%
 }
 
+% Single-title entry line (no company): #1 bold title, #2 right-aligned meta.
+% Used for projects and for certifications that carry no issuer.
+\newcommand{\marsimpleentry}[2]{%
+  \vspace{4pt}\noindent
+  \begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    \textbf{#1} & #2 \\
+  \end{tabular*}%
+  \par%
+}
+
+% Wrapping description line under a project entry.
+\newcommand{\mardesc}[1]{%
+  \noindent #1\par%
+}
+
 % Bulleted list for entry details.
 \newcommand{\marbullets}[1]{%
   \begin{itemize}[leftmargin=1.6em, topsep=2pt, itemsep=1pt, parsep=0pt]
