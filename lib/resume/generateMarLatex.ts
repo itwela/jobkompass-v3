@@ -37,7 +37,7 @@ function marContactLines(content: ResumeContent): string {
     extra.push(`\\href{${e(url)}}{${e(display)}}`);
   }
 
-  const lines = [line1.join('\\hspace{18pt}'), line2.join(' $|$ '), ...extra].filter((l) => l.trim());
+  const lines = [line1.join('\\hspace{8pt}'), line2.join(' $|$ '), ...extra].filter((l) => l.trim());
   return lines.join(' \\\\ ');
 }
 
