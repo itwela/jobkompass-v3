@@ -93,11 +93,15 @@ export function getAppOnlyResumeTemplates(): Template[] {
   return RESUME_TEMPLATES.filter((t) => !t.freeResumeEligible);
 }
 
-/** Templates shown as options in the app (context panel, My Jobs gen, etc.). For now only Jake. */
+/**
+ * Templates shown as options in the app (context panel, My Jobs gen, Documents form).
+ * Explicit allowlist so a half-finished template can't leak into the picker just by
+ * being added to RESUME_TEMPLATES.
+ */
+const APP_SELECTABLE_TEMPLATE_IDS = ['jake', 'joseph'];
+
 export function getAppResumeTemplateOptions(): Template[] {
-  return RESUME_TEMPLATES.filter((t) => t.id === 'jake');
-  // vertex, minimal, executive, momentum - commented out for now
-  // return RESUME_TEMPLATES;
+  return RESUME_TEMPLATES.filter((t) => APP_SELECTABLE_TEMPLATE_IDS.includes(t.id));
 }
 
 /** API route for exporting a resume by template ID */
