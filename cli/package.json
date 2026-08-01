@@ -1,6 +1,6 @@
 {
   "name": "jobkompass-cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Agent-first CLI for JobKompass — run your job search from the terminal, or let an AI agent run it for you.",
   "license": "MIT",
   "type": "module",
