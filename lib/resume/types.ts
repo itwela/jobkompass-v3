@@ -55,9 +55,9 @@ export interface ResumeContent {
     date?: string | null;
     credentialId?: string | null;
   }> | null;
-  /** Mar template only: pipe-separated core competencies list. */
+  /** Joseph template only: pipe-separated core competencies list. */
   coreCompetencies?: string[] | null;
-  /** Mar template only: compact early-career entries rendered without bullets. */
+  /** Joseph template only: compact early-career entries rendered without bullets. */
   earlyCareer?: Array<{
     title: string;
     company: string;

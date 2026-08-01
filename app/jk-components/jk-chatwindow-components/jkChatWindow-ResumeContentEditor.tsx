@@ -786,23 +786,23 @@ export default function JkCW_ResumeContentEditor({
                     )}
                 </div>
 
-                {/* Mar Template Fields: Core Competencies + Early Career */}
+                {/* Joseph Template Fields: Core Competencies + Early Career */}
                 <div className="border rounded-lg">
                     <button
-                        onClick={() => toggleSection("marExtras")}
+                        onClick={() => toggleSection("josephExtras")}
                         className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
                     >
                         <div className="text-left">
                             <h3 className="text-lg font-semibold">Core Competencies &amp; Early Career</h3>
-                            <p className="text-xs text-muted-foreground">Used by the Mar template</p>
+                            <p className="text-xs text-muted-foreground">Used by the Joseph template</p>
                         </div>
-                        {expandedSections.has("marExtras") ? (
+                        {expandedSections.has("josephExtras") ? (
                             <ChevronUp className="h-5 w-5" />
                         ) : (
                             <ChevronDown className="h-5 w-5" />
                         )}
                     </button>
-                    {expandedSections.has("marExtras") && (
+                    {expandedSections.has("josephExtras") && (
                         <div className="p-4 space-y-4 border-t">
                             <div>
                                 <label className="text-sm font-medium">Core Competencies</label>

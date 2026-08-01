@@ -18,7 +18,7 @@ export async function POST(
     const { templateId } = await params;
     if (!templateId || !isValidResumeTemplateId(templateId)) {
       return NextResponse.json(
-        { error: `Invalid template: ${templateId}. Valid: jake, mar` },
+        { error: `Invalid template: ${templateId}. Valid: jake, joseph` },
         { status: 400 }
       );
     }

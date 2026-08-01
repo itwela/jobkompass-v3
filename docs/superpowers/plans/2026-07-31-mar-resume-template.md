@@ -1,3 +1,5 @@
+> **Note (Aug 1 2026): this template was renamed from `mar` / "Mar" to `joseph` / "Joseph".** File names, LaTeX macros (`\mar*` → `\joseph*`), and the template id all changed; the old `mar` id still resolves for previously-saved resumes. The text below is the original historical record and uses the old name.
+
 # Mar Resume Template Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

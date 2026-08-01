@@ -28,11 +28,11 @@ export const RESUME_TEMPLATES: Template[] = [
     freeResumeEligible: true,
   },
   {
-    id: 'mar',
-    name: 'Mar',
+    id: 'joseph',
+    name: 'Joseph',
     description:
       'Clean Calibri-style resume with bold section headings, a competencies-forward layout, and a merged education & development section. Great for experienced, multi-domain professionals.',
-    previewImage: '/images/jobkompass_preview_resume_mar.png',
+    previewImage: '/images/jobkompass_preview_resume_joseph.png',
     tags: ['ATS-Friendly', 'Professional', 'Competencies'],
     features: ['Calibri-style typography', 'Core competencies section', 'Early career summary', 'Merged education & development'],
     freeResumeEligible: false,

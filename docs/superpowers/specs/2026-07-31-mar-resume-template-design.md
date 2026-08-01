@@ -1,3 +1,5 @@
+> **Note (Aug 1 2026): this template was renamed from `mar` / "Mar" to `joseph` / "Joseph".** File names, LaTeX macros (`\mar*` → `\joseph*`), and the template id all changed; the old `mar` id still resolves for previously-saved resumes. The text below is the original historical record and uses the old name.
+
 # Mar Resume Template — Design
 
 **Date:** 2026-07-31

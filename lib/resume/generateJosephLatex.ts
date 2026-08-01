@@ -3,7 +3,7 @@ import path from 'path';
 import { ResumeContent, escapeLatex, getFullName } from './types';
 
 /** Build the right-aligned header contact block (each line separated by \\). */
-function marContactLines(content: ResumeContent): string {
+function josephContactLines(content: ResumeContent): string {
   const e = escapeLatex;
   const p = content.personalInfo;
   // Location and citizenship share the top line, separated by a wide gap.
@@ -42,7 +42,7 @@ function marContactLines(content: ResumeContent): string {
 }
 
 /** Right-aligned "Location (dates)" meta for an entry line. */
-function marRightMeta(location?: string | null, date?: string | null): string {
+function josephRightMeta(location?: string | null, date?: string | null): string {
   const e = escapeLatex;
   const loc = location ? e(location) : '';
   const dt = date ? e(date) : '';
@@ -50,8 +50,8 @@ function marRightMeta(location?: string | null, date?: string | null): string {
   return loc || dt;
 }
 
-export function generateMarLatex(content: ResumeContent): string {
-  const templatePath = path.join(process.cwd(), 'templates/resume/marLatex.tex');
+export function generateJosephLatex(content: ResumeContent): string {
+  const templatePath = path.join(process.cwd(), 'templates/resume/josephLatex.tex');
   if (!fs.existsSync(templatePath)) throw new Error(`Template not found: ${templatePath}`);
   let tex = fs.readFileSync(templatePath, 'utf-8');
 
@@ -60,11 +60,11 @@ export function generateMarLatex(content: ResumeContent): string {
   const sections: string[] = [];
 
   // Header
-  sections.push(`\\marheader{${e(fullName)}}{${marContactLines(content)}}`);
+  sections.push(`\\josephheader{${e(fullName)}}{${josephContactLines(content)}}`);
 
   // Profile Summary
   if (content.personalInfo.summary && content.personalInfo.summary.trim()) {
-    sections.push(`\\marsection{Profile Summary}\n${e(content.personalInfo.summary)}`);
+    sections.push(`\\josephsection{Profile Summary}\n${e(content.personalInfo.summary)}`);
   }
 
   // Core Competencies (pipe list) + Technical Skills (bullets)
@@ -72,11 +72,11 @@ export function generateMarLatex(content: ResumeContent): string {
   const tech = (content.skills?.technical || []).filter((s) => s && s.trim());
   const extraSkills = (content.skills?.additional || []).filter((s) => s && s.trim());
   if (comps.length || tech.length || extraSkills.length) {
-    let block = `\\marsection{Core Competencies}`;
+    let block = `\\josephsection{Core Competencies}`;
     if (comps.length) block += `\n${comps.map((c) => e(c)).join(' $|$ ')}`;
     if (tech.length) {
       const items = tech.map((s) => `  \\item ${e(s)}`).join('\n');
-      block += `\n\n\\vspace{4pt}\\noindent\\textbf{Technical Skills:}\n\\marbullets{\n${items}\n}`;
+      block += `\n\n\\vspace{4pt}\\noindent\\textbf{Technical Skills:}\n\\josephbullets{\n${items}\n}`;
     }
     if (extraSkills.length) {
       block += `\n\n\\vspace{4pt}\\noindent\\textbf{Additional Skills:}\n${extraSkills.map((s) => e(s)).join(' $|$ ')}`;
@@ -89,17 +89,17 @@ export function generateMarLatex(content: ResumeContent): string {
   if (exp.length) {
     const entries = exp
       .map((x) => {
-        const meta = marRightMeta(x.location, x.date);
-        let entry = `\\marentry{${e(x.title)}}{${e(x.company)}}{${meta}}`;
+        const meta = josephRightMeta(x.location, x.date);
+        let entry = `\\josephentry{${e(x.title)}}{${e(x.company)}}{${meta}}`;
         const bullets = (x.details || []).filter((d) => typeof d === 'string' && d.trim());
         if (bullets.length) {
           const items = bullets.map((b) => `  \\item ${e(b)}`).join('\n');
-          entry += `\n\\marbullets{\n${items}\n}`;
+          entry += `\n\\josephbullets{\n${items}\n}`;
         }
         return entry;
       })
       .join('\n');
-    sections.push(`\\marsection{Professional Experience}\n${entries}`);
+    sections.push(`\\josephsection{Professional Experience}\n${entries}`);
   }
 
   // Key Projects
@@ -107,9 +107,9 @@ export function generateMarLatex(content: ResumeContent): string {
   if (projects.length) {
     const entries = projects
       .map((p) => {
-        let entry = `\\marsimpleentry{${e(p.name)}}{${p.date ? e(p.date) : ''}}`;
+        let entry = `\\josephsimpleentry{${e(p.name)}}{${p.date ? e(p.date) : ''}}`;
         if (p.description && p.description.trim()) {
-          entry += `\n\\mardesc{${e(p.description)}}`;
+          entry += `\n\\josephdesc{${e(p.description)}}`;
         }
         const bullets = (p.details || []).filter((d) => typeof d === 'string' && d.trim());
         const tech = (p.technologies || []).filter((t) => t && t.trim());
@@ -117,20 +117,20 @@ export function generateMarLatex(content: ResumeContent): string {
         if (tech.length) {
           items.push(`  \\item \\textbf{Technologies:} ${tech.map((t) => e(t)).join(', ')}`);
         }
-        if (items.length) entry += `\n\\marbullets{\n${items.join('\n')}\n}`;
+        if (items.length) entry += `\n\\josephbullets{\n${items.join('\n')}\n}`;
         return entry;
       })
       .join('\n');
-    sections.push(`\\marsection{Key Projects}\n${entries}`);
+    sections.push(`\\josephsection{Key Projects}\n${entries}`);
   }
 
   // Early Career Experience (no bullets)
   const early = (content.earlyCareer || []).filter((x) => x && (x.title || x.company));
   if (early.length) {
     const entries = early
-      .map((x) => `\\marentry{${e(x.title)}}{${e(x.company)}}{${marRightMeta(x.location, x.date)}}`)
+      .map((x) => `\\josephentry{${e(x.title)}}{${e(x.company)}}{${josephRightMeta(x.location, x.date)}}`)
       .join('\n');
-    sections.push(`\\marsection{Early Career Experience}\n${entries}`);
+    sections.push(`\\josephsection{Early Career Experience}\n${entries}`);
   }
 
   // Education and Professional Development (education + certifications merged)
@@ -147,10 +147,10 @@ export function generateMarLatex(content: ResumeContent): string {
         ed.degree.toLowerCase().includes(ed.field.trim().toLowerCase());
       const deg = fieldIsRedundant ? e(ed.degree) : `${e(ed.degree)} in ${e(ed.field!)}`;
       const dates = ed.startDate ? `${e(ed.startDate)} -- ${e(ed.endDate)}` : e(ed.endDate || '');
-      parts.push(`\\marentry{${deg}}{${e(ed.name)}}{${marRightMeta(ed.location, dates)}}`);
+      parts.push(`\\josephentry{${deg}}{${e(ed.name)}}{${josephRightMeta(ed.location, dates)}}`);
       const bullets = (ed.details || []).filter((d) => typeof d === 'string' && d.trim());
       if (bullets.length) {
-        parts.push(`\\marbullets{\n${bullets.map((b) => `  \\item ${e(b)}`).join('\n')}\n}`);
+        parts.push(`\\josephbullets{\n${bullets.map((b) => `  \\item ${e(b)}`).join('\n')}\n}`);
       }
     }
     for (const c of certs) {
@@ -159,13 +159,13 @@ export function generateMarLatex(content: ResumeContent): string {
       const date = c.date ? e(c.date) : '';
       parts.push(
         c.issuer && c.issuer.trim()
-          ? `\\marentry{${e(c.name)}}{${e(c.issuer)}}{${date}}`
-          : `\\marsimpleentry{${e(c.name)}}{${date}}`
+          ? `\\josephentry{${e(c.name)}}{${e(c.issuer)}}{${date}}`
+          : `\\josephsimpleentry{${e(c.name)}}{${date}}`
       );
     }
-    sections.push(`\\marsection{Education and Professional Development}\n${parts.join('\n')}`);
+    sections.push(`\\josephsection{Education and Professional Development}\n${parts.join('\n')}`);
   }
 
-  tex = tex.replace('XXXMARBODYXXX', sections.join('\n\n'));
+  tex = tex.replace('XXXJOSEPHBODYXXX', sections.join('\n\n'));
   return tex;
 }
