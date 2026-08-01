@@ -29,7 +29,7 @@ export const RESUME_TEMPLATES: Template[] = [
   },
   {
     id: 'joseph',
-    name: 'Joseph',
+    name: 'JobKompass Joseph',
     description:
       'Clean Calibri-style resume with bold section headings, a competencies-forward layout, and a merged education & development section. Great for experienced, multi-domain professionals.',
     previewImage: '/images/jobkompass_preview_resume_joseph.png',
