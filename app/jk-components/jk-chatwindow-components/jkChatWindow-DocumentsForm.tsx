@@ -9,7 +9,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
@@ -22,6 +22,7 @@ import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEdit
 import { toast } from "@/lib/toast";
 import { buildResumeContentFromPastedText } from "@/lib/resume/contentFromPastedText";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { resolveBaseResumeId, sortDocuments } from "@/lib/documents/sortDocuments";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -112,6 +113,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const markResumeAsSeen = useMutation(api.documents.markResumeAsSeen);
     const markCoverLetterAsSeen = useMutation(api.documents.markCoverLetterAsSeen);
     const setBaseResume = useMutation(api.documents.setBaseResume);
+    const toggleFavorite = useMutation(api.documents.toggleFavorite);
     const [settingBaseId, setSettingBaseId] = useState<string | null>(null);
 
     const handleSetBaseResume = async (resumeId: string, event: React.MouseEvent) => {
@@ -599,18 +601,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const hasDocuments = allDocuments.length > 0;
 
     // The base resume is the one the email agent tailors from for job leads
-    // (resumes.isActive === true). If several are flagged, the most recently updated
-    // wins so the displayed base is deterministic even before setBaseResume heals it.
-    const baseResumeId = (() => {
-        const activeResumes = allDocuments.filter(
-            (doc: any) => (doc.documentType || "resume") === "resume" && doc?.isActive
-        );
-        if (activeResumes.length === 0) return null;
-        const winner = activeResumes.reduce((best: any, cur: any) =>
-            (cur?.updatedAt ?? 0) > (best?.updatedAt ?? 0) ? cur : best
-        );
-        return String(winner?._id ?? winner?.id);
-    })();
+    // (resumes.isActive === true). Ordering logic lives in lib/documents/sortDocuments.ts.
+    const baseResumeId = resolveBaseResumeId(allDocuments);
 
     // Filter documents by type and search term
     const filteredDocuments = allDocuments.filter((doc: any) => {
@@ -629,14 +621,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         return title.includes(search) || role.includes(search) || label.includes(search) || tags.includes(search);
     });
 
-    // Base resume always renders first (order of everything else preserved).
-    if (baseResumeId) {
-        filteredDocuments.sort((a: any, b: any) => {
-            const aBase = String(a?._id ?? a?.id) === baseResumeId ? 0 : 1;
-            const bBase = String(b?._id ?? b?.id) === baseResumeId ? 0 : 1;
-            return aBase - bBase;
-        });
-    }
+    // Base resume → favorites → regulars.
+    const orderedDocuments = sortDocuments(filteredDocuments, baseResumeId);
 
 
     if (isLoading) {
@@ -1125,7 +1111,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
-                    {filteredDocuments.map((doc: any, index: number) => {
+                    {orderedDocuments.map((doc: any, index: number) => {
                         const resume = doc;
                         const documentType = doc.documentType || "resume";
                         const resumeId = String(resume?._id ?? resume?.id ?? `resume-${index}`);
@@ -1162,6 +1148,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
 
                         // The base resume feeding job leads (resumes.isActive === true)
                         const isBaseResume = documentType === "resume" && baseResumeId != null && resumeId === baseResumeId;
+                        const isFavorite = Boolean(resume?.isFavorite);
 
                         return (
                             <BlurFade key={resumeId} delay={0.0618 + index * 0.05} inView>
@@ -1182,6 +1169,8 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 min-w-0 overflow-hidden",
                                     !selectionMode && isNew && "border-primary border-2",
                                     selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200",
+                                    // Favorite: blue border, but base resume still wins
+                                    isFavorite && !isBaseResume && "border-blue-500 border-2",
                                     // Base resume treatment wins over new/selected styling
                                     isBaseResume && "border-amber-400 border-2 ring-1 ring-amber-300 hover:border-amber-400"
                                 )}
@@ -1216,6 +1205,32 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             </div>
                                         </div>
                                     )}
+                                    {/* Favorite toggle — bottom-right so it clears the
+                                        type badge (top-right) and job count (top-left) */}
+                                    <button
+                                        type="button"
+                                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                                        aria-pressed={isFavorite}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            void toggleFavorite({
+                                                documentId: resumeId,
+                                                documentType,
+                                            }).catch(() => {
+                                                toast.error("Could not update favorite. Please try again.");
+                                            });
+                                        }}
+                                        className="absolute bottom-2 right-2 z-10 rounded-full bg-white/90 p-1.5 shadow-sm transition-colors hover:bg-white"
+                                    >
+                                        <Star
+                                            className={cn(
+                                                "h-3.5 w-3.5",
+                                                isFavorite
+                                                    ? "fill-blue-500 text-blue-500"
+                                                    : "text-muted-foreground"
+                                            )}
+                                        />
+                                    </button>
                                 </div>
 
                                 <div className="flex min-w-0 flex-1 flex-col gap-2 sm:gap-3">
