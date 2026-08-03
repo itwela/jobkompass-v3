@@ -53,6 +53,13 @@ type ResumeContent = {
         location?: string;
         date: string;
     }>;
+    internships?: Array<{
+        company: string;
+        title: string;
+        date: string;
+        details?: string[];
+        location?: string;
+    }>;
     projects?: Array<{
         name: string;
         description: string;
@@ -95,6 +102,7 @@ const emptyContent: ResumeContent = {
     },
     coreCompetencies: [],
     earlyCareer: [],
+    internships: [],
     projects: [],
     certifications: [],
     additionalInfo: {
@@ -211,6 +219,14 @@ export default function JkCW_ResumeContentEditor({
             details: decodeStringArray(exp?.details),
             location: decodeString(exp?.location),
         }));
+
+        const normalizedInternships = (parsedContent?.internships || []).map((exp: any) => ({
+            company: decodeString(exp?.company),
+            title: decodeString(exp?.title),
+            date: decodeString(exp?.date),
+            details: decodeStringArray(exp?.details),
+            location: decodeString(exp?.location),
+        }));
         
         // Normalize and decode education entries
         const normalizedEducation = (parsedContent?.education || []).map((edu: any) => ({
@@ -266,6 +282,7 @@ export default function JkCW_ResumeContentEditor({
                 location: decodeString(e?.location),
                 date: decodeString(e?.date),
             })),
+            internships: normalizedInternships,
             projects: normalizedProjects,
             certifications: normalizedCertifications,
             additionalInfo: {
@@ -385,6 +402,9 @@ export default function JkCW_ResumeContentEditor({
                 },
                 coreCompetencies: coreCompetenciesText.split(',').map(s => s.trim()).filter(Boolean),
                 earlyCareer: (content.earlyCareer || []).filter(e => (e.title || e.company || e.date)),
+                internships: (content.internships || [])
+                    .filter(i => (i.title || i.company || i.date))
+                    .map(i => ({ ...i, details: i.details?.filter(d => d.trim() !== "") })),
             };
             await updateResume({
                 resumeId,
@@ -468,6 +488,32 @@ export default function JkCW_ResumeContentEditor({
         setContent(prev => ({
             ...prev,
             earlyCareer: (prev.earlyCareer || []).filter((_, i) => i !== index)
+        }));
+        setHasChanges(true);
+    };
+
+    const addInternship = () => {
+        setContent(prev => ({
+            ...prev,
+            internships: [...(prev.internships || []), { company: "", title: "", date: "", location: "", details: [] }]
+        }));
+        setHasChanges(true);
+    };
+
+    const updateInternship = (index: number, field: string, value: string | string[]) => {
+        setContent(prev => ({
+            ...prev,
+            internships: (prev.internships || []).map((it, i) =>
+                i === index ? { ...it, [field]: value } : it
+            )
+        }));
+        setHasChanges(true);
+    };
+
+    const removeInternship = (index: number) => {
+        setContent(prev => ({
+            ...prev,
+            internships: (prev.internships || []).filter((_, i) => i !== index)
         }));
         setHasChanges(true);
     };
@@ -948,6 +994,95 @@ export default function JkCW_ResumeContentEditor({
                             >
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Experience
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Internships Section (Mar template) */}
+                <div className="border rounded-lg">
+                    <button
+                        onClick={() => toggleSection("internships")}
+                        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                    >
+                        <div className="text-left">
+                            <h3 className="text-lg font-semibold">Internships</h3>
+                            <p className="text-xs text-muted-foreground">Used by the Mar template</p>
+                        </div>
+                        {expandedSections.has("internships") ? (
+                            <ChevronUp className="h-5 w-5" />
+                        ) : (
+                            <ChevronDown className="h-5 w-5" />
+                        )}
+                    </button>
+                    {expandedSections.has("internships") && (
+                        <div className="p-4 space-y-4 border-t">
+                            {(content.internships || []).map((intern, index) => (
+                                <div key={`intern-${index}`} className="space-y-3 pb-4 border-b last:border-b-0">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-muted-foreground">
+                                            Internship #{index + 1}
+                                        </span>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeInternship(index)}
+                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium">Company</label>
+                                        <Input
+                                            value={intern.company}
+                                            onChange={(e) => updateInternship(index, "company", e.target.value)}
+                                            placeholder="Acme Corp"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium">Title</label>
+                                        <Input
+                                            value={intern.title}
+                                            onChange={(e) => updateInternship(index, "title", e.target.value)}
+                                            placeholder="Information Security Engineer Intern"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium">Date</label>
+                                        <Input
+                                            value={intern.date}
+                                            onChange={(e) => updateInternship(index, "date", e.target.value)}
+                                            placeholder="Jan 2025 - Apr 2025"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium">Location</label>
+                                        <Input
+                                            value={intern.location || ""}
+                                            onChange={(e) => updateInternship(index, "location", e.target.value)}
+                                            placeholder="Remote"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium">Details (press Enter for a new bullet)</label>
+                                        <Textarea
+                                            value={intern.details?.join("\n") || ""}
+                                            onChange={(e) => updateInternship(index, "details", e.target.value.split('\n'))}
+                                            placeholder="Performed risk assessments on 25-50 systems...&#10;Contributed to updating antivirus definitions across 50+ endpoints..."
+                                            rows={4}
+                                            showBorder
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                            <Button
+                                onClick={addInternship}
+                                variant="outline"
+                                className="w-full"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Internship
                             </Button>
                         </div>
                     )}

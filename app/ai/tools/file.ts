@@ -44,7 +44,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
 
  const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
    name: 'createResumeJakeTemplate',
-   description: 'Generate a professional resume. Two templates are available: "jake" (default, tech-focused) and "joseph" (Calibri-style, competencies-forward). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents.',
+   description: 'Generate a professional resume. Three templates are available: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward) and "mar" (Times serif, centered header, categorized skills, separate internships section). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents.',
    parameters: z.object({
     personalInfo: z.object({
       firstName: z.string().describe('First name of the person'),
@@ -91,6 +91,13 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       date: z.string().optional().nullable().describe('Date issued'),
       credentialId: z.string().optional().nullable().describe('Credential ID, if any'),
     })).optional().nullable().default([]).describe('Certifications - rendered in a dedicated Certifications section'),
+    internships: z.array(z.object({
+      company: z.string().describe('Company name'),
+      title: z.string().describe('Internship title'),
+      location: z.string().optional().nullable().describe('Internship location'),
+      date: z.string().describe('Internship dates (e.g., "Jan 2025 - Apr 2025")'),
+      details: z.array(z.string()).optional().nullable().describe('Responsibilities and achievements'),
+    })).optional().nullable().describe('Mar template only: internships rendered in their own bulleted Internships section, separate from Professional Experience'),
     coreCompetencies: z.array(z.string()).optional().nullable().describe('Joseph template only: pipe-separated core competencies shown under the Core Competencies heading'),
     earlyCareer: z.array(z.object({
       title: z.string().describe('Job title'),
@@ -105,7 +112,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       references: z.array(z.string()).optional().nullable().describe('References'),
     }).optional().nullable(),
     targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
-    templateId: z.enum(['jake', 'joseph']).default('jake').describe('Template to use: "jake" (default, tech-focused) or "joseph" (Calibri-style, competencies-forward with Core Competencies and Early Career sections). Use the template from RESUME_TEMPLATE_PREFERENCE.'),
+    templateId: z.enum(['jake', 'joseph', 'mar']).default('jake').describe('Template to use: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward with Core Competencies and Early Career sections) or "mar" (Times serif, centered header repeated on every page, categorized technical skills, merged Education & Certifications, separate Internships section). Use the template from RESUME_TEMPLATE_PREFERENCE.'),
   }),
   execute: async (input) => {
     const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

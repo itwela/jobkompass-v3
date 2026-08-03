@@ -55,6 +55,14 @@ export interface ResumeContent {
     date?: string | null;
     credentialId?: string | null;
   }> | null;
+  /** Mar template only: internships rendered as their own bulleted section. */
+  internships?: Array<{
+    company: string;
+    title: string;
+    location?: string | null;
+    date: string;
+    details?: string[] | null;
+  }> | null;
   /** Joseph template only: pipe-separated core competencies list. */
   coreCompetencies?: string[] | null;
   /** Joseph template only: compact early-career entries rendered without bullets. */

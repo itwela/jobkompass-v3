@@ -1,0 +1,114 @@
+%-------------------------
+% MAR - Times/serif, centered header, plain bold section headings (JobKompass)
+% Reproduces the "Shammah Charles" reference layout: centered name over a
+% rule, justified body copy, label-style technical skills, and a repeating
+% name/contact header on continuation pages.
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+% Times-metric serif body+math. NOTE: newtx*/tgtermes are NOT installed on the
+% LaTeX service image (they need binhex.tex) — verified by probe. mathptmx is.
+\usepackage{mathptmx}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{needspace}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+% `includehead` reserves the header band on every page, so the continuation
+% header on page 2+ never collides with body copy.
+\geometry{
+  letterpaper,
+  top=0.5in, bottom=0.55in, left=0.65in, right=0.65in,
+  headheight=58pt, headsep=12pt, includehead
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+% Links render in the reference as blue underlined words ("Linkedin", "GitHub").
+\definecolor{marlink}{RGB}{0,0,238}
+\hypersetup{colorlinks=true, urlcolor=marlink, linkcolor=marlink}
+
+% Solid round bullet, matching the reference.
+\renewcommand{\labelitemi}{\textbullet}
+
+% ─── Header ────────────────────────────────────────────────────────────────
+% Centered name, contact line, and a full-width rule. Shared by the first-page
+% and continuation page styles so both bands are the same height.
+\newcommand{\marheaderblock}[2]{%
+  \begin{minipage}[b]{\textwidth}
+    \centering
+    {\fontsize{21}{25}\selectfont #1}\\[2pt]
+    {\fontsize{9}{11}\selectfont #2}\\[7pt]
+    \rule{\linewidth}{0.5pt}
+  \end{minipage}%
+}
+
+% #1 name, #2 first-page contact line, #3 continuation-page contact line.
+% Installs both page styles and selects the first-page one for page 1.
+\newcommand{\marsetheaders}[3]{%
+  \fancypagestyle{marfirstpage}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0pt}%
+    \fancyhead[C]{\marheaderblock{#1}{#2}}%
+  }%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyhead[C]{\marheaderblock{#1}{#3}}%
+  \pagestyle{fancy}%
+  \thispagestyle{marfirstpage}%
+}
+
+% ─── Sections ──────────────────────────────────────────────────────────────
+% Bold serif heading, no rule. \needspace stops a heading stranding itself at
+% the foot of a page with its first entry pushed to the next one.
+\newcommand{\marsection}[1]{%
+  \needspace{5\baselineskip}%
+  \vspace{9pt}\par\noindent
+  {\fontsize{14}{16}\selectfont\bfseries #1}%
+  \par\vspace{3pt}%
+}
+
+% ─── Entries ───────────────────────────────────────────────────────────────
+% Entry line: #1 flows/wraps on the left, #2 stays right-aligned. Uses paired
+% minipages rather than tabular* so a long left side wraps instead of being
+% silently clipped past the right margin. The right column is wide enough to
+% hold a full "September 2023 - August 2024" range on one line.
+% \needspace keeps the entry line with the first line or two of its bullets so
+% a heading never sits alone at the foot of a page.
+\newcommand{\marentry}[2]{%
+  \needspace{3\baselineskip}%
+  \vspace{3pt}\noindent
+  \begin{minipage}[t]{0.68\linewidth}\raggedright #1\end{minipage}%
+  \hfill
+  \begin{minipage}[t]{0.305\linewidth}\raggedleft #2\end{minipage}%
+  \par%
+}
+
+% Bulleted detail list under an entry. Justified, tight leading.
+\newcommand{\marbullets}[1]{%
+  \begin{itemize}[leftmargin=2.2em, topsep=1pt, itemsep=0pt, parsep=0pt, partopsep=0pt]
+  #1
+  \end{itemize}%
+}
+
+% One "Label: values" line in Technical Skills.
+\newcommand{\marskillline}[2]{%
+  \noindent\textbf{#1} #2\par\vspace{1.5pt}%
+}
+
+% Plain wrapping paragraph (professional summary, project descriptions).
+\newcommand{\marpara}[1]{%
+  \noindent #1\par%
+}
+
+\begin{document}
+
+XXXMARBODYXXX
+
+\end{document}

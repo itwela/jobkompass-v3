@@ -37,6 +37,22 @@ export const RESUME_TEMPLATES: Template[] = [
     features: ['Calibri-style typography', 'Core competencies section', 'Early career summary', 'Merged education & development'],
     freeResumeEligible: false,
   },
+  {
+    id: 'mar',
+    name: 'JobKompass Mar',
+    description:
+      'Classic Times serif resume with a centered name header, justified body copy, a categorized technical skills list, and a separate internships section. The name and contact details repeat at the top of every continuation page.',
+    previewImage: '/images/jobkompass_preview_resume_mar.png',
+    tags: ['ATS-Friendly', 'Classic', 'Academic'],
+    features: [
+      'Times serif typography',
+      'Centered name header repeated on every page',
+      'Categorized technical skills',
+      'Separate internships section',
+      'Merged education & certifications',
+    ],
+    freeResumeEligible: false,
+  },
 ];
 
 /** Cover letter templates - single source of truth */
@@ -98,7 +114,7 @@ export function getAppOnlyResumeTemplates(): Template[] {
  * Explicit allowlist so a half-finished template can't leak into the picker just by
  * being added to RESUME_TEMPLATES.
  */
-const APP_SELECTABLE_TEMPLATE_IDS = ['jake', 'joseph'];
+const APP_SELECTABLE_TEMPLATE_IDS = ['jake', 'joseph', 'mar'];
 
 export function getAppResumeTemplateOptions(): Template[] {
   return RESUME_TEMPLATES.filter((t) => APP_SELECTABLE_TEMPLATE_IDS.includes(t.id));
