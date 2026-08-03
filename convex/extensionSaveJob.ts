@@ -2,23 +2,44 @@ import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-const OPENROUTER_PARSE_PROMPT = `You are a job listing parser. Extract structured information from the following webpage text that contains a job listing.
+const OPENROUTER_PARSE_PROMPT = `You are a job listing parser. Extract structured metadata from the following webpage text that contains a job listing. Do NOT reproduce the job description text — only extract the fields below.
 
 Return a JSON object with these fields:
 - company: string (the hiring company name — NOT a job board like LinkedIn, Indeed, or Glassdoor)
 - title: string (the job title/position)
 - compensation: string or null (salary range if mentioned, e.g. "$100k-$150k")
 - location: string or null (job location, include remote if mentioned)
-- description: string (the FULL job description text — copy it completely, do NOT summarize or shorten it; only omit boilerplate site UI text like navigation menus and footers)
 - skills: string[] (every skill, tool, technology, and qualification explicitly mentioned — be exhaustive, not selective)
 - keywords: string[] (ATS-relevant keywords from the posting: role-specific terms, methodologies, certifications, seniority level)
 
 Rules:
 - For company: extract the actual employer, not the platform hosting the listing
-- For description: preserve the complete posting text including responsibilities, requirements, and nice-to-haves
 - For skills: include ALL technical and soft skills mentioned, no arbitrary cap
 - If you cannot determine a field, use null for optional fields or "Unknown" for required string fields
 - Respond with ONLY valid JSON, no explanation or markdown`;
+
+// Pull the first balanced {...} out of a model response that may have stray
+// prose or markdown fences around the JSON.
+function extractJson(content: string): any {
+  let jsonStr = content.trim();
+  if (jsonStr.startsWith("```")) {
+    jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    const start = jsonStr.indexOf("{");
+    const end = jsonStr.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      try {
+        return JSON.parse(jsonStr.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
 
 // Internal action: parse job listing text with OpenRouter and save to database
 export const parseAndSave = internalAction({
@@ -36,60 +57,54 @@ export const parseAndSave = internalAction({
       throw new Error("OpenRouter API key not configured on server");
     }
 
-    // Call OpenRouter to parse the job listing
-    let parsed: any;
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${openRouterKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://myjobkompass.com",
-          "X-Title": "JobKompass Extension",
-        },
-        body: JSON.stringify({
-          model: "google/gemma-3-27b-it:free",
-          messages: [
-            { role: "system", content: OPENROUTER_PARSE_PROMPT },
-            { role: "user", content: args.pageText.substring(0, 12000) },
-          ],
-          temperature: 0.1,
-          max_tokens: 4000,
-        }),
-      });
+    // Call OpenRouter to parse the job listing metadata (skills/keywords/etc).
+    // Retry once on transient failures (rate limits, network blips) since the
+    // free-tier model is flaky — this is the #1 source of missing skills/keywords.
+    let parsed: any = null;
+    for (let attempt = 0; attempt < 2 && parsed === null; attempt++) {
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openRouterKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://myjobkompass.com",
+            "X-Title": "JobKompass Extension",
+          },
+          body: JSON.stringify({
+            model: "google/gemma-3-27b-it:free",
+            messages: [
+              { role: "system", content: OPENROUTER_PARSE_PROMPT },
+              { role: "user", content: args.pageText.substring(0, 12000) },
+            ],
+            temperature: 0.1,
+            max_tokens: 2000,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("OpenRouter error:", response.status, errorText);
-        // Fall back to basic parsing if OpenRouter fails
-        parsed = null;
-      } else {
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`OpenRouter error (attempt ${attempt + 1}):`, response.status, errorText);
+          continue;
+        }
+
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content || "";
-
-        // Extract JSON from response (handle markdown code blocks)
-        let jsonStr = content.trim();
-        if (jsonStr.startsWith("```")) {
-          jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+        parsed = extractJson(content);
+        if (parsed === null) {
+          console.error(`Failed to parse OpenRouter JSON response (attempt ${attempt + 1}):`, content);
         }
-
-        try {
-          parsed = JSON.parse(jsonStr);
-        } catch {
-          console.error("Failed to parse OpenRouter JSON response:", content);
-          parsed = null;
-        }
+      } catch (error) {
+        console.error(`OpenRouter request failed (attempt ${attempt + 1}):`, error);
       }
-    } catch (error) {
-      console.error("OpenRouter request failed:", error);
-      parsed = null;
     }
 
-    // Build job data from parsed result or fallback
+    // Description always comes straight from the captured page text — never
+    // depends on the LLM call succeeding, so it's never silently dropped.
     const company = parsed?.company || extractCompanyFromTitle(args.pageTitle) || "Unknown";
     const title = parsed?.title || extractJobTitleFromTitle(args.pageTitle) || "Job Listing";
     const compensation = parsed?.compensation || undefined;
-    const description = parsed?.description || args.pageText.substring(0, 8000);
+    const description = args.pageText.substring(0, 8000).trim();
     const skills = Array.isArray(parsed?.skills) ? parsed.skills : undefined;
     const keywords = Array.isArray(parsed?.keywords) ? parsed.keywords : undefined;
 
