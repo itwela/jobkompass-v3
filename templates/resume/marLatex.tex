@@ -81,12 +81,23 @@
 % hold a full "September 2023 - August 2024" range on one line.
 % \needspace keeps the entry line with the first line or two of its bullets so
 % a heading never sits alone at the foot of a page.
+% The right column is measured from its own content and capped at 0.305, so a
+% short meta ("Expected 2027") hands its slack to the left column instead of
+% forcing a wrap, while a full "September 2023 - August 2024" still gets its
+% width. The left column takes whatever remains, less a small gutter.
+\newlength{\marrightw}
+\newlength{\marleftw}
 \newcommand{\marentry}[2]{%
   \needspace{3\baselineskip}%
   \vspace{3pt}\noindent
-  \begin{minipage}[t]{0.68\linewidth}\raggedright #1\end{minipage}%
+  \settowidth{\marrightw}{#2}%
+  \ifdim\marrightw>0.305\linewidth\setlength{\marrightw}{0.305\linewidth}\fi
+  \setlength{\marleftw}{\linewidth}%
+  \addtolength{\marleftw}{-\marrightw}%
+  \addtolength{\marleftw}{-0.02\linewidth}%
+  \begin{minipage}[t]{\marleftw}\raggedright #1\end{minipage}%
   \hfill
-  \begin{minipage}[t]{0.305\linewidth}\raggedleft #2\end{minipage}%
+  \begin{minipage}[t]{\marrightw}\raggedleft #2\end{minipage}%
   \par%
 }
 
