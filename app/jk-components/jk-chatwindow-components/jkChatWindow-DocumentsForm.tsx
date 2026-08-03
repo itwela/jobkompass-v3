@@ -201,34 +201,48 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     // Shared by all three filing paths (drag-and-drop, per-card ⋮ menu, and
     // the multi-select toolbar) so behavior — including never touching
     // updatedAt — stays identical no matter how the move was triggered.
+    //
+    // Returns the `moved` count on a successful mutation call (0 included —
+    // that just means nothing resolved) or `null` if the call itself threw
+    // or there was nothing to do. Never rejects: the other two move paths
+    // (drag, per-card menu) rely on this resolving so their own callers
+    // don't need their own try/catch. Callers that need to gate a side
+    // effect (like clearing a selection) on real success should branch on
+    // the return value instead of chaining unconditionally.
     const handleMoveDocuments = async (
         items: JkDraggedDocument[],
         folderId: Id<"documentFolders"> | null,
         folderName?: string,
-    ) => {
-        if (items.length === 0) return;
+    ): Promise<number | null> => {
+        if (items.length === 0) return null;
         try {
             const { moved } = await moveDocuments({ items, folderId });
-            if (moved === 0) return;
+            if (moved === 0) {
+                toast.info("Nothing was moved — those documents may have changed. Please try again.");
+                return moved;
+            }
             toast.success(
                 folderId === null
                     ? `Moved ${moved} document${moved === 1 ? '' : 's'} out of the folder`
                     : `Moved ${moved} document${moved === 1 ? '' : 's'} to "${folderName ?? 'folder'}"`
             );
+            return moved;
         } catch {
             toast.error("Could not move documents. Please try again.");
+            return null;
         }
     };
 
     const handleCreateFolderAndMove = async (
         name: string,
         items: JkDraggedDocument[],
-    ) => {
+    ): Promise<number | null> => {
         try {
             const folderId = await createFolder({ name });
-            await handleMoveDocuments(items, folderId, name.trim());
+            return await handleMoveDocuments(items, folderId, name.trim());
         } catch {
             toast.error("Could not create folder. Please try again.");
+            return null;
         }
     };
 
@@ -1172,18 +1186,26 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         selectedResumeIds.map((id) => ({ id, type: "resume" as const })),
                                         folderId,
                                         target?.name
-                                    ).then(() => {
-                                        clearResumeSelection();
-                                        setSelectionMode(false);
+                                    ).then((moved) => {
+                                        // Only clear the selection when something actually
+                                        // moved — a failed call (null) or a no-op (0, e.g.
+                                        // stale ids after a concurrent delete) leaves the
+                                        // user's selection intact so they can retry.
+                                        if (moved) {
+                                            clearResumeSelection();
+                                            setSelectionMode(false);
+                                        }
                                     });
                                 }}
                                 onCreateAndMove={(name) => {
                                     void handleCreateFolderAndMove(
                                         name,
                                         selectedResumeIds.map((id) => ({ id, type: "resume" as const }))
-                                    ).then(() => {
-                                        clearResumeSelection();
-                                        setSelectionMode(false);
+                                    ).then((moved) => {
+                                        if (moved) {
+                                            clearResumeSelection();
+                                            setSelectionMode(false);
+                                        }
                                     });
                                 }}
                             />
