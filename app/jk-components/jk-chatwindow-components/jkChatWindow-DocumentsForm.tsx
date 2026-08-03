@@ -23,8 +23,9 @@ import { toast } from "@/lib/toast";
 import { buildResumeContentFromPastedText } from "@/lib/resume/contentFromPastedText";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { resolveBaseResumeId, sortDocuments } from "@/lib/documents/sortDocuments";
-import JkDocumentFolderCard, { type JkFolder } from "../jk-documents/jkDocumentFolderCard";
+import JkDocumentFolderCard, { DRAG_MIME, type JkDraggedDocument, type JkFolder } from "../jk-documents/jkDocumentFolderCard";
 import JkFolderBreadcrumb from "../jk-documents/jkFolderBreadcrumb";
+import JkMoveToFolderMenu from "../jk-documents/jkMoveToFolderMenu";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -195,6 +196,41 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const createFolder = useMutation(api.documentFolders.createFolder);
     const renameFolder = useMutation(api.documentFolders.renameFolder);
     const deleteFolder = useMutation(api.documentFolders.deleteFolder);
+    const moveDocuments = useMutation(api.documentFolders.moveDocuments);
+
+    // Shared by all three filing paths (drag-and-drop, per-card ⋮ menu, and
+    // the multi-select toolbar) so behavior — including never touching
+    // updatedAt — stays identical no matter how the move was triggered.
+    const handleMoveDocuments = async (
+        items: JkDraggedDocument[],
+        folderId: Id<"documentFolders"> | null,
+        folderName?: string,
+    ) => {
+        if (items.length === 0) return;
+        try {
+            const { moved } = await moveDocuments({ items, folderId });
+            if (moved === 0) return;
+            toast.success(
+                folderId === null
+                    ? `Moved ${moved} document${moved === 1 ? '' : 's'} out of the folder`
+                    : `Moved ${moved} document${moved === 1 ? '' : 's'} to "${folderName ?? 'folder'}"`
+            );
+        } catch {
+            toast.error("Could not move documents. Please try again.");
+        }
+    };
+
+    const handleCreateFolderAndMove = async (
+        name: string,
+        items: JkDraggedDocument[],
+    ) => {
+        try {
+            const folderId = await createFolder({ name });
+            await handleMoveDocuments(items, folderId, name.trim());
+        } catch {
+            toast.error("Could not create folder. Please try again.");
+        }
+    };
 
     const [openFolderId, setOpenFolderId] = useState<Id<"documentFolders"> | null>(null);
     const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
@@ -1114,6 +1150,45 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     >
                         Delete Selected
                     </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={selectedResumeIds.length === 0}
+                            >
+                                Move to folder
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                            <JkMoveToFolderMenu
+                                folders={folders}
+                                currentFolderId={openFolderId ? String(openFolderId) : null}
+                                onMove={(folderId) => {
+                                    const target = folders.find(
+                                        (f: JkFolder) => String(f._id) === String(folderId)
+                                    );
+                                    void handleMoveDocuments(
+                                        selectedResumeIds.map((id) => ({ id, type: "resume" as const })),
+                                        folderId,
+                                        target?.name
+                                    ).then(() => {
+                                        clearResumeSelection();
+                                        setSelectionMode(false);
+                                    });
+                                }}
+                                onCreateAndMove={(name) => {
+                                    void handleCreateFolderAndMove(
+                                        name,
+                                        selectedResumeIds.map((id) => ({ id, type: "resume" as const }))
+                                    ).then(() => {
+                                        clearResumeSelection();
+                                        setSelectionMode(false);
+                                    });
+                                }}
+                            />
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                         variant="ghost"
                         size="sm"
@@ -1139,6 +1214,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 <JkFolderBreadcrumb
                     folderName={openFolder.name}
                     onBack={() => setOpenFolderId(null)}
+                    onDropDocument={(payload) => {
+                        void handleMoveDocuments([payload], null);
+                    }}
                 />
             )}
 
@@ -1183,6 +1261,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         void deleteFolder({ folderId: folder._id })
                                             .then(() => toast.success(`Deleted "${folder.name}". Its documents were moved out.`))
                                             .catch(() => toast.error("Could not delete folder."));
+                                    }}
+                                    onDropDocument={(payload) => {
+                                        void handleMoveDocuments([payload], folder._id, folder.name);
                                     }}
                                 />
                             ))}
@@ -1254,6 +1335,15 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                             <div
                                 role="button"
                                 tabIndex={0}
+                                draggable={!selectionMode}
+                                onDragStart={(event) => {
+                                    if (selectionMode) return;
+                                    event.dataTransfer.setData(
+                                        DRAG_MIME,
+                                        JSON.stringify({ id: resumeId, type: documentType })
+                                    );
+                                    event.dataTransfer.effectAllowed = "move";
+                                }}
                                 onClick={() => handleDocumentClick(resumeId, documentType)}
                                 onKeyDown={(event) => {
                                     const target = event.target as HTMLElement;
@@ -1511,6 +1601,31 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             <Copy className="h-4 w-4" />
                                                             <span>Duplicate</span>
                                                         </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <div className="px-1 py-1">
+                                                            <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                Move to folder
+                                                            </p>
+                                                            <JkMoveToFolderMenu
+                                                                folders={folders}
+                                                                currentFolderId={resume?.folderId ? String(resume.folderId) : null}
+                                                                onMove={(folderId) => {
+                                                                    const target = folders.find(
+                                                                        (f: JkFolder) => String(f._id) === String(folderId)
+                                                                    );
+                                                                    void handleMoveDocuments(
+                                                                        [{ id: resumeId, type: documentType }],
+                                                                        folderId,
+                                                                        target?.name
+                                                                    );
+                                                                }}
+                                                                onCreateAndMove={(name) => {
+                                                                    void handleCreateFolderAndMove(name, [
+                                                                        { id: resumeId, type: documentType },
+                                                                    ]);
+                                                                }}
+                                                            />
+                                                        </div>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             variant="destructive"
