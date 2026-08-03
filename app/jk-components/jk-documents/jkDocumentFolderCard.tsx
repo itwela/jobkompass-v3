@@ -147,6 +147,7 @@ export default function JkDocumentFolderCard({
                 event.stopPropagation();
                 if (event.key === "Enter") commitRename();
                 if (event.key === "Escape") {
+                  hasCommittedRef.current = true;
                   setDraftName(folder.name);
                   setIsRenaming(false);
                 }
