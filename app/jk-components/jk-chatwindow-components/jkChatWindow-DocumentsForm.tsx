@@ -1380,8 +1380,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 min-w-0 overflow-hidden",
                                     !selectionMode && isNew && "border-primary border-2",
                                     selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200",
-                                    // Favorite: blue border, but base resume still wins
-                                    isFavorite && !isBaseResume && "border-blue-500 border-2",
+                                    // Favorite: purple border, kept distinct from the blue
+                                    // bulk-selection border above. Base resume still wins.
+                                    isFavorite && !isBaseResume && "border-purple-600 border-2",
                                     // Base resume treatment wins over new/selected styling
                                     isBaseResume && "border-amber-400 border-2 ring-1 ring-amber-300 hover:border-amber-400"
                                 )}
@@ -1437,7 +1438,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             className={cn(
                                                 "h-3.5 w-3.5",
                                                 isFavorite
-                                                    ? "fill-blue-500 text-blue-500"
+                                                    ? "fill-purple-600 text-purple-600"
                                                     : "text-muted-foreground"
                                             )}
                                         />
