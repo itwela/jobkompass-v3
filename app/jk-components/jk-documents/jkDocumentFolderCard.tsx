@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,8 +61,15 @@ export default function JkDocumentFolderCard({
   const [draftName, setDraftName] = useState(folder.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDropTarget, setIsDropTarget] = useState(false);
+  // Guards against a double commit: pressing Enter sets isRenaming false and
+  // unmounts the still-focused Input, which can trigger a native blur that
+  // React resolves into a second onBlur call on this same closure before
+  // teardown completes. Reset whenever a new rename session begins.
+  const hasCommittedRef = useRef(false);
 
   const commitRename = () => {
+    if (hasCommittedRef.current) return;
+    hasCommittedRef.current = true;
     const next = draftName.trim();
     if (next && next !== folder.name) onRename(next);
     setIsRenaming(false);
@@ -171,6 +178,7 @@ export default function JkDocumentFolderCard({
                 onClick={(event) => {
                   event.stopPropagation();
                   setDraftName(folder.name);
+                  hasCommittedRef.current = false;
                   setIsRenaming(true);
                 }}
               >
