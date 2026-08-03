@@ -16,6 +16,7 @@ import type * as agent_routes from "../agent/routes.js";
 import type * as auth from "../auth.js";
 import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
+import type * as documentFolders from "../documentFolders.js";
 import type * as documents from "../documents.js";
 import type * as dopeAgents from "../dopeAgents.js";
 import type * as emailAccounts from "../emailAccounts.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   contacts: typeof contacts;
   crons: typeof crons;
+  documentFolders: typeof documentFolders;
   documents: typeof documents;
   dopeAgents: typeof dopeAgents;
   emailAccounts: typeof emailAccounts;

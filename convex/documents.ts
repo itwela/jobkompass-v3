@@ -420,6 +420,49 @@ export const setBaseResume = mutation({
   },
 });
 
+/**
+ * Flips a document's favorite flag. Favorites sort after the base resume and
+ * before regular documents (see lib/documents/sortDocuments.ts).
+ *
+ * `isFavorite` is intentionally separate from `isActive`: `isActive` is the base
+ * resume the job-lead email agent tailors from, and any number of documents may
+ * be favorited while exactly one resume is the base.
+ *
+ * Does not touch `updatedAt` — that field is the sort tie-breaker.
+ */
+export const toggleFavorite = mutation({
+  args: {
+    documentId: v.string(),
+    documentType: v.union(v.literal("resume"), v.literal("cover-letter")),
+  },
+  handler: async (ctx, { documentId, documentType }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    if (documentType === "resume") {
+      const id = ctx.db.normalizeId("resumes", documentId);
+      if (!id) throw new Error("Resume not found or access denied");
+      const doc = await ctx.db.get(id);
+      if (!doc || doc.userId !== userId) {
+        throw new Error("Resume not found or access denied");
+      }
+      const isFavorite = !(doc.isFavorite ?? false);
+      await ctx.db.patch(id, { isFavorite });
+      return { isFavorite };
+    }
+
+    const id = ctx.db.normalizeId("coverLetters", documentId);
+    if (!id) throw new Error("Cover letter not found or access denied");
+    const doc = await ctx.db.get(id);
+    if (!doc || doc.userId !== userId) {
+      throw new Error("Cover letter not found or access denied");
+    }
+    const isFavorite = !(doc.isFavorite ?? false);
+    await ctx.db.patch(id, { isFavorite });
+    return { isFavorite };
+  },
+});
+
 // Add a certification to a resume's content.certifications (dedupes by name).
 export const addCertificationInternal = internalMutation({
   args: {

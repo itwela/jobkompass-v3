@@ -17,6 +17,9 @@ const documentsTables = {
     // Labels and tags for organization
     label: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    // Organization: at most one folder per document (see documentFolders).
+    folderId: v.optional(v.id("documentFolders")),
+    isFavorite: v.optional(v.boolean()),
     template: v.optional(v.string()), // Template used for this resume (e.g., "modern", "classic", "minimalist")
     // Flexible content field - can be any JSON structure
     content: v.optional(v.any()),
@@ -51,11 +54,21 @@ const documentsTables = {
     // Labels and tags for organization
     label: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    // Organization: at most one folder per document (see documentFolders).
+    folderId: v.optional(v.id("documentFolders")),
+    isFavorite: v.optional(v.boolean()),
     template: v.optional(v.string()),
     // Flexible content field - stores the input used to generate the cover letter
     content: v.optional(v.any()),
     // Track when user has seen/viewed this document
     seenAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]),
+
+  documentFolders: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
   emailTemplates: defineTable({
