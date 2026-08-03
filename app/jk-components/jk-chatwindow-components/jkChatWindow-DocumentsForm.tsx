@@ -9,7 +9,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star, FolderPlus } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
@@ -23,6 +23,8 @@ import { toast } from "@/lib/toast";
 import { buildResumeContentFromPastedText } from "@/lib/resume/contentFromPastedText";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { resolveBaseResumeId, sortDocuments } from "@/lib/documents/sortDocuments";
+import JkDocumentFolderCard, { type JkFolder } from "../jk-documents/jkDocumentFolderCard";
+import JkFolderBreadcrumb from "../jk-documents/jkFolderBreadcrumb";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -188,6 +190,28 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
 
     // Track which document type is being edited for metadata
     const [editingDocType, setEditingDocType] = useState<"resume" | "cover-letter" | null>(null);
+
+    const folders = useQuery(api.documentFolders.listFolders) ?? [];
+    const createFolder = useMutation(api.documentFolders.createFolder);
+    const renameFolder = useMutation(api.documentFolders.renameFolder);
+    const deleteFolder = useMutation(api.documentFolders.deleteFolder);
+
+    const [openFolderId, setOpenFolderId] = useState<Id<"documentFolders"> | null>(null);
+    const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
+    const [newFolderName, setNewFolderName] = useState("");
+
+    const openFolder = folders.find((folder) => folder._id === openFolderId) ?? null;
+    const knownFolderIds = new Set(folders.map((folder) => String(folder._id)));
+
+    // A folderId pointing at a deleted folder is treated as loose, so an orphaned
+    // document is always reachable rather than invisible.
+    const isLoose = (doc: any) =>
+        !doc?.folderId || !knownFolderIds.has(String(doc.folderId));
+
+    // If the open folder was deleted, don't strand the user inside it.
+    useEffect(() => {
+        if (openFolderId && !openFolder) setOpenFolderId(null);
+    }, [openFolderId, openFolder]);
 
     useEffect(() => {
         if (!selectionMode) {
@@ -610,7 +634,19 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
         if (typeFilter !== "all" && doc.documentType !== typeFilter) {
             return false;
         }
-        
+
+        // Folder scope. Search overrides folders entirely: when the user is
+        // searching, every document is in scope regardless of where it is filed,
+        // because the flat list being unsearchable is the problem folders solve.
+        const isSearching = searchTerm.trim().length > 0;
+        if (!isSearching) {
+            if (openFolderId) {
+                if (String(doc?.folderId ?? "") !== String(openFolderId)) return false;
+            } else if (!isLoose(doc)) {
+                return false;
+            }
+        }
+
         // Filter by search term
         const title = (doc?.name || doc?.jobTitle || "").toString().toLowerCase();
         const role = (doc?.targetRole || "").toString().toLowerCase();
@@ -1097,6 +1133,69 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                         isLoading={isBulkDeleting}
                     />
                 </div>
+            )}
+
+            {searchTerm.trim().length === 0 && openFolder && (
+                <JkFolderBreadcrumb
+                    folderName={openFolder.name}
+                    onBack={() => setOpenFolderId(null)}
+                />
+            )}
+
+            {searchTerm.trim().length === 0 && !openFolderId && (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Folders
+                        </h2>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => {
+                                setNewFolderName("");
+                                setShowNewFolderDialog(true);
+                            }}
+                        >
+                            <FolderPlus className="h-4 w-4" />
+                            New folder
+                        </Button>
+                    </div>
+                    {folders.length > 0 && (
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                            {folders.map((folder: JkFolder) => (
+                                <JkDocumentFolderCard
+                                    key={String(folder._id)}
+                                    folder={folder}
+                                    count={
+                                        typeFilter === "resume"
+                                            ? folder.resumeCount
+                                            : typeFilter === "cover-letter"
+                                              ? folder.coverLetterCount
+                                              : folder.resumeCount + folder.coverLetterCount
+                                    }
+                                    onOpen={() => setOpenFolderId(folder._id)}
+                                    onRename={(name) => {
+                                        void renameFolder({ folderId: folder._id, name })
+                                            .catch(() => toast.error("Could not rename folder."));
+                                    }}
+                                    onDelete={() => {
+                                        void deleteFolder({ folderId: folder._id })
+                                            .then(() => toast.success(`Deleted "${folder.name}". Its documents were moved out.`))
+                                            .catch(() => toast.error("Could not delete folder."));
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
+                    <div className="border-b border-border" />
+                </div>
+            )}
+
+            {searchTerm.trim().length > 0 && folders.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                    Searching across all folders.
+                </p>
             )}
 
             {/* Upload progress */}
@@ -1903,6 +2002,66 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                             </>
                         )}
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={showNewFolderDialog}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setShowNewFolderDialog(false);
+                        setNewFolderName("");
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle>New folder</DialogTitle>
+                        <DialogDescription>
+                            Group your documents. A document can live in one folder at a time.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Input
+                        autoFocus
+                        value={newFolderName}
+                        onChange={(event) => setNewFolderName(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter" && newFolderName.trim()) {
+                                event.preventDefault();
+                                void createFolder({ name: newFolderName })
+                                    .then(() => {
+                                        setShowNewFolderDialog(false);
+                                        setNewFolderName("");
+                                    })
+                                    .catch(() => toast.error("Could not create folder."));
+                            }
+                        }}
+                        placeholder="e.g., Design roles"
+                    />
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowNewFolderDialog(false);
+                                setNewFolderName("");
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={!newFolderName.trim()}
+                            onClick={() => {
+                                void createFolder({ name: newFolderName })
+                                    .then(() => {
+                                        setShowNewFolderDialog(false);
+                                        setNewFolderName("");
+                                    })
+                                    .catch(() => toast.error("Could not create folder."));
+                            }}
+                        >
+                            Create folder
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
