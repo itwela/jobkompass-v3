@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, FileText, FileCheck, Sparkles, Upload } from 'lucide-react'
+import Image from 'next/image'
+import { X, FileText, FileCheck, Sparkles, Upload, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,6 +17,7 @@ import {
     type TemplateType,
 } from '@/lib/templates'
 import { getModelForTemplateGeneration } from '@/lib/aiModels'
+import { resolveInitialTemplateId, templatePreferenceKey } from '@/lib/resume/templatePreference'
 import { toast } from '@/lib/toast'
 
 export type { TemplateType, Template }
@@ -44,6 +46,22 @@ interface JkTemplateSelectorProps {
     jobCompany?: string
 }
 
+function readStoredTemplateId(type: TemplateType): string | null {
+    try {
+        return window.localStorage.getItem(templatePreferenceKey(type))
+    } catch {
+        return null
+    }
+}
+
+function writeStoredTemplateId(type: TemplateType, templateId: string) {
+    try {
+        window.localStorage.setItem(templatePreferenceKey(type), templateId)
+    } catch {
+        // Blocked or unavailable storage: the preference just won't persist.
+    }
+}
+
 export default function JkTemplateSelector({
     isOpen,
     onClose,
@@ -61,6 +79,7 @@ export default function JkTemplateSelector({
     const Icon = type === 'resume' ? FileText : FileCheck
 
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+    const [restoredFromPreference, setRestoredFromPreference] = useState(false)
     const [resumeInputMode, setResumeInputMode] = useState<ResumeInputMode>('reference')
     const [resumePdf, setResumePdf] = useState<string | null>(null)
     const [resumePdfName, setResumePdfName] = useState<string | null>(null)
@@ -69,12 +88,23 @@ export default function JkTemplateSelector({
     const [descriptionExpanded, setDescriptionExpanded] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    // Auto-select the only available template and reset input state when modal opens/closes
+    // Pre-select the last template the user generated with (validated against the current
+    // allowlist), falling back to the first template. Storage is read here rather than in a
+    // useState initialiser so it never runs during render and can't desync hydration.
     useEffect(() => {
         if (isOpen) {
-            if (templates.length > 0) setSelectedTemplateId(templates[0].id)
+            if (templates.length > 0) {
+                const { templateId, wasRemembered } = resolveInitialTemplateId(
+                    readStoredTemplateId(type),
+                    templates.map((t) => t.id),
+                    templates[0].id,
+                )
+                setSelectedTemplateId(templateId)
+                setRestoredFromPreference(wasRemembered)
+            }
         } else {
             setSelectedTemplateId(null)
+            setRestoredFromPreference(false)
             setResumeInputMode('reference')
             setResumePdf(null)
             setResumePdfName(null)
@@ -130,6 +160,7 @@ export default function JkTemplateSelector({
             promptText: resumeInputMode === 'paste' ? (promptText.trim() || undefined) : undefined,
         } : undefined
 
+        writeStoredTemplateId(type, selectedTemplateId)
         onSelectTemplate(selectedTemplateId, resumeInput)
     }
 
@@ -178,6 +209,64 @@ export default function JkTemplateSelector({
 
                         {/* Resume Input */}
                         <div className="p-6 w-full h-full overflow-y-auto !no-scrollbar flex flex-col gap-5">
+                            {templates.length > 1 && (
+                                <div className="space-y-3">
+                                    <label className="text-sm font-medium block">Choose a template</label>
+                                    <div className="flex flex-row gap-3 overflow-x-auto no-scrollbar pb-1">
+                                        {templates.map((template, index) => {
+                                            const isSelected = selectedTemplateId === template.id
+                                            return (
+                                                <motion.button
+                                                    key={template.id}
+                                                    type="button"
+                                                    aria-pressed={isSelected}
+                                                    onClick={() => setSelectedTemplateId(template.id)}
+                                                    className={`relative flex flex-col flex-shrink-0 w-[180px] rounded-xl border-2 overflow-hidden transition-colors duration-200 text-left group ${
+                                                        isSelected
+                                                            ? 'border-primary ring-2 ring-primary/40'
+                                                            : 'border-border hover:border-primary/60'
+                                                    }`}
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ duration: 0.4, delay: 0.1 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
+                                                >
+                                                    <div className="relative w-full aspect-[3/4] bg-muted/30">
+                                                        <Image
+                                                            src={template.previewImage}
+                                                            alt={template.name}
+                                                            fill
+                                                            className="object-cover object-top"
+                                                            sizes="180px"
+                                                        />
+                                                        <div className="absolute inset-0 bg-transparent group-hover:bg-black/5 transition-opacity" />
+                                                    </div>
+                                                    <div className="p-2.5 bg-background/95 backdrop-blur-sm flex-shrink-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="font-medium text-xs truncate flex-1">{template.name}</p>
+                                                            {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                                        </div>
+                                                        {isSelected && restoredFromPreference && (
+                                                            <span className="mt-1 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary">
+                                                                Last used
+                                                            </span>
+                                                        )}
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            {template.tags?.slice(0, 2).map((tag) => (
+                                                                <span
+                                                                    key={tag}
+                                                                    className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground"
+                                                                >
+                                                                    {tag}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </motion.button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                             {type === 'resume' && (
                                 <div className="space-y-4">
                                     <label className="text-sm font-medium block">
