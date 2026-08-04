@@ -659,3 +659,36 @@ textarea[aria-label="Message input"]:focus-visible {
     fill: #6b7280 !important;
   }
 }
+
+/* ─── iOS form-control auto-zoom ──────────────────────────────────────────── */
+/*
+ * Mobile Safari zooms the entire page when you focus a form control whose
+ * font-size is under 16px, and it does NOT zoom back out afterwards — so every
+ * login left the app zoomed in and had to be pinched back by hand. Tailwind's
+ * `text-sm` is 14px and the default Input/Textarea size uses it, so very nearly
+ * every field in the app triggered this.
+ *
+ * Guaranteeing 16px on small screens is the only reliable fix that keeps
+ * pinch-zoom working. The other commonly suggested fix — `maximum-scale=1` or
+ * `user-scalable=no` in the viewport meta — disables pinch-zoom entirely, which
+ * is an accessibility regression, and recent iOS ignores it anyway.
+ *
+ * This is deliberately NOT inside `@layer base`: Tailwind utilities live in a
+ * later layer and `text-sm` would keep winning the cascade. Unlayered rules
+ * outrank every layered rule, so this block stays outside all layers.
+ *
+ * Only text-entry controls are listed, so buttons, checkboxes, radios and
+ * sliders keep their existing sizing.
+ */
+@media (max-width: 767px) {
+  input:is(
+    [type="text"], [type="email"], [type="password"], [type="search"],
+    [type="tel"], [type="url"], [type="number"], [type="date"],
+    [type="datetime-local"], [type="month"], [type="time"], [type="week"]
+  ),
+  input:not([type]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
