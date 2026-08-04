@@ -322,6 +322,120 @@ export const resumesGenerate = internalAction({
   },
 });
 
+export const resumesReplaceGenerated = internalMutation({
+  args: {
+    userId: v.string(),
+    id: v.id("resumes"),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileSize: v.number(),
+    content: v.any(),
+    template: v.string(),
+  },
+  handler: async (ctx, { userId, id, ...rest }) => {
+    const resume = await owned<any>(ctx, id, userId, "Resume");
+    // Swap the stored PDF, dropping the old blob so storage doesn't accumulate
+    // orphans on every regeneration.
+    if (resume.fileId) await ctx.storage.delete(resume.fileId);
+    await ctx.db.patch(id, {
+      fileId: rest.fileId,
+      fileName: rest.fileName,
+      fileSize: rest.fileSize,
+      fileType: "application/pdf",
+      content: rest.content,
+      template: rest.template,
+      updatedAt: Date.now(),
+    });
+    return { id, name: resume.name };
+  },
+});
+
+/**
+ * Update an existing resume's content IN PLACE and regenerate its PDF.
+ *
+ * Only the sections passed are changed; everything else is carried over from the
+ * stored content, so an agent can add one project without restating the resume.
+ * The record keeps its id, name, label, favorite flag and created date — that is
+ * the whole point of this endpoint versus `resumesGenerate`, which always makes a
+ * new document.
+ */
+export const resumesUpdateContent = internalAction({
+  args: {
+    userId: v.string(),
+    id: v.id("resumes"),
+    personalInfo: v.optional(v.any()),
+    education: v.optional(v.any()),
+    experience: v.optional(v.any()),
+    projects: v.optional(v.any()),
+    skills: v.optional(v.any()),
+    certifications: v.optional(v.any()),
+    internships: v.optional(v.any()),
+    coreCompetencies: v.optional(v.any()),
+    earlyCareer: v.optional(v.any()),
+    additionalInfo: v.optional(v.any()),
+    template: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null }> => {
+    const existing: any = await ctx.runQuery(internal.agent.fns.resumesGet, {
+      userId: args.userId,
+      id: args.id,
+    });
+    if (!existing) throw new AgentError(404, "not_found", "Resume not found");
+
+    const prev = existing.content ?? {};
+    const pick = <T,>(next: T | undefined, fallback: T): T => (next === undefined ? fallback : next);
+    const content = {
+      personalInfo: pick(args.personalInfo, prev.personalInfo ?? {}),
+      education: pick(args.education, prev.education ?? []),
+      experience: pick(args.experience, prev.experience ?? []),
+      projects: pick(args.projects, prev.projects ?? []),
+      skills: pick(args.skills, prev.skills ?? null),
+      certifications: pick(args.certifications, prev.certifications ?? []),
+      internships: pick(args.internships, prev.internships ?? null),
+      coreCompetencies: pick(args.coreCompetencies, prev.coreCompetencies ?? null),
+      earlyCareer: pick(args.earlyCareer, prev.earlyCareer ?? null),
+      additionalInfo: pick(args.additionalInfo, prev.additionalInfo ?? null),
+    };
+
+    const template = args.template || existing.template || "jake";
+    const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
+    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${template}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!exportResponse.ok) {
+      const errorBody = await exportResponse.json().catch(() => ({}));
+      throw new AgentError(
+        502,
+        "generation_failed",
+        `Resume PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
+        errorBody.details
+      );
+    }
+    const pdfArrayBuffer = await exportResponse.arrayBuffer();
+    const pdfBlob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
+
+    const fileId = await ctx.storage.store(pdfBlob);
+    const fileUrl = await ctx.storage.getUrl(fileId);
+
+    const result: { id: Id<"resumes">; name: string } = await ctx.runMutation(
+      internal.agent.fns.resumesReplaceGenerated,
+      {
+        userId: args.userId,
+        id: args.id,
+        fileId,
+        fileName: existing.fileName || "resume.pdf",
+        fileSize: pdfBlob.size,
+        content,
+        template,
+      }
+    );
+
+    return { id: result.id, name: result.name, fileUrl };
+  },
+});
+
 export const coverLettersInsertGenerated = internalMutation({
   args: {
     userId: v.string(),

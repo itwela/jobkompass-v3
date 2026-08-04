@@ -93,6 +93,22 @@ export const commands: CommandSpec[] = [
       { flag: "--target-company <name>", api: "targetCompany", type: "str", desc: "Included in the saved resume's name" },
       { flag: "--template <id>", api: "template", type: "str", desc: "Template id: jake (default), joseph or mar" },
     ] },
+  { name: "resumes update", desc: "Edit an existing resume's content in place and regenerate its PDF (keeps id, name, label, favorite)", method: "PATCH", path: "/agent/resumes/content",
+    opts: [
+      { flag: "--id <id>", api: "id", type: "str", required: true },
+      { flag: "--personal-info <json>", api: "personalInfo", type: "json",
+        desc: "Only the sections you pass change; the rest carry over unchanged" },
+      { flag: "--education <json>", api: "education", type: "json", desc: "[{name,degree,field?,location?,startDate?,endDate,details?}]" },
+      { flag: "--experience <json>", api: "experience", type: "json", desc: "[{company,title,location?,date,details}]" },
+      { flag: "--projects <json>", api: "projects", type: "json", desc: "[{name,description,date?,technologies?,details?}]" },
+      { flag: "--skills <json>", api: "skills", type: "json", desc: '{"technical":[...],"additional"?:[...]}' },
+      { flag: "--certifications <json>", api: "certifications", type: "json", desc: "[{name,issuer?,date?,credentialId?}]" },
+      { flag: "--internships <json>", api: "internships", type: "json", desc: "(Mar template) [{company,title,location?,date,details?}]" },
+      { flag: "--core-competencies <json>", api: "coreCompetencies", type: "json", desc: '(Joseph template) ["Technical Support",...]' },
+      { flag: "--early-career <json>", api: "earlyCareer", type: "json", desc: "(Joseph template) [{title,company,location?,date}]" },
+      { flag: "--additional-info <json>", api: "additionalInfo", type: "json", desc: '{"languages"?:[...],"references"?}' },
+      { flag: "--template <id>", api: "template", type: "str", desc: "Switch template: jake, joseph or mar" },
+    ] },
 
   // coverletters
   { name: "coverletters list", desc: "List cover letters (metadata)", method: "GET", path: "/agent/coverletters", opts: [] },

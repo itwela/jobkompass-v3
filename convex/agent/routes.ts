@@ -118,6 +118,25 @@ export const agentRoutes: AgentRoute[] = [
     ],
     description: "Rename a resume",
   },
+  {
+    method: "PATCH", path: "/agent/resumes/content", fn: internal.agent.fns.resumesUpdateContent, kind: "action",
+    params: [
+      { name: "id", type: "string", required: true },
+      { name: "personalInfo", type: "json", description: "Only the sections you pass are changed; the rest carry over" },
+      { name: "education", type: "json", description: "Array of {name,degree,field?,location?,startDate?,endDate,details?}" },
+      { name: "experience", type: "json", description: "Array of {company,title,location?,date,details}" },
+      { name: "projects", type: "json", description: "Array of {name,description,date?,technologies?,details?}" },
+      { name: "skills", type: "json", description: '{"technical":[...],"additional"?:[...]}' },
+      { name: "certifications", type: "json", description: "Array of {name,issuer?,date?,credentialId?}" },
+      { name: "internships", type: "json", description: "Mar template only: Array of {company,title,location?,date,details?}" },
+      { name: "coreCompetencies", type: "json", description: 'Joseph template only: ["Technical Support",...]' },
+      { name: "earlyCareer", type: "json", description: "Joseph template only: Array of {title,company,location?,date}" },
+      { name: "additionalInfo", type: "json", description: '{"languages"?:[...],"references"?}' },
+      { name: "template", type: "string", description: 'Switch template: "jake", "joseph" or "mar"' },
+    ],
+    description:
+      "Update an existing resume's content in place and regenerate its PDF, keeping the same id, name, label and favorite flag",
+  },
 
   // ---- cover letters ----
   { method: "GET", path: "/agent/coverletters", fn: internal.agent.fns.coverLettersList, kind: "query", params: [], description: "List cover letters (metadata only)" },
