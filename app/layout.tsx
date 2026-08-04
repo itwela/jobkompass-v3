@@ -61,7 +61,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://jobkompass.com",
+    url: "https://myjobkompass.com",
     siteName: "JobKompass",
     title: "JobKompass - 100% AI-Powered Career Management Platform",
     description: "AI-powered career management platform using artificial intelligence. Manage your job search with AI, organize applications, and create tailored resumes and cover letters using advanced AI technology. Chat with AI to refine and improve your documents with intelligent career guidance.",

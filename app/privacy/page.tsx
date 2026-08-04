@@ -61,7 +61,47 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">3. How We Use Your Information</h2>
+            <h2 className="text-2xl font-semibold mb-4">3. Browser Extension</h2>
+            <p>
+              The JobKompass Chrome Extension lets you save job listings to your JobKompass account directly from
+              any webpage. Here is exactly what it does with your data:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>
+                The extension only reads a page when you click "Save" or "Pin to Queue" — it never runs in the
+                background or collects data automatically as you browse.
+              </li>
+              <li>
+                When triggered, it extracts the visible text, title, and URL of the current tab (capped at 15,000
+                characters, with navigation, ads, scripts, and comments stripped out) so it can identify the job
+                listing.
+              </li>
+              <li>
+                That page text, title, URL, and the status you assign are sent over HTTPS to JobKompass's backend,
+                tied to your personal API key, and saved to your JobKompass account.
+              </li>
+              <li>
+                Your API key and Convex server URL are stored locally in your browser (via Chrome's sync storage)
+                so you stay signed in. Jobs you "pin" but haven't saved yet are held temporarily in local browser
+                storage until you save or remove them.
+              </li>
+              <li>
+                The extension requests access to all websites so it can work on any job board or company careers
+                page — it does not read or transmit page content unless you explicitly click Save or Pin.
+              </li>
+              <li>
+                We do not sell captured page data, and the extension does not include any advertising or analytics
+                trackers of its own.
+              </li>
+              <li>
+                You can revoke the extension's access at any time by removing your API key from its Options page
+                or uninstalling the extension.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">4. How We Use Your Information</h2>
             <p>We use the information we collect to:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>Provide, operate, and maintain our platform</li>
@@ -76,7 +116,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">4. Data Security</h2>
+            <h2 className="text-2xl font-semibold mb-4">5. Data Security</h2>
             <p>
               We implement appropriate technical and organizational security measures designed to protect the security 
               of any personal information we process. However, please also remember that we cannot guarantee that the 
@@ -86,7 +126,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">5. Data Retention</h2>
+            <h2 className="text-2xl font-semibold mb-4">6. Data Retention</h2>
             <p>
               We will only keep your personal information for as long as it is necessary for the purposes set out in 
               this privacy policy, unless a longer retention period is required or permitted by law.
@@ -94,7 +134,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">6. Your Privacy Rights</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Your Privacy Rights</h2>
             <p>Depending on your location, you may have certain rights regarding your personal information, including:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>The right to access and receive a copy of your personal information</li>
@@ -109,7 +149,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">7. Third-Party Services</h2>
+            <h2 className="text-2xl font-semibold mb-4">8. Third-Party Services</h2>
             <p>
               We may employ third-party companies and individuals to facilitate our platform, provide the platform 
               on our behalf, perform platform-related services, or assist us in analyzing how our platform is used. 
@@ -119,7 +159,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">8. Children's Privacy</h2>
+            <h2 className="text-2xl font-semibold mb-4">9. Children's Privacy</h2>
             <p>
               Our platform is not intended for children under 18 years of age. We do not knowingly collect personal 
               information from children under 18. If you are a parent or guardian and believe your child has provided 
@@ -128,7 +168,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">9. Changes to This Privacy Policy</h2>
+            <h2 className="text-2xl font-semibold mb-4">10. Changes to This Privacy Policy</h2>
             <p>
               We may update our Privacy Policy from time to time. We will notify you of any changes by posting the 
               new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this 
@@ -137,7 +177,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold mb-4">10. Contact Us</h2>
+            <h2 className="text-2xl font-semibold mb-4">11. Contact Us</h2>
             <p>
               If you have questions or comments about this Privacy Policy, please contact us at:
             </p>
