@@ -5,6 +5,7 @@ import { useConvex, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
+import { toDownloadFileName } from "@/lib/downloadFileName";
 
 export type JkDocumentType = "resume" | "cover-letter";
 
@@ -26,8 +27,12 @@ interface JobKompassDocumentsContextType {
   selectedDocument: JkSelectedDocument;
   selectDocument: (id: string, type: JkDocumentType) => void;
 
-  // Trigger a download for a resume file (uses cached selected-resume URL when possible)
-  downloadFirstVersionResume: (fileId: Id<"_storage"> | undefined) => void;
+  // Download a resume file straight to disk. `fileName` names the saved file;
+  // it falls back to "resume.pdf" when the caller has no name to offer.
+  downloadFirstVersionResume: (
+    fileId: Id<"_storage"> | undefined,
+    fileName?: string
+  ) => void;
 }
 
 const DocumentsContext = createContext<JobKompassDocumentsContextType | null>(null);
@@ -106,24 +111,61 @@ export function JobKompassDocumentsProvider({ children }: { children: React.Reac
     }
   }, [coverLetters, resumes, documents, isLoading, selectedDocument, currentResumeId, resumeList, setCurrentResumeId]);
 
-  // One-shot download function (imperative query -> open URL). No state/useEffect needed.
-  // Open a window *synchronously* (before any await) so mobile doesn't block it as a popup.
-  const downloadFirstVersionResume = async (fileId: Id<"_storage"> | undefined) => {
+  // One-shot download: imperative query for the file URL, then save the bytes
+  // to disk via an anchor with `download`.
+  //
+  // This used to open a new tab pointed at the raw Convex storage URL. Convex
+  // serves the file inline, so the browser rendered the PDF in its viewer
+  // instead of downloading it — and on mobile that tab was also a popup target.
+  // Fetching the blob and clicking a `download` anchor is not a popup, needs no
+  // new tab, and saves the file directly on desktop and mobile alike. Verified
+  // that Convex storage reflects the request Origin, so the cross-origin fetch
+  // is allowed.
+  const downloadFirstVersionResume = async (
+    fileId: Id<"_storage"> | undefined,
+    fileName?: string
+  ) => {
     if (!fileId) {
       console.log("No fileId provided");
       return;
     }
 
-    const w = window.open("", "_blank");
+    let objectUrl: string | undefined;
     try {
       const url = await convex.query(api.documents.getFileUrlById, { fileId });
-      if (url) {
-        if (w) w.location.href = url;
-        else window.open(url, "_blank");
-      } else if (w) w.close();
+      if (!url) {
+        console.error("No file URL returned for resume file");
+        return;
+      }
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Fetching resume file failed: ${response.status}`);
+      }
+
+      // Keep the served content type when there is one; Convex hands back
+      // octet-stream for some uploads, which iOS treats as an unnamed binary.
+      const raw = await response.blob();
+      const blob = raw.type ? raw : new Blob([raw], { type: "application/pdf" });
+
+      objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = toDownloadFileName(fileName);
+      a.rel = "noopener";
+      // Safari only honours `download` for an anchor that is in the document.
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     } catch (err) {
-      if (w) w.close();
       console.error("Failed to download resume file:", err);
+    } finally {
+      // Revoking straight after `click()` can cancel the download before the
+      // browser has read the blob, which is most visible on mobile Safari.
+      if (objectUrl) {
+        const toRevoke = objectUrl;
+        setTimeout(() => URL.revokeObjectURL(toRevoke), 60_000);
+      }
     }
   };
 

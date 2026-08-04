@@ -1597,7 +1597,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             <DropdownMenuItem
                                                                 onClick={async (event) => {
                                                                     event.stopPropagation();
-                                                                    downloadFirstVersionResume(resume.fileId);
+                                                                    downloadFirstVersionResume(resume.fileId, resume.name);
                                                                     void markDocumentAsSeen(resumeId, documentType);
                                                                 }}
                                                             >
