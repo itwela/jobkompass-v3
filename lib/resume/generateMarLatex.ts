@@ -100,8 +100,16 @@ export function generateMarLatex(content: ResumeContent): string {
     sections.push(`\\marsection{Professional Summary}\n\\marpara{${e(content.personalInfo.summary)}}`);
   }
 
-  // Technical Skills — one "Label: values" line per entry. Entries already
-  // written as "Label: a, b, c" get the label bolded; plain entries render as-is.
+  // Technical Skills — one "Label: values" line per category.
+  //
+  // `technical` is a FLAT array: the category prefix rides on the first skill of
+  // each group and the rest follow bare ("Languages: Python", "TypeScript",
+  // "JavaScript", "Frontend: React", ...) — that's the shape Joseph renders as
+  // one bullet per item. So a colon-bearing item OPENS a category and every bare
+  // item after it belongs to that category, comma-joined onto the same line.
+  // Emitting a line per item instead is what made page 1 run one skill per row.
+  // An entry already written whole ("Label: a, b, c") still works: it opens a
+  // category whose values are already comma-separated.
   // coreCompetencies rides along as its own label line so switching a resume
   // from Joseph to Mar doesn't silently drop it.
   const tech = (content.skills?.technical || []).filter((s) => s && s.trim());
@@ -109,12 +117,31 @@ export function generateMarLatex(content: ResumeContent): string {
   const comps = (content.coreCompetencies || []).filter((c) => c && c.trim());
   if (tech.length || extraSkills.length || comps.length) {
     const lines: string[] = [];
-    for (const s of tech) {
+
+    // Groups are emitted in encounter order. `label: null` holds any bare items
+    // that appear before the first category so they aren't dropped.
+    const groups: Array<{ label: string | null; values: string[] }> = [];
+    for (const raw of tech) {
+      const s = raw.trim();
+      // Only a real label colon opens a category — not the one in "https://".
       const idx = s.indexOf(':');
-      if (idx > 0) {
-        lines.push(`\\marskillline{${e(s.slice(0, idx + 1))}}{${e(s.slice(idx + 1).trim())}}`);
+      const isLabel = idx > 0 && s[idx + 1] !== '/';
+      if (isLabel) {
+        const rest = s.slice(idx + 1).trim();
+        groups.push({ label: s.slice(0, idx + 1), values: rest ? [rest] : [] });
+      } else if (groups.length) {
+        groups[groups.length - 1].values.push(s);
       } else {
-        lines.push(`\\marpara{${e(s)}}`);
+        groups.push({ label: null, values: [s] });
+      }
+    }
+
+    for (const g of groups) {
+      const values = g.values.filter((v) => v).join(', ');
+      if (g.label === null) {
+        if (values) lines.push(`\\marpara{${e(values)}}`);
+      } else {
+        lines.push(`\\marskillline{${e(g.label)}}{${e(values)}}`);
       }
     }
     if (comps.length) {
