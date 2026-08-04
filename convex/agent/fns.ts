@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { AgentError } from "./auth";
+import { shouldSeedBaseResume } from "../baseResume";
 
 const jobFields = {
   company: v.string(),
@@ -138,9 +139,10 @@ export const resumesDuplicate = internalMutation({
     return await ctx.db.insert("resumes", {
       userId,
       name: `${resume.name} (Copy)`,
+      // A copy of the base must not become a second base — see convex/baseResume.ts
       createdAt: now,
       updatedAt: now,
-      isActive: resume.isActive ?? true,
+      isActive: await shouldSeedBaseResume(ctx, userId),
       content: resume.content,
       label: resume.label,
       tags: resume.tags,
@@ -219,7 +221,8 @@ export const resumesInsertGenerated = internalMutation({
       fileType: "application/pdf",
       content: args.content,
       template: args.template,
-      isActive: true,
+      // Seed if empty, never steal — see convex/baseResume.ts
+      isActive: await shouldSeedBaseResume(ctx, args.userId),
       createdAt: now,
       updatedAt: now,
     });

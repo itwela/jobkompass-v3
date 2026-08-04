@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { Auth } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { shouldSeedBaseResume } from "./baseResume";
 
 // Resume functions
 export const saveResume = mutation({
@@ -24,7 +25,9 @@ export const saveResume = mutation({
       name: args.name,
       createdAt: now,
       updatedAt: now,
-      isActive: args.isActive ?? true,
+      // Explicit `isActive` still wins; otherwise seed if empty, never steal
+      // — see convex/baseResume.ts
+      isActive: args.isActive ?? (await shouldSeedBaseResume(ctx, userId)),
       content: args.content,
       label: args.label,
       tags: args.tags,
@@ -263,7 +266,8 @@ export const uploadResumeFile = mutation({
       template: args.template,
       createdAt: now,
       updatedAt: now,
-      isActive: true,
+      // Seed if empty, never steal — see convex/baseResume.ts
+      isActive: await shouldSeedBaseResume(ctx, userId),
     });
   },
 });
@@ -299,7 +303,9 @@ export const saveGeneratedResumeWithFile = mutation({
       tags: args.tags,
       createdAt: now,
       updatedAt: now,
-      isActive: true,
+      // Generated resumes are OUTPUTS, not the master base — seed if empty,
+      // never steal (see convex/baseResume.ts)
+      isActive: await shouldSeedBaseResume(ctx, userId),
     });
   },
 });
@@ -1268,7 +1274,8 @@ export const duplicateResume = mutation({
       name: `${resume.name} (Copy)`,
       createdAt: now,
       updatedAt: now,
-      isActive: resume.isActive ?? true,
+      // A copy of the base must not become a second base — see convex/baseResume.ts
+      isActive: await shouldSeedBaseResume(ctx, userId),
       content: resume.content,
       label: resume.label,
       tags: resume.tags,
