@@ -236,6 +236,10 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       /// SECTION AUTO-SAVE TO CONVEX
       
       console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting auto-save to Convex...`);
+      // Hoisted so the tool result can hand the client a storage id to download
+      // from, instead of shipping the whole PDF back through the model's context.
+      let savedStorageId: string | undefined;
+      let savedResumeId: string | undefined;
       try {
         // Get upload URL from Convex
         console.log(`[${toolExecutionId}] [RESUME_TOOL] Getting upload URL...`);
@@ -267,6 +271,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
+          savedStorageId = storageId;
           console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF uploaded successfully`, { storageId });
           
           // Save resume to database
@@ -283,7 +288,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
             fileSize: pdfBuffer.length
           });
           
-          await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
+          savedResumeId = await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
             fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`,
@@ -331,8 +336,11 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       return {
         success: true,
         message: 'Resume generated and saved successfully',
-        // textContent: latexTemplate,
-        pdfBase64: pdfBase64,
+        // The PDF itself is deliberately NOT returned. It was ~55k characters of
+        // base64 (~14k tokens) injected into the model's context on every
+        // generation. The client downloads it from storage instead.
+        storageId: savedStorageId,
+        resumeId: savedResumeId,
         fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.pdf`,
         texFileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.tex`,
         // sections: {

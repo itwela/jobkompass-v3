@@ -2,6 +2,7 @@
 
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { useAuth } from "@/providers/jkAuthProvider";
+import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useMutation, useQuery } from "convex/react";
@@ -86,6 +87,7 @@ export default function JkCW_ChatMode() {
     
     const [showMorePrompts, setShowMorePrompts] = useState(false)
     const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+    const { downloadFirstVersionResume } = useJobKompassDocuments()
     
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -644,72 +646,31 @@ export default function JkCW_ChatMode() {
                                         const pdfResults = message.toolCalls.map((tool, index) => {
                                             const resultObj: any = tool?.result || {};
                                             
-                                            // Check multiple possible paths for the PDF data
-                                            let pdfBase64: string | undefined;
-                                            let fileName: string | undefined;
-                                            let textContent: string | undefined;
-                                            let texFileName: string | undefined;
-                                            
-                                            // Direct properties
-                                            if (resultObj?.pdfBase64) {
-                                                pdfBase64 = resultObj.pdfBase64;
-                                                fileName = resultObj.fileName;
-                                                textContent = resultObj.textContent;
-                                                texFileName = resultObj.texFileName;
+                                            // The resume tool returns a storage id, not the PDF bytes.
+                                            // Tool results still arrive in a few shapes depending on
+                                            // how the run was serialized, so unwrap those, then read
+                                            // one field.
+                                            let payload: any = resultObj;
+                                            if (typeof resultObj === 'string') {
+                                                try { payload = JSON.parse(resultObj); } catch { payload = {}; }
+                                            } else if (resultObj?.text) {
+                                                try { payload = JSON.parse(resultObj.text); } catch { payload = resultObj; }
+                                            } else if (resultObj?.output) {
+                                                payload = resultObj.output;
+                                            } else if (resultObj?.data) {
+                                                payload = resultObj.data;
                                             }
-                                            // Nested in output
-                                            else if (resultObj?.output?.pdfBase64) {
-                                                pdfBase64 = resultObj.output.pdfBase64;
-                                                fileName = resultObj.output.fileName;
-                                                textContent = resultObj.output.textContent;
-                                                texFileName = resultObj.output.texFileName;
-                                            }
-                                            // Nested in data
-                                            else if (resultObj?.data?.pdfBase64) {
-                                                pdfBase64 = resultObj.data.pdfBase64;
-                                                fileName = resultObj.data.fileName;
-                                                textContent = resultObj.data.textContent;
-                                                texFileName = resultObj.data.texFileName;
-                                            }
-                                            // Check if result is a string that might contain JSON
-                                            else if (typeof resultObj === 'string') {
-                                                try {
-                                                    const parsed = JSON.parse(resultObj);
-                                                    if (parsed?.pdfBase64) {
-                                                        pdfBase64 = parsed.pdfBase64;
-                                                        fileName = parsed.fileName;
-                                                        textContent = parsed.textContent;
-                                                        texFileName = parsed.texFileName;
-                                                    }
-                                                } catch (e) {
-                                                    // Not JSON, ignore
-                                                }
-                                            }
-                                            // Check if result.text contains JSON (like in your example)
-                                            else if (resultObj?.text) {
-                                                try {
-                                                    const parsed = JSON.parse(resultObj.text);
-                                                    if (parsed?.pdfBase64) {
-                                                        pdfBase64 = parsed.pdfBase64;
-                                                        fileName = parsed.fileName;
-                                                        textContent = parsed.textContent;
-                                                        texFileName = parsed.texFileName;
-                                                    }
-                                                } catch (e) {
-                                                    // Not JSON, ignore
-                                                }
-                                            }
-                                            
+
                                             return {
                                                 toolName: tool.name,
                                                 index,
-                                                pdfBase64,
-                                                fileName: fileName || 'resume.pdf',
-                                                hasPdf: Boolean(pdfBase64),
-                                                textContent,
-                                                texFileName: texFileName || 'resume.tex'
+                                                storageId: payload?.storageId as Id<"_storage"> | undefined,
+                                                resumeId: payload?.resumeId as string | undefined,
+                                                fileName: payload?.fileName || 'resume.pdf',
+                                                textContent: payload?.textContent as string | undefined,
+                                                texFileName: payload?.texFileName || 'resume.tex'
                                             };
-                                        }).filter(result => result.hasPdf);
+                                        }).filter(result => Boolean(result.storageId));
 
                                         return (
                                             <>
@@ -735,13 +696,12 @@ export default function JkCW_ChatMode() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="w-max flex gap-2">
-                                                                    <a
-                                                                        href={`data:application/pdf;base64,${result.pdfBase64}`}
-                                                                        download={result.fileName}
-                                                                        className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium no-underline hover:opacity-80 transition-opacity"
+                                                                    <button
+                                                                        onClick={() => downloadFirstVersionResume(result.storageId, result.fileName)}
+                                                                        className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:opacity-80 transition-opacity"
                                                                     >
                                                                         Download PDF
-                                                                    </a>
+                                                                    </button>
                                                                     {/* {result.textContent && (
                                                                         <button
                                                                             onClick={async () => {
