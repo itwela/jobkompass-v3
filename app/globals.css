@@ -158,7 +158,9 @@ textarea[aria-label="Message input"]:focus-visible {
   
   /* Interactive elements */
   --primary: #2196f3; /* Blue */
-  --primary-foreground: #0b0c0f;
+  /* White, not near-black: --primary is the same blue in both themes, so a dark
+     foreground rendered every bg-primary surface as near-black on blue. */
+  --primary-foreground: #ffffff;
   --secondary: #242834;
   --secondary-foreground: #e6e8ee;
   
