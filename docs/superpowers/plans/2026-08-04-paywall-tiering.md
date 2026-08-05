@@ -781,13 +781,23 @@ git commit -m "Require a Plus plan for the Chrome extension endpoint"
 - Consumes: `canUseResumeTemplate`, `resumeTemplateMinRank` from Task 2; `rankLabel` from Task 1; `userRank` resolved in Task 3 Step 4.
 - Produces: the chat tool's result gains `templateDowngraded?: { requested: string; used: string; requiredPlan: string }`.
 
-**Scope note:** enforcement already happened in Task 3 — the export route rejects
-any over-tier template with a 402 regardless of caller. This task is **not a
-second gate**. It is a presentation decision: in chat the model picks the
-template, not the user, so letting the request reach the route and fail would be
-a dead end for someone who never chose Mar in the first place. Downgrading to
-Jake and saying so is the better outcome. If this check were removed, the route
-would still hold the line.
+**Scope note (CORRECTED during execution):** the original plan said this was
+presentation only, and that "if this check were removed, the route would still
+hold the line." **That is false.** `app/ai/tools/file.ts` does not call
+`/api/resume/export` at all — it calls `generateResumeLatex` and posts straight
+to the LaTeX service (`file.ts:166-180`). The chat path never reaches the export
+route, so Task 3's gate does not cover it.
+
+This check is therefore **the enforcement point for the chat path**. Removing it
+opens every template to every tier through chat.
+
+It still *downgrades* rather than refuses, for the original reason: in chat the
+model picks the template, not the user, so a hard failure would be a dead end for
+someone who never chose Mar. But the downgrade is load-bearing, not cosmetic.
+
+Rewiring chat through the export route was considered and rejected: it would
+change error shape, timeout behavior, and buffer handling on a live generation
+path, and the goal was to add gating without altering existing behavior.
 
 - [ ] **Step 1: Fall back to Jake before calling the route**
 

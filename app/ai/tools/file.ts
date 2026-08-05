@@ -15,6 +15,8 @@ import os from "os";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { generateResumeLatex } from "@/lib/resume/generators";
+import { canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
+import { rankLabel, type PlanRank } from "@/convex/plans";
 
 
 // Helper function to escape LaTeX special characters
@@ -162,7 +164,31 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       }
 
       const formattedTime = getFormattedTime();
-      const templateId = input.templateId || 'jake';
+      const requestedTemplateId = input.templateId || 'jake';
+
+      // This chat tool compiles LaTeX directly and never calls
+      // /api/resume/export, so the export route's tier gate does NOT cover this
+      // path. This check IS the enforcement point here — removing it would open
+      // every template to every tier through chat.
+      //
+      // It downgrades rather than refuses because in chat the model picks the
+      // template, not the user: a hard failure would be a dead end for someone
+      // who never asked for Mar in the first place.
+      const userRank = await convexClient.query(api.usage.currentPlanRank, {});
+      let templateDowngraded:
+        | { requested: string; used: string; requiredPlan: string }
+        | undefined;
+      let templateId = requestedTemplateId;
+      if (!canUseResumeTemplate(templateId, userRank as PlanRank)) {
+        templateDowngraded = {
+          requested: templateId,
+          used: 'jake',
+          requiredPlan: rankLabel(resumeTemplateMinRank(templateId)),
+        };
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Template over tier, falling back to jake`, templateDowngraded);
+        templateId = 'jake';
+      }
+
       const latexTemplate = generateResumeLatex(input as any, templateId);
 
       /// SECTION PDF GENERATION (LaTeX service)
@@ -317,6 +343,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         //   skillsContent
         // },
         documentType: 'resume',
+        ...(templateDowngraded ? { templateDowngraded } : {}),
       };
     } catch (error) {
       const totalDuration = Date.now() - startTime;
