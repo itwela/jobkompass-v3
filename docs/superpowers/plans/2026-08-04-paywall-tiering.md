@@ -4,7 +4,7 @@
 
 **Goal:** Enforce plan tiers across every surface — templates by tier, CLI behind Pro, Chrome extension behind Plus — and fix the chat download plus two pricing page defects.
 
-**Architecture:** One pure module (`convex/plans.ts`) resolves a subscription record to a numeric rank 0-3. Every gate is a rank comparison against that single function. Templates carry a `minRank`; the CLI gate lives in the agent API's one `authenticate()` chokepoint; the extension gate lives in its HTTP route. No gate lives in UI code — UI only reflects state the server already enforces.
+**Architecture:** One pure module (`convex/plans.ts`) resolves a subscription record to a numeric rank 0-3. Every gate is a rank comparison against that single function, and each gate exists in exactly one place: templates are enforced solely by the resume export route (callers pass the rank, a shared secret proves the caller is our own infrastructure), the CLI by the agent API's one `authenticate()` chokepoint, the extension by its HTTP route. No gate lives in UI code — UI only reflects state the server already enforces.
 
 **Tech Stack:** Next.js 16, Convex, TypeScript, vitest, Tailwind v4 (CSS-variable theming).
 
@@ -405,27 +405,84 @@ git commit -m "Tier resume templates and collapse the duplicate id validator"
 
 ---
 
-### Task 3: Close the unauthenticated export route
+### Task 3: Close the export route and make it the single tier gate
 
 **Files:**
-- Modify: `app/api/resume/export/[templateId]/route.ts:13-24`
-- Modify: `convex/agent/fns.ts:284` and `convex/agent/fns.ts:402` (add header to both `fetch` calls)
-- Modify: `app/ai/tools/file.ts` (add header to its export `fetch` calls)
+- Modify: `app/api/resume/export/[templateId]/route.ts:13-30`
+- Modify: `convex/agent/fns.ts:284` and `convex/agent/fns.ts:402` (both `fetch` calls)
+- Modify: `convex/agent/fns.ts` (add `agentPlanRank` internal query)
+- Modify: `convex/usage.ts` (add `currentPlanRank` query)
+- Modify: `app/ai/tools/file.ts` (its export `fetch` calls)
 
 **Interfaces:**
-- Consumes: nothing from earlier tasks.
-- Produces: the env var contract `RESUME_EXPORT_SECRET`, sent as header `x-jk-export-secret`.
+- Consumes: `canUseResumeTemplate`, `resumeTemplateMinRank` from Task 2; `planRank`, `rankLabel`, `PlanRank` from Task 1.
+- Produces: env var `RESUME_EXPORT_SECRET`, sent as header `x-jk-export-secret`; the request body gains `rank: PlanRank`; `internal.agent.fns.agentPlanRank({ userId })`; `api.usage.currentPlanRank()`.
 
-**Why this task exists:** `/api/resume/export/[templateId]` takes a template id and raw resume content and returns a compiled PDF. It has **no authentication of any kind**. Template gating cannot live here, because the route never learns who the caller is — but that also means anyone on the internet can POST content and receive a Mar PDF, bypassing every gate the other tasks add. The route must become server-to-server only, so gating can live at the authenticated callers.
+**Why this task exists, and why the gate lives here:** `/api/resume/export/[templateId]` takes a template id and raw resume content and returns a compiled PDF. It has **no authentication of any kind**, so anyone on the internet can POST content and receive a Mar PDF, bypassing every other gate in this plan.
 
-- [ ] **Step 1: Reject unsigned callers**
+It cannot authenticate the *user*, because its main caller is a Convex action doing a bare server-to-server `fetch` with no session to present. But it does not need to. The shared secret establishes that the caller is our own infrastructure; the caller then states the user's rank, and the route enforces the tier. A caller able to lie about the rank could call the route directly anyway, so nothing is lost — and every tier decision ends up in exactly one place instead of scattered across three call sites.
 
-In `app/api/resume/export/[templateId]/route.ts`, insert immediately after `const { templateId } = await params;`:
+- [ ] **Step 1: Add the two rank lookups**
+
+In `convex/agent/fns.ts`, add the import and the query (used by this task and by Task 4):
+
+```ts
+import { planRank } from "../plans";
+
+export const agentPlanRank = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    return planRank(subscription);
+  },
+});
+```
+
+In `convex/usage.ts`, add the authenticated equivalent for app-side callers. This adds a query and alters no existing handler, so job-limit behavior is untouched:
+
+```ts
+import { planRank } from "./plans";
+
+export const currentPlanRank = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+    const user = await ctx.db.get(userId);
+    if (!user) return 0;
+    const convexUserId = (user as any).convex_user_id || userId;
+    let subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
+      .first();
+    if (!subscription && convexUserId !== userId) {
+      subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+    }
+    return planRank(subscription);
+  },
+});
+```
+
+- [ ] **Step 2: Make the route reject unsigned callers and enforce the tier**
+
+In `app/api/resume/export/[templateId]/route.ts`, add the import:
+
+```ts
+import { canUseResumeTemplate, resumeTemplateMinRank } from '@/lib/templates';
+import { rankLabel, type PlanRank } from '@/convex/plans';
+```
+
+Insert immediately after `const { templateId } = await params;`:
 
 ```ts
     // Server-to-server only. This route renders any template for any content, so
-    // it must not be reachable from a browser or an untrusted client; tier gating
-    // happens at the authenticated callers that know who the user is.
+    // it must not be reachable from a browser or an untrusted client.
     const expectedSecret = process.env.RESUME_EXPORT_SECRET;
     if (!expectedSecret) {
       return NextResponse.json(
@@ -438,7 +495,38 @@ In `app/api/resume/export/[templateId]/route.ts`, insert immediately after `cons
     }
 ```
 
-- [ ] **Step 2: Send the header from Convex**
+Then change the body destructure (currently `const { content } = (await req.json()) as { content: ResumeContent };`) to read the rank as well, and enforce the tier immediately after the existing missing-content check:
+
+```ts
+    const { content, rank } = (await req.json()) as {
+      content: ResumeContent;
+      rank?: number;
+    };
+    if (!content) {
+      return NextResponse.json({ error: 'Missing resume content' }, { status: 400 });
+    }
+
+    // Fail closed: an absent or malformed rank is treated as free.
+    const callerRank = (
+      rank === 0 || rank === 1 || rank === 2 || rank === 3 ? rank : 0
+    ) as PlanRank;
+
+    // The single tier gate. Callers state who is asking; this decides.
+    if (!canUseResumeTemplate(templateId, callerRank)) {
+      return NextResponse.json(
+        {
+          error: 'tier_required',
+          message: `The '${templateId}' template requires the ${rankLabel(
+            resumeTemplateMinRank(templateId)
+          )} plan.`,
+          hint: 'Upgrade at https://www.myjobkompass.com/pricing',
+        },
+        { status: 402 }
+      );
+    }
+```
+
+- [ ] **Step 3: Send the secret and rank from Convex**
 
 In `convex/agent/fns.ts`, both export calls (line 284 in `resumesGenerate`, line 402 in `resumesUpdateContent`) currently read:
 
@@ -455,11 +543,25 @@ Change both to:
       },
 ```
 
-- [ ] **Step 3: Send the header from the chat tool**
+In each of those two functions, resolve the rank before the `fetch` and add it to the JSON body alongside `content`:
 
-In `app/ai/tools/file.ts`, apply the same header addition to every `fetch` that targets `/api/resume/export/`. Search for `api/resume/export` to find them.
+```ts
+    const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, { userId });
+```
 
-- [ ] **Step 4: Set the secret in both environments**
+Both functions already build a body containing `content`; add `rank` to it. When the route answers 402, surface its `message` as the thrown error so the CLI prints it verbatim.
+
+- [ ] **Step 4: Send the secret and rank from the chat tool**
+
+In `app/ai/tools/file.ts`, resolve the rank once per tool invocation:
+
+```ts
+  const userRank = await convexClient.query(api.usage.currentPlanRank, {});
+```
+
+Apply the same header addition and add `rank: userRank` to the body of every `fetch` that targets `/api/resume/export/`. Search for `api/resume/export` to find them.
+
+- [ ] **Step 5: Set the secret in both environments**
 
 ```bash
 # Generate one value and use it in BOTH places — they must match.
@@ -479,25 +581,44 @@ npx --yes vercel@latest env add RESUME_EXPORT_SECRET production
 npx --yes vercel@latest env add RESUME_EXPORT_SECRET preview
 ```
 
-- [ ] **Step 5: Verify the route rejects and accepts correctly**
+- [ ] **Step 6: Verify all three gate outcomes**
 
-With `npm run dev` running:
+With `npm run dev` running and `RESUME_EXPORT_SECRET` set in `.env.local`, check
+each branch. Substitute the real secret for `$SECRET`.
 
 ```bash
-# Expect 403
-curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+# 1. No secret -> 403 Forbidden
+curl -s -o /dev/null -w "no-secret: %{http_code}\n" -X POST \
   http://localhost:3000/api/resume/export/mar \
-  -H 'Content-Type: application/json' -d '{"content":{}}'
+  -H 'Content-Type: application/json' \
+  -d '{"content":{},"rank":3}'
+
+# 2. Valid secret, free rank, Pro-only template -> 402 tier_required
+curl -s -w "\nfree-asks-mar: %{http_code}\n" -X POST \
+  http://localhost:3000/api/resume/export/mar \
+  -H 'Content-Type: application/json' \
+  -H "x-jk-export-secret: $SECRET" \
+  -d '{"content":{},"rank":0}'
+
+# 3. Valid secret, free rank, free template -> passes the gate
+#    (400 "Missing resume content" is the expected next failure, and proves
+#     the tier check was cleared.)
+curl -s -w "\nfree-asks-jake: %{http_code}\n" -X POST \
+  http://localhost:3000/api/resume/export/jake \
+  -H 'Content-Type: application/json' \
+  -H "x-jk-export-secret: $SECRET" \
+  -d '{"rank":0}'
 ```
 
-Expected: `403`.
+Expected: `403`, then `402` with a `tier_required` body naming the Pro plan, then
+`400`.
 
-- [ ] **Step 6: Typecheck and commit**
+- [ ] **Step 7: Typecheck and commit**
 
 ```bash
-npx tsc --noEmit
-git add app/api/resume/export/ convex/agent/fns.ts app/ai/tools/file.ts
-git commit -m "Require a shared secret on the resume export route"
+npx tsc --noEmit && npm test
+git add app/api/resume/export/ convex/agent/fns.ts convex/usage.ts app/ai/tools/file.ts
+git commit -m "Make the export route server-only and the single template tier gate"
 ```
 
 ---
@@ -506,37 +627,13 @@ git commit -m "Require a shared secret on the resume export route"
 
 **Files:**
 - Modify: `convex/agent/auth.ts`
-- Modify: `convex/agent/fns.ts` (add one internal query)
 - Modify: `convex/agent/dispatch.ts:86-99, 116-128, 130-144`
 
 **Interfaces:**
-- Consumes: `planRank`, `RANK_PRO`, `meetsTier` from Task 1.
-- Produces: `authenticate(ctx, request, opts?: { requireRank?: PlanRank }): Promise<string>`; `internal.agent.fns.agentPlanRank({ userId })` returning `PlanRank`.
+- Consumes: `RANK_PRO`, `rankLabel`, `PlanRank` from Task 1; `internal.agent.fns.agentPlanRank({ userId })` from Task 3.
+- Produces: `authenticate(ctx, request, opts?: { requireRank?: PlanRank }): Promise<string>`.
 
-- [ ] **Step 1: Add the rank lookup query**
-
-In `convex/agent/fns.ts`, add near `resumesCanGenerate` (around line 171):
-
-```ts
-export const agentPlanRank = internalQuery({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    const subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    return planRank(subscription);
-  },
-});
-```
-
-Add to the imports at the top of `convex/agent/fns.ts`:
-
-```ts
-import { planRank } from "../plans";
-```
-
-- [ ] **Step 2: Add the gate to authenticate()**
+- [ ] **Step 1: Add the gate to authenticate()**
 
 In `convex/agent/auth.ts`, add the import:
 
@@ -576,7 +673,7 @@ export async function authenticate(
 ): Promise<string> {
 ```
 
-- [ ] **Step 3: Require Pro on every route except ping and schema**
+- [ ] **Step 2: Require Pro on every route except ping and schema**
 
 In `convex/agent/dispatch.ts`, add the import:
 
@@ -598,7 +695,7 @@ to:
 
 Leave the `/agent/ping` (line 121) and `/agent/schema` (line 135) calls exactly as they are. A lapsed user must still be able to confirm their key resolves and read the error, otherwise a billing problem is indistinguishable from a broken credential.
 
-- [ ] **Step 4: Verify against the live deployment**
+- [ ] **Step 3: Verify against the live deployment**
 
 Deploy to the dev slot, then check with a real key:
 
@@ -614,10 +711,10 @@ To prove the gate fires, temporarily test with a non-Pro account's key if one ex
 `error.code`, `error.message`, and `error.hint` off any non-`ok` response and
 rethrows them as a `CliError`, which `cli/src/index.ts:48` prints as
 `error (subscription_required): ...` followed by a `hint:` line. The 402 built in
-Step 2 therefore renders as a clean sentence with the upgrade URL already. Verify
-this in Step 4 rather than editing the CLI.
+Step 1 therefore renders as a clean sentence with the upgrade URL already. Verify
+this in Step 3 rather than editing the CLI.
 
-- [ ] **Step 5: Typecheck and commit**
+- [ ] **Step 4: Typecheck and commit**
 
 ```bash
 npx tsc --noEmit
@@ -675,88 +772,34 @@ git commit -m "Require a Plus plan for the Chrome extension endpoint"
 
 ---
 
-### Task 6: Gate templates at the authenticated callers
+### Task 6: Downgrade instead of refusing in chat
 
 **Files:**
-- Modify: `convex/agent/fns.ts:282` (`resumesGenerate`) and `convex/agent/fns.ts:400` (`resumesUpdateContent`)
 - Modify: `app/ai/tools/file.ts`
 
 **Interfaces:**
-- Consumes: `canUseResumeTemplate`, `resumeTemplateMinRank` from Task 2; `agentPlanRank` from Task 4; `rankLabel` from Task 1.
+- Consumes: `canUseResumeTemplate`, `resumeTemplateMinRank` from Task 2; `rankLabel` from Task 1; `userRank` resolved in Task 3 Step 4.
 - Produces: the chat tool's result gains `templateDowngraded?: { requested: string; used: string; requiredPlan: string }`.
 
-- [ ] **Step 1: Reject over-tier templates in the agent API**
+**Scope note:** enforcement already happened in Task 3 — the export route rejects
+any over-tier template with a 402 regardless of caller. This task is **not a
+second gate**. It is a presentation decision: in chat the model picks the
+template, not the user, so letting the request reach the route and fail would be
+a dead end for someone who never chose Mar in the first place. Downgrading to
+Jake and saying so is the better outcome. If this check were removed, the route
+would still hold the line.
 
-In `convex/agent/fns.ts`, add to the imports:
+- [ ] **Step 1: Fall back to Jake before calling the route**
 
-```ts
-import { canUseResumeTemplate, resumeTemplateMinRank } from "../../lib/templates";
-import { rankLabel } from "../plans";
-```
-
-In `resumesGenerate`, the line `const template = args.template || "jake";` (line 282) becomes:
-
-```ts
-    const template = args.template || "jake";
-    const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, { userId });
-    if (!canUseResumeTemplate(template, rank)) {
-      throw new Error(
-        `tier_required: The '${template}' template requires the ${rankLabel(
-          resumeTemplateMinRank(template)
-        )} plan. Upgrade at https://www.myjobkompass.com/pricing`
-      );
-    }
-```
-
-Apply the identical check in `resumesUpdateContent` after its `const template = args.template || existing.template || "jake";` (line 400).
-
-Note: every CLI caller is already Pro after Task 4, so this is currently unreachable from `jk`. It is kept because the agent API is not CLI-exclusive by design, and because a future tier change would otherwise silently open a hole.
-
-- [ ] **Step 2: Expose the caller's rank to authenticated app code**
-
-The chat tools hold an authenticated `ConvexHttpClient` and already call
-`api.usage.canGenerateDocument` (`app/ai/tools/file.ts:147`). Add a sibling query
-so the same client can read a rank. In `convex/usage.ts`, add:
+In `app/ai/tools/file.ts`, add the imports:
 
 ```ts
-import { planRank } from "./plans";
-
-export const currentPlanRank = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return 0;
-    const user = await ctx.db.get(userId);
-    if (!user) return 0;
-    const convexUserId = (user as any).convex_user_id || userId;
-    let subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-      .first();
-    if (!subscription && convexUserId !== userId) {
-      subscription = await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
-    }
-    return planRank(subscription);
-  },
-});
+import { canUseResumeTemplate, resumeTemplateMinRank } from '@/lib/templates';
+import { rankLabel } from '@/convex/plans';
 ```
 
-This adds a query; it does not alter any existing handler, so job-limit behavior
-is untouched.
-
-- [ ] **Step 3: Downgrade rather than refuse in chat**
-
-In `app/ai/tools/file.ts`, resolve the rank before the template is used to build
-the export URL:
-
-```ts
-  const userRank = await convexClient.query(api.usage.currentPlanRank, {});
-```
-
-Then fall back:
+`userRank` is already in scope from Task 3 Step 4. Before the template is used to
+build the export URL, add:
 
 ```ts
   // The model picks the template here, not the user, so a hard refusal would be a
@@ -776,16 +819,16 @@ Then fall back:
 
 Include `templateDowngraded` in the tool's returned object so the model can surface it.
 
-- [ ] **Step 4: Verify**
+- [ ] **Step 2: Verify**
 
 Run: `npx tsc --noEmit && npm test`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add convex/agent/fns.ts convex/usage.ts app/ai/tools/file.ts
-git commit -m "Enforce template tiers at the authenticated callers"
+git add app/ai/tools/file.ts
+git commit -m "Fall back to Jake in chat when the requested template is over tier"
 ```
 
 ---
@@ -938,10 +981,16 @@ async function switchTemplate(resumeId: string, templateId: string) {
 ```
 
 Create `app/api/resume/switch-template/route.ts` as the authenticated wrapper: it
-reads the saved resume content, checks `canUseResumeTemplate(templateId, rank)`
-against the caller's rank and returns 402 if it fails, calls the export route
-with the shared secret from Task 3, uploads the resulting PDF via
-`generateUploadUrl`, and returns the new `storageId`.
+reads the saved resume content, resolves the caller's rank via
+`api.usage.currentPlanRank`, and calls the export route with the shared secret
+and that rank. It performs **no tier check of its own** — the export route is the
+single gate (Task 3) and answers 402 for an over-tier template. The wrapper
+forwards that 402 through unchanged, then on success uploads the PDF via
+`generateUploadUrl` and returns the new `storageId`.
+
+The UI still renders locked templates as non-clickable, but that is presentation:
+a hand-crafted request reaching this route is rejected by the export route all
+the same.
 
 Same record id, same name, same label, same favorite flag, PDF replaced. No new
 resume row is created and no document-generation credit is consumed, because the
