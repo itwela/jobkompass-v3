@@ -2,6 +2,7 @@ import type { HttpRouter } from "convex/server";
 import { httpAction } from "../_generated/server";
 import { AgentError, authenticate } from "./auth";
 import { agentRoutes, type AgentRoute, type ParamSpec } from "./routes";
+import { RANK_PRO } from "../plans";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -86,7 +87,7 @@ async function buildArgs(route: AgentRoute, request: Request): Promise<Record<st
 function makeHandler(route: AgentRoute) {
   return httpAction(async (ctx, request) => {
     try {
-      const userId = await authenticate(ctx, request);
+      const userId = await authenticate(ctx, request, { requireRank: RANK_PRO });
       const args = await buildArgs(route, request);
       args.userId = userId; // every agent fn takes explicit userId and enforces ownership
       const result =

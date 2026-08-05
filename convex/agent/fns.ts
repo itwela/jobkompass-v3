@@ -5,6 +5,22 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { AgentError } from "./auth";
 import { shouldSeedBaseResume } from "../baseResume";
+import { planRank } from "../plans";
+
+/**
+ * The caller's plan rank, resolved from their subscription row. Used by the
+ * agent API's auth chokepoint and by every server-to-server export call.
+ */
+export const agentPlanRank = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    return planRank(subscription);
+  },
+});
 
 const jobFields = {
   company: v.string(),
@@ -280,14 +296,27 @@ export const resumesGenerate = internalAction({
     };
 
     const template = args.template || "jake";
+    const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, { userId: args.userId });
     const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
     const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${template}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-jk-export-secret": process.env.RESUME_EXPORT_SECRET ?? "",
+      },
+      body: JSON.stringify({ content, rank }),
     });
     if (!exportResponse.ok) {
       const errorBody = await exportResponse.json().catch(() => ({}));
+      // The export route is the single template tier gate; surface its 402 verbatim.
+      if (exportResponse.status === 402) {
+        throw new AgentError(
+          402,
+          "tier_required",
+          errorBody.message || "This template requires a higher plan.",
+          errorBody.hint
+        );
+      }
       throw new AgentError(
         502,
         "generation_failed",
@@ -398,14 +427,27 @@ export const resumesUpdateContent = internalAction({
     };
 
     const template = args.template || existing.template || "jake";
+    const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, { userId: args.userId });
     const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
     const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${template}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-jk-export-secret": process.env.RESUME_EXPORT_SECRET ?? "",
+      },
+      body: JSON.stringify({ content, rank }),
     });
     if (!exportResponse.ok) {
       const errorBody = await exportResponse.json().catch(() => ({}));
+      // The export route is the single template tier gate; surface its 402 verbatim.
+      if (exportResponse.status === 402) {
+        throw new AgentError(
+          402,
+          "tier_required",
+          errorBody.message || "This template requires a higher plan.",
+          errorBody.hint
+        );
+      }
       throw new AgentError(
         502,
         "generation_failed",

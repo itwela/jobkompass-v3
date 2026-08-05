@@ -4,6 +4,8 @@
  * Migrate to DB later by replacing this module with a Convex query.
  */
 
+import { RANK_FREE, RANK_PRO, RANK_STARTER, type PlanRank } from '../convex/plans';
+
 export interface Template {
   id: string;
   name: string;
@@ -13,6 +15,12 @@ export interface Template {
   features?: string[];
   /** If true, available in free resume generator. Otherwise app-only. */
   freeResumeEligible?: boolean;
+  /**
+   * Lowest plan rank that may generate with this template. Absent means free.
+   * Distinct from `freeResumeEligible`, which governs the logged-out lead-magnet
+   * generator and is unrelated to subscriber tiering.
+   */
+  minRank?: PlanRank;
 }
 
 /** Resume templates - single source of truth */
@@ -26,6 +34,7 @@ export const RESUME_TEMPLATES: Template[] = [
     tags: ['ATS-Friendly', 'Professional', 'Tech'],
     features: ['Optimized for ATS systems', 'Clean section hierarchy', 'Modern typography', 'Tech-focused layout'],
     freeResumeEligible: true,
+    minRank: RANK_FREE,
   },
   {
     id: 'joseph',
@@ -36,6 +45,7 @@ export const RESUME_TEMPLATES: Template[] = [
     tags: ['ATS-Friendly', 'Professional', 'Competencies'],
     features: ['Calibri-style typography', 'Core competencies section', 'Early career summary', 'Merged education & development'],
     freeResumeEligible: false,
+    minRank: RANK_STARTER,
   },
   {
     id: 'mar',
@@ -52,6 +62,7 @@ export const RESUME_TEMPLATES: Template[] = [
       'Merged education & certifications',
     ],
     freeResumeEligible: false,
+    minRank: RANK_PRO,
   },
 ];
 
@@ -86,8 +97,39 @@ export function getDefaultCoverLetterTemplateId(): string {
   return 'jake';
 }
 
+export const RESUME_TEMPLATE_IDS = ['jake', 'joseph', 'mar'] as const;
+
+/**
+ * Template ids that were renamed. Resumes saved before a rename still carry the
+ * old id, so keep resolving them instead of silently falling back to jake.
+ *
+ * NOTE: `mar` used to alias to `joseph`. That alias was removed when Mar was
+ * reintroduced as its own template, so pre-rename resumes saved as `mar` now
+ * render in the new Mar template.
+ */
+const LEGACY_TEMPLATE_IDS: Record<string, string> = {};
+
+export function resolveResumeTemplateId(id: string): string {
+  return LEGACY_TEMPLATE_IDS[id] ?? id;
+}
+
 export function isValidResumeTemplateId(id: string): boolean {
-  return RESUME_TEMPLATES.some((t) => t.id === id);
+  return RESUME_TEMPLATES.some((t) => t.id === resolveResumeTemplateId(id));
+}
+
+/** Unknown ids return Pro, so a typo fails closed rather than granting access. */
+export function resumeTemplateMinRank(id: string): PlanRank {
+  const template = getResumeTemplateById(resolveResumeTemplateId(id));
+  if (!template) return RANK_PRO;
+  return template.minRank ?? RANK_FREE;
+}
+
+export function canUseResumeTemplate(id: string, rank: PlanRank): boolean {
+  return rank >= resumeTemplateMinRank(id);
+}
+
+export function getResumeTemplatesForRank(rank: PlanRank): Template[] {
+  return RESUME_TEMPLATES.filter((t) => rank >= (t.minRank ?? RANK_FREE));
 }
 
 export function isValidCoverLetterTemplateId(id: string): boolean {

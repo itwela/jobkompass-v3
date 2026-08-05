@@ -3,6 +3,7 @@ import { auth } from "./auth";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { registerAgentRoutes } from "./agent/dispatch";
+import { RANK_PLUS } from "./plans";
 
 const http = httpRouter();
 
@@ -57,6 +58,20 @@ http.route({
         return new Response(
           JSON.stringify({ success: false, error: "Invalid API key" }),
           { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, {
+        userId: keyRecord.userId,
+      });
+      if (rank < RANK_PLUS) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "The Chrome extension requires the Plus plan or higher.",
+            upgradeUrl: "https://www.myjobkompass.com/pricing",
+          }),
+          { status: 402, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
 

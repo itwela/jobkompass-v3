@@ -42,13 +42,13 @@ const plans: Plan[] = [
     name: '7-Day Starter',
     description: 'Try everything for a week - no commitment',
     features: [
-      'Full access for 7 days',
+      'Full app access for 7 days',
       '10 AI-generated documents',
       'Unlimited edits',
       'Track up to 100 jobs',
       'Unlimited links & resources',
       'Full search functionality',
-      'All premium templates',
+      'Jake and Joseph resume templates',
     ],
     isOneTime: true,
     oneTimePrice: '$2.99',
@@ -64,7 +64,8 @@ const plans: Plan[] = [
       'Track up to 100 jobs',
       'Unlimited links & resources',
       'Full search functionality',
-      'All premium templates',
+      'Jake and Joseph resume templates',
+      'Chrome extension access',
     ],
     pricing: {
       monthly: {
@@ -87,6 +88,8 @@ const plans: Plan[] = [
       'Everything in Plus',
       '180 AI-generated documents per month (vs 60)',
       'Track unlimited jobs (vs 100)',
+      'Mar template — exclusive to Pro',
+      'Command line & AI agent access (JobKompass CLI)',
       'Priority support',
     ],
     popular: true,
@@ -343,7 +346,7 @@ export default function JkPricing() {
                 {!isAuthenticated ? (
                   <Link href="/auth?mode=signup" className="block w-full" onClick={(e) => e.stopPropagation()}>
                     <Button
-                      className="w-full opacity-60 cursor-pointer transition-opacity duration-200 group-hover/card:opacity-100 active:opacity-100 bg-primary hover:bg-primary text-primary-foreground"
+                      className="w-full cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
                       variant="default"
                     >
                       {getButtonText(plan)}

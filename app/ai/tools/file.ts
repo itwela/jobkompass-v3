@@ -15,6 +15,8 @@ import os from "os";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { generateResumeLatex } from "@/lib/resume/generators";
+import { canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
+import { rankLabel, type PlanRank } from "@/convex/plans";
 
 
 // Helper function to escape LaTeX special characters
@@ -162,7 +164,31 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       }
 
       const formattedTime = getFormattedTime();
-      const templateId = input.templateId || 'jake';
+      const requestedTemplateId = input.templateId || 'jake';
+
+      // This chat tool compiles LaTeX directly and never calls
+      // /api/resume/export, so the export route's tier gate does NOT cover this
+      // path. This check IS the enforcement point here — removing it would open
+      // every template to every tier through chat.
+      //
+      // It downgrades rather than refuses because in chat the model picks the
+      // template, not the user: a hard failure would be a dead end for someone
+      // who never asked for Mar in the first place.
+      const userRank = await convexClient.query(api.usage.currentPlanRank, {});
+      let templateDowngraded:
+        | { requested: string; used: string; requiredPlan: string }
+        | undefined;
+      let templateId = requestedTemplateId;
+      if (!canUseResumeTemplate(templateId, userRank as PlanRank)) {
+        templateDowngraded = {
+          requested: templateId,
+          used: 'jake',
+          requiredPlan: rankLabel(resumeTemplateMinRank(templateId)),
+        };
+        console.log(`[${toolExecutionId}] [RESUME_TOOL] Template over tier, falling back to jake`, templateDowngraded);
+        templateId = 'jake';
+      }
+
       const latexTemplate = generateResumeLatex(input as any, templateId);
 
       /// SECTION PDF GENERATION (LaTeX service)
@@ -210,6 +236,10 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       /// SECTION AUTO-SAVE TO CONVEX
       
       console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting auto-save to Convex...`);
+      // Hoisted so the tool result can hand the client a storage id to download
+      // from, instead of shipping the whole PDF back through the model's context.
+      let savedStorageId: string | undefined;
+      let savedResumeId: string | undefined;
       try {
         // Get upload URL from Convex
         console.log(`[${toolExecutionId}] [RESUME_TOOL] Getting upload URL...`);
@@ -241,6 +271,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
+          savedStorageId = storageId;
           console.log(`[${toolExecutionId}] [RESUME_TOOL] PDF uploaded successfully`, { storageId });
           
           // Save resume to database
@@ -257,7 +288,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
             fileSize: pdfBuffer.length
           });
           
-          await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
+          savedResumeId = await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
             fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`,
@@ -305,8 +336,11 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       return {
         success: true,
         message: 'Resume generated and saved successfully',
-        // textContent: latexTemplate,
-        pdfBase64: pdfBase64,
+        // The PDF itself is deliberately NOT returned. It was ~55k characters of
+        // base64 (~14k tokens) injected into the model's context on every
+        // generation. The client downloads it from storage instead.
+        storageId: savedStorageId,
+        resumeId: savedResumeId,
         fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.pdf`,
         texFileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.tex`,
         // sections: {
@@ -317,6 +351,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         //   skillsContent
         // },
         documentType: 'resume',
+        ...(templateDowngraded ? { templateDowngraded } : {}),
       };
     } catch (error) {
       const totalDuration = Date.now() - startTime;

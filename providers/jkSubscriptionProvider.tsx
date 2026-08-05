@@ -4,10 +4,16 @@ import { createContext, useContext, ReactNode, useEffect } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useConvexAuth } from 'convex/react'
+import { planRank, type PlanRank } from '@/convex/plans'
 
 interface SubscriptionContextType {
   subscription: any | null
   isLoading: boolean
+  /**
+   * The caller's tier as a comparable rank. UI uses it to reflect entitlement;
+   * it is never the enforcement point, which lives server-side.
+   */
+  rank: PlanRank
   isFree: boolean
   isStarter: boolean
   isPlus: boolean
@@ -48,6 +54,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const value: SubscriptionContextType = {
     subscription,
     isLoading: subscription === undefined,
+    rank: planRank(subscription),
     isFree: !subscription || planKey === 'free',
     isStarter: planKey === 'starter' && (status === 'active' || status === 'trialing'),
     isPlus: (planKey === 'plus' || planKey === 'plus-annual') && (status === 'active' || status === 'trialing'),
