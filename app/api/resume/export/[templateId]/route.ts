@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '@/convex/_generated/api';
 import { generateResumeLatex, isValidResumeTemplateId } from '@/lib/resume/generators';
+import { canUseResumeTemplate, resumeTemplateMinRank } from '@/lib/templates';
+import { rankLabel, type PlanRank } from '@/convex/plans';
 import type { ResumeContent } from '@/lib/resume/types';
 
 export const maxDuration = 300;
@@ -16,6 +21,25 @@ export async function POST(
 ) {
   try {
     const { templateId } = await params;
+
+    // This route renders any template for any content, so it must never be
+    // anonymous. Two kinds of caller are allowed, and each establishes the rank
+    // a different way:
+    //
+    //   1. Our own infrastructure (Convex actions), proving itself with the
+    //      shared secret and stating the user's rank in the body.
+    //   2. A signed-in browser, proving itself with a Convex session. The rank
+    //      is resolved server-side from that session and any rank in the body is
+    //      ignored, since the browser is free to lie about it.
+    const expectedSecret = process.env.RESUME_EXPORT_SECRET;
+    if (!expectedSecret) {
+      return NextResponse.json(
+        { error: 'Export not configured', message: 'RESUME_EXPORT_SECRET is not set' },
+        { status: 503 }
+      );
+    }
+    const isTrustedCaller = req.headers.get('x-jk-export-secret') === expectedSecret;
+
     if (!templateId || !isValidResumeTemplateId(templateId)) {
       return NextResponse.json(
         { error: `Invalid template: ${templateId}. Valid: jake, joseph, mar` },
@@ -23,9 +47,45 @@ export async function POST(
       );
     }
 
-    const { content } = (await req.json()) as { content: ResumeContent };
+    const { content, rank } = (await req.json()) as {
+      content: ResumeContent;
+      rank?: number;
+    };
     if (!content) {
       return NextResponse.json({ error: 'Missing resume content' }, { status: 400 });
+    }
+
+    // Fail closed: an absent or malformed rank is treated as free.
+    const coerceRank = (value: unknown): PlanRank =>
+      (value === 0 || value === 1 || value === 2 || value === 3 ? value : 0) as PlanRank;
+
+    let callerRank: PlanRank;
+    if (isTrustedCaller) {
+      callerRank = coerceRank(rank);
+    } else {
+      const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
+      const convexToken = convexUrl ? await convexAuthNextjsToken() : null;
+      if (!convexToken || !convexUrl) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      const convexClient = new ConvexHttpClient(convexUrl);
+      convexClient.setAuth(convexToken);
+      // Resolved from the session, never from the body.
+      callerRank = coerceRank(await convexClient.query(api.usage.currentPlanRank, {}));
+    }
+
+    // The single tier gate. Callers state who is asking; this decides.
+    if (!canUseResumeTemplate(templateId, callerRank)) {
+      return NextResponse.json(
+        {
+          error: 'tier_required',
+          message: `The '${templateId}' template requires the ${rankLabel(
+            resumeTemplateMinRank(templateId)
+          )} plan.`,
+          hint: 'Upgrade at https://www.myjobkompass.com/pricing',
+        },
+        { status: 402 }
+      );
     }
 
     const LATEX_SERVICE_URL = getLatexServiceUrl();

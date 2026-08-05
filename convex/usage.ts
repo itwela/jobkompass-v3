@@ -1,6 +1,34 @@
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { planRank } from "./plans";
+
+/**
+ * The signed-in caller's plan rank, for app-side callers that need to pass a
+ * rank to the resume export route. Read-only: job-limit behavior below is
+ * untouched by this.
+ */
+export const currentPlanRank = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+    const user = await ctx.db.get(userId);
+    if (!user) return 0;
+    const convexUserId = (user as any).convex_user_id || userId;
+    let subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
+      .first();
+    if (!subscription && convexUserId !== userId) {
+      subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+    }
+    return planRank(subscription);
+  },
+});
 
 // Get user's usage stats for feature gating
 export const getUserUsage = query({

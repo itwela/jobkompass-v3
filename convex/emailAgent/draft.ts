@@ -4,6 +4,28 @@ import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { tailorResumeContent, draftReplyMessage, recipientFirstName, tailoredResumeName } from "../../lib/emailAgent/draftMessage";
+import { canUseResumeTemplate } from "../../lib/templates";
+import type { PlanRank } from "../plans";
+
+/**
+ * The template this user may actually render, for the automated draft pipeline.
+ *
+ * The export route is the tier gate and answers 402 for an over-tier template.
+ * A background pipeline should not die on that, so a base resume saved in a
+ * template the user is no longer entitled to quietly falls back to Jake and the
+ * draft still goes out with a resume attached.
+ */
+function entitledTemplate(template: string | undefined, rank: PlanRank): string {
+  const requested = template || "jake";
+  return canUseResumeTemplate(requested, rank) ? requested : "jake";
+}
+
+function exportHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    "x-jk-export-secret": process.env.RESUME_EXPORT_SECRET ?? "",
+  };
+}
 
 // Resume-only generation for digest listings ("extracted" leads): there is no sender
 // to draft a reply to, but the user still wants a tailored resume PDF to apply with.
@@ -11,7 +33,9 @@ import { tailorResumeContent, draftReplyMessage, recipientFirstName, tailoredRes
 // the lead's status or draftMessage.
 export const tailorResumeOnly = internalAction({
   args: { leadId: v.id("jobLeads") },
-  handler: async (ctx, args) => {
+  // Explicit return type: this handler reaches back into `internal`, which would
+  // otherwise make its own type circular and degrade the generated API to `any`.
+  handler: async (ctx, args): Promise<void> => {
     // Every failure path records a specific, user-readable message on the lead
     // (resumeStatus="error" + resumeError) instead of silently returning, so the
     // Generate-résumé button can flip to an error badge and show the reason on click.
@@ -51,10 +75,14 @@ export const tailorResumeOnly = internalAction({
       }
 
       const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-      const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${baseResume.template || "jake"}`, {
+      const exportRank = await ctx.runQuery(internal.agent.fns.agentPlanRank, {
+        userId: lead.userId,
+      });
+      const exportTemplate = entitledTemplate(baseResume.template, exportRank);
+      const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${exportTemplate}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: tailored }),
+        headers: exportHeaders(),
+        body: JSON.stringify({ content: tailored, rank: exportRank }),
       });
       if (!exportResponse.ok) {
         const body = await exportResponse.text().catch(() => "");
@@ -73,7 +101,7 @@ export const tailorResumeOnly = internalAction({
         fileName,
         fileSize: pdfBlob.size,
         content: tailored,
-        template: baseResume.template || "jake",
+        template: exportTemplate,
       });
 
       await ctx.runMutation(internal.jobLeads.attachResumeOnly, {
@@ -88,7 +116,8 @@ export const tailorResumeOnly = internalAction({
 
 export const draftForLead = internalAction({
   args: { leadId: v.id("jobLeads"), isFollowUp: v.optional(v.boolean()) },
-  handler: async (ctx, args) => {
+  // Explicit return type, for the same circularity reason as tailorResumeOnly.
+  handler: async (ctx, args): Promise<void> => {
     const lead: any = await ctx.runQuery(internal.jobLeads.getById, { leadId: args.leadId });
     if (!lead) return;
 
@@ -125,10 +154,14 @@ export const draftForLead = internalAction({
           // is NOT bundled into the Convex deployment, so generateResumeLatex + a raw
           // LaTeX-service call can never work from here.
           const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-          const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${baseResume.template || "jake"}`, {
+          const exportRank = await ctx.runQuery(internal.agent.fns.agentPlanRank, {
+            userId: lead.userId,
+          });
+          const exportTemplate = entitledTemplate(baseResume.template, exportRank);
+          const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${exportTemplate}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ content: tailored }),
+            headers: exportHeaders(),
+            body: JSON.stringify({ content: tailored, rank: exportRank }),
           });
 
           if (!exportResponse.ok) {
@@ -144,7 +177,7 @@ export const draftForLead = internalAction({
               fileName,
               fileSize: pdfBlob.size,
               content: tailored,
-              template: baseResume.template || "jake",
+              template: exportTemplate,
             });
           }
         }
