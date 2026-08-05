@@ -3,6 +3,10 @@
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { useAuth } from "@/providers/jkAuthProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
+import { useSubscription } from "@/providers/jkSubscriptionProvider";
+import { RESUME_TEMPLATES, canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
+import { rankLabel } from "@/convex/plans";
+import { useRouter } from "next/navigation";
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useMutation, useQuery } from "convex/react";
@@ -88,6 +92,31 @@ export default function JkCW_ChatMode() {
     const [showMorePrompts, setShowMorePrompts] = useState(false)
     const { user, isAuthenticated, isLoading: authLoading } = useAuth()
     const { downloadFirstVersionResume } = useJobKompassDocuments()
+    const { rank } = useSubscription()
+    const router = useRouter()
+    const [switchingTemplate, setSwitchingTemplate] = useState<string | null>(null)
+
+    // Re-renders a saved resume in another template on the same record. The
+    // server route is the gate; a locked button just routes to pricing instead.
+    const switchTemplate = async (resumeId: string | undefined, templateId: string) => {
+        if (!resumeId) return
+        setSwitchingTemplate(`${resumeId}:${templateId}`)
+        try {
+            const res = await fetch('/api/resume/switch-template', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resumeId, templateId }),
+            })
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}))
+                setError(body.message || body.error || `Template switch failed (${res.status})`)
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Template switch failed')
+        } finally {
+            setSwitchingTemplate(null)
+        }
+    }
     
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -728,6 +757,36 @@ export default function JkCW_ChatMode() {
                                                                         </button>
                                                                     )} */}
                                                                 </div>
+                                                                {result.resumeId && (
+                                                                    <div className="mt-3 pt-3 border-t border-border">
+                                                                        <div className="text-xs text-muted-foreground mb-2">Want this in a different template?</div>
+                                                                        <div className="flex flex-wrap gap-2">
+                                                                            {RESUME_TEMPLATES.map((t) => {
+                                                                                const unlocked = canUseResumeTemplate(t.id, rank);
+                                                                                const busy = switchingTemplate === `${result.resumeId}:${t.id}`;
+                                                                                return (
+                                                                                    <button
+                                                                                        key={t.id}
+                                                                                        disabled={busy}
+                                                                                        onClick={() =>
+                                                                                            unlocked
+                                                                                                ? switchTemplate(result.resumeId, t.id)
+                                                                                                : router.push('/pricing')
+                                                                                        }
+                                                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 ${
+                                                                                            unlocked
+                                                                                                ? 'border-border hover:bg-muted cursor-pointer'
+                                                                                                : 'border-border text-muted-foreground cursor-pointer'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {busy ? 'Switching…' : t.name.replace('JobKompass ', '')}
+                                                                                        {!unlocked && !busy && ` · ${rankLabel(resumeTemplateMinRank(t.id))}`}
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
