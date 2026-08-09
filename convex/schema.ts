@@ -171,7 +171,11 @@ const schema = defineSchema({
     refreshToken: v.string(),
     tokenExpiresAt: v.number(),
     historyId: v.optional(v.string()), // Gmail checkpoint cursor; unset until first poll
-    status: v.union(v.literal("active"), v.literal("revoked")),
+    // "paused" = user-initiated stop. Tokens stay valid and historyId is left alone, so
+    // resuming picks up from the old checkpoint and catches up on the pause gap. Distinct
+    // from "revoked", which means Google cut us off and a reconnect is required.
+    status: v.union(v.literal("active"), v.literal("paused"), v.literal("revoked")),
+    pausedAt: v.optional(v.number()),
     connectedAt: v.number(),
   }).index("by_user", ["userId"]),
 

@@ -198,11 +198,17 @@ export const pollMyAccounts = action({
   args: {},
   handler: async (
     ctx
-  ): Promise<{ scanned: number; newLeads: number; errors: string[] }> => {
+  ): Promise<{ scanned: number; paused: number; newLeads: number; errors: string[] }> => {
     const convexUserId = await ctx.runQuery(api.auth.getConvexUserId, {});
     if (!convexUserId) throw new Error("Not authenticated");
 
+    // Paused inboxes are already excluded by getActiveAccountsForUser; count them
+    // separately so the button can explain a zero-inbox scan instead of implying
+    // nothing is connected.
     const accounts = await ctx.runQuery(internal.emailAccounts.getActiveAccountsForUser, {
+      userId: convexUserId,
+    });
+    const paused = await ctx.runQuery(internal.emailAccounts.countPausedForUser, {
       userId: convexUserId,
     });
 
@@ -223,6 +229,6 @@ export const pollMyAccounts = action({
       }
     }
 
-    return { scanned: accounts.length, newLeads, errors };
+    return { scanned: accounts.length, paused, newLeads, errors };
   },
 });

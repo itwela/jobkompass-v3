@@ -7,7 +7,7 @@ import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useAction, useMutation, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check, Key, Copy, RefreshCw, Eye, EyeOff, Puzzle, Terminal, AlertTriangle } from "lucide-react"
+import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check, Key, Copy, RefreshCw, Eye, EyeOff, Puzzle, Terminal, AlertTriangle, Pause, Play } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -56,6 +56,7 @@ export default function JkCW_SettingsMode() {
   // Gmail accounts
   const gmailAccounts = useQuery(api.emailAccounts.list, isAuthenticated ? {} : "skip")
   const disconnectGmailAccount = useMutation(api.emailAccounts.disconnect)
+  const setGmailAccountPaused = useMutation(api.emailAccounts.setPaused)
   const [isGeneratingKey, setIsGeneratingKey] = useState(false)
   const [isRevokingKey, setIsRevokingKey] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
@@ -915,6 +916,13 @@ export default function JkCW_SettingsMode() {
                         <p className="text-xs">
                           {account.status === "active" ? (
                             <span className="text-muted-foreground">Connected</span>
+                          ) : account.status === "paused" ? (
+                            <span className="font-medium text-amber-600">
+                              Scanning paused
+                              {account.pausedAt
+                                ? ` since ${new Date(account.pausedAt).toLocaleDateString()}`
+                                : ""}
+                            </span>
                           ) : (
                             <span className="font-medium text-red-600">Disconnected — reconnect to keep sending</span>
                           )}
@@ -924,22 +932,52 @@ export default function JkCW_SettingsMode() {
                           </span>
                         </p>
                       </div>
-                      {account.status === "active" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => disconnectGmailAccount({ accountId: account._id })}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          Disconnect
-                        </Button>
-                      ) : (
+                      {account.status === "revoked" ? (
                         <Button asChild size="sm" className="gap-2">
                           <a href={`/api/gmail/oauth/start?login_hint=${encodeURIComponent(account.email)}`}>
                             <Mail className="h-4 w-4" />
                             Reconnect
                           </a>
                         </Button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            title={
+                              account.status === "paused"
+                                ? "Resume scanning. The next scan catches up on everything that arrived while paused."
+                                : "Stop scanning this inbox for new leads. Stays connected, so you can resume anytime."
+                            }
+                            onClick={() =>
+                              setGmailAccountPaused({
+                                accountId: account._id,
+                                paused: account.status !== "paused",
+                              })
+                            }
+                          >
+                            {account.status === "paused" ? (
+                              <>
+                                <Play className="h-4 w-4" />
+                                Resume
+                              </>
+                            ) : (
+                              <>
+                                <Pause className="h-4 w-4" />
+                                Pause
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => disconnectGmailAccount({ accountId: account._id })}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            Disconnect
+                          </Button>
+                        </div>
                       )}
                     </div>
                   ))}

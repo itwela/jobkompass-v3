@@ -17,9 +17,13 @@ export function ScanNowButton() {
     setScanning(true);
     setResult(null);
     try {
-      const { scanned, newLeads, errors } = await scan({});
+      const { scanned, paused, newLeads, errors } = await scan({});
       if (errors.length > 0) {
         setResult(errors.join(" "));
+      } else if (scanned === 0 && paused > 0) {
+        setResult(
+          `Scanning is paused on ${paused === 1 ? "your inbox" : `all ${paused} inboxes`} — resume it in Settings.`
+        );
       } else if (scanned === 0) {
         setResult("No connected inboxes to scan.");
       } else if (newLeads === 0) {

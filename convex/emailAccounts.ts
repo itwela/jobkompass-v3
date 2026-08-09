@@ -21,8 +21,38 @@ export const list = query({
       _id: a._id,
       email: a.email,
       status: a.status,
+      pausedAt: a.pausedAt,
       connectedAt: a.connectedAt,
     }));
+  },
+});
+
+// Pause/resume lead scanning for ONE inbox. Pausing only flips status — tokens and the
+// Gmail historyId checkpoint are left untouched, so resuming re-scans from that old
+// checkpoint and catches up on everything that landed during the pause. (Gmail expires a
+// historyId after ~1 week; past that, listNewMessageIds re-seeds from the last 14 days.)
+// Deliberately refuses to touch a "revoked" account — that needs a real reconnect.
+export const setPaused = mutation({
+  args: { accountId: v.id("emailAccounts"), paused: v.boolean() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    const convexUserId = (user as any)?.convex_user_id || userId;
+
+    const account = await ctx.db.get(args.accountId);
+    if (!account || account.userId !== convexUserId) {
+      throw new Error("Account not found");
+    }
+    if (account.status === "revoked") {
+      throw new Error("This inbox is disconnected — reconnect it before pausing or resuming.");
+    }
+
+    await ctx.db.patch(args.accountId, {
+      status: args.paused ? ("paused" as const) : ("active" as const),
+      pausedAt: args.paused ? Date.now() : undefined,
+    });
+    return { success: true };
   },
 });
 
@@ -64,6 +94,7 @@ export const saveTokens = internalMutation({
         refreshToken: args.refreshToken,
         tokenExpiresAt: args.tokenExpiresAt,
         status: "active" as const,
+        pausedAt: undefined, // a fresh connect always resumes scanning
       });
       return existing._id;
     }
@@ -140,6 +171,20 @@ export const getActiveAccountsForUser = internalQuery({
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
+  },
+});
+
+// How many of this user's inboxes are paused. Lets the manual "Scan now" button say
+// "all your inboxes are paused" instead of the misleading "no connected inboxes".
+export const countPausedForUser = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    const paused = await ctx.db
+      .query("emailAccounts")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("status"), "paused"))
+      .collect();
+    return paused.length;
   },
 });
 
