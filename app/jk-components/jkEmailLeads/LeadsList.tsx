@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,17 @@ const STATUS_STYLES: Record<string, string> = {
   new: "bg-muted text-muted-foreground",
 };
 
-export function LeadsList() {
+interface LeadsListProps {
+  selectionMode?: boolean;
+  selectedLeadIds?: Id<"jobLeads">[];
+  onToggleLeadSelection?: (id: Id<"jobLeads">) => void;
+}
+
+export function LeadsList({
+  selectionMode = false,
+  selectedLeadIds = [],
+  onToggleLeadSelection,
+}: LeadsListProps) {
   const leads = useQuery(api.jobLeads.list, {});
   const accounts = useQuery(api.emailAccounts.list, {});
   const promote = useMutation(api.jobLeads.promoteToJob);
@@ -92,6 +102,7 @@ export function LeadsList() {
       <table className="w-full min-w-max text-sm">
         <thead>
           <tr className="text-left border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+            {selectionMode && <th className="px-3 py-2.5 w-8" />}
             <th className="px-3 py-2.5 font-medium">Company</th>
             <th className="px-3 py-2.5 font-medium">Role</th>
             <th className="px-3 py-2.5 font-medium">From</th>
@@ -112,6 +123,16 @@ export function LeadsList() {
                 className="border-b last:border-b-0 hover:bg-muted/30 transition-colors"
                 onClick={() => { if (!lead.seenAt) markSeen({ leadId: lead._id }); }}
               >
+                {selectionMode && (
+                  <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedLeadIds.includes(lead._id)}
+                      onChange={() => onToggleLeadSelection?.(lead._id)}
+                      aria-label={`Select ${lead.company}`}
+                    />
+                  </td>
+                )}
                 <td className="px-3 py-2.5 font-medium whitespace-nowrap" title={lead.company}>
                   <div className="flex items-center gap-2">
                     {!lead.seenAt && (
