@@ -1,7 +1,7 @@
 // app/jk-components/jkEmailLeads/LeadsList.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -76,6 +76,7 @@ export function LeadsList({
   // Leads whose tailored resume was requested this session; cleared implicitly when
   // the lead's draftResumeId appears via the reactive query.
   const [tailoringIds, setTailoringIds] = useState<Set<string>>(new Set());
+  const selectedIdSet = useMemo(() => new Set(selectedLeadIds), [selectedLeadIds]);
 
   const confirmDelete = async () => {
     if (!leadToDelete) return;
@@ -127,7 +128,7 @@ export function LeadsList({
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      checked={selectedLeadIds.includes(lead._id)}
+                      checked={selectedIdSet.has(lead._id)}
                       onChange={() => onToggleLeadSelection?.(lead._id)}
                       aria-label={`Select ${lead.company}`}
                     />

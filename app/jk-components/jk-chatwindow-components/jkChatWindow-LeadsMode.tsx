@@ -11,6 +11,8 @@ import { ScanNowButton } from "@/app/jk-components/jkEmailLeads/ScanNowButton"
 import { AddLeadFromEmail } from "@/app/jk-components/jkEmailLeads/AddLeadFromEmail"
 import JkConfirmDelete from "../jkConfirmDelete"
 
+const BULK_DELETE_CHUNK_SIZE = 25
+
 export default function JkCW_LeadsMode() {
   // Same subscription the child components use — Convex dedupes it, and having the
   // full list here lets the section headers show live totals so it's obvious whether
@@ -52,20 +54,51 @@ export default function JkCW_LeadsMode() {
   }
 
   const handleConfirmBulkDelete = async () => {
+    if (selectedLeadIds.length === 0) {
+      setShowBulkDeleteConfirm(false)
+      return
+    }
+
+    const total = selectedLeadIds.length
     setIsBulkDeleting(true)
     setBulkDeleteError(null)
     try {
-      await Promise.all(selectedLeadIds.map((leadId) => deleteLead({ leadId })))
-      setSelectedLeadIds([])
-      setSelectionMode(false)
-      setShowBulkDeleteConfirm(false)
+      let deletedCount = 0
+      const failedIds: Id<"jobLeads">[] = []
+
+      for (let i = 0; i < selectedLeadIds.length; i += BULK_DELETE_CHUNK_SIZE) {
+        const chunk = selectedLeadIds.slice(i, i + BULK_DELETE_CHUNK_SIZE)
+        const results = await Promise.allSettled(
+          chunk.map((leadId) => deleteLead({ leadId }))
+        )
+        results.forEach((result, idx) => {
+          const leadId = chunk[idx]
+          if (result.status === "fulfilled") {
+            deletedCount += 1
+          } else {
+            console.error("Failed to delete lead", leadId, result.reason)
+            failedIds.push(leadId)
+          }
+        })
+      }
+
+      if (failedIds.length > 0) {
+        // Only re-select the leads that actually failed — leave the successfully
+        // deleted ones off the selection so a retry only re-attempts what's left.
+        setSelectedLeadIds(failedIds)
+        setBulkDeleteError(
+          `Deleted ${deletedCount} of ${total} leads. ${failedIds.length} failed — please try again.`
+        )
+        setShowBulkDeleteConfirm(false)
+      } else {
+        setSelectedLeadIds([])
+        setSelectionMode(false)
+        setShowBulkDeleteConfirm(false)
+      }
     } catch (err) {
-      // Some deletes may have succeeded and some failed — leave selectedLeadIds and
-      // selectionMode as-is so the user can see what's left and retry, rather than
-      // losing track of which leads did or didn't delete.
-      setBulkDeleteError(
-        err instanceof Error ? err.message : "Failed to delete selected leads. Please try again."
-      )
+      // Genuinely unexpected error outside the per-lead mutation handling above.
+      console.error("Unexpected error during bulk delete", err)
+      setBulkDeleteError("Something went wrong deleting the selected leads. Please try again.")
       setShowBulkDeleteConfirm(false)
     } finally {
       setIsBulkDeleting(false)
@@ -113,7 +146,7 @@ export default function JkCW_LeadsMode() {
                     variant="outline"
                     size="sm"
                     onClick={handleSelectAllVisible}
-                    disabled={leadIds.length === 0 || selectedLeadIds.length === leadIds.length}
+                    disabled={isBulkDeleting || leadIds.length === 0 || selectedLeadIds.length === leadIds.length}
                   >
                     Select All
                   </Button>
@@ -124,11 +157,11 @@ export default function JkCW_LeadsMode() {
                       if (selectedLeadIds.length === 0) return
                       setShowBulkDeleteConfirm(true)
                     }}
-                    disabled={selectedLeadIds.length === 0}
+                    disabled={isBulkDeleting || selectedLeadIds.length === 0}
                   >
                     Delete Selected
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={handleExitSelectionMode}>
+                  <Button variant="ghost" size="sm" onClick={handleExitSelectionMode} disabled={isBulkDeleting}>
                     Cancel
                   </Button>
                 </>
