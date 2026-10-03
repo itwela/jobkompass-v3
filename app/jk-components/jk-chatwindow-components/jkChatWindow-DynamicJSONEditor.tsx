@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { getResumeExportRoute, getDefaultResumeTemplateId } from "@/lib/templates";
+import { trackResumeExported } from "@/lib/analytics/client";
 import { X, Save, Download, Loader2, CheckCircle } from "lucide-react";
 import JkCW_ResumeContentEditor from "./jkChatWindow-ResumeContentEditor";
 import JkSlideModalGlass from "../jkSlideModalGlass";
@@ -172,6 +173,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+            trackResumeExported({ method: "export", template_id: template });
         } catch (error) {
             console.error("Download error:", error);
             alert("Failed to download resume. Please try again.");

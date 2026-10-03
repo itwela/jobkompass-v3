@@ -20,6 +20,7 @@ import JkGap from './jkGap'
 import JkSearchModal from './jkSearchModal'
 import JkUpgradeModal from './jkUpgradeModal'
 import { useJobKompassTheme } from '@/providers/jkThemeProvider'
+import { trackUpgradeClicked } from '@/lib/analytics/client'
 
 export default function JkSidebar() {
   const { user, isAuthenticated } = useAuth()
@@ -525,7 +526,12 @@ export default function JkSidebar() {
                   <Settings className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium text-foreground">Settings</span>
                 </motion.div>
-                <Link href="/pricing" onClick={() => setUserMenuOpen(false)}>
+                <Link href="/pricing" onClick={() => {
+                  setUserMenuOpen(false)
+                  if (!(isPro || isProAnnual)) {
+                    trackUpgradeClicked({ surface: 'sidebar', authenticated: true })
+                  }
+                }}>
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { planFromPriceId } from "@/lib/analytics/plan";
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_default", {
@@ -50,7 +51,12 @@ export async function POST(request: NextRequest) {
     const price = await stripe.prices.retrieve(priceId);
     const isRecurring = price.type === "recurring";
     
-    // Create checkout session
+    // Create checkout session. plan and interval on the success URL are slugs
+    // for analytics, not Stripe ids.
+    const mappedPlan = planFromPriceId(priceId);
+    const planQuery = mappedPlan
+      ? `&plan=${encodeURIComponent(mappedPlan.plan_id)}&interval=${encodeURIComponent(mappedPlan.interval)}`
+      : "";
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ["card"],
@@ -61,7 +67,7 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: isRecurring ? "subscription" : "payment",
-      success_url: `${baseUrl}/stripe/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${baseUrl}/stripe/success?session_id={CHECKOUT_SESSION_ID}${planQuery}`,
       cancel_url: `${baseUrl}/pricing`,
       metadata: {
         userId: userId || "",

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Sparkles } from 'lucide-react'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import Link from 'next/link'
+import { trackUpgradeClicked } from '@/lib/analytics/client'
 
 export default function JkUpgradeButton() {
   const { isFree, hasActiveSubscription } = useSubscription()
@@ -14,7 +15,10 @@ export default function JkUpgradeButton() {
   }
 
   return (
-    <Link href="/pricing">
+    <Link
+      href="/pricing"
+      onClick={() => trackUpgradeClicked({ surface: 'upgrade_button', authenticated: true })}
+    >
       <Button
         variant="outline"
         size="sm"

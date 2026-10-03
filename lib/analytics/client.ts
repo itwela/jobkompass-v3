@@ -1,0 +1,349 @@
+/**
+ * Browser analytics. No-ops when NEXT_PUBLIC_POSTHOG_KEY is unset, when the
+ * browser sends Do Not Track / Global Privacy Control, or when the visitor
+ * has set localStorage jk_analytics_opt_out=1.
+ *
+ * Heatmaps are on for every page. Session replay runs only on public marketing
+ * pages unless NEXT_PUBLIC_POSTHOG_SESSION_REPLAY=false. Text and inputs are
+ * masked, images are blocked, and recording stops on the app, auth, and documents.
+ */
+import posthog from "posthog-js";
+import { captureFirstTouch, firstTouchProperties, readFirstTouch } from "./attribution";
+import {
+  AnalyticsEvent,
+  buildCheckoutStartedProperties,
+  buildCtaClickedProperties,
+  buildFirstResumeProperties,
+  buildFreeGeneratorProperties,
+  buildPageviewProperties,
+  buildPaidConversionProperties,
+  buildResumeExportedProperties,
+  buildSignupProperties,
+  buildUpgradeClickedProperties,
+  checkoutPlanSelection,
+} from "./events";
+import {
+  isPublicReplayPath,
+  isSessionReplayEnabled,
+  isTrackingDeclinedInBrowser,
+  safeAbsoluteUrl,
+  safePageUrl,
+  safePath,
+  sanitizeAnalyticsValue,
+  sanitizeHeatmapData,
+  stripElementText,
+  toScrubbedError,
+} from "./privacy";
+
+const SIGNUP_DEDUPE_KEY = "jk_signup_tracked";
+const RESUME_SOURCE_KEY = "jk_resume_create_source";
+
+let initialized = false;
+
+export function hasAnalyticsKey(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim());
+}
+
+function browserStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function captureFirstTouchFromBrowser(): void {
+  if (typeof window === "undefined") return;
+  if (isTrackingDeclinedInBrowser()) return;
+  const storage = browserStorage();
+  if (!storage) return;
+  captureFirstTouch(storage, {
+    search: window.location.search,
+    referrer: document.referrer,
+    path: window.location.pathname,
+    host: window.location.host,
+  });
+}
+
+function registerFirstTouch(): void {
+  const storage = browserStorage();
+  const props = firstTouchProperties(readFirstTouch(storage));
+  if (Object.keys(props).length > 0) {
+    posthog.register(props);
+  }
+}
+
+function sanitizeProperties<T>(properties: T): T {
+  if (!properties || typeof properties !== "object") return properties;
+  const cleaned = sanitizeAnalyticsValue(properties);
+  if (!cleaned || typeof cleaned !== "object" || Array.isArray(cleaned)) {
+    return {} as T;
+  }
+  return cleaned as T;
+}
+
+export function initAnalytics(): boolean {
+  if (typeof window === "undefined") return false;
+  if (initialized) return true;
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
+  if (!key) return false;
+  if (isTrackingDeclinedInBrowser()) return false;
+
+  captureFirstTouchFromBrowser();
+
+  try {
+    posthog.init(key, {
+      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+      capture_pageview: false,
+      capture_pageleave: false,
+      autocapture: false,
+      // posthog-js 1.435.8 heatmap points are {x, y, target_fixed, type} only.
+      // capture_heatmaps: true turns them on in code, including inside the app.
+      capture_heatmaps: true,
+      enable_heatmaps: true,
+      capture_dead_clicks: false,
+      capture_exceptions: {
+        capture_unhandled_errors: true,
+        capture_unhandled_rejections: true,
+        capture_console_errors: false,
+      },
+      // Stay stopped until syncSessionReplay sees a public marketing path.
+      disable_session_recording: true,
+      disable_surveys: true,
+      person_profiles: "identified_only",
+      session_recording: {
+        maskAllInputs: true,
+        maskTextSelector: "*",
+        maskTextFn: () => "*",
+        maskInputFn: () => "*",
+        maskAllElementAttributes: true,
+        recordBody: false,
+        streamNetworkBody: false,
+        captureJsonLd: false,
+        blockSelector: 'img, image, picture, svg, video, canvas, input[type="file"], iframe',
+        maskCapturedNetworkRequestFn: () => null,
+      },
+      before_send: (event) => {
+        if (!event) return null;
+        if (event.event === "$autocapture" || event.event === "$dead_click") return null;
+        scrubOutboundProperties(event.properties);
+        event.properties = sanitizeProperties(event.properties);
+        if (event.$set) event.$set = sanitizeProperties(event.$set);
+        if (event.$set_once) event.$set_once = sanitizeProperties(event.$set_once);
+        return event;
+      },
+      loaded: (instance) => {
+        instance.stopSessionRecording();
+      },
+    });
+    initialized = true;
+    registerFirstTouch();
+    syncSessionReplay(window.location.pathname);
+    return true;
+  } catch {
+    initialized = false;
+    return false;
+  }
+}
+
+export function syncSessionReplay(pathname: string): void {
+  if (!initialized) return;
+  if (!isSessionReplayEnabled() || !isPublicReplayPath(pathname)) {
+    posthog.stopSessionRecording();
+    return;
+  }
+  posthog.startSessionRecording();
+}
+
+const URL_PROPERTY_KEYS = new Set(["$current_url", "$referrer", "$session_entry_url", "$session_entry_referrer"]);
+
+function scrubOutboundProperties(properties: Record<string, unknown> | undefined): void {
+  if (!properties) return;
+  const stripped = stripElementText(properties);
+  if (!stripped || typeof stripped !== "object" || Array.isArray(stripped)) return;
+  for (const key of Object.keys(properties)) delete properties[key];
+  Object.assign(properties, stripped);
+  if ("$heatmap_data" in properties) {
+    const heatmap = sanitizeHeatmapData(properties.$heatmap_data);
+    if (heatmap) properties.$heatmap_data = heatmap;
+    else delete properties.$heatmap_data;
+  }
+  for (const key of Object.keys(properties)) {
+    const value = properties[key];
+    if (typeof value !== "string") continue;
+    if (URL_PROPERTY_KEYS.has(key) && value.startsWith("http")) {
+      properties[key] = safeAbsoluteUrl(value);
+    } else if (key === "$pathname" || key === "$session_entry_pathname") {
+      properties[key] = safePath(value);
+    }
+  }
+}
+
+function capture(event: string, properties: Record<string, string | number | boolean>): void {
+  if (!initAnalytics()) return;
+  posthog.capture(event, properties);
+}
+
+export function capturePageview(pathname: string, search: string): void {
+  if (typeof window === "undefined") return;
+  captureFirstTouchFromBrowser();
+  if (!initAnalytics()) return;
+  const path = safePath(pathname);
+  syncSessionReplay(path);
+  const page = buildPageviewProperties(path);
+  capture(AnalyticsEvent.pageview, {
+    path: page.path,
+    page_kind: page.page_kind,
+    $current_url: safePageUrl(window.location.origin, path, search),
+  });
+}
+
+function isSafeUserId(userId: string): boolean {
+  return /^[A-Za-z0-9]{1,128}$/.test(userId);
+}
+
+export function identifyUser(userId: string): void {
+  if (!isSafeUserId(userId)) return;
+  if (!initAnalytics()) return;
+  const props = firstTouchProperties(readFirstTouch(browserStorage()));
+  posthog.identify(userId, undefined, Object.keys(props).length > 0 ? props : undefined);
+}
+
+export function resetAnalytics(): void {
+  if (!initialized) return;
+  posthog.reset();
+  registerFirstTouch();
+}
+
+export function trackCtaClicked(input: { cta: "signup" | "free_generator"; surface: "hero" | "header" | "midpage" | "sticky" }): void {
+  if (typeof window === "undefined") return;
+  const properties = buildCtaClickedProperties({ ...input, path: window.location.pathname });
+  if (!properties) return;
+  capture(AnalyticsEvent.ctaClicked, properties);
+}
+
+export function trackFreeGeneratorStarted(templateId?: string | null): void {
+  capture(AnalyticsEvent.freeGeneratorStarted, buildFreeGeneratorProperties(templateId));
+}
+
+export function trackFreeGeneratorCompleted(templateId?: string | null): void {
+  capture(AnalyticsEvent.freeGeneratorCompleted, buildFreeGeneratorProperties(templateId));
+}
+
+export function trackCheckoutStarted(input: { planId: string; isAnnual: boolean; isOneTime: boolean }): void {
+  const selection = checkoutPlanSelection(input.planId, input.isAnnual, input.isOneTime);
+  if (!selection) return;
+  capture(AnalyticsEvent.checkoutStarted, buildCheckoutStartedProperties(selection));
+}
+
+export function trackSignup(): void {
+  if (!initAnalytics()) return;
+  try {
+    if (window.sessionStorage.getItem(SIGNUP_DEDUPE_KEY) === "1") return;
+    capture(AnalyticsEvent.signup, buildSignupProperties());
+    window.sessionStorage.setItem(SIGNUP_DEDUPE_KEY, "1");
+  } catch {
+    capture(AnalyticsEvent.signup, buildSignupProperties());
+  }
+}
+
+export function markResumeCreateSource(source: "upload" | "paste" | "generated" | "chat" | "free_generator"): void {
+  try {
+    window.sessionStorage.setItem(RESUME_SOURCE_KEY, source);
+  } catch {
+    // Private mode can reject storage; the event still fires with source in_app.
+  }
+}
+
+function consumeResumeCreateSource(): string {
+  try {
+    const value = window.sessionStorage.getItem(RESUME_SOURCE_KEY);
+    window.sessionStorage.removeItem(RESUME_SOURCE_KEY);
+    return value || "in_app";
+  } catch {
+    return "in_app";
+  }
+}
+
+export function trackFirstResumeCreated(userKey: string, source?: string | null, templateId?: string | null): void {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(userKey)) return;
+  if (!initAnalytics()) return;
+  const storageKey = `jk_first_resume_tracked:${userKey}`;
+  try {
+    if (window.localStorage.getItem(storageKey) === "1") return;
+  } catch {
+    return;
+  }
+  capture(AnalyticsEvent.firstResumeCreated, buildFirstResumeProperties({ source, template_id: templateId }));
+  try {
+    window.localStorage.setItem(storageKey, "1");
+  } catch {
+    // The event was sent; a later duplicate is acceptable if storage is blocked.
+  }
+}
+
+export function trackResumeExported(input: { method: "download" | "export"; template_id?: string | null }): void {
+  const properties = buildResumeExportedProperties(input);
+  if (!properties) return;
+  capture(AnalyticsEvent.resumeExported, properties);
+}
+
+export function trackUpgradeClicked(input: {
+  surface: string;
+  plan_id?: string | null;
+  interval?: string | null;
+  authenticated: boolean;
+}): void {
+  const properties = buildUpgradeClickedProperties(input);
+  if (!properties) return;
+  capture(AnalyticsEvent.upgradeClicked, properties);
+}
+
+export function trackPlanUpgrade(input: {
+  surface: "pricing" | "pricing_modal";
+  planId: string;
+  isAnnual: boolean;
+  isOneTime: boolean;
+  authenticated: boolean;
+}): void {
+  const selection = checkoutPlanSelection(input.planId, input.isAnnual, input.isOneTime);
+  trackUpgradeClicked({
+    surface: input.surface,
+    plan_id: selection?.plan_id,
+    interval: selection?.interval,
+    authenticated: input.authenticated,
+  });
+}
+
+export function trackPaidConversion(
+  input: { plan_id?: string | null; interval?: string | null },
+  dedupeKey?: string | null
+): void {
+  if (!initAnalytics()) return;
+  const safeKey = dedupeKey && /^[A-Za-z0-9_]{1,120}$/.test(dedupeKey) ? dedupeKey : "checkout";
+  const storageKey = `jk_paid_conversion:${safeKey}`;
+  try {
+    if (window.sessionStorage.getItem(storageKey) === "1") return;
+  } catch {
+    // continue without dedupe
+  }
+  capture(AnalyticsEvent.paidConversion, buildPaidConversionProperties(input));
+  try {
+    window.sessionStorage.setItem(storageKey, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function readPendingResumeSource(): string {
+  return consumeResumeCreateSource();
+}
+
+export function captureClientException(error: unknown): void {
+  try {
+    if (!initAnalytics()) return;
+    posthog.captureException(toScrubbedError(error));
+  } catch {
+    // Reporting a failure must not create another one.
+  }
+}

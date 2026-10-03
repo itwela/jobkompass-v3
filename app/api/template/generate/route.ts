@@ -32,8 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    console.log(`[${requestId}] [TEMPLATE_GENERATE] Request body received`, { body });
-    
+
     const {
       templateType,
       templateId,
@@ -53,9 +52,6 @@ export async function POST(request: NextRequest) {
     console.log(`[${requestId}] [TEMPLATE_GENERATE] Parsed request`, {
       templateType,
       templateId,
-      jobId,
-      jobTitle,
-      jobCompany,
       hasReferenceResumeId: hasReferenceResume,
       hasResumePdf,
       hasResumeText,
@@ -147,7 +143,6 @@ export async function POST(request: NextRequest) {
         jobDetails = await convexClient.query(api.jobs.get, { id: jobId as any });
         console.log(`[${requestId}] [TEMPLATE_GENERATE] Job details fetched`, { 
           hasJob: !!jobDetails,
-          jobCompany: jobDetails?.company 
         });
       } catch (e) {
         console.warn(`[${requestId}] [TEMPLATE_GENERATE] Error fetching job details (ignored):`, e);

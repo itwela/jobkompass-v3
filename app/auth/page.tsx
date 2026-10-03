@@ -16,6 +16,7 @@ import { mainAssets } from "@/app/lib/constants"
 import JkPublicHeader from "@/app/jk-components/jkPublicHeader"
 import JkPricingModal from "@/app/jk-components/jkPricingModal"
 import { PRICING_REDIRECT_THRESHOLD } from "@/app/lib/timePeriods"
+import { trackSignup } from "@/lib/analytics/client"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
 
 export default function AuthPage() {
@@ -175,9 +176,10 @@ export default function AuthPage() {
       setWasSignUp(isSignUp)
       
       await signIn("password", formData)
+      if (isSignUp) trackSignup()
       // Redirect will happen via useEffect when isAuthenticated changes
     } catch (error) {
-      console.error('Authentication error:', error)
+      console.error('Authentication failed')
       const friendlyMessage = getErrorMessage(error)
       setAuthError(friendlyMessage)
     } finally {

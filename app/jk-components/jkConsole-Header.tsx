@@ -15,6 +15,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Jk_AutoFill from "./jk-AutoFill";
 import JkUpgradeButton from "./jkUpgradeButton";
+import { trackSignup, trackUpgradeClicked } from "@/lib/analytics/client";
 import { nooutline } from "@/lib/utils";
 import { mainAssets } from "@/app/lib/constants";
 import Image from "next/image";
@@ -520,7 +521,13 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                                     <Settings className="h-4 w-4 text-muted-foreground" />
                                                     <span className="text-sm font-medium text-foreground">Settings</span>
                                                 </div>
-                                                <Link href="/pricing" onClick={() => { setUserMenuOpen(false); setSidebarOpen(false); }}>
+                                                <Link href="/pricing" onClick={() => {
+                                                    setUserMenuOpen(false);
+                                                    setSidebarOpen(false);
+                                                    if (!(isPro || isProAnnual)) {
+                                                        trackUpgradeClicked({ surface: 'header', authenticated: true });
+                                                    }
+                                                }}>
                                                     <div className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border active:bg-accent">
                                                         <CreditCard className="h-4 w-4 text-muted-foreground" />
                                                         <span className="text-sm font-medium text-foreground">
@@ -611,13 +618,12 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                         
                                         try {
                                             const formData = new FormData(e.currentTarget);
-                                            console.log("Attempting sign in (mobile) with flow:", formData.get("flow"));
-                                            const result = await signIn("password", formData);
-                                            console.log("Sign in result (mobile):", result);
+                                            await signIn("password", formData);
+                                            if (formData.get("flow") === "signUp") trackSignup();
                                             setShowSignIn(false);
                                             setSidebarOpen(false);
                                         } catch (error) {
-                                            console.error("Sign in error details (mobile):", error);
+                                            console.error("Sign in failed");
                                             const friendlyMessage = getErrorMessage(error);
                                             setAuthError(friendlyMessage);
                                         } finally {

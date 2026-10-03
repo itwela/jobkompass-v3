@@ -13,6 +13,7 @@ import { Search, MessageSquare, FileText, Briefcase, Link2, X, Calendar, Filter 
 import { motion, AnimatePresence } from "framer-motion"
 import { Id } from "@/convex/_generated/dataModel"
 import Link from "next/link"
+import { trackUpgradeClicked } from "@/lib/analytics/client"
 
 interface SearchResult {
   id: string
@@ -362,7 +363,11 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
                 ) : isFree ? (
                   <div className="px-6 py-8 text-center">
                     <p className="text-muted-foreground mb-2">Search is only available on paid plans</p>
-                    <Link href="/pricing" className="text-primary hover:underline">
+                    <Link
+                      href="/pricing"
+                      className="text-primary hover:underline"
+                      onClick={() => trackUpgradeClicked({ surface: 'search', authenticated: true })}
+                    >
                       Upgrade to access search
                     </Link>
                   </div>
