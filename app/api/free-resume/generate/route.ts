@@ -5,6 +5,7 @@ import { api } from '@/convex/_generated/api';
 import { getFreeResumeTemplates, isValidResumeTemplateId } from '@/lib/templates';
 import { generateResumeLatex } from '@/lib/resume/generators';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 const MAX_PDF_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -24,6 +25,9 @@ function getLatexServiceUrl(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceAiRateLimit(request, "freeResume");
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { resumeText, resumePdf, email, templateId } = body as {

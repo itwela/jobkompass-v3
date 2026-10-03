@@ -10,6 +10,7 @@ import { ConvexHttpClient } from 'convex/browser';
 import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server';
 import { api } from '@/convex/_generated/api';
 import { createAddToJobsTool } from '@/app/ai/tools/file';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 const requestSchema = z.object({
   jobInformation: z.string().min(1, 'Job information is required'),
@@ -56,6 +57,9 @@ Your goal is to accurately extract and save ALL jobs mentioned in the user's inp
 `;
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceAiRateLimit(request, "ai");
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { jobInformation } = requestSchema.parse(body);

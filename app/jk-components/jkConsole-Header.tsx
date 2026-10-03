@@ -23,6 +23,7 @@ import Link from "next/link";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import JkGap from "./jkGap";
 import { toast } from "@/lib/toast";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 import { useJobKompassTheme } from "@/providers/jkThemeProvider";
 
 interface JkConsoleHeaderProps {
@@ -136,6 +137,11 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ excerpt: last2000Chars }),
             });
+            if (response.status === 429) {
+                toast.error("Retitle failed", rateLimitMessageFromResponse(response));
+                return;
+            }
+
             const data = await response.json();
 
             if (!response.ok) {

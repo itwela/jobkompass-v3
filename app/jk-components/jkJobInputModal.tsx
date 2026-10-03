@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import JkInputSection from "./jkInputSection";
 import { toast } from "@/lib/toast";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 
 interface JkJobInputModalProps {
   isOpen: boolean;
@@ -54,6 +55,10 @@ export default function JkJobInputModal({
           jobInformation: value.trim(),
         }),
       });
+
+      if (response.status === 429) {
+        throw new Error(rateLimitMessageFromResponse(response));
+      }
 
       const data = await response.json().catch(() => ({}));
 

@@ -4,6 +4,8 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { registerAgentRoutes } from "./agent/dispatch";
 import { RANK_PLUS } from "./plans";
+import { consumeOrFailOpen } from "./rateLimit";
+import { retryAfterSeconds } from "./rateLimitConfig";
 
 const http = httpRouter();
 
@@ -72,6 +74,26 @@ http.route({
             upgradeUrl: "https://www.myjobkompass.com/pricing",
           }),
           { status: 402, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      const limit = await consumeOrFailOpen(ctx, "extension", keyRecord.userId);
+      if (!limit.ok) {
+        const seconds = retryAfterSeconds(limit.retryAfter);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Too many requests. Please try again later.",
+          }),
+          {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              "Retry-After": String(seconds),
+              "Cache-Control": "no-store",
+              ...corsHeaders,
+            },
+          },
         );
       }
 

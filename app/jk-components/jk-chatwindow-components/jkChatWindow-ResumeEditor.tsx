@@ -10,6 +10,7 @@ import { ResumeIR, SectionIR, ExperienceItemIR, BulletIR } from "@/types/resumeI
 import ResumeAssistantPanel, { ResumeAssistantMessage } from "./jkResumeAssistantPanel";
 import { Sparkles } from "lucide-react";
 import { trackResumeExported } from "@/lib/analytics/client";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 
 function newId() {
 	return Math.random().toString(36).slice(2);
@@ -142,6 +143,18 @@ export default function JkCW_ResumeEditor() {
 					history: historyPayload,
 				}),
 			});
+
+			if (response.status === 429) {
+				const text = rateLimitMessageFromResponse(response);
+				const limitedMessage: ResumeAssistantMessage = {
+					id: newId(),
+					role: "assistant",
+					content: text,
+					internalContent: text,
+				};
+				setAssistantMessages(prev => [...prev, limitedMessage]);
+				return null;
+			}
 
 			const data = await response.json();
 			if (!response.ok || !data?.message) {

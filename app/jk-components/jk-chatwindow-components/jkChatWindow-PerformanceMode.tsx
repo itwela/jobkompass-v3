@@ -8,6 +8,7 @@ import { useJobKompassResume } from '@/providers/jkResumeProvider'
 import { useFeatureAccess } from '@/hooks/useFeatureAccess'
 import { Button } from '@/components/ui/button'
 import { trackUpgradeClicked } from '@/lib/analytics/client'
+import { rateLimitMessageFromResponse } from '@/lib/rateLimit/message'
 import { motion } from 'framer-motion'
 import {
   TrendingUp,
@@ -186,6 +187,10 @@ export default function JkCW_PerformanceMode() {
           body: JSON.stringify(stats),
         });
 
+        if (response.status === 429) {
+          throw new Error(rateLimitMessageFromResponse(response));
+        }
+
         const data = await response.json();
 
         if (!response.ok || !data.success) {
@@ -350,7 +355,11 @@ export default function JkCW_PerformanceMode() {
                   </div>
                 ) : summaryError ? (
                   <div className="flex items-center gap-3">
-                    <p className="text-sm text-muted-foreground">There was a hiccup generating your AI summary.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {summaryError?.startsWith("Too many AI requests")
+                        ? summaryError
+                        : "There was a hiccup generating your AI summary."}
+                    </p>
                     <Button
                       size="sm"
                       variant="outline"
@@ -363,8 +372,12 @@ export default function JkCW_PerformanceMode() {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify(stats),
                         })
-                          .then(res => res.json())
-                          .then(data => {
+                          .then(async (res) => {
+                            if (res.status === 429) {
+                              setSummaryError(rateLimitMessageFromResponse(res));
+                              return;
+                            }
+                            const data = await res.json();
                             if (data.success) {
                               setAiSummary(data.summary);
                             } else {
