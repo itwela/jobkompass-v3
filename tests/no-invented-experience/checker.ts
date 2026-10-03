@@ -369,10 +369,16 @@ function checkSummary(
       if (target?.role) scanned = removePhrase(scanned, target.role);
       if (target?.company) scanned = removePhrase(scanned, target.company);
     }
-    const prospective = /^(?:eager to|looking (?:to|for)|hoping to|excited to|interested in|aiming to|passionate about|aspiring to|seeking)\b/i.test(
-      sentence.trim(),
+    out.push(...checkFreeText(scanned, allow, "personalInfo.summary", false));
+    // "Seeking a backend role at Acme" names the application. It is not a claim of past work.
+    // Metrics, tools, and employers in the same sentence still flag above.
+    const objective = /\b(?:eager to|looking (?:to|for)|hoping to|excited to|interested in|aiming to|passionate about|aspiring to|seeking)\b/i.test(
+      sentence,
     );
-    out.push(...checkFreeText(scanned, allow, "personalInfo.summary", !prospective));
+    if (!objective) {
+      const claim = accomplishmentViolation(scanned, allow, "personalInfo.summary");
+      if (claim) out.push(claim);
+    }
   }
   return out;
 }
@@ -401,13 +407,19 @@ function checkFreeText(text: string, allow: Allow, where: string, accomplishment
     if (unsupportedEmployer(org, allow)) out.push({ kind: "employer", value: org, where });
   }
   if (accomplishments) {
-    const novel = novelContentTokens(text, allow);
-    const content = contentTokens(text);
-    if (content.length > 0 && novel.length >= 2 && novel.length / content.length > 0.4) {
-      out.push({ kind: "accomplishment", value: text, where });
-    }
+    const claim = accomplishmentViolation(text, allow, where);
+    if (claim) out.push(claim);
   }
   return out;
+}
+
+function accomplishmentViolation(text: string, allow: Allow, where: string): Violation | null {
+  const novel = novelContentTokens(text, allow);
+  const content = contentTokens(text);
+  if (content.length > 0 && novel.length >= 2 && novel.length / content.length > 0.4) {
+    return { kind: "accomplishment", value: text, where };
+  }
+  return null;
 }
 
 function checkProse(

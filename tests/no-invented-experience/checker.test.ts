@@ -91,13 +91,23 @@ describe("checker allows harmless rewording", () => {
   it("accepts a summary that names the job being applied for and restates real skills", () => {
     const out = structuredClone(studentResume);
     out.personalInfo.summary =
-      "Highly motivated computer science student with experience in Python scripting seeking a backend engineering role at Northwind Payments. Eager to contribute to scalable and reliable payment systems.";
+      "Highly motivated computer science student with experience in Python scripting seeking a challenging backend engineering role at Northwind Payments. Eager to contribute to scalable and reliable payment systems.";
     expect(
       checkNoInventedExperience(studentResume, out, {
         applicationTarget: { company: "Northwind Payments", role: "Senior Backend Engineer" },
         jobDescription: jdBackend,
       }),
     ).toEqual([]);
+  });
+
+  it("still flags a summary that invents work without framing it as a job objective", () => {
+    const out = structuredClone(studentResume);
+    out.personalInfo.summary = "Designed distributed payment ledgers for card networks.";
+    expect(
+      checkNoInventedExperience(studentResume, out, {
+        applicationTarget: { company: "Northwind Payments", role: "Senior Backend Engineer" },
+      }).some((violation) => violation.kind === "accomplishment"),
+    ).toBe(true);
   });
 
   it("still flags a summary that claims the target company as a past employer", () => {
