@@ -165,6 +165,7 @@ export default function FreeResumeGeneratorPage() {
     const payload: {
       resumeText?: string;
       resumePdf?: string;
+      styleInstructions?: string;
       email: string;
       templateId: string;
     } = {
@@ -174,11 +175,11 @@ export default function FreeResumeGeneratorPage() {
     if (resumePdf) {
       payload.resumePdf = resumePdf.startsWith('data:') ? resumePdf : `data:application/pdf;base64,${resumePdf}`;
     } else {
-      // Client-side append: resume text + optional prompt with a space
-      const textToSend = promptText.trim()
-        ? `${resumeText.trim()} ${promptText.trim()}`
-        : resumeText.trim();
-      payload.resumeText = textToSend;
+      // Resume text stays the only source of facts. Instructions are sent separately.
+      payload.resumeText = resumeText.trim();
+      if (promptText.trim()) {
+        payload.styleInstructions = promptText.trim();
+      }
     }
     try {
       const res = await fetch('/api/free-resume/generate', {
@@ -540,9 +541,13 @@ export default function FreeResumeGeneratorPage() {
                           Still need to add more instructions?
                         </Button>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-xs text-muted-foreground">
+                            Instructions can only change wording, formatting, or emphasis. They cannot add jobs, employers, or metrics.
+                          </p>
+                          <div className="flex gap-2">
                           <Input
-                            placeholder="e.g. emphasize leadership, make it more concise"
+                            placeholder="e.g. emphasize leadership, make the wording more concise"
                             value={promptText}
                             onChange={(e) => setPromptText(e.target.value)}
                             className="h-8 text-sm flex-1"
@@ -560,6 +565,7 @@ export default function FreeResumeGeneratorPage() {
                           >
                             <X className="h-4 w-4" />
                           </Button>
+                          </div>
                         </div>
                       )}
                       </div>

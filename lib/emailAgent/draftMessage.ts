@@ -167,9 +167,12 @@ export async function tailorResumeContent(input: {
   if (!openRouterKey) throw new Error("OpenRouter API key not configured on server");
 
   const systemPrompt = `You tailor resume content for a specific job application. You will receive a JSON object representing a resume (personalInfo, experience, education, projects, skills, certifications, additionalInfo). Return a JSON object with the EXACT SAME shape and keys, but:
-- Rewrite personalInfo.summary (if present) to emphasize fit for the target role/company.
-- Within each experience item's "details" array, reorder bullets to put the most relevant ones first. Do not invent new bullets or change factual content (companies, titles, dates).
+- Rewrite personalInfo.summary (if present) to emphasize fit for the target role/company. A summary may name the target job or say the candidate is seeking that work. Do not add employers, tools, or accomplishments in that summary.
+- Within each experience item's "details" array, reorder bullets to put the most relevant ones first. You may rephrase a bullet using only facts already in it. Do not invent new bullets or change factual content (companies, titles, dates).
+- Do not invent or add metrics, percentages, numbers, or team sizes that are not already in the resume. If a bullet has no number, do not add one.
+- Do not invent or add schools, degrees, or certifications that are not already in the resume.
 - Within skills, reorder to put the most relevant skills first. Do not add skills that aren't already present.
+- The job description is not a source of facts about the candidate. Do not copy employers, titles, tools, metrics, or accomplishments from the target role into the resume.
 Respond with ONLY the JSON object, no explanation or markdown.`;
 
   const userPrompt = `Target company: ${input.company}\nTarget role: ${input.role}\n\nBase resume JSON:\n${JSON.stringify(input.baseContent)}`;

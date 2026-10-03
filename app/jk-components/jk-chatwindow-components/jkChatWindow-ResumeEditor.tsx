@@ -281,7 +281,7 @@ export default function JkCW_ResumeEditor() {
 	) {
 		const prompt = [
 			`You are updating the resume field "${fieldLabel}".`,
-			options.guidance ?? "Provide a concise, polished value suitable for a modern resume.",
+			options.guidance ?? "Use only facts already in this resume. Return the current value. If it is empty, return an empty string. Do not invent a new fact.",
 			options.extraContext ? `Context: ${options.extraContext}` : null,
 			options.currentValue ? `Current value: ${options.currentValue}` : null,
 			"Respond with only the text that should be inserted into the field.",
@@ -399,7 +399,7 @@ export default function JkCW_ResumeEditor() {
 									)}
 									onGenerate={() =>
 										handleGenerateField("First name", value => updatePersonal("firstName", value), {
-											guidance: "Suggest a professional-sounding first name. Return the name in Title Case.",
+											guidance: "Keep the first name already in this resume. Use only facts already in this resume. Return the name in Title Case. If it is empty, return an empty string.",
 											currentValue: ir.personal.firstName,
 										})
 									}
@@ -416,7 +416,7 @@ export default function JkCW_ResumeEditor() {
 									)}
 									onGenerate={() =>
 										handleGenerateField("Last name", value => updatePersonal("lastName", value), {
-											guidance: "Suggest a professional last name. Return the name only.",
+											guidance: "Keep the last name already in this resume. Use only facts already in this resume. Return the name only. If it is empty, return an empty string.",
 											currentValue: ir.personal.lastName,
 										})
 									}
@@ -434,7 +434,7 @@ export default function JkCW_ResumeEditor() {
 									onGenerate={() =>
 										handleGenerateField("Email address", value => updatePersonal("email", value), {
 											guidance:
-												"Create a professional email address using lowercase characters. Do not include commentary.",
+												"Keep the email already in this resume. Use only facts already in this resume. Return the email only. If it is empty, return an empty string. Do not create a new address.",
 											currentValue: ir.personal.email,
 										})
 									}
@@ -451,7 +451,7 @@ export default function JkCW_ResumeEditor() {
 									)}
 									onGenerate={() =>
 										handleGenerateField("Location", value => updatePersonal("location", value), {
-											guidance: "Suggest a city and state or region. Keep it short.",
+											guidance: "Keep the location already in this resume. Use only facts already in this resume. If it is empty, return an empty string.",
 											currentValue: ir.personal.location ?? "",
 										})
 									}
@@ -479,7 +479,7 @@ export default function JkCW_ResumeEditor() {
 												)}
 												onGenerate={() =>
 													handleGenerateField("Company", value => updateExperienceItem(it.id, { company: value }), {
-														guidance: "Provide the name of a reputable company. Return the company name only.",
+														guidance: "Keep the company already in this resume. Use only facts already in this resume. Return the company name only. If it is empty, return an empty string instead of inventing an employer.",
 														currentValue: it.company,
 														extraContext: describeExperienceItem(it),
 													})
@@ -498,7 +498,7 @@ export default function JkCW_ResumeEditor() {
 												onGenerate={() =>
 													handleGenerateField("Job title", value => updateExperienceItem(it.id, { title: value }), {
 														guidance:
-															"Craft a strong job title for this experience. Keep it short and capitalized appropriately.",
+															"Keep the job title already in this resume. You may fix capitalization. Use only facts already in this resume. Return the title only. If it is empty, return an empty string instead of inventing a title.",
 														currentValue: it.title,
 														extraContext: describeExperienceItem(it),
 													})
@@ -517,7 +517,7 @@ export default function JkCW_ResumeEditor() {
 												onGenerate={() =>
 													handleGenerateField("Start date", value => updateExperienceItem(it.id, { start: value }), {
 														guidance:
-															"Provide a concise start date (e.g., Jan 2023). Do not include additional words.",
+															"Keep the start date already in this resume. You may reformat a date that is already present. If it is empty, return an empty string. Do not invent a date. Use only facts already in this resume.",
 														currentValue: it.start,
 														extraContext: describeExperienceItem(it),
 													})
@@ -536,7 +536,7 @@ export default function JkCW_ResumeEditor() {
 												onGenerate={() =>
 													handleGenerateField("End date", value => updateExperienceItem(it.id, { end: value }), {
 														guidance:
-															"Provide an end date (e.g., Present or Jun 2024). Return just the date or 'Present'.",
+															"Keep the end date already in this resume. You may reformat a date that is already present, or keep Present. If it is empty, return an empty string. Do not invent a date. Use only facts already in this resume.",
 														currentValue: typeof it.end === "string" ? it.end : "",
 														extraContext: describeExperienceItem(it),
 													})
@@ -554,7 +554,7 @@ export default function JkCW_ResumeEditor() {
 												)}
 												onGenerate={() =>
 													handleGenerateField("Role location", value => updateExperienceItem(it.id, { location: value }), {
-														guidance: "Suggest a city, state, or remote indicator for the role.",
+														guidance: "Keep the role location already in this resume. Use only facts already in this resume. If it is empty, return an empty string.",
 														currentValue: it.location ?? "",
 														extraContext: describeExperienceItem(it),
 													})
@@ -586,7 +586,7 @@ export default function JkCW_ResumeEditor() {
 															value => updateBullet(it.id, bullet.id, value),
 															{
 																guidance:
-																	"Write a single impactful bullet that starts with a strong action verb and highlights measurable impact.",
+																	"Rewrite this bullet with a strong action verb. Use only facts already in this resume. If the bullet has no number, do not add one. Return the bullet only.",
 																currentValue: bullet.text,
 																extraContext: describeExperienceItem(it),
 																postProcess: value => sanitizeResponse(value),

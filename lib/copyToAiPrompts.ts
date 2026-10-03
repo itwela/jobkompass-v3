@@ -18,7 +18,7 @@ export const COPY_TO_AI_OPTIONS: CopyToAiOption[] = [
   { id: 'perplexity', name: 'Perplexity', logoUrl: 'https://www.perplexity.ai/favicon.ico', url: 'https://www.perplexity.ai/' },
 ];
 
-const RESUME_PROMPT = `Based on everything you know about me, craft my resume information. Provide the fields below in a clear, structured format so I can use them:
+const RESUME_PROMPT = `Use only the resume I paste below. If I have not pasted one, ask me to paste it before you fill in experience. Do not invent employers, titles, dates, schools, degrees, certifications, metrics, percentages, team sizes, tools, or skills. You may rephrase and reorder facts from that resume. Provide the fields below in a clear, structured format so I can use them:
 
 **PERSONAL INFO**
 - firstName, lastName, email (required)
@@ -43,7 +43,7 @@ For each: name, description, date (optional), technologies (optional), details (
 
 **TARGET COMPANY** (optional): Company name if tailoring for a specific role`;
 
-const COVER_LETTER_PROMPT = `Based on everything you know about me, craft my cover letter content for this role. Provide the fields below in a clear, structured format:
+const COVER_LETTER_PROMPT = `Use only the resume I paste below. Do not invent employers, titles, dates, schools, degrees, certifications, metrics, percentages, team sizes, tools, or skills. You may rephrase facts from that resume and name the role I am applying for. Provide the fields below in a clear, structured format:
 
 **PERSONAL INFO**
 - firstName, lastName, email (required)

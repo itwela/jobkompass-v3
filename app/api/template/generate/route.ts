@@ -86,12 +86,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get reference resume content (only for resume generation)
-    // Source: Convex reference, uploaded PDF, or pasted text
+    // Facts about the candidate come from a selected resume, an upload, pasted text,
+    // or — for a cover letter with none of those — the account's saved resume.
     let referenceResume: { name: string; content: any } | null = null;
-    
-    if (templateType === 'resume') {
-      if (hasReferenceResume && referenceResumeId) {
+
+    if (hasReferenceResume && referenceResumeId) {
         try {
           console.log(`[${requestId}] [TEMPLATE_GENERATE] Fetching reference resume`, { referenceResumeId });
           const fetched = await convexClient.query(api.documents.getResume, {
@@ -136,8 +135,24 @@ export async function POST(request: NextRequest) {
             { status: 502 }
           );
         }
+      } else if (templateType === 'cover-letter') {
+        try {
+          const resumes = await convexClient.query(api.documents.listResumes, {});
+          const saved = (Array.isArray(resumes) ? resumes : []).find((resume: { content?: unknown }) => {
+            const content = resume?.content;
+            return !!content && typeof content === 'object' && Object.keys(content as object).length > 0;
+          }) as { name?: string; content?: unknown } | undefined;
+          if (saved?.content) {
+            referenceResume = {
+              name: saved.name || 'Saved Resume',
+              content: saved.content,
+            };
+            console.log(`[${requestId}] [TEMPLATE_GENERATE] Using saved resume for cover letter`);
+          }
+        } catch (e) {
+          console.warn(`[${requestId}] [TEMPLATE_GENERATE] Could not load a saved resume for the cover letter:`, e);
+        }
       }
-    }
 
     // Fetch job details if jobId is provided
     let jobDetails = null;
@@ -191,14 +206,14 @@ export async function POST(request: NextRequest) {
     if (templateType === 'resume' && jobDetails) {
       const keywordAgent = new Agent({
         name: 'KeywordExtractor',
-        instructions: `You are an ATS keyword extraction specialist. Analyze the job posting and extract the most important keywords and phrases that must appear in a tailored resume to pass ATS screening.
+        instructions: `You are an ATS keyword extraction specialist. Analyze the job posting and list keywords and phrases the posting emphasizes. These labels describe the job, not the candidate.
 
 Extract keywords across these categories:
 1. Technical skills, tools, and technologies (exact names matter — "React.js" not just "React")
 2. Soft skills explicitly stated in the posting
 3. Role-specific action verbs (e.g. "architected", "spearheaded", "optimized")
-4. Industry terms, methodologies, and certifications
-5. Key responsibilities reframed as resume-ready competencies
+4. Industry terms, methodologies, and certifications named in the posting
+5. Key responsibilities stated in the posting
 
 Rules:
 - Output ONLY a raw JSON array of strings. No markdown, no explanation, no code fences.
@@ -232,10 +247,12 @@ Full job data: ${JSON.stringify(jobDetails)}`;
     const coverLetterTool = createCoverLetterJakeTemplateTool(convexClient);
 
     const keywordsBlock = extractedKeywords.length > 0
-      ? `\nEXTRACTED JOB KEYWORDS — MUST integrate these naturally into the resume:\n${extractedKeywords.join(', ')}\n\nCRITICAL: These keywords were pulled directly from the job posting. Weave them into bullet points, the skills section, and any summary. Do NOT list them verbatim — incorporate them where genuinely applicable to the candidate's background.\n`
+      ? `\nJOB KEYWORDS (emphasis only, not new facts):\n${extractedKeywords.join(', ')}\n\nYou may mention a keyword only where the candidate's real experience already supports it. Do not add it as a new skill, tool, employer, or metric.\n`
       : '';
 
-    // Build instructions using reference resume content (for resumes) or job info (for cover letters)
+    const noInventedFactsRule = `The job posting is not a source of facts about the candidate. Do not invent employers, metrics, skills, schools, certifications, titles, dates, degrees, team sizes, or tools. You may rephrase and reorder facts that are already in the candidate resume. A summary may name the target job or say the candidate is seeking that work.`;
+
+    // Build instructions from the candidate's real resume. The job posting names the role; it is not the candidate's history.
     let instructions = `You are a professional ${templateType === 'resume' ? 'resume' : 'cover letter'} generator. Generate a ${templateType === 'resume' ? 'professional, ATS-optimized resume' : 'tailored cover letter'} using the ${templateId} template. This is not a conversation, it is a single task.
 
 ${templateType === 'resume' && referenceResume?.content ? `REFERENCE RESUME DATA:
@@ -245,21 +262,26 @@ ${templateType === 'resume' && referenceResume?.content ? `REFERENCE RESUME DATA
 ${keywordsBlock}
 TASK:
 - Use the reference resume content as the primary source for all user information (personal info, experience, education, skills, etc.).
-- Tailor the content for the target position by incorporating the extracted keywords above.
-- Apply any resume preferences provided.
+- ${noInventedFactsRule}
+- Apply any resume preferences provided only when they do not add facts that are absent from the reference resume.
 - IMPORTANT: When calling createResumeJakeTemplate, include "targetCompany" with the company name AND "templateId" with "${templateId}".
 - Call createResumeJakeTemplate ONCE to generate and auto-save the document.` : `COVER LETTER GENERATION:
 ${jobTitle && jobCompany ? `TARGET POSITION: ${jobTitle} at ${jobCompany}` : ''}
-${jobDetails ? `JOB DETAILS:\n${JSON.stringify(jobDetails, null, 2)}` : ''}
+${jobDetails ? `JOB DETAILS (what the employer is hiring for, not the candidate's history):\n${JSON.stringify(jobDetails, null, 2)}` : ''}
 ${currentUser?.name ? `USER NAME: ${currentUser.name} (split into firstName and lastName for personalInfo)` : ''}
 ${currentUser?.email ? `USER EMAIL: ${currentUser.email}` : ''}
+${referenceResume?.content ? `CANDIDATE RESUME (the only source of facts about this person):
+${JSON.stringify(referenceResume.content, null, 2)}
+
+Use only the candidate resume for any claim about employers, titles, dates, schools, degrees, certifications, skills, tools, or metrics. ${noInventedFactsRule}` : `NO CANDIDATE RESUME WAS PROVIDED.
+Do not state experience, years, employers, titles, schools, degrees, certifications, metrics, or credentials. Write only about the role being applied for and the candidate's interest in that work.`}
 
 TASK:
 - Generate a professional cover letter tailored for this specific position.
-- Use information from the job details to craft compelling content.
+- Use only the candidate resume when one is provided. If none is provided, do not invent experience.
 - IMPORTANT: When calling createCoverLetterJakeTemplate:
-  - Set personalInfo.firstName and personalInfo.lastName from the user's name (${currentUser?.name || 'use a placeholder name'})
-  - Set personalInfo.email to ${currentUser?.email || 'the user\'s email'}
+  - Set personalInfo.firstName and personalInfo.lastName from the user's name (${currentUser?.name || 'leave them empty if the name is unknown'})
+  - Set personalInfo.email to ${currentUser?.email || 'the user\'s email if it is known, otherwise leave it empty'}
   - Set jobInfo.company to "${jobCompany || 'the company name'}" so the document name includes the company name.
   - Set jobInfo.position to "${jobTitle || 'the job title'}"
   ${jobCompany ? `- Set targetCompany to "${jobCompany}" so the document name includes the company name.` : ''}
@@ -292,7 +314,7 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
       userMessage += ` Make sure to ${templateType === 'resume' ? 'include targetCompany parameter with "' + jobCompany + '"' : 'set jobInfo.company to "' + jobCompany + '"'} so the document name includes the company name.`;
     }
     if (templateType === 'resume' && promptText && promptText.trim()) {
-      userMessage += `\n\nAdditional instructions from the user: ${promptText.trim()}`;
+      userMessage += `\n\nAdditional instructions from the user (wording, formatting, or emphasis only — do not add facts that are not in the resume): ${promptText.trim()}`;
     }
     userMessage += ` Use the provided context to fill details. Then call the generation tool once to produce and save the document.`;
 

@@ -30,11 +30,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { resumeText, resumePdf, email, templateId } = body as {
+    const { resumeText, resumePdf, email, templateId, styleInstructions } = body as {
       resumeText?: string;
       resumePdf?: string;
       email?: string;
       templateId?: string;
+      styleInstructions?: string;
     };
 
     const freeTemplates = getFreeResumeTemplates();
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
         resumePdf: hasPdf ? (resumePdf as string) : undefined,
         resumeText: hasText ? (resumeText as string) : undefined,
         fallbackEmail: sanitizedEmail,
+        styleInstructions: typeof styleInstructions === 'string' ? styleInstructions : undefined,
       });
     } catch (extractErr) {
       const errMsg = extractErr instanceof Error ? extractErr.message : String(extractErr);
