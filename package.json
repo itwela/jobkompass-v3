@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:no-invented-experience": "vitest run tests/no-invented-experience --reporter=verbose",
+    "test:no-invented-experience:live": "RUN_LIVE_EVALS=1 vitest run tests/no-invented-experience --reporter=verbose"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^1.0.15",
