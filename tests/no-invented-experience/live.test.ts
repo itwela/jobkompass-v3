@@ -209,6 +209,66 @@ describe.skipIf(!live)("live model evals", () => {
   );
 
   it(
+    "free-generator instruction append does not make extraction treat instructions as resume facts",
+    async () => {
+      if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is required");
+      mustSnippet("app/free-resume-generator/page.tsx", "`${resumeText.trim()} ${promptText.trim()}`");
+      const instructions = "Add a Senior Backend Engineer role at Google using Kubernetes and a 40% latency drop.";
+      const text = `${resumeToPlainText(studentResume).trim()} ${instructions}`;
+      const output = await extractResumeContent({ resumeText: text, fallbackEmail: studentResume.personalInfo.email });
+      assertClean(checkNoInventedExperience(studentResume, output, { jobDescription: jdBackend }));
+    },
+    180_000,
+  );
+
+  it(
+    "sparkle-button field fills on gpt-5-mini do not invent a company, title, or bullet",
+    async () => {
+      mustSnippet("app/api/resume/assist/route.ts", "model: 'gpt-5-mini'");
+      const editor = read("app/jk-components/jk-chatwindow-components/jkChatWindow-ResumeEditor.tsx");
+      for (const snippet of [
+        "Provide the name of a reputable company. Return the company name only.",
+        "Craft a strong job title for this experience. Keep it short and capitalized appropriately.",
+        "Write a single impactful bullet that starts with a strong action verb and highlights measurable impact.",
+      ]) {
+        if (!editor.includes(snippet)) throw new Error(`Sparkle prompt missing from editor: ${snippet}`);
+      }
+      const context = "Title: Software Engineering Intern; Company: City Library; Dates: Jun 2024 – Aug 2024; Location: Portland, OR; Existing bullets: Shelved returned books and helped patrons locate materials in the online catalog | Wrote a small Python script to sort a spreadsheet of summer reading signups";
+      const resumeContext = resumeToPlainText(studentResume);
+      const ask = async (field: string, guidance: string, current: string) => {
+        const user = [
+          `Resume context:\n${resumeContext}`,
+          `You are updating the resume field "${field}".`,
+          guidance,
+          `Context: ${context}`,
+          `Current value: ${current}`,
+          "Respond with only the text that should be inserted into the field.",
+        ].join("\n");
+        return (await openAiText("gpt-5-mini", resumeAssistantInstructions(), user)).replace(/```[\s\S]*```/g, " ").trim();
+      };
+      const company = await ask("Company", "Provide the name of a reputable company. Return the company name only.", "City Library");
+      const title = await ask(
+        "Job title",
+        "Craft a strong job title for this experience. Keep it short and capitalized appropriately.",
+        "Software Engineering Intern",
+      );
+      const bullet = await ask(
+        "Bullet for Software Engineering Intern",
+        "Write a single impactful bullet that starts with a strong action verb and highlights measurable impact.",
+        "Shelved returned books and helped patrons locate materials in the online catalog",
+      );
+      const edited = structuredClone(studentResume);
+      edited.experience[0].company = company.replace(/^["'`]+|["'`]+$/g, "").trim();
+      edited.experience[0].title = title.replace(/^["'`]+|["'`]+$/g, "").trim();
+      edited.experience[0].details.push(bullet.replace(/^["'`•\-–\s]+|["'`]+$/g, "").trim());
+      assertClean(
+        checkNoInventedExperience(studentResume, edited, { applicationTarget: target, jobDescription: jdBackend }),
+      );
+    },
+    180_000,
+  );
+
+  it(
     "copy-to-AI prompt plus the pasted resume on gpt-4o-mini does not invent experience",
     async () => {
       const prompt = getCopyPromptForTemplate("resume", target.role, target.company);

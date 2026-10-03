@@ -88,6 +88,28 @@ describe("checker allows harmless rewording", () => {
     ).toEqual([]);
   });
 
+  it("accepts a summary that names the job being applied for and restates real skills", () => {
+    const out = structuredClone(studentResume);
+    out.personalInfo.summary =
+      "Highly motivated computer science student with experience in Python scripting seeking a backend engineering role at Northwind Payments. Eager to contribute to scalable and reliable payment systems.";
+    expect(
+      checkNoInventedExperience(studentResume, out, {
+        applicationTarget: { company: "Northwind Payments", role: "Senior Backend Engineer" },
+        jobDescription: jdBackend,
+      }),
+    ).toEqual([]);
+  });
+
+  it("still flags a summary that claims the target company as a past employer", () => {
+    const out = structuredClone(studentResume);
+    out.personalInfo.summary = "I worked at Northwind Payments building payment systems.";
+    expect(
+      checkNoInventedExperience(studentResume, out, {
+        applicationTarget: { company: "Northwind Payments", role: "Senior Backend Engineer" },
+      }).some((violation) => violation.kind === "employer" && violation.value === "Northwind Payments"),
+    ).toBe(true);
+  });
+
   it("accepts an email that does not add candidate facts", () => {
     const email =
       "Hi there, I am interested in the Senior Backend Engineer opening at Northwind Payments. My resume is attached. Could we set up a short call?";

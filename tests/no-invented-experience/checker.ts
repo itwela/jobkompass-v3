@@ -344,13 +344,36 @@ function checkResume(
   }
 
   const summary = resume.personalInfo?.summary;
-  if (summary) out.push(...checkFreeText(summary, allow, "personalInfo.summary", true));
+  if (summary) out.push(...checkSummary(summary, allow, target));
 
-  if (target) {
-    // A summary may name the role being applied for. Concrete new facts still flag above.
-    void target;
+  return out;
+}
+
+/**
+ * A summary may name the job being applied for, and it may say the candidate
+ * wants that work. Concrete new facts in the same summary still flag.
+ * A forward-looking sentence ("Eager to…", "Seeking…") is not an accomplishment.
+ */
+function checkSummary(
+  text: string,
+  allow: Allow,
+  target: CheckOptions["applicationTarget"],
+): Violation[] {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter((sentence) => sentence.trim());
+  const chunks = sentences.length ? sentences : [text];
+  const out: Violation[] = [];
+  for (const sentence of chunks) {
+    const claimedWork = EMPLOYMENT_CUE.test(sentence);
+    let scanned = sentence;
+    if (!claimedWork) {
+      if (target?.role) scanned = removePhrase(scanned, target.role);
+      if (target?.company) scanned = removePhrase(scanned, target.company);
+    }
+    const prospective = /^(?:eager to|looking (?:to|for)|hoping to|excited to|interested in|aiming to|passionate about|aspiring to|seeking)\b/i.test(
+      sentence.trim(),
+    );
+    out.push(...checkFreeText(scanned, allow, "personalInfo.summary", !prospective));
   }
-
   return out;
 }
 
@@ -375,9 +398,7 @@ function checkFreeText(text: string, allow: Allow, where: string, accomplishment
     out.push({ kind: "title", value: titleMatch[0], where });
   }
   for (const org of orgHits(text)) {
-    if (!employerSupported(org, allow) && !schoolOk(org, allow) && !phraseIn(org, allow.corpus)) {
-      out.push({ kind: "employer", value: org, where });
-    }
+    if (unsupportedEmployer(org, allow)) out.push({ kind: "employer", value: org, where });
   }
   if (accomplishments) {
     const novel = novelContentTokens(text, allow);
@@ -425,9 +446,7 @@ function checkProse(
       out.push({ kind: "title", value: titleMatch[0], where: loc });
     }
     for (const org of orgHits(scanned)) {
-      if (!employerSupported(org, allow) && !schoolOk(org, allow) && !phraseIn(org, allow.corpus)) {
-        out.push({ kind: "employer", value: org, where: loc });
-      }
+      if (unsupportedEmployer(org, allow)) out.push({ kind: "employer", value: org, where: loc });
     }
     if (
       claimedWork &&
@@ -539,6 +558,19 @@ function employerSupported(name: string, allow: Allow): boolean {
   if (allow.orgs.some((org) => orgMatch(name, org, allow))) return true;
   if (allow.textSource && phraseIn(name, allow.corpus)) return true;
   return false;
+}
+
+function unsupportedEmployer(name: string, allow: Allow): boolean {
+  if (isSingleTokenLexicon(name)) return false;
+  return !employerSupported(name, allow) && !schoolOk(name, allow) && !phraseIn(name, allow.corpus);
+}
+
+/** "with Kafka" is a tool, not an employer. Multi-word names still count. */
+function isSingleTokenLexicon(name: string): boolean {
+  const norm = normOrg(name);
+  if (!norm || /\s/.test(norm)) return false;
+  if (LEXICON.includes(norm)) return true;
+  return ALIAS_GROUPS.some((group) => group.includes(norm));
 }
 
 function orgMatch(candidate: string, allowed: string, allow: Allow): boolean {
@@ -767,7 +799,9 @@ function schoolHits(text: string): string[] {
 
 function orgHits(sentence: string): string[] {
   const hits: string[] = [];
-  const re = /\b(?:at|with|for)\s+([A-Z][\w.&'-]*(?:\s+[A-Z][\w.&'-]*){0,4})/g;
+  // A period ends the name. "at Northwind Payments. Eager" is one employer, not two words.
+  const token = "[A-Z][\\w&'-]*(?:\\.[A-Z][\\w&'-]*)?";
+  const re = new RegExp(`\\b(?:at|with|for)\\s+(${token}(?:\\s+${token}){0,4})`, "g");
   let match: RegExpExecArray | null;
   while ((match = re.exec(sentence))) {
     const org = match[1].replace(/\b(Inc|LLC|Ltd|Corp)\b\.?$/i, "").trim();
