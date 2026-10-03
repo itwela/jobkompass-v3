@@ -130,6 +130,25 @@ describe("checker allows harmless rewording", () => {
     ).toEqual([]);
   });
 
+  it("accepts a shortened name for the company being applied to", () => {
+    const email =
+      "Hi Priya, I am interested in the Senior Backend Engineer opening at Northwind. My resume is attached. Could we find a time to talk?";
+    expect(
+      checkNoInventedExperience(studentResume, email, {
+        applicationTarget: { company: "Northwind Payments", role: "Senior Backend Engineer" },
+      }),
+    ).toEqual([]);
+  });
+
+  it("still flags a shortened target name when the sentence claims past employment", () => {
+    const email = "I worked at Northwind building payment systems before applying.";
+    expect(
+      checkNoInventedExperience(studentResume, email, {
+        applicationTarget: { company: "Northwind Payments", role: "Senior Backend Engineer" },
+      }).some((violation) => violation.kind === "employer" && violation.value === "Northwind"),
+    ).toBe(true);
+  });
+
   it("accepts a faithful parse of pasted resume text", () => {
     const text = resumeToPlainText(studentResume);
     expect(checkNoInventedExperience(text, studentResume)).toEqual([]);

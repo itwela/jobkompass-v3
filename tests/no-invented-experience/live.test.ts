@@ -161,6 +161,10 @@ describe.skipIf(!live)("live model evals", () => {
           "app/api/template/generate/route.ts",
           "Do not state experience, years, employers, titles, schools, degrees, certifications, metrics, or credentials.",
         ),
+        mustSnippet(
+          "app/api/template/generate/route.ts",
+          "Do not mention tools, technologies, or skills from the job posting, and do not say the candidate has them.",
+        ),
         "Return ONLY JSON with letterContent.openingParagraph, letterContent.bodyParagraphs (array of strings), and letterContent.closingParagraph.",
       ].join("\n\n");
       // Production attaches the saved resume when the account has one.

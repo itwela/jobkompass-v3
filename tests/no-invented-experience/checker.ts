@@ -354,6 +354,17 @@ function checkResume(
  * wants that work. Concrete new facts in the same summary still flag.
  * A forward-looking sentence ("Eager to…", "Seeking…") is not an accomplishment.
  */
+function withoutApplicationTarget(sentence: string, target: CheckOptions["applicationTarget"]): string {
+  let scanned = sentence;
+  if (target?.role) scanned = removePhrase(scanned, target.role);
+  if (target?.company) {
+    scanned = removePhrase(scanned, target.company);
+    const leading = target.company.split(/\s+/).find((part) => part.length > 3);
+    if (leading) scanned = removePhrase(scanned, leading);
+  }
+  return scanned;
+}
+
 function checkSummary(
   text: string,
   allow: Allow,
@@ -365,10 +376,7 @@ function checkSummary(
   for (const sentence of chunks) {
     const claimedWork = EMPLOYMENT_CUE.test(sentence);
     let scanned = sentence;
-    if (!claimedWork) {
-      if (target?.role) scanned = removePhrase(scanned, target.role);
-      if (target?.company) scanned = removePhrase(scanned, target.company);
-    }
+    if (!claimedWork) scanned = withoutApplicationTarget(sentence, target);
     out.push(...checkFreeText(scanned, allow, "personalInfo.summary", false));
     // "Seeking a backend role at Acme" names the application. It is not a claim of past work.
     // Metrics, tools, and employers in the same sentence still flag above.
@@ -435,10 +443,7 @@ function checkProse(
     const loc = `${where}[${i}]`;
     const claimedWork = EMPLOYMENT_CUE.test(sentence);
     let scanned = sentence;
-    if (!claimedWork) {
-      if (target?.role) scanned = removePhrase(scanned, target.role);
-      if (target?.company) scanned = removePhrase(scanned, target.company);
-    }
+    if (!claimedWork) scanned = withoutApplicationTarget(sentence, target);
     out.push(...unsupportedMetrics(scanned, allow, loc));
     out.push(...unsupportedDatesInText(scanned, allow, loc));
     for (const skill of lexiconHits(scanned)) {

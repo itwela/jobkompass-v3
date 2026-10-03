@@ -274,7 +274,7 @@ ${referenceResume?.content ? `CANDIDATE RESUME (the only source of facts about t
 ${JSON.stringify(referenceResume.content, null, 2)}
 
 Use only the candidate resume for any claim about employers, titles, dates, schools, degrees, certifications, skills, tools, or metrics. ${noInventedFactsRule}` : `NO CANDIDATE RESUME WAS PROVIDED.
-Do not state experience, years, employers, titles, schools, degrees, certifications, metrics, or credentials. Write only about the role being applied for and the candidate's interest in that work.`}
+Do not state experience, years, employers, titles, schools, degrees, certifications, metrics, or credentials. Do not mention tools, technologies, or skills from the job posting, and do not say the candidate has them. Write only about interest in the named role at the named company.`}
 
 TASK:
 - Generate a professional cover letter tailored for this specific position.
