@@ -100,6 +100,20 @@ The Stripe session id is not a property. It is only used in `sessionStorage` so 
 
 Checkout appends `plan` and `interval` to the success URL. Those values are the same slugs the app already stores on a subscription. They are not price ids.
 
+## Error tracking
+
+The same PostHog project records exceptions. No extra env vars. With no project key, nothing is sent.
+
+- Browser: `capture_exceptions` records uncaught errors and unhandled promise rejections. `console.error` is not captured, because the app logs resume objects and names to the console.
+- React: `app/error.tsx` and `app/global-error.tsx` call `captureException` for render errors. The page shows a generic message and, when Next provides one, an error digest. It does not show `error.message`.
+- Server: `instrumentation.ts` `onRequestError` runs in the Node.js runtime and sends the exception through `posthog-node`. Properties are `source`, `path` (no query string), `method`, `router_kind`, `route_path`, and `route_type`. The PostHog cookie is read only to copy `distinct_id`. Cookies, authorization headers, and request bodies are not sent.
+
+Exception messages longer than 180 characters are replaced. Emails in a message or stack are replaced with `[redacted]`. Source context lines from a stack (`context_line`, `pre_context`, `post_context`) are dropped.
+
+PostHog's free tier includes error tracking up to its monthly quota. The same **$0 billing limit** in the PostHog dashboard covers this, so an overage cannot charge the card.
+
+Sentry's free developer plan is the alternative if you want a separate error tracker. This repo does not install Sentry. Stay on PostHog unless you deliberately switch.
+
 ## What is intentionally not collected
 
 Resume text, cover letter text, job descriptions, names, emails, usernames, file names, prompts, and raw Stripe customer or session ids.

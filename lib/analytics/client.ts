@@ -25,6 +25,7 @@ import {
   safePageUrl,
   safePath,
   sanitizeAnalyticsValue,
+  toScrubbedError,
 } from "./privacy";
 
 const SIGNUP_DEDUPE_KEY = "jk_signup_tracked";
@@ -89,8 +90,12 @@ export function initAnalytics(): boolean {
       capture_pageview: false,
       capture_pageleave: false,
       autocapture: false,
-      // Exception autocapture is turned on in the error-tracking setup.
-      capture_exceptions: false,
+      capture_exceptions: {
+        capture_unhandled_errors: true,
+        capture_unhandled_rejections: true,
+        // Leave console capture off. The app logs resume objects and names.
+        capture_console_errors: false,
+      },
       disable_session_recording: true,
       disable_surveys: true,
       person_profiles: "identified_only",
@@ -271,4 +276,13 @@ export function trackPaidConversion(
 
 export function readPendingResumeSource(): string {
   return consumeResumeCreateSource();
+}
+
+export function captureClientException(error: unknown): void {
+  try {
+    if (!initAnalytics()) return;
+    posthog.captureException(toScrubbedError(error));
+  } catch {
+    // Reporting a failure must not create another one.
+  }
 }

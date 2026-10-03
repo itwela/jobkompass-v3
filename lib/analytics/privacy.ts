@@ -43,6 +43,10 @@ const BLOCKED_EXACT_KEYS = new Set([
   "prompt",
   "latex",
   "pdf",
+  "context_line",
+  "pre_context",
+  "post_context",
+  "vars",
 ]);
 
 const BLOCKED_KEY_RE = /(email|password|passwd|secret|cookie|authorization|bearer|firstname|lastname|fullname|username|personalinfo)/;
@@ -158,26 +162,36 @@ function isBlockedKey(key: string): boolean {
  * a name, or an email. Nested objects are kept only for PostHog's own
  * `$…` exception metadata, with strings redacted.
  */
-export function sanitizeAnalyticsValue(value: unknown, depth = 0): unknown {
+function cleanAnalyticsString(key: string, value: string): string {
+  const redacted = redactEmails(value);
+  if (/(\$exception_message|\$exception_value|^value$|^message$)/i.test(key)) {
+    return redacted.length > 180 ? "[redacted-long-text]" : redacted;
+  }
+  if (/stack|filename|function|abs_path|module/i.test(key)) {
+    return redacted.slice(0, 2000);
+  }
+  if (redacted.length > 300) return "[redacted-long-text]";
+  return redacted;
+}
+
+export function sanitizeAnalyticsValue(value: unknown, depth = 0, key = ""): unknown {
   if (depth > 6) return undefined;
   if (typeof value === "string") {
-    const redacted = redactEmails(value);
-    if (redacted.length > 500) return "[redacted-long-text]";
-    return redacted;
+    return cleanAnalyticsString(key, value);
   }
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   if (Array.isArray(value)) {
     return value
       .slice(0, 30)
-      .map((item) => sanitizeAnalyticsValue(item, depth + 1))
+      .map((item) => sanitizeAnalyticsValue(item, depth + 1, key))
       .filter((item) => item !== undefined);
   }
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
       if (isBlockedKey(key)) continue;
-      const cleaned = sanitizeAnalyticsValue(nested, depth + 1);
+      const cleaned = sanitizeAnalyticsValue(nested, depth + 1, key);
       if (cleaned !== undefined) out[key] = cleaned;
     }
     return out;
@@ -213,6 +227,19 @@ export function upgradeSurface(value: string | null | undefined): string | undef
 
 export function templateId(value: string | null | undefined): string | undefined {
   return slug(value, TEMPLATE_IDS);
+}
+
+export function toScrubbedError(error: unknown): Error {
+  const raw = error instanceof Error ? error : new Error("Unknown error");
+  const message = redactEmails(raw.message || "Unknown error");
+  const safeMessage = message.length > 180 ? "Error message redacted" : message || "Unknown error";
+  const scrubbed = new Error(safeMessage);
+  const name = raw.name && raw.name.length <= 80 && !raw.name.includes("@") ? raw.name : "Error";
+  scrubbed.name = name;
+  if (raw.stack) {
+    scrubbed.stack = redactEmails(raw.stack).slice(0, 2000);
+  }
+  return scrubbed;
 }
 
 export function safePath(pathname: string): string {
