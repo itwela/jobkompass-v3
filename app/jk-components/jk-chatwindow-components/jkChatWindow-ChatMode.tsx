@@ -23,6 +23,7 @@ import Image from "next/image";
 import { getModelForChat } from "@/lib/aiModels";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 
 interface ChatMessage {
   id: string;
@@ -314,6 +315,13 @@ export default function JkCW_ChatMode() {
             
             // Clear attachments immediately after sending
             clearAllAttachments()
+
+            if (response.status === 429) {
+                setError(rateLimitMessageFromResponse(response))
+                setIsLoading(false)
+                setMessages(prev => prev.filter(msg => msg.id !== tempMessageId))
+                return
+            }
 
             if (!response.ok) {
                 // Check if it's a context length exceeded error

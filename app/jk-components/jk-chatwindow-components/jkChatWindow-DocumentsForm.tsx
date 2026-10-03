@@ -27,6 +27,7 @@ import JkDocumentFolderCard, { DRAG_MIME, type JkDraggedDocument, type JkFolder 
 import JkFolderBreadcrumb from "../jk-documents/jkFolderBreadcrumb";
 import JkMoveToFolderMenu from "../jk-documents/jkMoveToFolderMenu";
 import { markResumeCreateSource } from "@/lib/analytics/client";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -467,6 +468,10 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     clearInterval(aiProgressTimer);
                     aiProgressTimer = undefined;
                 }
+            }
+
+            if (generateResumePdfRes.status === 429) {
+                throw new Error(rateLimitMessageFromResponse(generateResumePdfRes));
             }
 
             if (!generateResumePdfRes.ok) {

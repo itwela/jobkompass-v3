@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { RATE_LIMIT_FRIENDLY } from "@/lib/rateLimit/message";
 
 type SenderHit = {
   accountId: string;
@@ -67,7 +68,8 @@ export function AddLeadFromEmail() {
         setSender("");
       }
     } catch (err: any) {
-      setMessage(err?.message ?? "Could not add that email.");
+      const raw = typeof err?.message === "string" ? err.message : "";
+      setMessage(raw.includes("Too many AI requests") ? RATE_LIMIT_FRIENDLY : raw || "Could not add that email.");
     } finally {
       setAddingId(null);
     }

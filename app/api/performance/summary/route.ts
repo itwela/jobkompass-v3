@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 import { FREE_RESUME_MODEL_IDS } from '@/lib/aiModels';
 
 const OPENROUTER_MODEL_PRIMARY = FREE_RESUME_MODEL_IDS[0];
@@ -56,6 +57,9 @@ Guidelines:
 Return ONLY the summary text, no additional formatting or explanations.`;
 
 export async function POST(req: NextRequest) {
+  const limited = await enforceAiRateLimit(req, "ai");
+  if (limited) return limited;
+
   try {
     const stats: PerformanceStats = await req.json();
 

@@ -17,6 +17,7 @@ import JkTemplateSelector, { TemplateType, ResumeInputOptions } from "../jkTempl
 import JkUpgradeModal from "../jkUpgradeModal";
 import JkJobInputModal from "../jkJobInputModal";
 import { toast } from "@/lib/toast";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 import { Id } from "@/convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -130,6 +131,10 @@ export default function JkCW_MyJobsMode() {
       });
 
       const data = await response.json();
+
+      if (response.status === 429) {
+        throw new Error(rateLimitMessageFromResponse(response));
+      }
 
       if (!response.ok || !data.success) {
         // Check if it's a limit error

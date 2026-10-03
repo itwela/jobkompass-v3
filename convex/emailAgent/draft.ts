@@ -6,6 +6,8 @@ import { internal } from "../_generated/api";
 import { tailorResumeContent, draftReplyMessage, recipientFirstName, tailoredResumeName } from "../../lib/emailAgent/draftMessage";
 import { canUseResumeTemplate } from "../../lib/templates";
 import type { PlanRank } from "../plans";
+import { consumeOrFailOpen } from "../rateLimit";
+import { RATE_LIMIT_FRIENDLY } from "../rateLimitConfig";
 
 /**
  * The template this user may actually render, for the automated draft pipeline.
@@ -61,6 +63,11 @@ export const tailorResumeOnly = internalAction({
         return await fail(
           "You don't have a base resume with content yet. Add or activate a resume in My Documents, then try again."
         );
+      }
+
+      const limit = await consumeOrFailOpen(ctx, "emailAgent", lead.userId);
+      if (!limit.ok) {
+        return await fail(RATE_LIMIT_FRIENDLY);
       }
 
       const tailored = await tailorResumeContent({
@@ -126,6 +133,24 @@ export const draftForLead = internalAction({
     // click) instead of regenerating it — and never clear it via attachDraft below.
     // Follow-ups deliberately drop it: they don't attach a resume at all (redundant).
     let draftResumeId: string | undefined = isFollowUp ? undefined : (lead.draftResumeId ?? undefined);
+
+    const limit = await consumeOrFailOpen(ctx, "emailAgent", lead.userId);
+    if (!limit.ok) {
+      console.warn(`draftForLead ${args.leadId}: rate limit reached; skipping model calls.`);
+      await ctx.runMutation(internal.jobLeads.setResumeStatus, {
+        leadId: args.leadId,
+        status: "error",
+        error: RATE_LIMIT_FRIENDLY,
+      });
+      await ctx.runMutation(internal.jobLeads.attachDraft, {
+        leadId: args.leadId,
+        draftResumeId: draftResumeId as any,
+        draftMessage:
+          "Thanks for reaching out — I'd love to learn more about this opportunity.",
+        isFollowUp,
+      });
+      return;
+    }
 
     // The tailored-resume PDF is a nice-to-have: any failure in this block (LaTeX service
     // down/unconfigured, tailoring model error) must not prevent the reply draft below

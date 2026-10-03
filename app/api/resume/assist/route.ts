@@ -6,6 +6,7 @@ import {
 	user,
 } from '@openai/agents';
 import { NextRequest, NextResponse } from 'next/server';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 import { z } from 'zod';
 
 const requestSchema = z.object({
@@ -53,6 +54,9 @@ setDefaultOpenAIKey(
 );
 
 export async function POST(request: NextRequest) {
+	const limited = await enforceAiRateLimit(request, "ai");
+	if (limited) return limited;
+
 	try {
 		const body = await request.json();
 		const { message, history } = requestSchema.parse(body);

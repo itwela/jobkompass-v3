@@ -7,6 +7,7 @@ import { Agent, run, user } from '@openai/agents';
 import { setDefaultOpenAIKey } from '@openai/agents';
 import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from '@/app/ai/tools/file';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 
@@ -23,6 +24,9 @@ const GenerateRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceAiRateLimit(request, "ai");
+  if (limited) return limited;
+
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const startTime = Date.now();
   

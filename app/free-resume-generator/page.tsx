@@ -27,6 +27,7 @@ import JkFooter from '@/app/jk-components/jkFooter';
 import { getFreeResumeTemplates, getLockedFreeResumeTemplates } from '@/lib/templates';
 import { trackFirstResumeCreated, trackFreeGeneratorCompleted, trackFreeGeneratorStarted, trackResumeExported } from '@/lib/analytics/client';
 import { getModelsForFreeResume } from '@/lib/aiModels';
+import { rateLimitMessageFromResponse } from '@/lib/rateLimit/message';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -190,6 +191,10 @@ export default function FreeResumeGeneratorPage() {
         data = await res.json();
       } catch {
         data = { error: `Server error (${res.status} ${res.statusText})` };
+      }
+      if (res.status === 429) {
+        toast.error(rateLimitMessageFromResponse(res), { duration: 10000 });
+        return;
       }
       if (!res.ok) {
         toast.error(data.error || 'Failed to parse resume', {

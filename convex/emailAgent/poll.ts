@@ -9,6 +9,7 @@ import {
   getMessageIfExists,
 } from "./gmailClient";
 import { classifyEmail } from "../../lib/emailAgent/classify";
+import { consumeOrFailOpen } from "../rateLimit";
 
 // One-shot backfill for leads ingested before emailReceivedAt was captured: re-fetch
 // each dateless lead's Gmail message for its internalDate, patch the lead, and re-mirror
@@ -96,6 +97,14 @@ async function pollAccount(ctx: ActionCtx, account: any): Promise<number> {
     if (repliedToLead) {
       await ctx.runMutation(internal.jobLeads.markReplied, { leadId: repliedToLead._id });
       continue;
+    }
+
+    const limit = await consumeOrFailOpen(ctx, "emailAgent", account.userId);
+    if (!limit.ok) {
+      console.warn(
+        "Email classification rate limit reached; leaving the Gmail history cursor in place.",
+      );
+      return newLeads;
     }
 
     const classification = await classifyEmail({
