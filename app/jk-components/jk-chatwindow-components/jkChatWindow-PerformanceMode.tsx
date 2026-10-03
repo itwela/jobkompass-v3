@@ -7,6 +7,7 @@ import { useJobs } from '@/providers/jkJobsProvider'
 import { useJobKompassResume } from '@/providers/jkResumeProvider'
 import { useFeatureAccess } from '@/hooks/useFeatureAccess'
 import { Button } from '@/components/ui/button'
+import { trackUpgradeClicked } from '@/lib/analytics/client'
 import { motion } from 'framer-motion'
 import {
   TrendingUp,
@@ -259,7 +260,10 @@ export default function JkCW_PerformanceMode() {
               Performance analytics and AI-powered insights are available on Starter, Plus, and Pro plans. Subscribe to track your job hunt progress and get personalized recommendations.
             </p>
             <Button asChild className="gap-2">
-              <a href="/pricing">
+              <a
+                href="/pricing"
+                onClick={() => trackUpgradeClicked({ surface: 'performance', authenticated: true })}
+              >
                 <CreditCard className="h-4 w-4" />
                 View plans
               </a>

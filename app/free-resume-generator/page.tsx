@@ -25,6 +25,7 @@ import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
 import JkFooter from '@/app/jk-components/jkFooter';
 import { getFreeResumeTemplates, getLockedFreeResumeTemplates } from '@/lib/templates';
+import { trackFirstResumeCreated, trackResumeExported } from '@/lib/analytics/client';
 import { getModelsForFreeResume } from '@/lib/aiModels';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -208,6 +209,7 @@ export default function FreeResumeGeneratorPage() {
         return;
       }
       setPdfBase64(data.pdfBase64!);
+      trackFirstResumeCreated('free_generator', 'free_generator', selectedTemplateId);
       const templateName = getFreeResumeTemplates().find((t) => t.id === selectedTemplateId)?.name ?? selectedTemplateId;
       setGeneratedDownloads((prev) => [
         ...prev,
@@ -367,6 +369,7 @@ export default function FreeResumeGeneratorPage() {
     link.href = `data:application/pdf;base64,${b64}`;
     link.download = 'formatted-resume.pdf';
     link.click();
+    trackResumeExported({ method: 'download', template_id: selectedTemplateId });
   };
 
   const handleChangeTemplate = () => {

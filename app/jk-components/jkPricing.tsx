@@ -9,6 +9,7 @@ import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { Check, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import JkPublicHeader from './jkPublicHeader'
+import { trackPlanUpgrade } from '@/lib/analytics/client'
 
 
 interface PlanPricing {
@@ -118,6 +119,13 @@ export default function JkPricing() {
 
   const handleSubscribe = async (plan: Plan) => {
     if (!isAuthenticated || !user) {
+      trackPlanUpgrade({
+        surface: 'pricing',
+        planId: plan.id,
+        isAnnual,
+        isOneTime: Boolean(plan.isOneTime),
+        authenticated: false,
+      })
       router.push('/auth?mode=signup')
       return
     }
@@ -135,6 +143,14 @@ export default function JkPricing() {
       setLoadingPlan(null)
       return
     }
+
+    trackPlanUpgrade({
+      surface: 'pricing',
+      planId: plan.id,
+      isAnnual,
+      isOneTime: Boolean(plan.isOneTime),
+      authenticated: true,
+    })
 
     try {
       // Create Stripe checkout session
@@ -344,7 +360,20 @@ export default function JkPricing() {
                 </ul>
 
                 {!isAuthenticated ? (
-                  <Link href="/auth?mode=signup" className="block w-full" onClick={(e) => e.stopPropagation()}>
+                  <Link
+                    href="/auth?mode=signup"
+                    className="block w-full"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      trackPlanUpgrade({
+                        surface: 'pricing',
+                        planId: plan.id,
+                        isAnnual,
+                        isOneTime: Boolean(plan.isOneTime),
+                        authenticated: false,
+                      })
+                    }}
+                  >
                     <Button
                       className="w-full cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
                       variant="default"

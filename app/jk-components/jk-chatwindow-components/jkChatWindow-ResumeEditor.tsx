@@ -9,6 +9,7 @@ import { api } from "@/convex/_generated/api";
 import { ResumeIR, SectionIR, ExperienceItemIR, BulletIR } from "@/types/resumeIR";
 import ResumeAssistantPanel, { ResumeAssistantMessage } from "./jkResumeAssistantPanel";
 import { Sparkles } from "lucide-react";
+import { trackResumeExported } from "@/lib/analytics/client";
 
 function newId() {
 	return Math.random().toString(36).slice(2);
@@ -110,6 +111,7 @@ export default function JkCW_ResumeEditor() {
 		a.download = "resume.pdf";
 		a.click();
 		URL.revokeObjectURL(url);
+		trackResumeExported({ method: "export", template_id: ir?.meta?.template });
 	}
 
 	async function sendAssistantMessage({ message, display, includeContext = true }: AssistantRequest) {

@@ -6,11 +6,12 @@ import { useAuth } from '@/providers/jkAuthProvider'
 import { CheckCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { trackPaidConversion } from '@/lib/analytics/client'
 
 export default function StripeSuccessPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading } = useAuth()
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
   
@@ -23,6 +24,8 @@ export default function StripeSuccessPage() {
       return
     }
 
+    if (isLoading) return
+
     if (!isAuthenticated || !user) {
       router.push('/auth')
       return
@@ -30,12 +33,20 @@ export default function StripeSuccessPage() {
 
     // Verify the session (optional - webhook handles the actual subscription creation)
     setStatus('success')
+    trackPaidConversion(
+      {
+        plan_id: searchParams.get('plan'),
+        interval: searchParams.get('interval'),
+      },
+      sessionId
+    )
     
     // Redirect to app after a short delay
-    setTimeout(() => {
+    const redirectTimer = setTimeout(() => {
       router.push('/app')
     }, 2000)
-  }, [sessionId, isAuthenticated, user, router])
+    return () => clearTimeout(redirectTimer)
+  }, [sessionId, isAuthenticated, isLoading, user, router, searchParams])
 
   if (status === 'loading') {
     return (
