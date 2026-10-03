@@ -18,6 +18,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
 import { mcpTools } from '@/app/lib/mcp-tools';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
+import { resumeJsonFromText, type FactGuard } from '@/lib/resume/noInventedFacts';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -75,11 +76,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create tool *instances* for client-dependent tools
-    // Pass the convexClient directly since it's already instantiated
+    // Pass the convexClient directly since it's already instantiated.
+    // When the user pasted a resume, the save tools drop facts that resume does not support.
+    const pastedResume = resumeJsonFromText(message);
+    const factGuard: FactGuard | undefined = pastedResume ? { source: pastedResume } : undefined;
     const toolInstancesWithConvexClient = [
       createGetUserUsageTool(convexClient), // Always available - check usage first
-      createResumeJakeTemplateTool(convexClient),
-      createCoverLetterJakeTemplateTool(convexClient),
+      createResumeJakeTemplateTool(convexClient, factGuard),
+      createCoverLetterJakeTemplateTool(convexClient, factGuard),
       createAddToResourcesTool(convexClient),
       createAddToJobsTool(convexClient),
       createGetUserResumesTool(convexClient),

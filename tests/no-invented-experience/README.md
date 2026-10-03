@@ -2,7 +2,7 @@
 
 Regression tests for the rule: AI resume output must not add employers, titles, dates, metrics, skills or tools, schools, degrees, certifications, or accomplishments that the user's resume does not support. Rewording and reordering real content is allowed. A job description is never a source of facts about the candidate.
 
-The checker proves invented facts are visible in each path's output shape. Prompt checks now require the fixed paths to forbid those facts. Two prompt gaps remain expected failures: reply drafts, which still do not receive the resume, and chat best practices, which still push numbers and job-description keywords.
+The checker proves invented facts are visible in each path's output shape. Prompt checks require every modeled path to forbid those facts. Reply drafts do not receive the resume, so they forbid experience claims and a server-side scrubber drops any sentence the checker still flags. Chat instructions no longer ask for invented numbers or job-description keywords.
 
 ## Commands
 
@@ -27,13 +27,13 @@ Same files, with `RUN_LIVE_EVALS=1`. This calls the real models. It needs:
 
 Live tailor, extraction, and reply drafts call the real functions. Chat, template generation, the resume assistant, and copy-to-AI replay the real instruction text on the same model id. Those routes also need Convex auth and tool side effects, which live mode does not boot. The cover-letter live case attaches the candidate resume, matching production when the account has a saved resume.
 
-The Vitest summary prints `expected fail` for the remaining prompt gaps (reply drafts and chat) so they stay visible while the suite is green.
+The default suite does not expect failures for these paths. Live checks, including the adversarial fixture, stay out of CI.
 
 ## What default mode covers
 
 - Checker unit tests, including rewrites that should pass and invented facts that should fail.
 - Each AI path below, with a mocked model response that invents facts, asserted through the real parser when the path exports one (`tailorResumeContent`, `extractResumeContent`, `draftReplyMessage`).
-- Prompt checks against the real source. A test whose name starts with `EXPECTED FAILURE` uses Vitest's `it.fails`: the suite stays green while that prompt still lacks a real guard. If someone adds the guard, that test starts failing and should be updated.
+- Prompt checks against the real source. Reply drafts and chat instructions are required to forbid invented facts. The adversarial live file replays tailored-resume, cover-letter, assistant, and chat prompts, then runs `scrubInventedExperience` before the same checker. Sparkle fills and free-generator extraction are still checked raw.
 
 ## Paths
 

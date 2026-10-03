@@ -88,11 +88,10 @@ describe("email agent resume tailoring (tailorResumeContent)", () => {
 });
 
 describe("email agent reply draft (draftReplyMessage)", () => {
-  it("catches a mocked reply that invents the candidate's history", async () => {
+  it("strips a mocked reply that invents the candidate's history", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-    const calls = stubModel(
-      "I spent 5 years building Kubernetes platforms at Google and improved uptime to 99.9%.",
-    );
+    const invented = "I spent 5 years building Kubernetes platforms at Google and improved uptime to 99.9%.";
+    const calls = stubModel(invented);
     const message = await draftReplyMessage({
       senderName: "Priya",
       company: target.company,
@@ -102,8 +101,11 @@ describe("email agent reply draft (draftReplyMessage)", () => {
     });
     expect(calls[0].body.model).toBe("google/gemma-3-27b-it");
     expect(calls[0].body.messages[1].content).not.toContain("City Library");
-    const violations = checkNoInventedExperience(studentResume, message, { applicationTarget: target, jobDescription: jdBackend });
-    expect(violations.map((violation) => violation.kind)).toEqual(expect.arrayContaining(["employer", "metric", "skill"]));
+    expect(calls[0].body.messages[0].content).toMatch(/do not invent/i);
+    const rawViolations = checkNoInventedExperience(studentResume, invented, { applicationTarget: target, jobDescription: jdBackend });
+    expect(rawViolations.map((violation) => violation.kind)).toEqual(expect.arrayContaining(["employer", "metric", "skill"]));
+    expect(checkNoInventedExperience(studentResume, message, { applicationTarget: target, jobDescription: jdBackend })).toEqual([]);
+    expect(message).not.toMatch(/Google|Kubernetes|99\.9/);
   });
 
   it("accepts a mocked reply that does not add candidate facts", async () => {
@@ -121,15 +123,14 @@ describe("email agent reply draft (draftReplyMessage)", () => {
     expect(checkNoInventedExperience(studentResume, message, { applicationTarget: target })).toEqual([]);
   });
 
-  it.fails(
-    "EXPECTED FAILURE: reply drafts never receive the resume, so the model can invent employers, metrics, and skills",
-    () => {
-      const src = read("lib/emailAgent/draftMessage.ts");
-      const body = src.slice(src.indexOf("export async function draftReplyMessage"));
-      expect(body).toMatch(/baseContent|resume JSON|candidate resume/i);
-      expect(body).toMatch(/do not invent (employers|experience|metrics)/i);
-    },
-  );
+  it("forbids experience claims because a reply draft is not given the resume", () => {
+    const src = read("lib/emailAgent/draftMessage.ts");
+    const body = src.slice(src.indexOf("export async function draftReplyMessage"));
+    expect(body).toMatch(/do not invent employers, experience, metrics/i);
+    expect(body).toMatch(/never a source of facts about the candidate/i);
+    expect(body).toContain("scrubProse");
+    expect(body).toContain("EMPTY_CANDIDATE");
+  });
 });
 
 describe("resume extraction (extractResumeContent)", () => {
@@ -286,9 +287,12 @@ describe("template generation", () => {
 });
 
 describe("chat agent", () => {
-  it("documents best practices that push invented numbers and job-description keywords", () => {
-    expect(resumeBestPractices).toContain("Quantify achievements with numbers and percentages");
-    expect(resumeBestPractices).toContain("Include relevant keywords from job descriptions");
+  it("does not tell the model to invent numbers or stuff job-description keywords", () => {
+    const text = `${jobKompassInstructions}\n${resumeBestPractices}`;
+    expect(text).not.toContain("Quantify achievements with numbers and percentages");
+    expect(text).not.toContain("Include relevant keywords from job descriptions");
+    expect(text).toMatch(/do not invent/i);
+    expect(text).toMatch(/never a source of facts about the candidate/i);
     expect(jobKompassInstructions).toContain("createResumeJakeTemplate");
     expect(read("app/api/chat/route.ts")).toContain('model: "gpt-5-mini"');
     expect(read("app/ai/tools/file.ts")).toContain("name: 'createResumeJakeTemplate'");
@@ -301,16 +305,6 @@ describe("chat agent", () => {
     });
     expect(violations.length).toBeGreaterThan(0);
   });
-
-  it.fails(
-    "EXPECTED FAILURE: chat instructions do not forbid invented employers, metrics, skills, schools, or certifications",
-    () => {
-      const text = `${jobKompassInstructions}\n${resumeBestPractices}`;
-      expect(text).not.toContain("Quantify achievements with numbers and percentages");
-      expect(text).not.toContain("Include relevant keywords from job descriptions");
-      expect(text).toMatch(/do not invent/i);
-    },
-  );
 });
 
 describe("resume assistant", () => {

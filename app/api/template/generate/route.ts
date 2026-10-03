@@ -7,6 +7,7 @@ import { Agent, run, user } from '@openai/agents';
 import { setDefaultOpenAIKey } from '@openai/agents';
 import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from '@/app/ai/tools/file';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
+import { EMPTY_CANDIDATE, NO_INVENTED_FACTS_RULE, type FactGuard } from '@/lib/resume/noInventedFacts';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -242,15 +243,23 @@ Full job data: ${JSON.stringify(jobDetails)}`;
       }
     }
 
-    // Create tool instances (only the generation tool is needed)
-    const resumeTool = createResumeJakeTemplateTool(convexClient);
-    const coverLetterTool = createCoverLetterJakeTemplateTool(convexClient);
+    // Create tool instances (only the generation tool is needed).
+    // The tool drops employers, schools, tools, and metrics that are not in the source resume.
+    const factGuard: FactGuard = {
+      source: referenceResume?.content ?? EMPTY_CANDIDATE,
+      applicationTarget: {
+        company: jobCompany || (jobDetails as any)?.company,
+        role: jobTitle || (jobDetails as any)?.title,
+      },
+    };
+    const resumeTool = createResumeJakeTemplateTool(convexClient, factGuard);
+    const coverLetterTool = createCoverLetterJakeTemplateTool(convexClient, factGuard);
 
     const keywordsBlock = extractedKeywords.length > 0
       ? `\nJOB KEYWORDS (emphasis only, not new facts):\n${extractedKeywords.join(', ')}\n\nYou may mention a keyword only where the candidate's real experience already supports it. Do not add it as a new skill, tool, employer, or metric.\n`
       : '';
 
-    const noInventedFactsRule = `The job posting is not a source of facts about the candidate. Do not invent employers, metrics, skills, schools, certifications, titles, dates, degrees, team sizes, or tools. You may rephrase and reorder facts that are already in the candidate resume. A summary may name the target job or say the candidate is seeking that work.`;
+    const noInventedFactsRule = `The job posting is not a source of facts about the candidate. Do not invent employers, metrics, skills, schools, certifications, titles, dates, degrees, team sizes, or tools. You may rephrase and reorder facts that are already in the candidate resume. A summary may name the target job or say the candidate is seeking that work. ${NO_INVENTED_FACTS_RULE}`;
 
     // Build instructions from the candidate's real resume. The job posting names the role; it is not the candidate's history.
     let instructions = `You are a professional ${templateType === 'resume' ? 'resume' : 'cover letter'} generator. Generate a ${templateType === 'resume' ? 'professional, ATS-optimized resume' : 'tailored cover letter'} using the ${templateId} template. This is not a conversation, it is a single task.

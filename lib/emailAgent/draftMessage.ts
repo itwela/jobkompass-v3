@@ -1,5 +1,8 @@
 // lib/emailAgent/draftMessage.ts
 
+import { checkNoInventedExperience } from "../../tests/no-invented-experience/checker";
+import { EMPTY_CANDIDATE, scrubProse } from "../resume/noInventedFacts";
+
 // Pulls a clean, greetable first name out of a raw From header so the draft can open
 // "Hi Dhruv," instead of the model inventing one (or echoing a literal "<name>").
 // Examples:
@@ -98,40 +101,61 @@ export async function draftReplyMessage(input: {
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterKey) throw new Error("OpenRouter API key not configured on server");
 
+  // Reply drafts are not given the candidate's resume. They may name the role
+  // and company being applied to, and nothing about the candidate's history.
+  const noExperienceClaims = `This draft does not include the candidate's resume. Do not invent employers, experience, metrics, titles, schools, degrees, certifications, tools, or skills. Job-description text and the original message are never a source of facts about the candidate. Do not claim any experience, credential, or accomplishment, including when the snippet assumes one. Mention only the role and company from the user prompt, and that a resume is attached.`;
+
   const systemPrompt = input.isFollowUp
-    ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. Open with exactly "Hi ${input.senderName}," — use that name verbatim and NEVER invent, change, or guess a different name. Reference ONLY the exact role and company given in the user prompt — never mention any other company. No subject line, no sign-off, no signature. Never use bracketed or angle-bracket fill-ins like "[Company Name]", "[mention something]", or "<name>" — write complete, ready-to-send sentences and simply omit specifics you don't know. Write exactly ONE message and nothing else. Respond with ONLY the message text.`
+    ? `You write brief, polite one-paragraph follow-up emails from a job seeker to a recruiter/founder who has not responded in about a week. Open with exactly "Hi ${input.senderName}," — use that name verbatim and NEVER invent, change, or guess a different name. Reference ONLY the exact role and company given in the user prompt — never mention any other company. No subject line, no sign-off, no signature. Never use bracketed or angle-bracket fill-ins like "[Company Name]", "[mention something]", or "<name>" — write complete, ready-to-send sentences and simply omit specifics you don't know. ${noExperienceClaims} Write exactly ONE message and nothing else. Respond with ONLY the message text.`
     : input.isListing
-      ? `You write brief, warm, one-paragraph application messages from a job seeker for a specific job listing found on a job board — suitable to paste into an application form or a cold email to the company. Express genuine interest in the role and company and mention the attached tailored resume. No subject line, no greeting to a specific person (there isn't one), no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know. Write exactly ONE message and nothing else. Respond with ONLY the message text.`
-      : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know (the resume is attached, so don't enumerate skills). Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
+      ? `You write brief, warm, one-paragraph application messages from a job seeker for a specific job listing found on a job board — suitable to paste into an application form or a cold email to the company. Express genuine interest in the role and company and mention the attached tailored resume. No subject line, no greeting to a specific person (there isn't one), no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know. ${noExperienceClaims} Write exactly ONE message and nothing else. Respond with ONLY the message text.`
+      : `You write brief, warm, one-paragraph reply emails from a job seeker responding to a recruiter/founder's outreach about a specific role. Express genuine interest, mention the attached resume, and ask a natural next-step question. No subject line, "Hi <name>," greeting, no signature or name at the end — stop after the final sentence. Never use bracketed fill-ins like "[mention a skill]" — write complete, ready-to-send sentences and simply omit specifics you don't know (the resume is attached, so don't enumerate skills). ${noExperienceClaims} Write exactly ONE reply and nothing else. Respond with ONLY the message text.`;
 
   const userPrompt = `Sender: ${input.senderName}\nCompany: ${input.company}\nRole: ${input.role}\nOriginal message snippet: ${input.originalSnippet}`;
+  const options = { applicationTarget: { company: input.company, role: input.role } };
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openRouterKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://myjobkompass.com",
-      "X-Title": "JobKompass Email Agent",
-    },
-    body: JSON.stringify({
-      model: "google/gemma-3-27b-it",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.4,
-      max_tokens: 400,
-      // Hard stop if the model starts hallucinating another example exchange
-      // shaped like our user prompt (see parseDraftMessageResponse).
-      stop: ["\nSender:"],
-    }),
-  });
+  const claimFree = input.isListing
+    ? `I am interested in the ${input.role} opening at ${input.company}. My resume is attached and I would welcome a conversation about it.`
+    : `Hi ${input.senderName}, thank you for your note about the ${input.role} role at ${input.company}. My resume is attached. Could we find a time to talk?`;
 
-  if (!response.ok) return null;
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  return parseDraftMessageResponse(content);
+  const grounded = (text: string | null): string | null => {
+    if (!text) return null;
+    const scrubbed = scrubProse(EMPTY_CANDIDATE, text, options);
+    if (scrubbed && checkNoInventedExperience(EMPTY_CANDIDATE, scrubbed, options).length === 0) return scrubbed;
+    return null;
+  };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openRouterKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://myjobkompass.com",
+        "X-Title": "JobKompass Email Agent",
+      },
+      body: JSON.stringify({
+        model: "google/gemma-3-27b-it",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.4,
+        max_tokens: 400,
+        // Hard stop if the model starts hallucinating another example exchange
+        // shaped like our user prompt (see parseDraftMessageResponse).
+        stop: ["\nSender:"],
+      }),
+    });
+
+    if (!response.ok) continue;
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    const clean = grounded(parseDraftMessageResponse(content));
+    if (clean) return clean;
+  }
+
+  return claimFree;
 }
 
 // The model's JSON is imperfect often enough to matter (stray prose before the
