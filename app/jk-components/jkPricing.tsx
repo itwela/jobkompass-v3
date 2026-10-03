@@ -9,6 +9,7 @@ import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { Check, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import JkPublicHeader from './jkPublicHeader'
+import { trackCheckoutStarted, trackPlanUpgrade } from '@/lib/analytics/client'
 
 
 interface PlanPricing {
@@ -118,6 +119,13 @@ export default function JkPricing() {
 
   const handleSubscribe = async (plan: Plan) => {
     if (!isAuthenticated || !user) {
+      trackPlanUpgrade({
+        surface: 'pricing',
+        planId: plan.id,
+        isAnnual,
+        isOneTime: Boolean(plan.isOneTime),
+        authenticated: false,
+      })
       router.push('/auth?mode=signup')
       return
     }
@@ -136,6 +144,14 @@ export default function JkPricing() {
       return
     }
 
+    trackPlanUpgrade({
+      surface: 'pricing',
+      planId: plan.id,
+      isAnnual,
+      isOneTime: Boolean(plan.isOneTime),
+      authenticated: true,
+    })
+
     try {
       // Create Stripe checkout session
       const res = await fetch('/api/stripe/checkout', {
@@ -152,7 +168,11 @@ export default function JkPricing() {
       const data = await res.json()
 
       if (data.checkoutUrl) {
-        // Redirect to Stripe Checkout
+        trackCheckoutStarted({
+          planId: plan.id,
+          isAnnual,
+          isOneTime: Boolean(plan.isOneTime),
+        })
         window.location.href = data.checkoutUrl
       } else {
         console.error('No checkout URL returned')
@@ -344,7 +364,20 @@ export default function JkPricing() {
                 </ul>
 
                 {!isAuthenticated ? (
-                  <Link href="/auth?mode=signup" className="block w-full" onClick={(e) => e.stopPropagation()}>
+                  <Link
+                    href="/auth?mode=signup"
+                    className="block w-full"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      trackPlanUpgrade({
+                        surface: 'pricing',
+                        planId: plan.id,
+                        isAnnual,
+                        isOneTime: Boolean(plan.isOneTime),
+                        authenticated: false,
+                      })
+                    }}
+                  >
                     <Button
                       className="w-full cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
                       variant="default"

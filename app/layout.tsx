@@ -16,6 +16,7 @@ import { JobKompassDocumentsProvider } from "@/providers/jkDocumentsProvider";
 import { JkConvexProviders } from "@/providers/jkConvexProvider";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { JkAuthProvider } from "@/providers/jkAuthProvider";
+import { JkAnalyticsProvider } from "@/providers/jkAnalyticsProvider";
 import { JkResourcesProvider } from "@/providers/jkResourcesProvider";
 import { JkJobsProvider } from "@/providers/jkJobsProvider";
 import { JkHelpProvider } from "@/providers/jkHelpProvider";
@@ -114,6 +115,7 @@ export default function RootLayout({
     <ConvexAuthNextjsServerProvider>
       <JkConvexProviders>
         <JkAuthProvider>
+          <JkAnalyticsProvider>
           <SubscriptionProvider>
             <JobKompassThemeProvider>
               <JkResourcesProvider>
@@ -137,6 +139,7 @@ export default function RootLayout({
               </JkResourcesProvider>
             </JobKompassThemeProvider>
           </SubscriptionProvider>
+          </JkAnalyticsProvider>
         </JkAuthProvider>
       </JkConvexProviders>
     </ConvexAuthNextjsServerProvider>

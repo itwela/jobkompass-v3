@@ -5,6 +5,8 @@ import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getGmailClient, getMessage, searchMessagesFromSender } from "./gmailClient";
 import { classifyEmail } from "../../lib/emailAgent/classify";
+import { consumeOrFailOpen } from "../rateLimit";
+import { RATE_LIMIT_FRIENDLY } from "../rateLimitConfig";
 import {
   mergeTopMessages,
   resolveLeadFields,
@@ -94,6 +96,11 @@ export const ingestSelectedMessageInternal = internalAction({
 
     const msg = await getMessage(gmail, messageId);
     const senderEmail = (msg.from.match(/<([^>]+)>/)?.[1] ?? msg.from).trim();
+
+    const limit = await consumeOrFailOpen(ctx, "emailAgent", userId);
+    if (!limit.ok) {
+      throw new Error(RATE_LIMIT_FRIENDLY);
+    }
 
     const classification = await classifyEmail({
       subject: msg.subject,

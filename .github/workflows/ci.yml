@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Dummy values so install, lint, typecheck, and vitest never need
+      # production secrets. PostHog stays off because the key is empty.
+      NEXT_PUBLIC_CONVEX_URL: https://placeholder.convex.cloud
+      NEXT_PUBLIC_POSTHOG_KEY: ""
+      NEXT_PUBLIC_POSTHOG_HOST: https://us.i.posthog.com
+      NEXT_PUBLIC_POSTHOG_SESSION_REPLAY: "false"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID: price_test_starter
+      NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID: price_test_plus
+      NEXT_PUBLIC_STRIPE_PRO_PRICE_ID: price_test_pro
+      NEXT_PUBLIC_STRIPE_PLUS_ANNUAL_PRICE_ID: price_test_plus_annual
+      NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID: price_test_pro_annual
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # PLACEHOLDER: a teammate will drop the "no invented experience"
+      # resume-content regression test into tests/no-invented-experience/.
+      # This step does not invent resume content and does not run that test.
+      # Vitest will pick up any *.test.ts file added in that folder later.
+      - name: Placeholder — no invented experience resume-content regression
+        run: |
+          echo "PLACEHOLDER: no-invented-experience resume-content regression test is not written yet."
+          echo "Add it under tests/no-invented-experience/ as a Vitest file. Do not invent resume content here."
+          test -d tests/no-invented-experience

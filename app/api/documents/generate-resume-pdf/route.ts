@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 const MAX_PDF_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 const MAX_RESUME_TEXT_CHARS = 400_000;
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
+
+    const limited = await enforceAiRateLimit(request, "ai");
+    if (limited) return limited;
 
     const body = await request.json();
     const { resumePdf, resumeText } = body as { resumePdf?: string; resumeText?: string };

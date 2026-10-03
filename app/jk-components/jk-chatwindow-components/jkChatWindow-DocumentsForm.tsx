@@ -26,6 +26,8 @@ import { resolveBaseResumeId, sortDocuments } from "@/lib/documents/sortDocument
 import JkDocumentFolderCard, { DRAG_MIME, type JkDraggedDocument, type JkFolder } from "../jk-documents/jkDocumentFolderCard";
 import JkFolderBreadcrumb from "../jk-documents/jkFolderBreadcrumb";
 import JkMoveToFolderMenu from "../jk-documents/jkMoveToFolderMenu";
+import { markResumeCreateSource } from "@/lib/analytics/client";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
@@ -371,6 +373,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
 
         setIsUploading(true);
         setUploadProgress(10);
+        markResumeCreateSource(usePastedText ? "paste" : "upload");
 
         const CLIENT_AI_EXTRACT_TIMEOUT_MS = 240_000;
         const CLIENT_EXPORT_TIMEOUT_MS = 120_000;
@@ -465,6 +468,10 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     clearInterval(aiProgressTimer);
                     aiProgressTimer = undefined;
                 }
+            }
+
+            if (generateResumePdfRes.status === 429) {
+                throw new Error(rateLimitMessageFromResponse(generateResumePdfRes));
             }
 
             if (!generateResumePdfRes.ok) {

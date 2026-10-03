@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/lib/toast"
 import Link from "next/link"
+import { trackUpgradeClicked } from "@/lib/analytics/client"
 import { useSearchParams } from "next/navigation"
 
 const GMAIL_ERROR_MESSAGES: Record<string, string> = {
@@ -402,7 +403,7 @@ export default function JkCW_SettingsMode() {
             </p>
             {subscription?.status === 'canceled' && (
               <p className="text-sm text-muted-foreground mt-2">
-                Your subscription is canceled. <Link href="/pricing" className="text-primary hover:underline font-medium">Renew today</Link> to continue enjoying all benefits.
+                Your subscription is canceled. <Link href="/pricing" className="text-primary hover:underline font-medium" onClick={() => trackUpgradeClicked({ surface: 'settings', authenticated: true, plan_id: planId })}>Renew today</Link> to continue enjoying all benefits.
               </p>
             )}
           </div>

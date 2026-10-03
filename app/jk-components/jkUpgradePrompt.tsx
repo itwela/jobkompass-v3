@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Sparkles, Zap } from 'lucide-react'
 import Link from 'next/link'
+import { trackUpgradeClicked } from '@/lib/analytics/client'
 import { motion } from 'framer-motion'
 
 interface JkUpgradePromptProps {
@@ -31,7 +32,16 @@ export default function JkUpgradePrompt({
       </p>
       
       <div className="flex items-center gap-3">
-        <Link href="/pricing">
+        <Link
+          href="/pricing"
+          onClick={() =>
+            trackUpgradeClicked({
+              surface: 'upgrade_prompt',
+              authenticated: true,
+              plan_id: requiredPlan,
+            })
+          }
+        >
           <Button className="gap-2">
             <Zap className="h-4 w-4" />
             View Plans

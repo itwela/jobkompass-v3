@@ -25,7 +25,9 @@ import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
 import JkFooter from '@/app/jk-components/jkFooter';
 import { getFreeResumeTemplates, getLockedFreeResumeTemplates } from '@/lib/templates';
+import { trackFirstResumeCreated, trackFreeGeneratorCompleted, trackFreeGeneratorStarted, trackResumeExported } from '@/lib/analytics/client';
 import { getModelsForFreeResume } from '@/lib/aiModels';
+import { rateLimitMessageFromResponse } from '@/lib/rateLimit/message';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -190,6 +192,10 @@ export default function FreeResumeGeneratorPage() {
       } catch {
         data = { error: `Server error (${res.status} ${res.statusText})` };
       }
+      if (res.status === 429) {
+        toast.error(rateLimitMessageFromResponse(res), { duration: 10000 });
+        return;
+      }
       if (!res.ok) {
         toast.error(data.error || 'Failed to parse resume', {
           description: data.details || (res.status >= 500 ? `Status: ${res.status} ${res.statusText}` : undefined),
@@ -208,6 +214,8 @@ export default function FreeResumeGeneratorPage() {
         return;
       }
       setPdfBase64(data.pdfBase64!);
+      trackFreeGeneratorCompleted(selectedTemplateId);
+      trackFirstResumeCreated('free_generator', 'free_generator', selectedTemplateId);
       const templateName = getFreeResumeTemplates().find((t) => t.id === selectedTemplateId)?.name ?? selectedTemplateId;
       setGeneratedDownloads((prev) => [
         ...prev,
@@ -235,6 +243,7 @@ export default function FreeResumeGeneratorPage() {
       toast.error('Please select a template first');
       return;
     }
+    trackFreeGeneratorStarted(selectedTemplateId);
     if (!emailVerified || !storedEmail) {
       setShowEmailGate(true);
       setGateMode('signup');
@@ -367,6 +376,7 @@ export default function FreeResumeGeneratorPage() {
     link.href = `data:application/pdf;base64,${b64}`;
     link.download = 'formatted-resume.pdf';
     link.click();
+    trackResumeExported({ method: 'download', template_id: selectedTemplateId });
   };
 
   const handleChangeTemplate = () => {

@@ -112,14 +112,9 @@ export async function POST(request: NextRequest) {
         }
         
         console.log(`[Webhook] Processing subscription update:`, {
-          subscriptionId: subscription.id,
-          userId,
           planId,
           status,
           cancelAtPeriodEnd,
-          cancelAt: subData.cancel_at,
-          canceledAt: subData.canceled_at,
-          subscriptionMetadata: subscription.metadata,
         });
         
         // If we have userId, use the mutation that includes it (ensures convex_user_id is used)

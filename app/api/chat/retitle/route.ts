@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { enforceAiRateLimit } from "@/lib/rateLimit/guard";
 
 const OPENAI_KEY =
   process.env.NODE_ENV === "production"
@@ -6,6 +7,9 @@ const OPENAI_KEY =
     : process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceAiRateLimit(request, "ai");
+  if (limited) return limited;
+
   if (!OPENAI_KEY) {
     return NextResponse.json(
       { error: "OpenAI API key not configured" },

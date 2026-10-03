@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Sparkles, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { trackUpgradeClicked } from '@/lib/analytics/client'
 
 interface JkUpgradeModalProps {
   isOpen: boolean
@@ -83,7 +84,13 @@ export default function JkUpgradeModal({
                   )}
 
                   {/* CTA Button */}
-                  <Link href="/pricing" onClick={onClose}>
+                  <Link
+                    href="/pricing"
+                    onClick={() => {
+                      trackUpgradeClicked({ surface: 'upgrade_modal', authenticated: true })
+                      onClose()
+                    }}
+                  >
                     <Button className="w-full">
                       View Plans
                       <ArrowRight className="h-4 w-4 ml-2" />

@@ -7,6 +7,7 @@ import { Agent, run, user } from '@openai/agents';
 import { setDefaultOpenAIKey } from '@openai/agents';
 import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from '@/app/ai/tools/file';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 
@@ -23,6 +24,9 @@ const GenerateRequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceAiRateLimit(request, "ai");
+  if (limited) return limited;
+
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const startTime = Date.now();
   
@@ -32,8 +36,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    console.log(`[${requestId}] [TEMPLATE_GENERATE] Request body received`, { body });
-    
+
     const {
       templateType,
       templateId,
@@ -53,9 +56,6 @@ export async function POST(request: NextRequest) {
     console.log(`[${requestId}] [TEMPLATE_GENERATE] Parsed request`, {
       templateType,
       templateId,
-      jobId,
-      jobTitle,
-      jobCompany,
       hasReferenceResumeId: hasReferenceResume,
       hasResumePdf,
       hasResumeText,
@@ -147,7 +147,6 @@ export async function POST(request: NextRequest) {
         jobDetails = await convexClient.query(api.jobs.get, { id: jobId as any });
         console.log(`[${requestId}] [TEMPLATE_GENERATE] Job details fetched`, { 
           hasJob: !!jobDetails,
-          jobCompany: jobDetails?.company 
         });
       } catch (e) {
         console.warn(`[${requestId}] [TEMPLATE_GENERATE] Error fetching job details (ignored):`, e);

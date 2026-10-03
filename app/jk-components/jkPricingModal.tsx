@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { Check, X } from 'lucide-react'
+import { trackCheckoutStarted, trackPlanUpgrade } from '@/lib/analytics/client'
 import { motion } from 'framer-motion'
 import {
   Dialog,
@@ -122,6 +123,14 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
 
   const handleSubscribe = async (plan: Plan) => {
+    trackPlanUpgrade({
+      surface: 'pricing_modal',
+      planId: plan.id,
+      isAnnual,
+      isOneTime: Boolean(plan.isOneTime),
+      authenticated: Boolean(isAuthenticated && user),
+    })
+
     if (!isAuthenticated || !user) {
       window.location.href = '/auth?mode=signup'
       return
@@ -157,7 +166,11 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
       const data = await res.json()
 
       if (data.checkoutUrl) {
-        // Redirect to Stripe Checkout
+        trackCheckoutStarted({
+          planId: plan.id,
+          isAnnual,
+          isOneTime: Boolean(plan.isOneTime),
+        })
         window.location.href = data.checkoutUrl
       } else {
         console.error('No checkout URL returned')

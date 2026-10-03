@@ -9,6 +9,7 @@ import {
   getMessageIfExists,
 } from "./gmailClient";
 import { classifyEmail } from "../../lib/emailAgent/classify";
+import { consumeOrFailOpen } from "../rateLimit";
 
 // One-shot backfill for leads ingested before emailReceivedAt was captured: re-fetch
 // each dateless lead's Gmail message for its internalDate, patch the lead, and re-mirror
@@ -98,6 +99,14 @@ async function pollAccount(ctx: ActionCtx, account: any): Promise<number> {
       continue;
     }
 
+    const limit = await consumeOrFailOpen(ctx, "emailAgent", account.userId);
+    if (!limit.ok) {
+      console.warn(
+        "Email classification rate limit reached; leaving the Gmail history cursor in place.",
+      );
+      return newLeads;
+    }
+
     const classification = await classifyEmail({
       subject: message.subject,
       from: message.from,
@@ -184,7 +193,7 @@ export const pollAllAccounts = internalAction({
         if (error?.code === 401 || error?.message?.includes("invalid_grant")) {
           await ctx.runMutation(internal.emailAccounts.markRevoked, { accountId: account._id });
         }
-        console.error(`Poll failed for account ${account.email}:`, error);
+        console.error("Poll failed for an email account");
       }
     }
   },
@@ -225,7 +234,7 @@ export const pollMyAccounts = action({
         } else {
           errors.push(`${account.email}: ${error?.message ?? "scan failed"}`);
         }
-        console.error(`Manual poll failed for account ${account.email}:`, error);
+        console.error("Manual poll failed for an email account");
       }
     }
 

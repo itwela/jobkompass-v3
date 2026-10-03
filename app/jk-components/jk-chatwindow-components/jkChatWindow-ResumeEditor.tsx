@@ -9,6 +9,8 @@ import { api } from "@/convex/_generated/api";
 import { ResumeIR, SectionIR, ExperienceItemIR, BulletIR } from "@/types/resumeIR";
 import ResumeAssistantPanel, { ResumeAssistantMessage } from "./jkResumeAssistantPanel";
 import { Sparkles } from "lucide-react";
+import { trackResumeExported } from "@/lib/analytics/client";
+import { rateLimitMessageFromResponse } from "@/lib/rateLimit/message";
 
 function newId() {
 	return Math.random().toString(36).slice(2);
@@ -110,6 +112,7 @@ export default function JkCW_ResumeEditor() {
 		a.download = "resume.pdf";
 		a.click();
 		URL.revokeObjectURL(url);
+		trackResumeExported({ method: "export", template_id: ir?.meta?.template });
 	}
 
 	async function sendAssistantMessage({ message, display, includeContext = true }: AssistantRequest) {
@@ -140,6 +143,18 @@ export default function JkCW_ResumeEditor() {
 					history: historyPayload,
 				}),
 			});
+
+			if (response.status === 429) {
+				const text = rateLimitMessageFromResponse(response);
+				const limitedMessage: ResumeAssistantMessage = {
+					id: newId(),
+					role: "assistant",
+					content: text,
+					internalContent: text,
+				};
+				setAssistantMessages(prev => [...prev, limitedMessage]);
+				return null;
+			}
 
 			const data = await response.json();
 			if (!response.ok || !data?.message) {

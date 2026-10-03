@@ -17,6 +17,7 @@ import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
 import { mcpTools } from '@/app/lib/mcp-tools';
+import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -53,6 +54,9 @@ const ChatResponseSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const limited = await enforceAiRateLimit(request, "ai");
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const { message, file, history = [], agentId, userId, username, contextResumeIds, contextJobIds, contextResumeTemplateId } = ChatRequestSchema.parse(body);
@@ -174,9 +178,6 @@ export async function POST(request: NextRequest) {
     // Build the user message with image support only
     let userMessage: AgentInputItem;
     
-    console.log('file', file);
-    console.log('message', message);
-
     if (file) {
       // Only support images for now
       const isImage = file.type.startsWith('image/');
@@ -199,8 +200,6 @@ export async function POST(request: NextRequest) {
           image: `data:${file.type};base64,${file.base64}`,
         });
 
-        console.log('contentParts', contentParts);
-        
         userMessage = {
           role: 'user',
           content: contentParts,

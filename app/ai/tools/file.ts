@@ -120,17 +120,6 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
     const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const startTime = Date.now();
     
-    console.log(`[${toolExecutionId}] [RESUME_TOOL] Starting resume generation`, {
-      timestamp: new Date().toISOString(),
-      firstName: input.personalInfo?.firstName,
-      lastName: input.personalInfo?.lastName,
-      targetCompany: input.targetCompany,
-      hasExperience: !!input.experience?.length,
-      experienceCount: input.experience?.length || 0,
-      hasEducation: !!input.education?.length,
-      educationCount: input.education?.length || 0,
-    });
-    
     try {
       const LATEX_SERVICE_URL =
         process.env.NODE_ENV === 'development'
@@ -210,8 +199,6 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         const log = errorData.log ?? '';
         console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX service error`, {
           status: compileResponse.status,
-          error: errorData.error,
-          log: log.substring(0, 500),
         });
         return {
           success: false,
@@ -282,12 +269,6 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
           const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
           const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
           
-          console.log(`[${toolExecutionId}] [RESUME_TOOL] Saving resume to database...`, {
-            resumeName,
-            storageId,
-            fileSize: pdfBuffer.length
-          });
-          
           savedResumeId = await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
             name: resumeName,
             fileId: storageId,
@@ -297,30 +278,19 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
             template: templateId,
           });
           
-          console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume saved to database successfully`, { resumeName });
         } else {
-          const errorText = await uploadResponse.text();
           console.error(`[${toolExecutionId}] [RESUME_TOOL] Upload failed`, {
             status: uploadResponse.status,
-            statusText: uploadResponse.statusText,
-            errorText: errorText.substring(0, 500)
           });
         }
       } catch (saveError) {
         // Don't fail the whole operation if save fails, just log it
-        console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Failed to auto-save resume:`, {
-          error: saveError instanceof Error ? saveError.message : String(saveError),
-          stack: saveError instanceof Error ? saveError.stack : undefined
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] Failed to auto-save resume`, {
+          error: saveError instanceof Error ? saveError.name : "Error",
         });
       }
 
       /// SECTION RETURN RESULT
-      
-      const totalDuration = Date.now() - startTime;
-      console.log(`[${toolExecutionId}] [RESUME_TOOL] ✅ Resume generation completed successfully`, {
-        totalDuration: `${totalDuration}ms`,
-        fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`
-      });
       
       // Clean up temp folder before returning
       try {
@@ -355,11 +325,9 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       };
     } catch (error) {
       const totalDuration = Date.now() - startTime;
-      console.error(`[${toolExecutionId}] [RESUME_TOOL] ❌ Resume generation error:`, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+      console.error(`[${toolExecutionId}] [RESUME_TOOL] Resume generation error`, {
+        error: error instanceof Error ? error.name : "Error",
         totalDuration: `${totalDuration}ms`,
-        errorType: error instanceof Error ? error.constructor.name : typeof error
       });
       // Clean up temp folder even on error
       try {

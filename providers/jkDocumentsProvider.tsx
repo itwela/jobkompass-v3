@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { toDownloadFileName } from "@/lib/downloadFileName";
+import { trackResumeExported } from "@/lib/analytics/client";
 
 export type JkDocumentType = "resume" | "cover-letter";
 
@@ -157,6 +158,7 @@ export function JobKompassDocumentsProvider({ children }: { children: React.Reac
       document.body.appendChild(a);
       a.click();
       a.remove();
+      trackResumeExported({ method: "download" });
     } catch (err) {
       console.error("Failed to download resume file:", err);
     } finally {
