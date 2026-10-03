@@ -174,9 +174,6 @@ export async function POST(request: NextRequest) {
     // Build the user message with image support only
     let userMessage: AgentInputItem;
     
-    console.log('file', file);
-    console.log('message', message);
-
     if (file) {
       // Only support images for now
       const isImage = file.type.startsWith('image/');
@@ -199,8 +196,6 @@ export async function POST(request: NextRequest) {
           image: `data:${file.type};base64,${file.base64}`,
         });
 
-        console.log('contentParts', contentParts);
-        
         userMessage = {
           role: 'user',
           content: contentParts,

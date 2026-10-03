@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  isPublicReplayPath,
   isSensitivePath,
   isTrackingDeclined,
   redactEmails,
   safePageUrl,
   sanitizeAnalyticsValue,
+  sanitizeHeatmapData,
+  stripElementText,
 } from "./privacy";
 
 describe("analytics privacy", () => {
@@ -27,6 +30,41 @@ describe("analytics privacy", () => {
     expect(isSensitivePath("/profile")).toBe(true);
     expect(isSensitivePath("/stripe/success")).toBe(true);
     expect(isSensitivePath("/")).toBe(false);
+    expect(isSensitivePath("/app/chat")).toBe(true);
+  });
+
+  it("records replay only on logged-out marketing pages", () => {
+    expect(isPublicReplayPath("/")).toBe(true);
+    expect(isPublicReplayPath("/pricing")).toBe(true);
+    expect(isPublicReplayPath("/pricing/")).toBe(true);
+    expect(isPublicReplayPath("/contact")).toBe(true);
+    expect(isPublicReplayPath("/privacy")).toBe(true);
+    expect(isPublicReplayPath("/terms")).toBe(true);
+    expect(isPublicReplayPath("/waitlist")).toBe(true);
+    expect(isPublicReplayPath("/app")).toBe(false);
+    expect(isPublicReplayPath("/auth")).toBe(false);
+    expect(isPublicReplayPath("/free-resume-generator")).toBe(false);
+    expect(isPublicReplayPath("/stripe/success")).toBe(false);
+    expect(isPublicReplayPath("/profile")).toBe(false);
+  });
+
+  it("keeps heatmap coordinates and drops the query string, text, and selectors", () => {
+    const heatmap = sanitizeHeatmapData({
+      "https://myjobkompass.com/app?email=ada@example.com&session_id=cs_test#name": [
+        { x: 12, y: 40, target_fixed: false, type: "click", $el_text: "Ada Lovelace", selector: "button.name" },
+      ],
+    });
+    expect(heatmap).toEqual({
+      "https://myjobkompass.com/app": [{ x: 12, y: 40, target_fixed: false, type: "click" }],
+    });
+    const stripped = stripElementText({
+      $el_text: "Get started",
+      $elements: [{ tag_name: "button", $el_text: "Get started" }],
+      path: "/pricing",
+    }) as Record<string, unknown>;
+    expect(stripped.$el_text).toBeUndefined();
+    expect(stripped.$elements).toBeUndefined();
+    expect(stripped.path).toBe("/pricing");
   });
 
   it("strips emails and drops resume content, names, and nested document fields", () => {

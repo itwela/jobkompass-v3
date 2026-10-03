@@ -87,6 +87,10 @@ const UPGRADE_SURFACES = new Set([
 
 const TEMPLATE_IDS = new Set(["jake", "joseph", "mar"]);
 
+const CTA_IDS = new Set(["signup", "free_generator"]);
+
+const CTA_SURFACES = new Set(["hero", "header", "midpage", "sticky"]);
+
 export type AnalyticsSignals = {
   doNotTrack?: string | null;
   globalPrivacyControl?: boolean;
@@ -141,12 +145,42 @@ export function isSensitivePath(pathname: string): boolean {
     /^\/stripe(?:\/|$)/.test(path) ||
     /\/resume(?:\/|$|-)/i.test(path) ||
     /\/documents?(?:\/|$)/i.test(path) ||
+    /chat/i.test(path) ||
     /editor/i.test(path)
   );
 }
 
-export function isSessionReplayRequested(): boolean {
-  return process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY === "true";
+/**
+ * Logged-out marketing pages. Session replay may run only on these paths.
+ * Everything else, including the app, auth, resumes, and the free generator, never records.
+ */
+const PUBLIC_REPLAY_PATHS = new Set(["/", "/pricing", "/contact", "/privacy", "/terms", "/waitlist"]);
+
+export function normalizePath(pathname: string): string {
+  const path = (pathname || "/").split("?")[0]?.split("#")[0] || "/";
+  if (!path.startsWith("/")) return "/";
+  if (path.length > 1 && path.endsWith("/")) return path.slice(0, -1);
+  return path;
+}
+
+export function isPublicReplayPath(pathname: string): boolean {
+  return PUBLIC_REPLAY_PATHS.has(normalizePath(pathname));
+}
+
+/**
+ * Replay gate. The default is public-pages-only (the safe behavior).
+ * `NEXT_PUBLIC_POSTHOG_SESSION_REPLAY=false` turns replay off entirely.
+ * No value records the authenticated app, chat, or document screens.
+ */
+export function isSessionReplayEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_POSTHOG_SESSION_REPLAY !== "false";
+}
+
+export function pageKind(pathname: string): "landing" | "pricing" | "other" {
+  const path = normalizePath(pathname);
+  if (path === "/") return "landing";
+  if (path === "/pricing") return "pricing";
+  return "other";
 }
 
 function isBlockedKey(key: string): boolean {
@@ -229,6 +263,14 @@ export function templateId(value: string | null | undefined): string | undefined
   return slug(value, TEMPLATE_IDS);
 }
 
+export function ctaId(value: string | null | undefined): string | undefined {
+  return slug(value, CTA_IDS);
+}
+
+export function ctaSurface(value: string | null | undefined): string | undefined {
+  return slug(value, CTA_SURFACES);
+}
+
 export function toScrubbedError(error: unknown): Error {
   const raw = error instanceof Error ? error : new Error("Unknown error");
   const message = redactEmails(raw.message || "Unknown error");
@@ -277,4 +319,63 @@ export function safePageUrl(origin: string, pathname: string, search: string): s
   }
   const qs = kept.toString();
   return qs ? `${host}${path}?${qs}` : `${host}${path}`;
+}
+
+/** Absolute URL reduced to origin, path, and utm params. Hash and other query params are dropped. */
+export function safeAbsoluteUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return safePageUrl(url.origin, url.pathname, url.search);
+  } catch {
+    if (value.startsWith("/")) return safePath(value.split("?")[0] || "/");
+    return "/";
+  }
+}
+
+const HEATMAP_TYPES = new Set(["click", "mousemove", "rageclick", "deadclick"]);
+
+/**
+ * posthog-js 1.435.8 stores heatmap points as {x, y, target_fixed, type} under the
+ * raw page URL. There is no element text, selector, or input value on the point.
+ * The URL key can still carry a query string, so it is rewritten here.
+ */
+export function sanitizeHeatmapData(data: unknown): Record<string, Array<Record<string, string | number | boolean>>> | undefined {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
+  const out: Record<string, Array<Record<string, string | number | boolean>>> = {};
+  for (const [rawUrl, points] of Object.entries(data as Record<string, unknown>)) {
+    if (!Array.isArray(points)) continue;
+    const url = safeAbsoluteUrl(rawUrl);
+    const cleaned: Array<Record<string, string | number | boolean>> = [];
+    for (const point of points.slice(0, 80)) {
+      if (!point || typeof point !== "object") continue;
+      const record = point as Record<string, unknown>;
+      if (typeof record.x !== "number" || typeof record.y !== "number") continue;
+      if (!Number.isFinite(record.x) || !Number.isFinite(record.y)) continue;
+      const type = typeof record.type === "string" && HEATMAP_TYPES.has(record.type) ? record.type : "click";
+      cleaned.push({
+        x: record.x,
+        y: record.y,
+        target_fixed: record.target_fixed === true,
+        type,
+      });
+    }
+    if (cleaned.length === 0) continue;
+    out[url] = [...(out[url] ?? []), ...cleaned].slice(0, 80);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+const ELEMENT_TEXT_KEYS = new Set(["$el_text", "$elements", "$elements_chain", "$selected_content", "el_text"]);
+
+/** Drop autocapture text fields wherever they appear, including nested objects. */
+export function stripElementText(value: unknown, depth = 0): unknown {
+  if (depth > 6 || value == null) return value;
+  if (Array.isArray(value)) return value.slice(0, 40).map((item) => stripElementText(item, depth + 1));
+  if (typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (ELEMENT_TEXT_KEYS.has(key)) continue;
+    out[key] = stripElementText(nested, depth + 1);
+  }
+  return out;
 }

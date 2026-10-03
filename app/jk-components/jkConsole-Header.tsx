@@ -618,14 +618,12 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                         
                                         try {
                                             const formData = new FormData(e.currentTarget);
-                                            console.log("Attempting sign in (mobile) with flow:", formData.get("flow"));
-                                            const result = await signIn("password", formData);
-                                            console.log("Sign in result (mobile):", result);
+                                            await signIn("password", formData);
                                             if (formData.get("flow") === "signUp") trackSignup();
                                             setShowSignIn(false);
                                             setSidebarOpen(false);
                                         } catch (error) {
-                                            console.error("Sign in error details (mobile):", error);
+                                            console.error("Sign in failed");
                                             const friendlyMessage = getErrorMessage(error);
                                             setAuthError(friendlyMessage);
                                         } finally {

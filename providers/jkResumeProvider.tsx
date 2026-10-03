@@ -76,7 +76,6 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
   const coverLetters = useQuery(api.documents.listCoverLetters);
   const resumePreferences = useQuery(api.auth.getResumePreferences);
 
-  console.log('resumes:', resumes);
   const deleteResumeMutation = useMutation(api.documents.deleteResume);
   
   // Calculate resume stats locally using jobs from Jobs Provider
@@ -271,10 +270,6 @@ export function JobKompassResumeProvider({ children }: { children: React.ReactNo
 
   useEffect(() => {
   }, [])
-
-  useEffect(() => {
-    console.log('resumeStats:', resumeStats);
-  }, [resumeStats]);
 
   const value = {
 

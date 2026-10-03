@@ -25,7 +25,7 @@ import { toast } from '@/lib/toast';
 import JkPublicHeader from '@/app/jk-components/jkPublicHeader';
 import JkFooter from '@/app/jk-components/jkFooter';
 import { getFreeResumeTemplates, getLockedFreeResumeTemplates } from '@/lib/templates';
-import { trackFirstResumeCreated, trackResumeExported } from '@/lib/analytics/client';
+import { trackFirstResumeCreated, trackFreeGeneratorCompleted, trackFreeGeneratorStarted, trackResumeExported } from '@/lib/analytics/client';
 import { getModelsForFreeResume } from '@/lib/aiModels';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -209,6 +209,7 @@ export default function FreeResumeGeneratorPage() {
         return;
       }
       setPdfBase64(data.pdfBase64!);
+      trackFreeGeneratorCompleted(selectedTemplateId);
       trackFirstResumeCreated('free_generator', 'free_generator', selectedTemplateId);
       const templateName = getFreeResumeTemplates().find((t) => t.id === selectedTemplateId)?.name ?? selectedTemplateId;
       setGeneratedDownloads((prev) => [
@@ -237,6 +238,7 @@ export default function FreeResumeGeneratorPage() {
       toast.error('Please select a template first');
       return;
     }
+    trackFreeGeneratorStarted(selectedTemplateId);
     if (!emailVerified || !storedEmail) {
       setShowEmailGate(true);
       setGateMode('signup');

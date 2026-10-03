@@ -179,7 +179,7 @@ export default function AuthPage() {
       if (isSignUp) trackSignup()
       // Redirect will happen via useEffect when isAuthenticated changes
     } catch (error) {
-      console.error('Authentication error:', error)
+      console.error('Authentication failed')
       const friendlyMessage = getErrorMessage(error)
       setAuthError(friendlyMessage)
     } finally {

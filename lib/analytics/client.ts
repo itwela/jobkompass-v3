@@ -3,15 +3,19 @@
  * browser sends Do Not Track / Global Privacy Control, or when the visitor
  * has set localStorage jk_analytics_opt_out=1.
  *
- * Session replay is off unless NEXT_PUBLIC_POSTHOG_SESSION_REPLAY=true, and
- * even then every input and text node is masked and recording is stopped on
- * resume, document, and editor screens.
+ * Heatmaps are on for every page. Session replay runs only on public marketing
+ * pages unless NEXT_PUBLIC_POSTHOG_SESSION_REPLAY=false. Text and inputs are
+ * masked, images are blocked, and recording stops on the app, auth, and documents.
  */
 import posthog from "posthog-js";
 import { captureFirstTouch, firstTouchProperties, readFirstTouch } from "./attribution";
 import {
   AnalyticsEvent,
+  buildCheckoutStartedProperties,
+  buildCtaClickedProperties,
   buildFirstResumeProperties,
+  buildFreeGeneratorProperties,
+  buildPageviewProperties,
   buildPaidConversionProperties,
   buildResumeExportedProperties,
   buildSignupProperties,
@@ -19,12 +23,15 @@ import {
   checkoutPlanSelection,
 } from "./events";
 import {
-  isSensitivePath,
-  isSessionReplayRequested,
+  isPublicReplayPath,
+  isSessionReplayEnabled,
   isTrackingDeclinedInBrowser,
+  safeAbsoluteUrl,
   safePageUrl,
   safePath,
   sanitizeAnalyticsValue,
+  sanitizeHeatmapData,
+  stripElementText,
   toScrubbedError,
 } from "./privacy";
 
@@ -90,12 +97,17 @@ export function initAnalytics(): boolean {
       capture_pageview: false,
       capture_pageleave: false,
       autocapture: false,
+      // posthog-js 1.435.8 heatmap points are {x, y, target_fixed, type} only.
+      // capture_heatmaps: true turns them on in code, including inside the app.
+      capture_heatmaps: true,
+      enable_heatmaps: true,
+      capture_dead_clicks: false,
       capture_exceptions: {
         capture_unhandled_errors: true,
         capture_unhandled_rejections: true,
-        // Leave console capture off. The app logs resume objects and names.
         capture_console_errors: false,
       },
+      // Stay stopped until syncSessionReplay sees a public marketing path.
       disable_session_recording: true,
       disable_surveys: true,
       person_profiles: "identified_only",
@@ -108,11 +120,13 @@ export function initAnalytics(): boolean {
         recordBody: false,
         streamNetworkBody: false,
         captureJsonLd: false,
-        blockSelector: 'input[type="file"], iframe',
+        blockSelector: 'img, image, picture, svg, video, canvas, input[type="file"], iframe',
         maskCapturedNetworkRequestFn: () => null,
       },
       before_send: (event) => {
         if (!event) return null;
+        if (event.event === "$autocapture" || event.event === "$dead_click") return null;
+        scrubOutboundProperties(event.properties);
         event.properties = sanitizeProperties(event.properties);
         if (event.$set) event.$set = sanitizeProperties(event.$set);
         if (event.$set_once) event.$set_once = sanitizeProperties(event.$set_once);
@@ -134,11 +148,35 @@ export function initAnalytics(): boolean {
 
 export function syncSessionReplay(pathname: string): void {
   if (!initialized) return;
-  if (!isSessionReplayRequested() || isSensitivePath(pathname)) {
+  if (!isSessionReplayEnabled() || !isPublicReplayPath(pathname)) {
     posthog.stopSessionRecording();
     return;
   }
   posthog.startSessionRecording();
+}
+
+const URL_PROPERTY_KEYS = new Set(["$current_url", "$referrer", "$session_entry_url", "$session_entry_referrer"]);
+
+function scrubOutboundProperties(properties: Record<string, unknown> | undefined): void {
+  if (!properties) return;
+  const stripped = stripElementText(properties);
+  if (!stripped || typeof stripped !== "object" || Array.isArray(stripped)) return;
+  for (const key of Object.keys(properties)) delete properties[key];
+  Object.assign(properties, stripped);
+  if ("$heatmap_data" in properties) {
+    const heatmap = sanitizeHeatmapData(properties.$heatmap_data);
+    if (heatmap) properties.$heatmap_data = heatmap;
+    else delete properties.$heatmap_data;
+  }
+  for (const key of Object.keys(properties)) {
+    const value = properties[key];
+    if (typeof value !== "string") continue;
+    if (URL_PROPERTY_KEYS.has(key) && value.startsWith("http")) {
+      properties[key] = safeAbsoluteUrl(value);
+    } else if (key === "$pathname" || key === "$session_entry_pathname") {
+      properties[key] = safePath(value);
+    }
+  }
 }
 
 function capture(event: string, properties: Record<string, string | number | boolean>): void {
@@ -152,8 +190,10 @@ export function capturePageview(pathname: string, search: string): void {
   if (!initAnalytics()) return;
   const path = safePath(pathname);
   syncSessionReplay(path);
+  const page = buildPageviewProperties(path);
   capture(AnalyticsEvent.pageview, {
-    path,
+    path: page.path,
+    page_kind: page.page_kind,
     $current_url: safePageUrl(window.location.origin, path, search),
   });
 }
@@ -173,6 +213,27 @@ export function resetAnalytics(): void {
   if (!initialized) return;
   posthog.reset();
   registerFirstTouch();
+}
+
+export function trackCtaClicked(input: { cta: "signup" | "free_generator"; surface: "hero" | "header" | "midpage" | "sticky" }): void {
+  if (typeof window === "undefined") return;
+  const properties = buildCtaClickedProperties({ ...input, path: window.location.pathname });
+  if (!properties) return;
+  capture(AnalyticsEvent.ctaClicked, properties);
+}
+
+export function trackFreeGeneratorStarted(templateId?: string | null): void {
+  capture(AnalyticsEvent.freeGeneratorStarted, buildFreeGeneratorProperties(templateId));
+}
+
+export function trackFreeGeneratorCompleted(templateId?: string | null): void {
+  capture(AnalyticsEvent.freeGeneratorCompleted, buildFreeGeneratorProperties(templateId));
+}
+
+export function trackCheckoutStarted(input: { planId: string; isAnnual: boolean; isOneTime: boolean }): void {
+  const selection = checkoutPlanSelection(input.planId, input.isAnnual, input.isOneTime);
+  if (!selection) return;
+  capture(AnalyticsEvent.checkoutStarted, buildCheckoutStartedProperties(selection));
 }
 
 export function trackSignup(): void {

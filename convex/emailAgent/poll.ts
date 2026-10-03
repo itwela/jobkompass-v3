@@ -184,7 +184,7 @@ export const pollAllAccounts = internalAction({
         if (error?.code === 401 || error?.message?.includes("invalid_grant")) {
           await ctx.runMutation(internal.emailAccounts.markRevoked, { accountId: account._id });
         }
-        console.error(`Poll failed for account ${account.email}:`, error);
+        console.error("Poll failed for an email account");
       }
     }
   },
@@ -225,7 +225,7 @@ export const pollMyAccounts = action({
         } else {
           errors.push(`${account.email}: ${error?.message ?? "scan failed"}`);
         }
-        console.error(`Manual poll failed for account ${account.email}:`, error);
+        console.error("Manual poll failed for an email account");
       }
     }
 

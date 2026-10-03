@@ -9,7 +9,7 @@ import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { Check, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import JkPublicHeader from './jkPublicHeader'
-import { trackPlanUpgrade } from '@/lib/analytics/client'
+import { trackCheckoutStarted, trackPlanUpgrade } from '@/lib/analytics/client'
 
 
 interface PlanPricing {
@@ -168,7 +168,11 @@ export default function JkPricing() {
       const data = await res.json()
 
       if (data.checkoutUrl) {
-        // Redirect to Stripe Checkout
+        trackCheckoutStarted({
+          planId: plan.id,
+          isAnnual,
+          isOneTime: Boolean(plan.isOneTime),
+        })
         window.location.href = data.checkoutUrl
       } else {
         console.error('No checkout URL returned')
