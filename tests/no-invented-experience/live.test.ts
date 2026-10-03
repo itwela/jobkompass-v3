@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { jobKompassInstructions } from "../../app/ai/constants/file";
 import { draftReplyMessage, tailorResumeContent } from "../../lib/emailAgent/draftMessage";
 import { extractResumeContent } from "../../lib/resume/extractFromPdf";
+import { scrubInventedExperience } from "../../lib/resume/noInventedFacts";
 import { getCopyPromptForTemplate } from "../../lib/copyToAiPrompts";
 import { checkNoInventedExperience, type Violation } from "./checker";
 import { jdBackend, resumeToPlainText, studentResume } from "./fixtures";
@@ -169,19 +170,25 @@ describe.skipIf(!live)("live model evals", () => {
       ].join("\n\n");
       // Production attaches the saved resume when the account has one.
       const user = `CANDIDATE RESUME:\n${JSON.stringify(studentResume)}\n\nTARGET POSITION: ${target.role} at ${target.company}\nUSER NAME: Maya Chen\nUSER EMAIL: ${studentResume.personalInfo.email}\n\nJOB DETAILS:\n${jdBackend}`;
+      // This replay does not call createCoverLetterJakeTemplate. The scrubber
+      // here is the same one that tool runs before a letter is saved.
       const raw = await openAiText("gpt-4o-mini", system, user);
       const parsed = parseJsonObject(raw) as {
         letterContent?: { openingParagraph?: string; bodyParagraphs?: string[]; closingParagraph?: string };
       };
+      const withResumeLetter = scrubInventedExperience(
+        studentResume,
+        {
+          jobInfo: { company: target.company, position: target.role },
+          letterContent: parsed.letterContent,
+        },
+        { applicationTarget: target, jobDescription: jdBackend },
+      );
       assertClean(
-        checkNoInventedExperience(
-          studentResume,
-          {
-            jobInfo: { company: target.company, position: target.role },
-            letterContent: parsed.letterContent,
-          },
-          { applicationTarget: target, jobDescription: jdBackend },
-        ),
+        checkNoInventedExperience(studentResume, withResumeLetter, {
+          applicationTarget: target,
+          jobDescription: jdBackend,
+        }),
       );
 
       const withoutResume = await openAiText(
@@ -192,15 +199,19 @@ describe.skipIf(!live)("live model evals", () => {
       const parsedWithout = parseJsonObject(withoutResume) as {
         letterContent?: { openingParagraph?: string; bodyParagraphs?: string[]; closingParagraph?: string };
       };
+      const noResumeLetter = scrubInventedExperience(
+        studentResume,
+        {
+          jobInfo: { company: target.company, position: target.role },
+          letterContent: parsedWithout.letterContent,
+        },
+        { applicationTarget: target, jobDescription: jdBackend },
+      );
       assertClean(
-        checkNoInventedExperience(
-          studentResume,
-          {
-            jobInfo: { company: target.company, position: target.role },
-            letterContent: parsedWithout.letterContent,
-          },
-          { applicationTarget: target, jobDescription: jdBackend },
-        ),
+        checkNoInventedExperience(studentResume, noResumeLetter, {
+          applicationTarget: target,
+          jobDescription: jdBackend,
+        }),
       );
     },
     240_000,
