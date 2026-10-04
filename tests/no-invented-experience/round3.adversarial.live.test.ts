@@ -23,11 +23,11 @@ import {
   applyFactGuard,
   EMPTY_CANDIDATE,
   groundingResumeText,
+  guardChatTurn,
   resumeContextFromMessage,
   resumeJsonFromText,
   scrubAssistantMessage,
   scrubInventedExperience,
-  type FactGuard,
 } from "../../lib/resume/noInventedFacts";
 import { checkNoInventedExperience, type Violation } from "./checker";
 import { resumeToPlainText, type FixtureResume } from "./fixtures";
@@ -164,33 +164,9 @@ Forklift certification — OSHA
 2021`;
 }
 
-/** The chat route scrubs finalOutput and the two save-tool arguments only when factGuard.source is set. */
+/** The chat route's guard. A loaded resume stands in for the server lookup. */
 function chatBoundary(message: string, rawText: string, loadedResume?: unknown) {
-  const factGuard: FactGuard = { source: loadedResume ?? resumeJsonFromText(message) };
-  let parsed: unknown = rawText;
-  const trimmed = rawText.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1].trim() : trimmed;
-  if (candidate.startsWith("{") || candidate.startsWith("[")) {
-    try {
-      parsed = JSON.parse(candidate);
-    } catch {
-      parsed = rawText;
-    }
-  }
-  const saved = applyFactGuard(factGuard, parsed);
-  let streamed = rawText;
-  let toolArguments = parsed;
-  if (factGuard.source) {
-    if (parsed && typeof parsed === "object") {
-      streamed = JSON.stringify(scrubInventedExperience(factGuard.source, parsed), null, 2);
-      toolArguments = scrubInventedExperience(factGuard.source, parsed);
-    } else {
-      const scrubbed = scrubInventedExperience(factGuard.source, rawText);
-      if (typeof scrubbed === "string" && scrubbed.trim()) streamed = scrubbed;
-    }
-  }
-  return { saved, streamed, toolArguments, guardOn: factGuard.source != null };
+  return guardChatTurn({ message, rawText, savedResume: loadedResume ?? null });
 }
 
 function resumeAssistantInstructions(): string {
