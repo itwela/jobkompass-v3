@@ -100,6 +100,72 @@ describe("checker allows harmless rewording", () => {
     ).toEqual([]);
   });
 
+  it("accepts a cashier bullet rewritten with the same drawer and cash facts", () => {
+    const cashier = {
+      personalInfo: { summary: "Retail cashier." },
+      experience: [
+        {
+          company: "Red Wagon Market",
+          title: "Cashier",
+          date: "Jun 2022 - Aug 2023",
+          details: ["Rang up groceries and counted the drawer at close", "Restocked produce during morning shifts"],
+        },
+      ],
+      skills: { technical: [], additional: ["cash handling"] },
+    };
+    const rewritten = structuredClone(cashier);
+    rewritten.experience[0].details = ["Processed sales and balanced cash drawer", "Restocked produce during morning shifts"];
+    expect(checkNoInventedExperience(cashier, rewritten)).toEqual([]);
+  });
+
+  it("still flags a new leadership claim and a CKAD on a cashier resume", () => {
+    const cashier = {
+      personalInfo: { summary: "Retail cashier." },
+      experience: [
+        {
+          company: "Red Wagon Market",
+          title: "Cashier",
+          date: "Jun 2022 - Aug 2023",
+          details: ["Rang up groceries and counted the drawer at close"],
+        },
+      ],
+      skills: { additional: ["cash handling"] },
+      certifications: [] as Array<{ name: string }>,
+    };
+    const claimed = structuredClone(cashier);
+    claimed.experience[0].details.push("Managed cross-functional teams across the store");
+    claimed.certifications.push({ name: "CKAD" });
+    const asString = structuredClone(cashier) as unknown as { certifications: string[] };
+    asString.certifications = ["Six Sigma Green Belt"];
+    const violations = checkNoInventedExperience(cashier, claimed);
+    expect(violations.some((violation) => violation.kind === "accomplishment")).toBe(true);
+    expect(violations.some((violation) => violation.kind === "certification" && /ckad/i.test(violation.value))).toBe(true);
+    expect(checkNoInventedExperience(cashier, asString).some((violation) => violation.kind === "certification")).toBe(true);
+  });
+
+  it("does not treat a copied job posting as the candidate's history", () => {
+    const source = {
+      experience: [{ company: "Red Wagon Market", title: "Cashier", date: "Jun 2022 - Aug 2023", details: ["Rang up groceries"] }],
+    };
+    const output = {
+      ...structuredClone(source),
+      targetJob: {
+        jobPosting: "5+ years, SQL, Kubernetes, AWS Certified Solutions Architect, M.S. from Stanford University, cut cost 30%.",
+      },
+    };
+    expect(checkNoInventedExperience(source, output)).toEqual([]);
+  });
+
+  it("reads an EXPERIENCE key and a work array", () => {
+    const source = {
+      experience: [{ company: "Red Wagon Market", title: "Cashier", date: "Jun 2022 - Aug 2023", details: ["Rang up groceries"] }],
+    };
+    const wrapped = { EXPERIENCE: [{ company: "Google", title: "Senior Software Engineer", date: "2018 - 2023", details: ["Ran Kubernetes"] }] };
+    const work = { work: [{ company: "Amazon", title: "Operations Analyst", date: "2019 - 2024", details: ["Cut cost 30%"] }] };
+    expect(checkNoInventedExperience(source, wrapped).some((violation) => violation.kind === "employer")).toBe(true);
+    expect(checkNoInventedExperience(source, work).some((violation) => violation.kind === "employer")).toBe(true);
+  });
+
   it("still flags a summary that invents work without framing it as a job objective", () => {
     const out = structuredClone(studentResume);
     out.personalInfo.summary = "Designed distributed payment ledgers for card networks.";

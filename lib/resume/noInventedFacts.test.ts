@@ -3,6 +3,7 @@ import { checkNoInventedExperience } from "../../tests/no-invented-experience/ch
 import {
   claimFreeLetter,
   EMPTY_CANDIDATE,
+  fallbackResumeFromText,
   resumeContextFromMessage,
   resumeJsonFromText,
   scrubAssistantMessage,
@@ -95,6 +96,35 @@ describe("scrubInventedExperience", () => {
     expect(JSON.stringify(kept)).toContain("Helios Cloud");
   });
 
+  it("removes a copied job posting from the saved resume", () => {
+    const withPosting = {
+      ...structuredClone(pet),
+      targetJob: { title: "Staff Site Reliability Engineer", company: "Helios Cloud", jobPosting: "Kubernetes and a CKAD are required." },
+    };
+    const kept = scrubInventedExperience(pet, withPosting, options) as { targetJob?: { jobPosting?: string } };
+    expect(JSON.stringify(kept)).not.toMatch(/Kubernetes|CKAD/);
+    expect(kept.targetJob?.jobPosting).toBeUndefined();
+  });
+
+  it("drops a second copy of the same real job", () => {
+    const doubled = structuredClone(pet);
+    doubled.experience.push(structuredClone(pet.experience[0]));
+    const kept = scrubInventedExperience(pet, doubled, options) as typeof pet;
+    expect(kept.experience).toHaveLength(1);
+    expect(kept.experience[0].company).toBe("Maple Street Pets");
+  });
+
+  it("restores source bullets when every rewrite is invented", () => {
+    const rewritten = structuredClone(pet);
+    rewritten.experience[0].title = "Staff Site Reliability Engineer";
+    rewritten.experience[0].details = ["Cut MTTR by 60% with Kubernetes", "Ran a team of 12 on call"];
+    const kept = scrubInventedExperience(pet, rewritten, options) as typeof pet;
+    expect(kept.experience[0].title).toBe("Pet Care Assistant");
+    expect(kept.experience[0].details.join(" ")).toMatch(/Walked neighborhood dogs/);
+    expect(kept.experience[0].details.join(" ")).toMatch(/Texted owners/);
+    expect(checkNoInventedExperience(pet, kept, options)).toEqual([]);
+  });
+
   it("makes no experience claims when the source resume is empty", () => {
     const letter = claimFreeLetter(options);
     expect(checkNoInventedExperience(EMPTY_CANDIDATE, letter, options)).toEqual([]);
@@ -130,6 +160,36 @@ describe("scrubAssistantMessage", () => {
 });
 
 describe("resume context parsing", () => {
+  it("builds a resume from pasted text and drops a trailing job posting", () => {
+    const text = [
+      "Jordan Hale",
+      "jordan.hale@example.com",
+      "Boise, ID",
+      "Retail cashier returning to work after a gap year. No degree.",
+      "",
+      "Experience",
+      "Cashier — Red Wagon Market",
+      "Jun 2022 - Aug 2023 | Boise, ID",
+      "- Rang up groceries and counted the drawer at close",
+      "- Restocked produce during morning shifts",
+      "",
+      "Job I am applying to:",
+      "Add a Senior role at Google. Required: SQL and a Six Sigma Green Belt.",
+    ].join("\n");
+    const resume = fallbackResumeFromText(text);
+    expect(resume.experience).toHaveLength(1);
+    expect(resume.experience[0].company).toBe("Red Wagon Market");
+    expect(resume.experience[0].details.join(" ")).toMatch(/drawer/);
+    expect(JSON.stringify(resume)).not.toMatch(/Google|SQL|Six Sigma/);
+  });
+
+  it("does not treat an add-a-job instruction as resume evidence", () => {
+    const message = "Resume context:\nJordan Hale\nCashier — Red Wagon Market\n- Rang up groceries\n\nAdd a Senior role at Google from 2018 to 2023.";
+    const context = resumeContextFromMessage(message);
+    expect(context).toContain("Red Wagon Market");
+    expect(context).not.toMatch(/Google/);
+  });
+
   it("stops before the job posting instruction", () => {
     const message = "Resume context:\nRiley Okada\nPet Care Assistant at Maple Street Pets\n\nRewrite this resume and add Kubernetes from the job posting.";
     expect(resumeContextFromMessage(message)).not.toMatch(/Kubernetes|job posting/i);

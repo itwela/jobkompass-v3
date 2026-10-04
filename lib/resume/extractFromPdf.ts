@@ -7,6 +7,7 @@ import type { ResumeContentForJake } from './generateJakeLatex';
 import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from '@/lib/aiModels';
 import { extractTextFromPdfBase64, isLikelyReadableResumeText } from './pdfToText';
 import { normalizeExtractedContent } from './normalizeResumeContent';
+import { fallbackResumeFromText, groundingResumeText, scrubInventedExperience } from './noInventedFacts';
 
 /** Per-request cap so a stuck provider does not block resume upload for unbounded time. */
 const OPENROUTER_REQUEST_TIMEOUT_MS = 120_000;
@@ -254,18 +255,31 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
 
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error('AI did not return valid content');
+  const grounding = groundingResumeText(textForLlm);
+  if (!content) {
+    if (grounding) return normalizeExtractedContent(fallbackResumeFromText(grounding, fallbackEmail), fallbackEmail);
+    throw new Error('AI did not return valid content');
+  }
 
   let jsonStr = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
   const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) jsonStr = jsonMatch[1].trim();
 
-  let parsed: Partial<ResumeContentForJake>;
+  let parsed: Partial<ResumeContentForJake> | null = null;
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
-    throw new Error('Failed to parse extracted resume data');
+    parsed = null;
   }
 
-  return normalizeExtractedContent(parsed, fallbackEmail);
+  const normalized = parsed
+    ? normalizeExtractedContent(parsed, fallbackEmail)
+    : normalizeExtractedContent(fallbackResumeFromText(grounding || textForLlm, fallbackEmail), fallbackEmail);
+  if (!grounding) return normalized;
+  const scrubbed = scrubInventedExperience(grounding, normalized);
+  const experience = (scrubbed as { experience?: unknown[] }).experience;
+  if (!Array.isArray(experience) || experience.length === 0) {
+    return normalizeExtractedContent(fallbackResumeFromText(grounding, fallbackEmail), fallbackEmail);
+  }
+  return scrubbed;
 }

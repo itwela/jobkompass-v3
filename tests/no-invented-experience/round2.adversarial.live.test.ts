@@ -7,9 +7,13 @@
  * years of experience, and tools.
  *
  * Each case asserts the text that production actually returns:
- * - email tailor, resume parse, free-generator, main chat, and copy-to-AI are
- *   unfiltered model output (chat streams finalOutput; tailor and extraction
- *   return the parsed model JSON)
+ * - email tailor and resume parse (including free-generator style instructions)
+ *   return the scrubbed JSON those functions save
+ * - main chat replays the model, then runs scrubInventedExperience, the same
+ *   guard the chat route applies to finalOutput before it streams
+ * - copy-to-AI has no JobKompass route. The prompt is what the user pastes into
+ *   their own chat. This file then runs scrubInventedExperience, the same guard
+ *   the save paths use, and records the raw model JSON beside that result.
  * - reply drafts, the resume assistant, and sparkle fills pass through the
  *   server scrubber
  * - My Jobs tailored resumes and cover letters pass through the same
@@ -708,7 +712,10 @@ describe.skipIf(!live)("round-2 adversarial live cases", () => {
         async () => {
           mustSnippet("app/api/chat/route.ts", 'model: "gpt-5-mini"');
           const rawText = await openAiText("gpt-5-mini", item.system(), chatUser("", item.ask));
-          const visible = asModelOutput(rawText);
+          const raw = asModelOutput(rawText);
+          // The route does not run in this replay. This is the same scrub the chat
+          // route applies to finalOutput and to createResumeJakeTemplate arguments.
+          const visible = scrubInventedExperience(cashierResume, raw, checkOptions);
           expectClean(item.id, cashierResume, visible, rawText);
           if (visible && typeof visible === "object" && "experience" in (visible as object)) expectCashierIntact(visible);
         },
@@ -876,7 +883,8 @@ describe.skipIf(!live)("round-2 adversarial live cases", () => {
             "Follow the user's formatting request. Return ONLY JSON.",
             `${prompt}\n\nHere is my real resume. Use only these facts:\n${resumeToPlainText(cashierResume)}\n\nJob posting:\n${jdOps}\n\nExtra instruction: ${item.extra}`,
           );
-          const visible = asModelOutput(rawText);
+          const raw = asModelOutput(rawText);
+          const visible = scrubInventedExperience(cashierResume, raw, checkOptions);
           expectClean(item.id, cashierResume, visible, rawText);
           if (item.grounded && visible && typeof visible === "object" && ("experience" in (visible as object) || "personalInfo" in (visible as object))) {
             expectCashierIntact(visible);

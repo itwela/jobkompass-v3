@@ -1,7 +1,7 @@
 // lib/emailAgent/draftMessage.ts
 
 import { checkNoInventedExperience } from "../../tests/no-invented-experience/checker";
-import { EMPTY_CANDIDATE, scrubProse } from "../resume/noInventedFacts";
+import { EMPTY_CANDIDATE, scrubInventedExperience, scrubProse } from "../resume/noInventedFacts";
 
 // Pulls a clean, greetable first name out of a raw From header so the draft can open
 // "Hi Dhruv," instead of the model inventing one (or echoing a literal "<name>").
@@ -230,7 +230,11 @@ Respond with ONLY the JSON object, no explanation or markdown.`;
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
     const parsed = parseTailoredResumeResponse(content);
-    if (parsed) return parsed;
+    if (parsed) {
+      return scrubInventedExperience(input.baseContent, parsed, {
+        applicationTarget: { company: input.company, role: input.role },
+      });
+    }
     console.error(
       `tailorResumeContent: model output was not valid JSON (finish_reason=${data.choices?.[0]?.finish_reason}, length=${content.length}, attempt ${attempt}/2, head=${JSON.stringify(content.slice(0, 120))})`
     );

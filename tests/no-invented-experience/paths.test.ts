@@ -57,19 +57,22 @@ describe("email agent resume tailoring (tailorResumeContent)", () => {
     expect(checkNoInventedExperience(studentResume, output, { applicationTarget: target, jobDescription: jdBackend })).toEqual([]);
   });
 
-  it("catches a mocked invented tailor response", async () => {
+  it("scrubs a mocked tailor response that invents a job", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-    stubModel(JSON.stringify(inventedStudentResume()));
+    const invented = inventedStudentResume();
+    stubModel(JSON.stringify(invented));
     const output = await tailorResumeContent({
       baseContent: studentResume,
       company: target.company,
       role: target.role,
     });
-    const violations = checkNoInventedExperience(studentResume, output, { applicationTarget: target, jobDescription: jdBackend });
-    expect(violations.map((violation) => violation.kind)).toEqual(
+    const rawViolations = checkNoInventedExperience(studentResume, invented, { applicationTarget: target, jobDescription: jdBackend });
+    expect(rawViolations.map((violation) => violation.kind)).toEqual(
       expect.arrayContaining(["employer", "metric", "skill", "school"]),
     );
-    expect(violations.some((violation) => violation.value === "Northwind Payments")).toBe(true);
+    expect(checkNoInventedExperience(studentResume, output, { applicationTarget: target, jobDescription: jdBackend })).toEqual([]);
+    expect(JSON.stringify(output)).toContain("City Library");
+    expect(JSON.stringify(output)).not.toContain("Northwind Payments");
   });
 
   it("documents the tailor prompt's partial guard", () => {
@@ -145,12 +148,15 @@ describe("resume extraction (extractResumeContent)", () => {
     expect(checkNoInventedExperience(text, output)).toEqual([]);
   });
 
-  it("catches a mocked parse that adds a job the paste does not contain", async () => {
+  it("drops a mocked parse that adds a job the paste does not contain", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-    stubModel(JSON.stringify(inventedStudentResume()));
+    const invented = inventedStudentResume();
+    stubModel(JSON.stringify(invented));
     const output = await extractResumeContent({ resumeText: resumeToPlainText(studentResume) });
-    const violations = checkNoInventedExperience(studentResume, output);
-    expect(violations.some((violation) => violation.kind === "employer" && violation.value === "Northwind Payments")).toBe(true);
+    const rawViolations = checkNoInventedExperience(studentResume, invented);
+    expect(rawViolations.some((violation) => violation.kind === "employer" && violation.value === "Northwind Payments")).toBe(true);
+    expect(checkNoInventedExperience(resumeToPlainText(studentResume), output)).toEqual([]);
+    expect(JSON.stringify(output)).not.toContain("Northwind Payments");
   });
 
   it("callers are the free generator, document upload, and template generation", () => {

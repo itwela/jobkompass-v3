@@ -903,7 +903,7 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
   });
 
 // Get Specific Resume by ID Tool
-const createGetResumeByIdTool = (convexClient: ConvexHttpClient) =>
+const createGetResumeByIdTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) =>
   tool({
     name: "getResumeById",
     description:
@@ -926,7 +926,9 @@ const createGetResumeByIdTool = (convexClient: ConvexHttpClient) =>
             error: "Resume not found",
           };
         }
-        
+
+        if (factGuard && resume.content) factGuard.source = resume.content;
+
         return {
           success: true,
           message: `Successfully fetched resume: ${resume.name || 'Untitled'}`,

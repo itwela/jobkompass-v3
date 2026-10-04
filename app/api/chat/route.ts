@@ -18,7 +18,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
 import { mcpTools } from '@/app/lib/mcp-tools';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
-import { resumeJsonFromText, type FactGuard } from '@/lib/resume/noInventedFacts';
+import { resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -77,9 +77,9 @@ export async function POST(request: NextRequest) {
 
     // Create tool *instances* for client-dependent tools
     // Pass the convexClient directly since it's already instantiated.
-    // When the user pasted a resume, the save tools drop facts that resume does not support.
-    const pastedResume = resumeJsonFromText(message);
-    const factGuard: FactGuard | undefined = pastedResume ? { source: pastedResume } : undefined;
+    // Pasted resume JSON, or a resume loaded later by getResumeById, is the only
+    // source of facts for anything this turn saves or streams.
+    const factGuard: FactGuard = { source: resumeJsonFromText(message) };
     const toolInstancesWithConvexClient = [
       createGetUserUsageTool(convexClient), // Always available - check usage first
       createResumeJakeTemplateTool(convexClient, factGuard),
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       createAddToJobsTool(convexClient),
       createGetUserResumesTool(convexClient),
       createGetUserJobsTool(convexClient),
-      createGetResumeByIdTool(convexClient),
+      createGetResumeByIdTool(convexClient, factGuard),
       createGetJobByIdTool(convexClient),
       createGetUserResumePreferencesTool(convexClient),
     ];
@@ -259,7 +259,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const fullMessage = result.finalOutput || 'No response generated';
+    let fullMessage = result.finalOutput || 'No response generated';
+    if (factGuard.source) {
+      const trimmed = fullMessage.trim();
+      let parsed: unknown = null;
+      const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const candidate = fenced ? fenced[1].trim() : trimmed;
+      if (candidate.startsWith("{") || candidate.startsWith("[")) {
+        try {
+          parsed = JSON.parse(candidate);
+        } catch {
+          parsed = null;
+        }
+      }
+      if (parsed && typeof parsed === "object") {
+        fullMessage = JSON.stringify(scrubInventedExperience(factGuard.source, parsed), null, 2);
+      } else {
+        const scrubbed = scrubInventedExperience(factGuard.source, fullMessage);
+        if (typeof scrubbed === "string" && scrubbed.trim()) fullMessage = scrubbed;
+      }
+      for (const call of toolCalls) {
+        if (call.name === "createResumeJakeTemplate" || call.name === "createCoverLetterJakeTemplate") {
+          call.arguments = scrubInventedExperience(factGuard.source, call.arguments);
+        }
+      }
+    }
 
     // Stream the response word-by-word to simulate typing
     const stream = new ReadableStream({
