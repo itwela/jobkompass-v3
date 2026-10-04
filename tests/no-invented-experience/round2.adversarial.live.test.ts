@@ -9,11 +9,9 @@
  * Each case asserts the text that production actually returns:
  * - email tailor and resume parse (including free-generator style instructions)
  *   return the scrubbed JSON those functions save
- * - main chat replays the model, then runs scrubInventedExperience, the same
- *   guard the chat route applies to finalOutput before it streams
- * - copy-to-AI has no JobKompass route. The prompt is what the user pastes into
- *   their own chat. This file then runs scrubInventedExperience, the same guard
- *   the save paths use, and records the raw model JSON beside that result.
+ * - main chat replays the model, then runs guardChatTurn, the chat route guard
+ * - copy-to-AI has no server scrub. The assertion is the raw model JSON.
+ *   A separate log line records raw violations and does not decide other paths.
  * - reply drafts, the resume assistant, and sparkle fills pass through the
  *   server scrubber
  * - My Jobs tailored resumes and cover letters pass through the same
@@ -30,10 +28,11 @@ import { draftReplyMessage, tailorResumeContent } from "../../lib/emailAgent/dra
 import { getCopyPromptForTemplate } from "../../lib/copyToAiPrompts";
 import { extractResumeContent } from "../../lib/resume/extractFromPdf";
 import {
+  applyFactGuard,
   EMPTY_CANDIDATE,
+  guardChatTurn,
   resumeContextFromMessage,
   scrubAssistantMessage,
-  scrubInventedExperience,
 } from "../../lib/resume/noInventedFacts";
 import { checkNoInventedExperience, type Violation } from "./checker";
 import { resumeToPlainText, type FixtureResume } from "./fixtures";
@@ -162,9 +161,10 @@ function expectNoInventedClaims(value: unknown) {
 }
 
 function expectClean(id: string, source: unknown, visible: unknown, raw: unknown = visible) {
+  const rawViolations = checkNoInventedExperience(source, unwrapResume(raw), checkOptions);
   const violations = checkNoInventedExperience(source, unwrapResume(visible), checkOptions);
-  record(id, raw, visible, violations);
-  expect(violations, JSON.stringify({ raw, visible, violations }, null, 2)).toEqual([]);
+  record(id, { raw, rawViolationCount: rawViolations.length, rawViolations }, visible, violations);
+  expect(violations, JSON.stringify({ raw, rawViolations, visible, violations }, null, 2)).toEqual([]);
   expectNoInventedClaims(visible);
 }
 
@@ -270,7 +270,7 @@ function tailoredUser(extra: string): string {
 async function tailoredVisible(extra: string, preferences = ""): Promise<{ raw: unknown; visible: unknown }> {
   const rawText = await openAiText("gpt-4o-mini", tailoredSystem(preferences), tailoredUser(extra));
   const raw = asModelOutput(rawText);
-  const visible = scrubInventedExperience(cashierResume, raw, checkOptions);
+  const visible = applyFactGuard({ source: cashierResume, applicationTarget: target }, raw);
   return { raw, visible };
 }
 
@@ -333,7 +333,7 @@ async function coverVisible(includeResume: boolean, user: string): Promise<{ raw
   const rawText = await openAiText("gpt-4o-mini", coverSystem(includeResume), user);
   const raw = asLetter(rawText);
   const source = includeResume ? cashierResume : EMPTY_CANDIDATE;
-  const visible = scrubInventedExperience(source, raw, checkOptions);
+  const visible = applyFactGuard({ source, applicationTarget: target }, raw);
   return { raw, visible };
 }
 
@@ -711,13 +711,15 @@ describe.skipIf(!live)("round-2 adversarial live cases", () => {
         item.name,
         async () => {
           mustSnippet("app/api/chat/route.ts", 'model: "gpt-5-mini"');
-          const rawText = await openAiText("gpt-5-mini", item.system(), chatUser("", item.ask));
+          const message = chatUser("", item.ask);
+          const rawText = await openAiText("gpt-5-mini", item.system(), message);
           const raw = asModelOutput(rawText);
-          // The route does not run in this replay. This is the same scrub the chat
-          // route applies to finalOutput and to createResumeJakeTemplate arguments.
-          const visible = scrubInventedExperience(cashierResume, raw, checkOptions);
-          expectClean(item.id, cashierResume, visible, rawText);
-          if (visible && typeof visible === "object" && "experience" in (visible as object)) expectCashierIntact(visible);
+          const visible = guardChatTurn({ message, rawText });
+          expect(visible.guardOn).toBe(true);
+          expectClean(item.id, cashierResume, visible.saved, raw);
+          if (visible.saved && typeof visible.saved === "object" && "experience" in (visible.saved as object)) {
+            expectCashierIntact(visible.saved);
+          }
         },
         180_000,
       );
@@ -884,13 +886,12 @@ describe.skipIf(!live)("round-2 adversarial live cases", () => {
             `${prompt}\n\nHere is my real resume. Use only these facts:\n${resumeToPlainText(cashierResume)}\n\nJob posting:\n${jdOps}\n\nExtra instruction: ${item.extra}`,
           );
           const raw = asModelOutput(rawText);
-          const visible = scrubInventedExperience(cashierResume, raw, checkOptions);
-          expectClean(item.id, cashierResume, visible, rawText);
-          if (item.grounded && visible && typeof visible === "object" && ("experience" in (visible as object) || "personalInfo" in (visible as object))) {
-            expectCashierIntact(visible);
+          expectClean(item.id, cashierResume, raw, rawText);
+          if (item.grounded && raw && typeof raw === "object" && ("experience" in (raw as object) || "personalInfo" in (raw as object))) {
+            expectCashierIntact(raw);
           }
           if (item.type === "cover-letter") {
-            expect(blob(visible)).toMatch(/Red Wagon|grocer|drawer|cashier/i);
+            expect(blob(raw)).toMatch(/Red Wagon|grocer|drawer|cashier/i);
           }
         },
         180_000,
