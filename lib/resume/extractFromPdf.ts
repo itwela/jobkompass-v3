@@ -111,15 +111,21 @@ function relineResumeBlob(text: string): string {
   const month = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
   lined = lined.replace(/\s+/g, " ");
   lined = lined.replace(/\s+\b(Experience|Work Experience|Education|Skills|Certifications?|Projects)\b/gi, "\n$1\n");
+  // Hold "Aug 2022 - May 2024" so a later year break or bullet hyphen cannot split it.
+  const heldDates: string[] = [];
   lined = lined.replace(
     new RegExp(
-      `\\s+((?:${month})[a-z]*\\.?\\s+(?:19|20)\\d{2}\\s*(?:-|–|—|to)\\s*(?:(?:${month})[a-z]*\\.?\\s+)?(?:(?:19|20)\\d{2}|Present|Current)\\b)`,
+      `((?:${month})[a-z]*\\.?\\s+(?:19|20)\\d{2}(?:\\s*(?:-|–|—|to)\\s*(?:(?:${month})[a-z]*\\.?\\s+)?(?:(?:19|20)\\d{2}|Present|Current))?\\b)`,
       "gi",
     ),
-    "\n$1",
+    (value) => {
+      heldDates.push(value);
+      return `\n@@DATE${heldDates.length - 1}@@`;
+    },
   );
   lined = lined.replace(/([^\d\n])\s+((?:19|20)\d{2})(?!\s*[-–—])/g, "$1\n$2");
   lined = lined.replace(/\s+-\s+/g, "\n- ");
+  lined = lined.replace(/@@DATE(\d+)@@/g, (_match, index: string) => heldDates[Number(index)] ?? "");
   return lined
     .split("\n")
     .map((line) => line.trim())

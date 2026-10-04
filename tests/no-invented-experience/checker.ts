@@ -1190,7 +1190,12 @@ function earnedClaimHits(text: string): string[] {
   return hits;
 }
 
+/** A section label or a bare "certified" is not a named credential. "ServSafe Manager" still is. */
+const GENERIC_CREDENTIAL_LABEL =
+  /^(?:(?:a|an|the|my|our)\s+)?(?:certifications?|certificates?|certified|credentials?|licen[cs]e[ds]?|cards?)$/i;
+
 function credentialUnsupported(phrase: string, allow: Allow): boolean {
+  if (GENERIC_CREDENTIAL_LABEL.test(phrase.trim())) return false;
   if (certOk(phrase, allow)) return false;
   if (phraseIn(phrase, allow.certs.join(" "))) return false;
   if (employerSupported(phrase, allow) || schoolOk(phrase, allow)) return false;

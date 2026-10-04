@@ -329,6 +329,27 @@ describe("checker flags invented experience", () => {
     expect(found).toEqual(expect.arrayContaining(["employer", "metric", "skill"]));
   });
 
+  it("does not treat the section word certifications as a named credential", () => {
+    const withLabel = structuredClone(studentResume) as typeof studentResume & { notes?: string[] };
+    withLabel.notes = ["certifications"];
+    expect(checkNoInventedExperience(studentResume, withLabel)).toEqual([]);
+    const emptyJson = `{
+  "personalInfo": {},
+  "experience": [],
+  "education": [],
+  "skills": { "technical": [], "additional": [] },
+  "certifications": []
+}`;
+    expect(checkNoInventedExperience(studentResume, emptyJson)).toEqual([]);
+  });
+
+  it("still flags ServSafe and a card the resume does not list", () => {
+    const servSafe = checkNoInventedExperience(studentResume, "I earned a ServSafe Manager credential.");
+    expect(servSafe.some((violation) => /servsafe/i.test(violation.value))).toBe(true);
+    const card = checkNoInventedExperience(studentResume, "I hold a food handler card.");
+    expect(card.some((violation) => /food handler card/i.test(violation.value))).toBe(true);
+  });
+
   it("flags employers added while parsing pasted text", () => {
     const text = resumeToPlainText(sparseResume);
     const parsed = structuredClone(sparseResume);

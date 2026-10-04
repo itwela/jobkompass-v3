@@ -502,21 +502,27 @@ describe("round-4 production boundary, no model", () => {
       date: "Jan 2018 - Dec 2021",
       details: ["Cut ticket times 30%"],
     });
-    vi.stubGlobal("fetch", async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ choices: [{ message: { content: JSON.stringify(invented) }, finish_reason: "stop" }] }),
-      text: async () => "",
-      clone() {
-        return this;
-      },
-    }));
+    let sentBody = "";
+    vi.stubGlobal("fetch", async (_url: unknown, init?: { body?: unknown }) => {
+      sentBody = typeof init?.body === "string" ? init.body : "";
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify(invented) }, finish_reason: "stop" }] }),
+        text: async () => "",
+        clone() {
+          return this;
+        },
+      };
+    });
     const output = await extractResumeContent({
       resumePdf: tinyPdf(cookPlain()),
       fallbackEmail: cookResume.personalInfo.email,
     });
     expect(blob(output)).not.toMatch(/French Laundry|ServSafe|30\s*%/);
     expect(blob(output)).toMatch(/Cedar Spoon/);
+    expect(sentBody).toContain("Aug 2022 - May 2024");
+    expect(sentBody).not.toContain("Aug 2022\\n- May 2024");
     expect(read("app/api/documents/generate-resume-pdf/route.ts")).toContain("extractResumeContent");
     expect(read("lib/resume/extractFromPdf.ts")).toContain("scrubInventedExperience(EMPTY_CANDIDATE, normalized)");
   });
