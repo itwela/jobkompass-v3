@@ -65,8 +65,12 @@ export function guardChatTurn(input: {
   const pasted = resumeJsonFromText(input.message);
   const source = input.savedResume ?? pasted ?? null;
   const guardOn = source != null;
-  const saved = scrubInventedExperience(guardOn ? source : EMPTY_CANDIDATE, parseModelPayload(input.rawText));
-  const streamed = typeof saved === "string" ? saved : JSON.stringify(saved, null, 2);
+  const sourceUsed = guardOn ? source : EMPTY_CANDIDATE;
+  const saved = scrubInventedExperience(sourceUsed, parseModelPayload(input.rawText));
+  let streamed = typeof saved === "string" ? saved : JSON.stringify(saved, null, 2);
+  if (typeof saved === "string" && (!saved.trim() || chatTurnNamesInventedFact(sourceUsed, input.rawText))) {
+    streamed = CHAT_FALLBACK;
+  }
   return { saved, streamed, toolArguments: saved, guardOn };
 }
 
@@ -85,10 +89,24 @@ function splitSentences(text: string): string[] {
 }
 
 export function scrubProse(source: unknown, text: string, options: CheckOptions = {}): string {
-  const kept = splitSentences(text).filter(
-    (sentence) => checkNoInventedExperience(source, sentence, options).length === 0,
+  const sentences = splitSentences(text);
+  const chunks = sentences.length > 0 ? sentences : text.trim() ? [text.trim()] : [];
+  return chunks
+    .filter((sentence) => checkNoInventedExperience(source, sentence, options).length === 0)
+    .join(" ");
+}
+
+const CHAT_FALLBACK = "I can only rephrase facts already on the resume.";
+
+/** A chat reply that names an employer or credential the resume does not have, even inside a refusal. */
+export function chatTurnNamesInventedFact(source: unknown, text: string, options: CheckOptions = {}): boolean {
+  const sentences = splitSentences(text);
+  const chunks = sentences.length > 0 ? sentences : text.trim() ? [text.trim()] : [];
+  return chunks.some((sentence) =>
+    checkNoInventedExperience(source, sentence, options).some(
+      (violation) => violation.kind === "employer" || violation.kind === "certification",
+    ),
   );
-  return kept.join(" ");
 }
 
 function escapeRegExp(value: string): string {
@@ -144,8 +162,13 @@ function stripResumeViolation(
     const index = Number(job[2]);
     const bullet = where.match(/\.details\[(\d+)\]$/);
     const items = Array.isArray(next[key]) ? next[key] : [];
-    if (bullet && items[index]?.details) {
+    if (bullet && Array.isArray(items[index]?.details)) {
       items[index].details.splice(Number(bullet[1]), 1);
+      next[key] = items;
+      return next;
+    }
+    if (bullet && items[index]) {
+      items[index].details = [];
       next[key] = items;
       return next;
     }
@@ -767,6 +790,26 @@ function unwrapRecord(record: Record<string, any>): { key: string | null; inner:
   return { key: null, inner: record };
 }
 
+const ALIAS_KEYS: Record<string, string[]> = {
+  experience: ["empleo", "experiencia", "experiencias", "arbeit", "emplois"],
+  certifications: ["zertifikat", "zertifikate", "certificaciones", "certificado", "zertifizierung"],
+  education: ["educacion", "bildung"],
+};
+
+/** Copy empleo / zertifikat onto the canonical keys, then drop the odd key so it cannot leak. */
+function promoteAliasKeys(record: Record<string, any>) {
+  for (const [canonical, aliases] of Object.entries(ALIAS_KEYS)) {
+    for (const [key, value] of Object.entries(record)) {
+      const normalized = key.toLowerCase().replace(/[^a-z]/g, "");
+      if (!aliases.includes(normalized)) continue;
+      const current = record[canonical];
+      const empty = current == null || (Array.isArray(current) && current.length === 0);
+      if (empty) record[canonical] = value;
+      delete record[key];
+    }
+  }
+}
+
 export function scrubInventedExperience<T>(source: unknown, output: T, options: CheckOptions = {}): T {
   const finish = (value: T) => {
     const dropped = value && typeof value === "object" ? dropPostingFields(value) : value;
@@ -779,6 +822,9 @@ export function scrubInventedExperience<T>(source: unknown, output: T, options: 
     logScrub("scrub", source, output, cleaned, options);
     return cleaned;
   };
+  if (Array.isArray(output)) {
+    return scrubInventedExperience(source, { experience: output } as T, options);
+  }
   if (typeof output === "string") {
     const parsed = parseModelPayload(output);
     if (parsed !== output && parsed && typeof parsed === "object") {
@@ -788,6 +834,7 @@ export function scrubInventedExperience<T>(source: unknown, output: T, options: 
   }
   const record = asRecord(structuredClone(output));
   if (!record) return output;
+  promoteAliasKeys(record);
   const unwrapped = unwrapRecord(record);
   if (unwrapped.key) {
     const inner = scrubInventedExperience(source, unwrapped.inner, options);

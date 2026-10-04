@@ -19,7 +19,7 @@ import { api } from "@/convex/_generated/api";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
 import { mcpTools } from '@/app/lib/mcp-tools';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
-import { guardChatTurn, resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
+import { chatTurnNamesInventedFact, guardChatTurn, resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 
 /** Saved resume for this signed-in user. Earlier chat turns are not a source. */
 async function loadSignedInResume(
@@ -303,9 +303,13 @@ export async function POST(request: NextRequest) {
       if (parsed && typeof parsed === "object") {
         fullMessage = JSON.stringify(scrubInventedExperience(factGuard.source, parsed), null, 2);
       } else {
+        const original = fullMessage;
         const scrubbed = scrubInventedExperience(factGuard.source, fullMessage);
         if (typeof scrubbed === "string" && scrubbed.trim()) fullMessage = scrubbed;
         else fullMessage = "I can only rephrase facts already on the resume.";
+        if (chatTurnNamesInventedFact(factGuard.source, original)) {
+          fullMessage = "I can only rephrase facts already on the resume.";
+        }
       }
       for (const call of toolCalls) {
         if (call.name === "createResumeJakeTemplate" || call.name === "createCoverLetterJakeTemplate") {

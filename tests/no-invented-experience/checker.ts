@@ -260,6 +260,11 @@ function startsInventedJobBlock(line: string): boolean {
   return /\b(asked me to|make it look like)\b/i.test(line) || (/[—–-]/.test(line) && INSTRUCTION_SENTENCE.test(line));
 }
 
+/** "Please add the following role" puts the fake header on the next line. */
+function asksForRoleOnNextLine(line: string): boolean {
+  return /\b(?:please\s+)?(?:add|include|list)\b/i.test(line) && /\b(role|job|position|following)\b/i.test(line);
+}
+
 /**
  * Lines that are resume evidence. Instruction lines are skipped.
  * A job-posting header ends the resume. A new employer header after Skills
@@ -270,7 +275,7 @@ function startsInventedJobBlock(line: string): boolean {
 export function resumeEvidenceLines(text: string): string[] {
   const kept: string[] = [];
   let section = "header";
-  let skippingFakeJob = false;
+  let skippingFakeJob: false | "await-header" | "in-fake" = false;
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) {
@@ -296,14 +301,18 @@ export function resumeEvidenceLines(text: string): string[] {
       continue;
     }
     if (isInstructionEvidenceLine(line)) {
-      if (startsInventedJobBlock(line)) skippingFakeJob = true;
+      if (startsInventedJobBlock(line)) skippingFakeJob = "in-fake";
+      else if (asksForRoleOnNextLine(trimmed)) skippingFakeJob = "await-header";
       continue;
     }
     if (skippingFakeJob) {
       const header = trimmed.match(/^(.+?)\s+[—–-]\s+(.+)$/);
       const dateLike = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
-      if (header && !dateLike) skippingFakeJob = false;
-      else continue;
+      if (header && !dateLike && skippingFakeJob === "in-fake") skippingFakeJob = false;
+      else {
+        if (header && !dateLike) skippingFakeJob = "in-fake";
+        continue;
+      }
     }
     const header = trimmed.match(/^(.+?)\s+[—–]\s+(.+)$/);
     const dateLike = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
@@ -318,7 +327,7 @@ const CERT_RE =
 
 /** Credentials the named-cert list does not cover, including ServSafe and "food handler card". */
 const CREDENTIAL_PHRASE =
-  /\b((?:[A-Za-z][\w'+.&/-]*\s+){0,5}(?:certifications?|certificates?|certified|credentials?|licen[cs]e[ds]?|card)|servsafe(?:\s+[A-Za-z][\w'+-]*){0,3}|\bcpr\b|\bosha\b|\bcdl\b|\bpmp\b)/gi;
+  /\b((?:[A-Za-z][\w'+.&/-]*\s+){0,5}(?:certifications?|certificates?|certified|credentials?|licen[cs]e[ds]?|card)|servsafe(?:\s+[A-Za-z][\w'+-]*){0,3}|\bcpr\b|\bosha\b|\bcdl\b|\bpmp\b|\bacls\b|\bpals\b|\btncc\b|\bbls\b)/gi;
 
 /** New claims that are not a reword of the source, even with no number attached. */
 const UNGROUNDED_CLAIM =
@@ -345,10 +354,10 @@ const STRUCTURED_KEYS = new Set([
 
 function aliasKey(key: string): string {
   const normalized = key.toLowerCase().replace(/[^a-z]/g, "");
-  if (["experience", "work", "jobs", "employment", "workexperience"].includes(normalized)) return "experience";
+  if (["experience", "work", "jobs", "employment", "workexperience", "empleo", "experiencia", "experiencias", "arbeit", "emplois"].includes(normalized)) return "experience";
   if (["lettercontent", "letter", "coverletter"].includes(normalized)) return "letterContent";
-  if (["education", "schools"].includes(normalized)) return "education";
-  if (["certifications", "certs", "certificates"].includes(normalized)) return "certifications";
+  if (["education", "schools", "educacion", "bildung"].includes(normalized)) return "education";
+  if (["certifications", "certs", "certificates", "zertifikat", "zertifikate", "certificaciones", "certificado", "zertifizierung"].includes(normalized)) return "certifications";
   if (["skills", "skill"].includes(normalized)) return "skills";
   if (["projects", "project"].includes(normalized)) return "projects";
   if (["additionalinfo", "additional"].includes(normalized)) return "additionalInfo";
@@ -474,6 +483,14 @@ function checkResume(
   ];
 
   for (const { job, where } of jobs) {
+    const item = job as unknown;
+    if (typeof item === "string") {
+      if (item.trim() && !phraseIn(item, allow.corpus) && !employerSupported(item, allow)) {
+        out.push({ kind: "employer", value: item, where: `${where}.company` });
+      }
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
     if (job.company && !employerSupported(job.company, allow)) {
       out.push({ kind: "employer", value: job.company, where: `${where}.company` });
     }
@@ -483,7 +500,7 @@ function checkResume(
     if (job.date && !dateFieldOk(job.date, allow.experienceDates)) {
       out.push({ kind: "date", value: job.date, where: `${where}.date` });
     }
-    for (const [b, bullet] of (job.details ?? []).entries()) {
+    for (const [b, bullet] of textItems(job.details).entries()) {
       out.push(...checkFreeText(bullet, allow, `${where}.details[${b}]`, true));
     }
   }
@@ -506,7 +523,7 @@ function checkResume(
     if (dateBits && !dateFieldOk(dateBits, allow.educationDates)) {
       out.push({ kind: "date", value: dateBits, where: `education[${i}].date` });
     }
-    for (const detail of school.details ?? []) {
+    for (const detail of textItems(school.details)) {
       out.push(...checkFreeText(detail, allow, `education[${i}].details`, false));
     }
   }
@@ -521,7 +538,7 @@ function checkResume(
     for (const tech of project.technologies ?? []) {
       if (!skillOk(tech, allow)) out.push({ kind: "skill", value: tech, where: `projects[${i}].technologies` });
     }
-    const blob = [project.description, ...(project.details ?? [])].filter(Boolean).join(" ");
+    const blob = [project.description, ...textItems(project.details)].filter(Boolean).join(" ");
     if (blob) out.push(...checkFreeText(blob, allow, `projects[${i}].description`, true));
   }
 
@@ -606,6 +623,12 @@ function checkFreeText(text: string, allow: Allow, where: string, accomplishment
   for (const claim of earnedClaimHits(text)) {
     if (credentialUnsupported(claim, allow)) out.push({ kind: "certification", value: claim, where });
   }
+  for (const held of heldCredentialHits(text)) {
+    if (credentialUnsupported(held, allow)) out.push({ kind: "certification", value: held, where });
+  }
+  for (const org of namedOrgHits(text)) {
+    if (namedOrgUnsupported(org, allow)) out.push({ kind: "employer", value: org, where });
+  }
   for (const school of schoolHits(text)) {
     if (!schoolOk(school, allow)) out.push({ kind: "school", value: school, where });
   }
@@ -673,6 +696,12 @@ function checkProse(
     }
     for (const claim of earnedClaimHits(sentence)) {
       if (credentialUnsupported(claim, allow)) out.push({ kind: "certification", value: claim, where: loc });
+    }
+    for (const held of heldCredentialHits(sentence)) {
+      if (credentialUnsupported(held, allow)) out.push({ kind: "certification", value: held, where: loc });
+    }
+    for (const org of namedOrgHits(scanned)) {
+      if (namedOrgUnsupported(org, allow)) out.push({ kind: "employer", value: org, where: loc });
     }
     for (const school of schoolHits(sentence)) {
       if (!schoolOk(school, allow)) out.push({ kind: "school", value: school, where: loc });
@@ -1069,7 +1098,9 @@ function durationMonths(text: string): number[] {
 function isDerivedDuration(num: NumTok, text: string, allow: Allow): boolean {
   if (num.percent || num.money || !Number.isInteger(num.value)) return false;
   if (!allow.durations.some((months) => months === num.value)) return false;
-  return new RegExp(`\\b${num.value}\\s+months?\\b|\\b${num.value}\\s+years?\\b`, "i").test(text);
+  // durations are month counts. "21 years" is not the 21-month span Jun 2019–Mar 2021.
+  if (new RegExp(`\\b${num.value}\\s+years?\\b`, "i").test(text)) return false;
+  return new RegExp(`\\b${num.value}\\s+months?\\b`, "i").test(text);
 }
 
 function unsupportedMetrics(text: string, allow: Allow, where: string): Violation[] {
@@ -1200,7 +1231,62 @@ function credentialUnsupported(phrase: string, allow: Allow): boolean {
   if (phraseIn(phrase, allow.certs.join(" "))) return false;
   if (employerSupported(phrase, allow) || schoolOk(phrase, allow)) return false;
   if (phraseIn(phrase, allow.corpus)) return false;
+  const letters = phrase.trim().toLowerCase();
+  if (/^[a-z]{2,8}$/.test(letters) && allow.certs.some((cert) => acronymOf(cert) === letters)) return false;
   return true;
+}
+
+function acronymOf(phrase: string): string {
+  return phrase
+    .split(/[^A-Za-z0-9]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => part[0])
+    .join("")
+    .toLowerCase();
+}
+
+function heldCredentialHits(text: string): string[] {
+  const hits: string[] = [];
+  const have = /\b(?:have|hold|holds|holding)\s+(?:an?\s+)?([A-Z][A-Z0-9]{2,7})\b/g;
+  const certifiedIn = /\bcertified\s+in\s+([A-Za-z][\w'+/-]*(?:\s+[A-Za-z][\w'+/-]*){0,3})/gi;
+  for (const re of [have, certifiedIn]) {
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(text))) hits.push((match[1] || "").trim());
+  }
+  return hits.filter(Boolean);
+}
+
+const ORG_SUFFIX =
+  /(?:Clinic|Hospital|University|College|Institute|School|Laundry|District|Inc\.?|LLC|Corp\.?|Company|Laboratory|Center|Centre)$/;
+const ROLE_WORD =
+  /^(?:senior|staff|principal|lead|director|head|chief|engineer|developer|manager|designer|analyst|scientist|consultant|architect|nurse|cook|aide|assistant|chef|cashier|associate|intern|officer|specialist|coordinator|technician|operator|driver|courier|home|health|charge|line|prep|sous|patient|care|bicycle|backend|frontend|software|engineering|warehouse|operations|full|stack|retail|pet)$/i;
+
+/** "Mayo Clinic" or "The French Laundry" inside a refusal, without "at" or "for". */
+function namedOrgHits(text: string): string[] {
+  const hits: string[] = [];
+  const re = /\b([A-Z][A-Za-z0-9'&.-]*(?:\s+[A-Z][A-Za-z0-9'&.-]*){1,4})\b/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    const phrase = match[1].replace(/^(?:The|A|An)\s+/, "");
+    if (/^(?:Hi|Hello|Hey|Dear|Thanks|Thank)\b/.test(phrase)) continue;
+    const tokens = phrase.split(/\s+/).filter((token) => !/^(?:of|and|for|the|at)$/i.test(token));
+    if (tokens.length < 2) continue;
+    if (!ORG_SUFFIX.test(phrase) && tokens.every((token) => ROLE_WORD.test(token))) continue;
+    hits.push(phrase);
+  }
+  return hits;
+}
+
+function namedOrgUnsupported(phrase: string, allow: Allow): boolean {
+  if (phraseIn(phrase, allow.corpus)) return false;
+  if (employerSupported(phrase, allow) || schoolOk(phrase, allow)) return false;
+  return true;
+}
+
+function textItems(value: unknown): string[] {
+  if (typeof value === "string") return value.trim() ? [value] : [];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
 function schoolHits(text: string): string[] {
