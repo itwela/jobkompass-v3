@@ -1162,7 +1162,8 @@ function allSkillPhrases(resume: ResumeShape): string[] {
   return phrases.flatMap(splitSkill).filter(Boolean);
 }
 
-function splitSkill(phrase: string): string[] {
+function splitSkill(phrase: unknown): string[] {
+  if (typeof phrase !== "string") return [];
   const withoutLabel = phrase.includes(":") ? phrase.split(":").slice(1).join(":") : phrase;
   return withoutLabel
     .split(/,|&|\|/)
@@ -1194,7 +1195,8 @@ function words(text: string): string[] {
   return text.toLowerCase().match(/[a-z0-9+#]+(?:\.[a-z0-9+#]+)*/g) ?? [];
 }
 
-function normOrg(value: string): string {
+function normOrg(value: unknown): string {
+  if (typeof value !== "string") return "";
   return value
     .toLowerCase()
     .replace(/&/g, " and ")
