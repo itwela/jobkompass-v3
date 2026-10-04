@@ -295,24 +295,144 @@ function overlayFromSource(source: Record<string, any>, output: Record<string, a
   return next;
 }
 
-function jobsFromGroundingText(text: string) {
-  const jobs: Array<{ title: string; company: string; date: string; location: string; details: string[] }> = [];
-  let current: (typeof jobs)[number] | null = null;
+type GroundedJob = { title: string; company: string; date: string; location: string; details: string[] };
+type GroundedSchool = { name: string; degree: string; startDate: string; endDate: string; details: string[] };
+type GroundedCert = { name: string; issuer: string; date: string };
+
+function sectionName(line: string): "experience" | "education" | "skills" | "certs" | "projects" | null {
+  if (/^(experience|work experience)$/i.test(line)) return "experience";
+  if (/^education$/i.test(line)) return "education";
+  if (/^skills$/i.test(line)) return "skills";
+  if (/^certifications?$/i.test(line)) return "certs";
+  if (/^projects$/i.test(line)) return "projects";
+  return null;
+}
+
+function headerParts(line: string): { left: string; right: string } | null {
+  const header = line.match(/^(.+?)\s+[—–]\s+(.+)$/);
+  if (!header) return null;
+  if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header[1])) return null;
+  return { left: header[1].trim(), right: header[2].trim() };
+}
+
+function assignYearRange(school: { startDate: string; endDate: string }, line: string) {
+  const years = line.match(/\b(?:19|20)\d{2}\b/g) ?? [];
+  if (years.length >= 2) {
+    school.startDate = years[0] ?? "";
+    school.endDate = years[years.length - 1] ?? "";
+  } else if (years.length === 1 && !school.endDate) {
+    school.endDate = years[0] ?? "";
+  }
+}
+
+/** Experience headers are jobs. Education and certification headers stay in those sections. */
+function parseGrounding(text: string) {
+  const jobs: GroundedJob[] = [];
+  const education: GroundedSchool[] = [];
+  const certifications: GroundedCert[] = [];
+  const skills: string[] = [];
+  let section: "header" | "experience" | "education" | "skills" | "certs" | "projects" = "header";
+  let currentJob: GroundedJob | null = null;
+  let currentSchool: GroundedSchool | null = null;
   for (const raw of groundingResumeText(text).split("\n")) {
     const line = raw.trim();
     if (!line) continue;
-    if (/^(experience|education|skills|projects|certifications)$/i.test(line)) continue;
-    if (/^[-•]\s+/.test(line)) {
-      if (current) current.details.push(line.replace(/^[-•]\s+/, ""));
+    const nextSection = sectionName(line);
+    if (nextSection) {
+      section = nextSection;
+      currentJob = null;
+      currentSchool = null;
       continue;
     }
-    const header = line.match(/^(.+?)\s+[—–]\s+(.+)$/);
-    if (header && !/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header[1])) {
-      current = { title: header[1].trim(), company: header[2].trim(), date: "", location: "", details: [] };
-      jobs.push(current);
+    if (/^[-•]\s+/.test(line)) {
+      const bullet = line.replace(/^[-•]\s+/, "");
+      if ((section === "experience" || section === "header") && currentJob) currentJob.details.push(bullet);
+      else if (section === "education" && currentSchool) currentSchool.details.push(bullet);
+      continue;
+    }
+    const header = headerParts(line);
+    if (section === "education") {
+      if (header) {
+        currentSchool = { degree: header.left, name: header.right, startDate: "", endDate: "", details: [] };
+        education.push(currentSchool);
+      } else if (currentSchool) assignYearRange(currentSchool, line);
+      continue;
+    }
+    if (section === "certs") {
+      if (header) {
+        certifications.push({ name: header.left, issuer: header.right, date: "" });
+        continue;
+      }
+      const year = line.match(/\b((?:19|20)\d{2})\b/);
+      const last = certifications[certifications.length - 1];
+      if (year && last && !last.date) last.date = year[1];
+      continue;
+    }
+    if (section === "skills") {
+      skills.push(...line.split(",").map((part) => part.trim()).filter(Boolean));
+      continue;
+    }
+    if (section === "projects") continue;
+    if (header) {
+      currentJob = { title: header.left, company: header.right, date: "", location: "", details: [] };
+      jobs.push(currentJob);
+      if (section === "header") section = "experience";
+      continue;
+    }
+    if (currentJob && !currentJob.date && (/\b(?:19|20)\d{2}\b/.test(line) || /\bpresent\b/i.test(line))) {
+      const [date, location] = line.split("|").map((part) => part.trim());
+      currentJob.date = date;
+      if (location) currentJob.location = location;
     }
   }
-  return jobs;
+  return { jobs, education, certifications, skills };
+}
+
+function jobsFromGroundingText(text: string) {
+  return parseGrounding(text).jobs;
+}
+
+function sameLabel(a: unknown, b: unknown): boolean {
+  return String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+}
+
+function educationFromGrounding(education: GroundedSchool[]) {
+  return education.map((school) => ({
+    name: school.name,
+    degree: school.degree,
+    field: null as string | null,
+    startDate: school.startDate || null,
+    endDate: school.endDate,
+    details: school.details,
+  }));
+}
+
+/**
+ * A model (or the text fallback) sometimes files "GED — School" and
+ * "Cert — Issuer" as extra jobs. Put them back in education and certifications.
+ */
+function restoreSectionsFromText(text: string, resume: Record<string, any>) {
+  const parsed = parseGrounding(text);
+  if (Array.isArray(resume.experience)) {
+    resume.experience = resume.experience.filter((job: Record<string, any>) => {
+      const school = parsed.education.some((item) => sameLabel(item.degree, job?.title) && sameLabel(item.name, job?.company));
+      const cert = parsed.certifications.some((item) => sameLabel(item.name, job?.title) && sameLabel(item.issuer, job?.company));
+      return !school && !cert;
+    });
+  }
+  if (!Array.isArray(resume.education) || resume.education.length === 0) {
+    resume.education = educationFromGrounding(parsed.education);
+  }
+  if (!Array.isArray(resume.certifications) || resume.certifications.length === 0) {
+    resume.certifications = parsed.certifications.map((cert) => ({ name: cert.name, issuer: cert.issuer, date: cert.date }));
+  }
+  const technical = Array.isArray(resume.skills?.technical) ? resume.skills.technical : [];
+  const additional = Array.isArray(resume.skills?.additional) ? resume.skills.additional : [];
+  const listed = Array.isArray(resume.skills) ? resume.skills : [];
+  if (technical.length + additional.length + listed.length === 0 && parsed.skills.length > 0) {
+    resume.skills = { technical: [], additional: parsed.skills };
+  }
+  return resume;
 }
 
 /** A resume built only from lines that look like the pasted resume, after instructions are cut off. */
@@ -322,7 +442,7 @@ export function fallbackResumeFromText(text: string, fallbackEmail?: string) {
   const email = lines.find((line) => /@/.test(line)) ?? fallbackEmail ?? "";
   const nameLine = lines.find((line) => line !== email && !/@/.test(line) && !/^[-•]/.test(line)) ?? "";
   const nameParts = nameLine.split(/\s+/).filter(Boolean);
-  const jobs = jobsFromGroundingText(grounding);
+  const parsed = parseGrounding(grounding);
   const summary = lines.find((line) => line.length > 40 && !line.includes("—") && !line.includes("–") && !/^[-•]/.test(line) && line !== nameLine) ?? "";
   return {
     personalInfo: {
@@ -331,26 +451,27 @@ export function fallbackResumeFromText(text: string, fallbackEmail?: string) {
       email,
       summary,
     },
-    experience: jobs,
-    education: [],
+    experience: parsed.jobs,
+    education: educationFromGrounding(parsed.education),
     projects: [],
-    skills: { technical: [], additional: [] as string[] },
-    certifications: [],
+    skills: { technical: [] as string[], additional: parsed.skills },
+    certifications: parsed.certifications.map((cert) => ({ name: cert.name, issuer: cert.issuer, date: cert.date })),
   };
 }
 
 function rehydrateFromText(text: string, resume: Record<string, any>) {
   const parsed = jobsFromGroundingText(text);
-  const bullets = parsed.flatMap((job) => job.details);
   if (!Array.isArray(resume.experience) || resume.experience.length === 0) {
     if (parsed.length > 0) resume.experience = parsed;
     return resume;
   }
   for (const job of resume.experience) {
-    const filled = Array.isArray(job.details) ? job.details.filter((detail: string) => typeof detail === "string" && detail.trim()) : [];
-    if (filled.length > 0) continue;
     const match = parsed.find((item) => orgsMatch(item.company, job.company));
-    job.details = match?.details?.length ? match.details : bullets;
+    if (!match) continue;
+    const filled = Array.isArray(job.details) ? job.details.filter((detail: string) => typeof detail === "string" && detail.trim()) : [];
+    if (filled.length === 0 && match.details.length > 0) job.details = match.details;
+    if (!String(job.date ?? "").trim() && match.date) job.date = match.date;
+    if (!String(job.location ?? "").trim() && match.location) job.location = match.location;
   }
   return resume;
 }
@@ -504,13 +625,17 @@ function scrubLooseFields(source: unknown, value: unknown, options: CheckOptions
 }
 
 function scrubResume(source: unknown, output: Record<string, any>, options: CheckOptions) {
-  if (checkNoInventedExperience(source, output, options).length === 0) return collapseCopiedJobs(structuredClone(output));
+  let current = structuredClone(output);
+  if (typeof source === "string" && source.trim()) {
+    rehydrateFromText(source, current);
+    restoreSectionsFromText(source, current);
+  }
+  if (checkNoInventedExperience(source, current, options).length === 0) return collapseCopiedJobs(current);
   const sourceRecord = asRecord(source);
   if (sourceRecord && ("experience" in sourceRecord || "personalInfo" in sourceRecord || "education" in sourceRecord)) {
     const overlaid = collapseCopiedJobs(overlayFromSource(sourceRecord, output, options));
     if (checkNoInventedExperience(source, overlaid, options).length === 0) return overlaid;
   }
-  let current = structuredClone(output);
   for (let pass = 0; pass < 48; pass++) {
     const violations = checkNoInventedExperience(source, current, options);
     if (violations.length === 0) break;
@@ -518,7 +643,10 @@ function scrubResume(source: unknown, output: Record<string, any>, options: Chec
     if (JSON.stringify(next) === JSON.stringify(current)) break;
     current = next;
   }
-  if (typeof source === "string" && source.trim()) rehydrateFromText(source, current);
+  if (typeof source === "string" && source.trim()) {
+    rehydrateFromText(source, current);
+    restoreSectionsFromText(source, current);
+  }
   if (checkNoInventedExperience(source, current, options).length === 0) return current;
   if (sourceRecord && ("experience" in sourceRecord || "personalInfo" in sourceRecord)) {
     const fallback = structuredClone(sourceRecord);
