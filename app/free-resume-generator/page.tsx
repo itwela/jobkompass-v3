@@ -829,7 +829,7 @@ export default function FreeResumeGeneratorPage() {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const prompt = getCopyPromptForTemplate('resume');
+                                        const prompt = getCopyPromptForTemplate('resume', undefined, undefined, resumeText);
                                         navigator.clipboard.writeText(prompt).then(() => {
                                           toast.success('Prompt copied to clipboard', {
                                             description: 'An external model is not checked by JobKompass. Review the result before you paste it back.',

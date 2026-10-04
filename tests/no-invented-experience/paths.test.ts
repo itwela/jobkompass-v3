@@ -395,6 +395,18 @@ describe("copy-to-external-AI prompts", () => {
     expect(prompt).toMatch(/paste/i);
   });
 
+  it("places a pasted resume inside the RESUME block", () => {
+    const resume = "Line Cook — Cedar Spoon\nAug 2022 - May 2024";
+    const prompt = getCopyPromptForTemplate("resume", "Prep Cook", "Hearth & Rye", resume);
+    const resumeAt = prompt.indexOf("=== RESUME");
+    const postingAt = prompt.indexOf("=== JOB POSTING");
+    const factAt = prompt.indexOf("Cedar Spoon");
+    expect(resumeAt).toBeGreaterThan(-1);
+    expect(factAt).toBeGreaterThan(resumeAt);
+    expect(factAt).toBeLessThan(postingAt);
+    expect(prompt).toMatch(/cannot guard an external model/i);
+  });
+
   it("tells the external chat to use a pasted resume and not invent facts", () => {
     const prompt = getCopyPromptForTemplate("resume", "Senior Backend Engineer", "Northwind Payments");
     expect(prompt).not.toContain("Based on everything you know about me");

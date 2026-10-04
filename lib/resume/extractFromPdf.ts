@@ -156,7 +156,8 @@ function textLayerFromPdf(resumePdf: string): string {
   while ((match = re.exec(decoded))) {
     parts.push(match[1].replace(/\\([()\\])/g, "$1"));
   }
-  const text = relineResumeBlob(parts.join("\n"));
+  const joined = parts.length > 0 ? parts.join("\n") : decoded.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ");
+  const text = relineResumeBlob(joined);
   return looksLikeResumeText(text) ? text : "";
 }
 
