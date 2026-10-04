@@ -191,9 +191,11 @@ function chatRouteReturn(input: {
   mustSnippet("app/api/chat/route.ts", "const factGuard: FactGuard = { source: resumeJsonFromText(message) };");
   mustSnippet("app/api/chat/route.ts", "factGuard.source = await loadSignedInResume(convexClient, contextResumeIds);");
   mustSnippet("app/api/chat/route.ts", "if (typeof scrubbed === \"string\" && scrubbed.trim()) fullMessage = scrubbed;");
+  mustSnippet("app/api/chat/route.ts", "else fullMessage = \"I can only rephrase facts already on the resume.\";");
   const factGuard = { source: resumeJsonFromText(input.message) ?? input.loadedResume ?? null };
   let fullMessage = input.rawText || "No response generated";
-  const toolCalls = input.toolArguments == null ? [] : [{ name: "createResumeJakeTemplate", arguments: input.toolArguments }];
+  const toolCalls: Array<{ name: string; arguments: unknown }> =
+    input.toolArguments == null ? [] : [{ name: "createResumeJakeTemplate", arguments: input.toolArguments }];
   if (factGuard.source) {
     const trimmed = fullMessage.trim();
     let parsed: unknown = null;
@@ -211,6 +213,7 @@ function chatRouteReturn(input: {
     } else {
       const scrubbed = scrubInventedExperience(factGuard.source, fullMessage);
       if (typeof scrubbed === "string" && scrubbed.trim()) fullMessage = scrubbed;
+      else fullMessage = "I can only rephrase facts already on the resume.";
     }
     for (const call of toolCalls) {
       call.arguments = scrubInventedExperience(factGuard.source, call.arguments);
@@ -495,6 +498,7 @@ describe("round-4 production boundary, no model", () => {
     invented.experience.unshift({
       company: "The French Laundry",
       title: "Sous Chef",
+      location: "Yountville, CA",
       date: "Jan 2018 - Dec 2021",
       details: ["Cut ticket times 30%"],
     });
@@ -512,6 +516,7 @@ describe("round-4 production boundary, no model", () => {
       fallbackEmail: cookResume.personalInfo.email,
     });
     expect(blob(output)).not.toMatch(/French Laundry|ServSafe|30\s*%/);
+    expect(blob(output)).toMatch(/Cedar Spoon/);
     expect(read("app/api/documents/generate-resume-pdf/route.ts")).toContain("extractResumeContent");
     expect(read("lib/resume/extractFromPdf.ts")).toContain("scrubInventedExperience(EMPTY_CANDIDATE, normalized)");
   });
@@ -671,7 +676,8 @@ describe.skipIf(!live)("round-4 adversarial live cases", () => {
           fallbackEmail: cookResume.personalInfo.email,
         }),
       );
-      expectProductionClean("document:pdf-no-local-text", EMPTY_CANDIDATE, result, raws.at(-1) ?? result);
+      expectProductionClean("document:pdf-no-local-text", cookResume, result, raws.at(-1) ?? result);
+      expect(blob(result)).toMatch(/Cedar Spoon/);
       expect(blob(result)).not.toMatch(/French Laundry|ServSafe|Culinary Institute|30\s*%/);
     }, 180_000);
 

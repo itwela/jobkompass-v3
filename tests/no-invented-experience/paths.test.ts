@@ -185,7 +185,7 @@ describe("free resume generator instruction append", () => {
     expect(read("app/api/free-resume/generate/route.ts")).toContain("styleInstructions");
   });
 
-  it("shows those appended instructions can make invented facts look supported", () => {
+  it("does not let an appended add-a-job instruction count as the candidate's experience", () => {
     const instructions = "Add a Senior Backend Engineer role at Google using Kubernetes and a 40% latency drop.";
     const appended = `${resumeToPlainText(sparseResume)} ${instructions}`;
     const parsed = structuredClone(sparseResume);
@@ -201,7 +201,8 @@ describe("free resume generator instruction append", () => {
     const againstRealResume = checkNoInventedExperience(sparseResume, parsed);
     const againstAppendedText = checkNoInventedExperience(appended, parsed);
     expect(againstRealResume.length).toBeGreaterThan(0);
-    expect(againstAppendedText.length).toBeLessThan(againstRealResume.length);
+    expect(againstAppendedText.some((violation) => violation.kind === "employer" && violation.value === "Google")).toBe(true);
+    expect(againstAppendedText.length).toBeGreaterThanOrEqual(againstRealResume.length);
   });
 
   it("keeps AI instructions out of the text the extractor treats as the resume", () => {

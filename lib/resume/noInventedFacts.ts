@@ -726,14 +726,30 @@ function letterKeepingFacts(source: unknown, options: CheckOptions, letter: Reco
   return base;
 }
 
-function mentionsSourceJob(source: unknown, letter: Record<string, any>): boolean {
+function companyNamed(source: unknown, letter: Record<string, any>): boolean {
   const resume = asRecord(source);
   const job = Array.isArray(resume?.experience) ? resume.experience[0] : null;
   if (!job?.company) return true;
   const text = JSON.stringify(letter.letterContent ?? {}).toLowerCase();
-  if (text.includes(String(job.company).toLowerCase())) return true;
-  if (job.title && text.includes(String(job.title).toLowerCase())) return true;
-  return false;
+  return text.includes(String(job.company).toLowerCase());
+}
+
+/** A clean letter that names the role but not the employer still has to name the employer. */
+function withEmployerNamed(source: unknown, options: CheckOptions, letter: Record<string, any>) {
+  if (companyNamed(source, letter)) return letter;
+  const resume = asRecord(source);
+  const job = Array.isArray(resume?.experience) ? resume.experience[0] : null;
+  if (!job?.company || !job?.title) return letterKeepingFacts(source, options, letter);
+  const next = structuredClone(letter);
+  const content = next.letterContent ?? {};
+  const body = Array.isArray(content.bodyParagraphs) ? [...content.bodyParagraphs] : [];
+  body.push(`I worked as a ${job.title} at ${job.company}.`);
+  next.letterContent = {
+    ...content,
+    bodyParagraphs: body.filter((paragraph: unknown) => typeof paragraph === "string" && paragraph.trim()),
+  };
+  if (checkNoInventedExperience(source, next, options).length === 0) return next;
+  return letterKeepingFacts(source, options, letter);
 }
 
 function unwrapRecord(record: Record<string, any>): { key: string | null; inner: Record<string, any> } {
@@ -763,7 +779,13 @@ export function scrubInventedExperience<T>(source: unknown, output: T, options: 
     logScrub("scrub", source, output, cleaned, options);
     return cleaned;
   };
-  if (typeof output === "string") return finish(scrubProse(source, output, options) as T);
+  if (typeof output === "string") {
+    const parsed = parseModelPayload(output);
+    if (parsed !== output && parsed && typeof parsed === "object") {
+      return scrubInventedExperience(source, parsed as T, options);
+    }
+    return finish(scrubProse(source, output, options) as T);
+  }
   const record = asRecord(structuredClone(output));
   if (!record) return output;
   const unwrapped = unwrapRecord(record);
@@ -774,11 +796,7 @@ export function scrubInventedExperience<T>(source: unknown, output: T, options: 
   if (!record.letterContent && record["LETTER CONTENT"]) record.letterContent = record["LETTER CONTENT"];
   if (!record.experience && (record.work || record.EXPERIENCE)) record.experience = record.work ?? record.EXPERIENCE;
   if ("letterContent" in record) {
-    const letter = scrubLetter(source, record, options);
-    if (!mentionsSourceJob(source, letter)) {
-      const withFacts = letterKeepingFacts(source, options, letter);
-      if (checkNoInventedExperience(source, withFacts, options).length === 0) return finish(withFacts as T);
-    }
+    const letter = withEmployerNamed(source, options, scrubLetter(source, record, options));
     return finish(letter as T);
   }
   if ("personalInfo" in record || "experience" in record || "education" in record || "skills" in record || "work" in record) {

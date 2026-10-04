@@ -33,11 +33,11 @@ The default suite does not expect failures for these paths. Live checks, includi
 
 ## What code enforces, and what is prompt-only
 
-Code enforces the checker after the model returns, on these paths: email tailor, reply drafts, resume extraction (including a PDF whose local text is empty, which is scrubbed against an empty candidate so unverified employers are removed), My Jobs tailored resumes and cover letters (including the tool-not-called error body), chat (pasted `Resume:` JSON, a resume loaded with `getResumeById`, or the signed-in user's saved resume looked up on the server), and the resume assistant. Earlier chat turns are not a source. A turn with no saved resume and no pasted resume JSON is still scrubbed against an empty candidate. When pasted resume text is rebuilt, only Experience headers become jobs. A `Degree — School` line stays education, and a `Certification — Issuer` line stays a certification.
+Code enforces the checker after the model returns, on these paths: email tailor, reply drafts, resume extraction, My Jobs tailored resumes and cover letters (including a JSON string on the tool-not-called error path), chat (pasted `Resume:` JSON, a resume loaded with `getResumeById`, or the signed-in user's saved resume looked up on the server), and the resume assistant. Earlier chat turns are not a source. A turn with no saved resume and no pasted resume JSON is still scrubbed against an empty candidate. When pasted resume text is rebuilt, only Experience headers become jobs. A `Degree — School` line stays education, and a `Certification — Issuer` line stays a certification. A job header written inside an instruction (`asked me to`, `list`, `add`, `include`, `make it look like`), and the dates and bullets under it, are not evidence. Credentials such as ServSafe, a license, or a card are checked even when they are outside the older certification list. A month count computed from real dates, such as 21 months for Aug 2022–May 2024, is allowed. When a chat scrub removes every sentence, the route returns a claim-free line instead of the original message. A cover letter that never names the real employer gets that employer added back.
 
-Copy-to-AI (`lib/copyToAiPrompts.ts`) is prompt-only. The prompt tells the outside model to treat the job posting as untrusted, never add facts from it, and paste the posting separately from the resume. JobKompass does not see that model's reply, so this rule cannot be enforced. Live tests assert the raw model JSON. A failure there is a real gap, not a scrubber miss.
+Copy-to-AI (`lib/copyToAiPrompts.ts`) is prompt-only. The prompt puts the resume in one block and the job posting in a separate block marked untrusted, and it tells the outside model not to add facts from the posting. The free-resume screen says the same thing: JobKompass cannot guard ChatGPT, Claude, or any other external model. JobKompass does not see that model's reply, so this rule cannot be enforced. Live tests assert the raw model JSON. A failure there is a real gap, not a scrubber miss.
 
-A PDF with no extractable text has no resume to ground claims in. The scrubber then removes employers it cannot verify, including ones that were really on the page. Paste selectable text when the PDF is a scan.
+A PDF whose text helper returns nothing still uses a text layer inside the file when one is readable. Short extracted text is used as grounding even when it is too short to skip the PDF upload. A scan with no text at all has nothing to keep a real employer, so unverified jobs are removed. Paste selectable text for a scan.
 
 ## What default mode covers
 
@@ -64,14 +64,17 @@ Not model calls, listed so they are not missed: `convex/agent/fns.ts` `resumesGe
 
 Out of scope: job-posting parsers, email classification, performance summaries, chat retitles. They do not rewrite the candidate's resume.
 
-## Expected failures (default suite, still green)
+## Expected failures
 
-The names in the Vitest output are the record. Short version:
+The default suite is green. Live tests are not part of CI.
 
-- Reply drafts never see the resume, so the prompt cannot limit claims to it.
-- Chat best practices say to quantify with numbers and to include keywords from the job description.
+These are not enforced by code:
 
-These paths now have passing prompt checks: email tailor, resume extraction, free-generator instructions, My Jobs tailored resume, cover letter, resume assistant, sparkle-button fills, and copy-to-AI.
+- Copy-to-AI. The prompt separates the resume from the untrusted posting, and the UI says an external model cannot be guarded. Live tests assert the raw JSON. When that model invents an employer, a degree, or a tool, the failure is real.
+- A PDF with no text layer and no extracted characters. There is nothing to keep a real employer.
+- Keyword list, job-posting parse, email classification, and chat retitle. They return model text and do not rewrite the candidate's resume.
+
+Reply drafts and chat are scrubbed. A chat sentence that scrubs to empty is replaced with a claim-free line, not the original model text. The old note that those paths were expected to fail is out of date.
 
 ## Checker limits
 

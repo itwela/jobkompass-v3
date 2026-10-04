@@ -49,6 +49,8 @@ type Allow = {
   certs: string[];
   projectNames: string[];
   numbers: NumTok[];
+  /** Month counts computed from real start/end dates, such as Aug 2022–May 2024 → 21. */
+  durations: number[];
   experienceDates: DateFacts;
   educationDates: DateFacts;
   allDates: DateFacts;
@@ -244,33 +246,68 @@ const POSTING_HEADER = /^(job i am applying|job posting|job description)\b/i;
 const EMBEDDED_INVENTION =
   /\b(already true|already confirmed|hiring manager|treat the following|the candidate also|the applicant has|ignore previous|as already|you previously)\b/i;
 
+/** A sentence that tells the model to invent a job, even when it is not a prefix. */
+const INSTRUCTION_SENTENCE =
+  /\b(asked me to|make it look like|also add|add that)\b|\b(?:please\s+)?(?:add|include|list)\b/i;
+
+function isInstructionEvidenceLine(line: string): boolean {
+  const trimmed = line.trim();
+  return INSTRUCTION_LINE.test(trimmed) || EMBEDDED_INVENTION.test(line) || INSTRUCTION_SENTENCE.test(trimmed);
+}
+
+/** "asked me to list Sous Chef — The French Laundry" introduces a fake job, not a header. */
+function startsInventedJobBlock(line: string): boolean {
+  return /\b(asked me to|make it look like)\b/i.test(line) || (/[—–-]/.test(line) && INSTRUCTION_SENTENCE.test(line));
+}
+
 /**
  * Lines that are resume evidence. Instruction lines are skipped.
  * A job-posting header ends the resume. A new employer header after Skills
  * or Certifications is a pasted posting, not another job. Prose that tells
- * the model a fact is already true is not evidence.
+ * the model a fact is already true is not evidence. A job header written
+ * inside an instruction, and the dates and bullets under it, are not evidence.
  */
 export function resumeEvidenceLines(text: string): string[] {
   const kept: string[] = [];
   let section = "header";
+  let skippingFakeJob = false;
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) {
-      kept.push(line);
+      if (!skippingFakeJob) kept.push(line);
       continue;
     }
     if (POSTING_HEADER.test(trimmed)) break;
-    if (INSTRUCTION_LINE.test(trimmed) || EMBEDDED_INVENTION.test(line)) continue;
-    if (/^(experience|work experience)$/i.test(trimmed)) section = "experience";
-    else if (/^education$/i.test(trimmed)) section = "education";
-    else if (/^skills$/i.test(trimmed)) section = "skills";
-    else if (/^certifications?$/i.test(trimmed)) section = "certs";
-    else if (/^projects$/i.test(trimmed)) section = "projects";
-    else {
-      const header = trimmed.match(/^(.+?)\s+[—–]\s+(.+)$/);
-      const dateLike = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
-      if (header && !dateLike && section === "skills") break;
+    const sectionName = /^(experience|work experience)$/i.test(trimmed)
+      ? "experience"
+      : /^education$/i.test(trimmed)
+        ? "education"
+        : /^skills$/i.test(trimmed)
+          ? "skills"
+          : /^certifications?$/i.test(trimmed)
+            ? "certs"
+            : /^projects$/i.test(trimmed)
+              ? "projects"
+              : null;
+    if (sectionName) {
+      skippingFakeJob = false;
+      section = sectionName;
+      kept.push(line);
+      continue;
     }
+    if (isInstructionEvidenceLine(line)) {
+      if (startsInventedJobBlock(line)) skippingFakeJob = true;
+      continue;
+    }
+    if (skippingFakeJob) {
+      const header = trimmed.match(/^(.+?)\s+[—–-]\s+(.+)$/);
+      const dateLike = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
+      if (header && !dateLike) skippingFakeJob = false;
+      else continue;
+    }
+    const header = trimmed.match(/^(.+?)\s+[—–]\s+(.+)$/);
+    const dateLike = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
+    if (header && !dateLike && section === "skills") break;
     kept.push(line);
   }
   return kept;
@@ -278,6 +315,10 @@ export function resumeEvidenceLines(text: string): string[] {
 
 const CERT_RE =
   /\b((?:aws|google|microsoft|cisco|oracle)\s+certified[\w\s-]{0,40}|certified\s+(?:solutions architect|developer|administrator|kubernetes|scrum master|public accountant)|pmp\b|cissp\b|ckad\b|cka\b|cks\b|cdl\b|comptia\s+[\w+]+|six sigma(?:\s+(?:green|black|yellow)\s+belt)?|(?:green|black) belt)/gi;
+
+/** Credentials the named-cert list does not cover, including ServSafe and "food handler card". */
+const CREDENTIAL_PHRASE =
+  /\b((?:[A-Za-z][\w'+.&/-]*\s+){0,5}(?:certifications?|certificates?|certified|credentials?|licen[cs]e[ds]?|card)|servsafe(?:\s+[A-Za-z][\w'+-]*){0,3}|\bcpr\b|\bosha\b|\bcdl\b|\bpmp\b)/gi;
 
 /** New claims that are not a reword of the source, even with no number attached. */
 const UNGROUNDED_CLAIM =
@@ -559,6 +600,12 @@ function checkFreeText(text: string, allow: Allow, where: string, accomplishment
   for (const cert of certHits(text)) {
     if (!certOk(cert, allow)) out.push({ kind: "certification", value: cert, where });
   }
+  for (const cred of credentialHits(text)) {
+    if (credentialUnsupported(cred, allow)) out.push({ kind: "certification", value: cred, where });
+  }
+  for (const claim of earnedClaimHits(text)) {
+    if (credentialUnsupported(claim, allow)) out.push({ kind: "certification", value: claim, where });
+  }
   for (const school of schoolHits(text)) {
     if (!schoolOk(school, allow)) out.push({ kind: "school", value: school, where });
   }
@@ -620,6 +667,12 @@ function checkProse(
     }
     for (const cert of certHits(sentence)) {
       if (!certOk(cert, allow)) out.push({ kind: "certification", value: cert, where: loc });
+    }
+    for (const cred of credentialHits(sentence)) {
+      if (credentialUnsupported(cred, allow)) out.push({ kind: "certification", value: cred, where: loc });
+    }
+    for (const claim of earnedClaimHits(sentence)) {
+      if (credentialUnsupported(claim, allow)) out.push({ kind: "certification", value: claim, where: loc });
     }
     for (const school of schoolHits(sentence)) {
       if (!schoolOk(school, allow)) out.push({ kind: "school", value: school, where: loc });
@@ -837,6 +890,7 @@ function buildAllow(input: unknown): Allow {
     certs,
     projectNames,
     numbers: extractNumbers(corpus),
+    durations: durationMonths(experienceDateText),
     experienceDates: dateFacts(experienceDateText),
     educationDates: dateFacts(educationDateText),
     allDates: dateFacts(allDateText),
@@ -969,10 +1023,59 @@ function unsupportedDatesInText(text: string, allow: Allow, where: string): Viol
   return out;
 }
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+};
+
+/** "Aug 2022 - May 2024" is 21 months. That count is the same fact as the dates. */
+function durationMonths(text: string): number[] {
+  const out: number[] = [];
+  const re =
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+((?:19|20)\d{2})\s*(?:-|–|—|to|through|until)\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+((?:19|20)\d{2})\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    const start = MONTH_INDEX[match[1].toLowerCase()];
+    const end = MONTH_INDEX[match[3].toLowerCase()];
+    if (start == null || end == null) continue;
+    const months = (Number(match[4]) - Number(match[2])) * 12 + (end - start);
+    if (months > 0 && months <= 600) out.push(months);
+  }
+  return out;
+}
+
+function isDerivedDuration(num: NumTok, text: string, allow: Allow): boolean {
+  if (num.percent || num.money || !Number.isInteger(num.value)) return false;
+  if (!allow.durations.some((months) => months === num.value)) return false;
+  return new RegExp(`\\b${num.value}\\s+months?\\b|\\b${num.value}\\s+years?\\b`, "i").test(text);
+}
+
 function unsupportedMetrics(text: string, allow: Allow, where: string): Violation[] {
   const out: Violation[] = [];
   for (const num of extractNumbers(text)) {
-    if (isAllowedYear(num)) continue;
+    if (isAllowedYear(num) || isDerivedDuration(num, text, allow)) continue;
     const ok = allow.numbers.some(
       (existing) =>
         existing.percent === num.percent &&
@@ -1071,6 +1174,28 @@ function degreeHits(text: string): string[] {
 
 function certHits(text: string): string[] {
   return text.match(CERT_RE) ?? [];
+}
+
+function credentialHits(text: string): string[] {
+  return text.match(CREDENTIAL_PHRASE) ?? [];
+}
+
+/** "earned a ServSafe Manager credential" names a proper noun the resume does not have. */
+function earnedClaimHits(text: string): string[] {
+  const hits: string[] = [];
+  const re =
+    /\b(?:earned|earns|holds|hold|obtained|obtains|received)\s+(?:a|an|the|my|our)?\s*([A-Z][A-Za-z0-9'+-]*(?:\s+[A-Z][A-Za-z0-9'+-]*){0,4})/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) hits.push(match[1].trim());
+  return hits;
+}
+
+function credentialUnsupported(phrase: string, allow: Allow): boolean {
+  if (certOk(phrase, allow)) return false;
+  if (phraseIn(phrase, allow.certs.join(" "))) return false;
+  if (employerSupported(phrase, allow) || schoolOk(phrase, allow)) return false;
+  if (phraseIn(phrase, allow.corpus)) return false;
+  return true;
 }
 
 function schoolHits(text: string): string[] {

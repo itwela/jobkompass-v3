@@ -305,6 +305,7 @@ export async function POST(request: NextRequest) {
       } else {
         const scrubbed = scrubInventedExperience(factGuard.source, fullMessage);
         if (typeof scrubbed === "string" && scrubbed.trim()) fullMessage = scrubbed;
+        else fullMessage = "I can only rephrase facts already on the resume.";
       }
       for (const call of toolCalls) {
         if (call.name === "createResumeJakeTemplate" || call.name === "createCoverLetterJakeTemplate") {
