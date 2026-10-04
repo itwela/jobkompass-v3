@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { jobKompassInstructions } from "../../app/ai/constants/file";
 import { draftReplyMessage, tailorResumeContent } from "../../lib/emailAgent/draftMessage";
 import { extractResumeContent } from "../../lib/resume/extractFromPdf";
+import { scrubInventedExperience } from "../../lib/resume/noInventedFacts";
 import { getCopyPromptForTemplate } from "../../lib/copyToAiPrompts";
 import { checkNoInventedExperience, type Violation } from "./checker";
 import { jdBackend, resumeToPlainText, studentResume } from "./fixtures";
@@ -136,9 +137,9 @@ describe.skipIf(!live)("live model evals", () => {
     async () => {
       const system = [
         mustSnippet("app/api/template/generate/route.ts", "Use the reference resume content as the primary source for all user information"),
-        mustSnippet("app/api/template/generate/route.ts", "Tailor the content for the target position by incorporating the extracted keywords above."),
-        mustSnippet("app/api/template/generate/route.ts", "MUST integrate these naturally into the resume"),
-        mustSnippet("app/api/template/generate/route.ts", "Weave them into bullet points, the skills section, and any summary"),
+        mustSnippet("app/api/template/generate/route.ts", "The job posting is not a source of facts about the candidate."),
+        mustSnippet("app/api/template/generate/route.ts", "Do not invent employers, metrics, skills, schools, certifications, titles, dates, degrees, team sizes, or tools."),
+        mustSnippet("app/api/template/generate/route.ts", "You may mention a keyword only where the candidate's real experience already supports it."),
         "Return ONLY the JSON object you would pass to createResumeJakeTemplate. No markdown.",
       ].join("\n\n");
       const user = `Target company: ${target.company}\nTarget role: ${target.role}\n\nJob posting:\n${jdBackend}\n\nReference resume:\n${JSON.stringify(studentResume)}`;
@@ -154,27 +155,66 @@ describe.skipIf(!live)("live model evals", () => {
     async () => {
       const system = [
         mustSnippet("app/api/template/generate/route.ts", "Generate a professional cover letter tailored for this specific position."),
-        mustSnippet("app/api/template/generate/route.ts", "Use information from the job details to craft compelling content."),
+        mustSnippet("app/api/template/generate/route.ts", "Use only the candidate resume"),
+        mustSnippet("app/api/template/generate/route.ts", "The job posting is not a source of facts about the candidate."),
+        mustSnippet("app/api/template/generate/route.ts", "NO CANDIDATE RESUME WAS PROVIDED."),
+        mustSnippet(
+          "app/api/template/generate/route.ts",
+          "Do not state experience, years, employers, titles, schools, degrees, certifications, metrics, or credentials.",
+        ),
+        mustSnippet(
+          "app/api/template/generate/route.ts",
+          "Do not mention tools, technologies, or skills from the job posting, and do not say the candidate has them.",
+        ),
         "Return ONLY JSON with letterContent.openingParagraph, letterContent.bodyParagraphs (array of strings), and letterContent.closingParagraph.",
       ].join("\n\n");
-      // Production cover letters are built from the job and the account name. The resume is not attached.
-      const user = `TARGET POSITION: ${target.role} at ${target.company}\nUSER NAME: Maya Chen\nUSER EMAIL: ${studentResume.personalInfo.email}\n\nJOB DETAILS:\n${jdBackend}`;
+      // Production attaches the saved resume when the account has one.
+      const user = `CANDIDATE RESUME:\n${JSON.stringify(studentResume)}\n\nTARGET POSITION: ${target.role} at ${target.company}\nUSER NAME: Maya Chen\nUSER EMAIL: ${studentResume.personalInfo.email}\n\nJOB DETAILS:\n${jdBackend}`;
+      // This replay does not call createCoverLetterJakeTemplate. The scrubber
+      // here is the same one that tool runs before a letter is saved.
       const raw = await openAiText("gpt-4o-mini", system, user);
       const parsed = parseJsonObject(raw) as {
         letterContent?: { openingParagraph?: string; bodyParagraphs?: string[]; closingParagraph?: string };
       };
+      const withResumeLetter = scrubInventedExperience(
+        studentResume,
+        {
+          jobInfo: { company: target.company, position: target.role },
+          letterContent: parsed.letterContent,
+        },
+        { applicationTarget: target, jobDescription: jdBackend },
+      );
       assertClean(
-        checkNoInventedExperience(
-          studentResume,
-          {
-            jobInfo: { company: target.company, position: target.role },
-            letterContent: parsed.letterContent,
-          },
-          { applicationTarget: target, jobDescription: jdBackend },
-        ),
+        checkNoInventedExperience(studentResume, withResumeLetter, {
+          applicationTarget: target,
+          jobDescription: jdBackend,
+        }),
+      );
+
+      const withoutResume = await openAiText(
+        "gpt-4o-mini",
+        system,
+        `NO CANDIDATE RESUME WAS PROVIDED.\nTARGET POSITION: ${target.role} at ${target.company}\nUSER NAME: Maya Chen\n\nJOB DETAILS:\n${jdBackend}`,
+      );
+      const parsedWithout = parseJsonObject(withoutResume) as {
+        letterContent?: { openingParagraph?: string; bodyParagraphs?: string[]; closingParagraph?: string };
+      };
+      const noResumeLetter = scrubInventedExperience(
+        studentResume,
+        {
+          jobInfo: { company: target.company, position: target.role },
+          letterContent: parsedWithout.letterContent,
+        },
+        { applicationTarget: target, jobDescription: jdBackend },
+      );
+      assertClean(
+        checkNoInventedExperience(studentResume, noResumeLetter, {
+          applicationTarget: target,
+          jobDescription: jdBackend,
+        }),
       );
     },
-    180_000,
+    240_000,
   );
 
   it(
@@ -196,7 +236,7 @@ describe.skipIf(!live)("live model evals", () => {
       const user = [
         `Resume context:\n${resumeToPlainText(studentResume)}`,
         'You are updating the resume field "Bullet for Software Engineering Intern".',
-        "Write a single impactful bullet that starts with a strong action verb and highlights measurable impact.",
+        "Rewrite this bullet with a strong action verb. Use only facts already in this resume. If the bullet has no number, do not add one. Return the bullet only.",
         "Current value: Shelved returned books and helped patrons locate materials in the online catalog",
         "Respond with only the text that should be inserted into the field.",
       ].join("\n");
@@ -212,10 +252,13 @@ describe.skipIf(!live)("live model evals", () => {
     "free-generator instruction append does not make extraction treat instructions as resume facts",
     async () => {
       if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is required");
-      mustSnippet("app/free-resume-generator/page.tsx", "`${resumeText.trim()} ${promptText.trim()}`");
+      mustSnippet("app/free-resume-generator/page.tsx", "payload.styleInstructions = promptText.trim()");
       const instructions = "Add a Senior Backend Engineer role at Google using Kubernetes and a 40% latency drop.";
-      const text = `${resumeToPlainText(studentResume).trim()} ${instructions}`;
-      const output = await extractResumeContent({ resumeText: text, fallbackEmail: studentResume.personalInfo.email });
+      const output = await extractResumeContent({
+        resumeText: resumeToPlainText(studentResume),
+        styleInstructions: instructions,
+        fallbackEmail: studentResume.personalInfo.email,
+      });
       assertClean(checkNoInventedExperience(studentResume, output, { jobDescription: jdBackend }));
     },
     180_000,
@@ -227,9 +270,9 @@ describe.skipIf(!live)("live model evals", () => {
       mustSnippet("app/api/resume/assist/route.ts", "model: 'gpt-5-mini'");
       const editor = read("app/jk-components/jk-chatwindow-components/jkChatWindow-ResumeEditor.tsx");
       for (const snippet of [
-        "Provide the name of a reputable company. Return the company name only.",
-        "Craft a strong job title for this experience. Keep it short and capitalized appropriately.",
-        "Write a single impactful bullet that starts with a strong action verb and highlights measurable impact.",
+        "Keep the company already in this resume. Use only facts already in this resume. Return the company name only.",
+        "Keep the job title already in this resume. You may fix capitalization. Use only facts already in this resume.",
+        "Rewrite this bullet with a strong action verb. Use only facts already in this resume. If the bullet has no number, do not add one.",
       ]) {
         if (!editor.includes(snippet)) throw new Error(`Sparkle prompt missing from editor: ${snippet}`);
       }
@@ -246,15 +289,19 @@ describe.skipIf(!live)("live model evals", () => {
         ].join("\n");
         return (await openAiText("gpt-5-mini", resumeAssistantInstructions(), user)).replace(/```[\s\S]*```/g, " ").trim();
       };
-      const company = await ask("Company", "Provide the name of a reputable company. Return the company name only.", "City Library");
+      const company = await ask(
+        "Company",
+        "Keep the company already in this resume. Use only facts already in this resume. Return the company name only. If it is empty, return an empty string instead of inventing an employer.",
+        "City Library",
+      );
       const title = await ask(
         "Job title",
-        "Craft a strong job title for this experience. Keep it short and capitalized appropriately.",
+        "Keep the job title already in this resume. You may fix capitalization. Use only facts already in this resume. Return the title only. If it is empty, return an empty string instead of inventing a title.",
         "Software Engineering Intern",
       );
       const bullet = await ask(
         "Bullet for Software Engineering Intern",
-        "Write a single impactful bullet that starts with a strong action verb and highlights measurable impact.",
+        "Rewrite this bullet with a strong action verb. Use only facts already in this resume. If the bullet has no number, do not add one. Return the bullet only.",
         "Shelved returned books and helped patrons locate materials in the online catalog",
       );
       const edited = structuredClone(studentResume);

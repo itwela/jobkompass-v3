@@ -196,6 +196,10 @@ const LEXICON = [
   "c#",
   ".net",
   "spring",
+  "sql",
+  "tableau",
+  "sap",
+  "excel",
 ];
 
 const WORD_NUMBERS: Record<string, number> = {
@@ -233,10 +237,104 @@ const DEGREE_WORD =
   /\b(ph\.?d\.?|doctorate|mba|m\.?\s?s\.?|m\.?\s?sc|master(?:'s)?|b\.?\s?s\.?|b\.?\s?sc|b\.?\s?a\.?|bachelor(?:'s)?|associate(?:'s)?)\b/i;
 
 const CERT_RE =
-  /\b((?:aws|google|microsoft|cisco|oracle)\s+certified[\w\s-]{0,40}|certified\s+(?:solutions architect|developer|administrator|scrum master|public accountant)|pmp\b|cissp\b|comptia\s+[\w+]+)/gi;
+  /\b((?:aws|google|microsoft|cisco|oracle)\s+certified[\w\s-]{0,40}|certified\s+(?:solutions architect|developer|administrator|kubernetes|scrum master|public accountant)|pmp\b|cissp\b|ckad\b|cka\b|cks\b|comptia\s+[\w+]+|six sigma(?:\s+(?:green|black|yellow)\s+belt)?|(?:green|black) belt)/gi;
+
+/** New claims that are not a reword of the source, even with no number attached. */
+const UNGROUNDED_CLAIM =
+  /\b(cross-functional|led a team|managed (?:a |the )?team|team of|on-?call leadership)\b/i;
 
 const SCHOOL_RE =
   /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\s+(?:University|College)|University of\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\b/g;
+
+const STRUCTURED_KEYS = new Set([
+  "personalInfo",
+  "experience",
+  "education",
+  "projects",
+  "skills",
+  "certifications",
+  "internships",
+  "earlyCareer",
+  "coreCompetencies",
+  "jobInfo",
+  "letterContent",
+  "targetCompany",
+  "templateId",
+]);
+
+function aliasKey(key: string): string {
+  const normalized = key.toLowerCase().replace(/[^a-z]/g, "");
+  if (["experience", "work", "jobs", "employment", "workexperience"].includes(normalized)) return "experience";
+  if (["lettercontent", "letter", "coverletter"].includes(normalized)) return "letterContent";
+  if (["education", "schools"].includes(normalized)) return "education";
+  if (["certifications", "certs", "certificates"].includes(normalized)) return "certifications";
+  if (["skills", "skill"].includes(normalized)) return "skills";
+  if (["projects", "project"].includes(normalized)) return "projects";
+  if (["additionalinfo", "additional"].includes(normalized)) return "additionalInfo";
+  if (["resume", "content", "arguments", "candidateresume", "createresumejaketemplate", "createcoverletterjaketemplate"].includes(normalized)) {
+    return "wrapper";
+  }
+  return key;
+}
+
+/** Pull nested resume/letter shapes up so EXPERIENCE, work, and tool wrappers are checked. */
+function prepareOutput(output: unknown): unknown {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return output;
+  const record = { ...(output as Record<string, unknown>) };
+  for (const [key, value] of Object.entries(record)) {
+    if (aliasKey(key) !== "wrapper" || !value || typeof value !== "object" || Array.isArray(value)) continue;
+    const inner = value as Record<string, unknown>;
+    if ("experience" in inner || "personalInfo" in inner || "letterContent" in inner || "EXPERIENCE" in inner || "work" in inner) {
+      return prepareOutput(value);
+    }
+  }
+  for (const [key, value] of Object.entries({ ...record })) {
+    const alias = aliasKey(key);
+    if (alias !== key && alias !== "wrapper" && record[alias] == null) record[alias] = value;
+  }
+  return record;
+}
+
+function walkLoose(value: unknown, allow: Allow, target: CheckOptions["applicationTarget"], where: string, out: Violation[]) {
+  if (typeof value === "string") {
+    out.push(...checkProse(value, allow, target, where));
+    return;
+  }
+  if (Array.isArray(value)) {
+    const jobs = value.filter((item) => item && typeof item === "object" && ("company" in (item as object) || "title" in (item as object)));
+    if (jobs.length > 0 && jobs.length === value.length) {
+      for (const violation of checkResume({ experience: value as ResumeShape["experience"] }, allow, target)) {
+        out.push({ ...violation, where: `${where}${violation.where.replace(/^experience/, "")}` });
+      }
+      return;
+    }
+    value.forEach((item, index) => walkLoose(item, allow, target, `${where}[${index}]`, out));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  if (isCoverLetter(value)) {
+    const letter = value as CoverLetterShape;
+    const prose = [
+      letter.letterContent?.openingParagraph,
+      ...(letter.letterContent?.bodyParagraphs ?? []),
+      letter.letterContent?.closingParagraph,
+    ]
+      .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+      .join("\n");
+    if (prose && where !== "") out.push(...checkProse(prose, allow, target, where));
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if (STRUCTURED_KEYS.has(key)) continue;
+      walkLoose(child, allow, target, where ? `${where}.${key}` : key, out);
+    }
+    return;
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (where === "" && STRUCTURED_KEYS.has(key)) continue;
+    // A copied job posting is the employer's text, not a claim about the candidate.
+    if (/^(jobposting|jobdescription|posting|jobdetails)$/.test(key.toLowerCase().replace(/[^a-z]/g, ""))) continue;
+    walkLoose(child, allow, target, where ? `${where}.${key}` : key, out);
+  }
+}
 
 export function checkNoInventedExperience(
   input: unknown,
@@ -247,26 +345,32 @@ export function checkNoInventedExperience(
   // It is intentionally unread.
   void options.jobDescription;
 
+  const prepared = prepareOutput(output);
   const allow = buildAllow(input);
   const violations: Violation[] = [];
 
-  if (isCoverLetter(output)) {
+  if (isCoverLetter(prepared)) {
+    const letter = prepared as CoverLetterShape;
     const target = {
-      company: options.applicationTarget?.company ?? output.jobInfo?.company,
-      role: options.applicationTarget?.role ?? output.jobInfo?.position,
+      company: options.applicationTarget?.company ?? letter.jobInfo?.company,
+      role: options.applicationTarget?.role ?? letter.jobInfo?.position,
     };
     const prose = [
-      output.letterContent?.openingParagraph,
-      ...(output.letterContent?.bodyParagraphs ?? []),
-      output.letterContent?.closingParagraph,
+      letter.letterContent?.openingParagraph,
+      ...(letter.letterContent?.bodyParagraphs ?? []),
+      letter.letterContent?.closingParagraph,
     ]
       .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
       .join("\n");
     violations.push(...checkProse(prose, allow, target, "letter"));
-  } else if (isResume(output)) {
-    violations.push(...checkResume(output, allow, options.applicationTarget));
-  } else if (typeof output === "string") {
-    violations.push(...checkProse(output, allow, options.applicationTarget, "text"));
+    walkLoose(prepared, allow, options.applicationTarget, "", violations);
+  } else if (isResume(prepared)) {
+    violations.push(...checkResume(prepared as ResumeShape, allow, options.applicationTarget));
+    walkLoose(prepared, allow, options.applicationTarget, "", violations);
+  } else if (typeof prepared === "string") {
+    violations.push(...checkProse(prepared, allow, options.applicationTarget, "text"));
+  } else if (prepared && typeof prepared === "object") {
+    walkLoose(prepared, allow, options.applicationTarget, "", violations);
   }
 
   return dedupe(violations);
@@ -300,6 +404,12 @@ function checkResume(
   }
 
   for (const [i, school] of (resume.education ?? []).entries()) {
+    if (typeof school === "string") {
+      if (!degreeOk(school, allow) && !schoolOk(school, allow)) {
+        out.push({ kind: "degree", value: school, where: `education[${i}].degree` });
+      }
+      continue;
+    }
     if (school.name && !schoolOk(school.name, allow)) {
       out.push({ kind: "school", value: school.name, where: `education[${i}].name` });
     }
@@ -335,10 +445,11 @@ function checkResume(
   }
 
   for (const [i, cert] of (resume.certifications ?? []).entries()) {
-    if (cert.name && !certOk(cert.name, allow)) {
-      out.push({ kind: "certification", value: cert.name, where: `certifications[${i}].name` });
+    const name = typeof cert === "string" ? cert : cert?.name;
+    if (name && !certOk(name, allow)) {
+      out.push({ kind: "certification", value: name, where: `certifications[${i}].name` });
     }
-    if (cert.issuer && !phraseIn(cert.issuer, allow.corpus) && !certOk(cert.issuer, allow)) {
+    if (cert && typeof cert === "object" && cert.issuer && !phraseIn(cert.issuer, allow.corpus) && !certOk(cert.issuer, allow)) {
       out.push({ kind: "certification", value: cert.issuer, where: `certifications[${i}].issuer` });
     }
   }
@@ -354,6 +465,17 @@ function checkResume(
  * wants that work. Concrete new facts in the same summary still flag.
  * A forward-looking sentence ("Eager to…", "Seeking…") is not an accomplishment.
  */
+function withoutApplicationTarget(sentence: string, target: CheckOptions["applicationTarget"]): string {
+  let scanned = sentence;
+  if (target?.role) scanned = removePhrase(scanned, target.role);
+  if (target?.company) {
+    scanned = removePhrase(scanned, target.company);
+    const leading = target.company.split(/\s+/).find((part) => part.length > 3);
+    if (leading) scanned = removePhrase(scanned, leading);
+  }
+  return scanned;
+}
+
 function checkSummary(
   text: string,
   allow: Allow,
@@ -365,10 +487,7 @@ function checkSummary(
   for (const sentence of chunks) {
     const claimedWork = EMPLOYMENT_CUE.test(sentence);
     let scanned = sentence;
-    if (!claimedWork) {
-      if (target?.role) scanned = removePhrase(scanned, target.role);
-      if (target?.company) scanned = removePhrase(scanned, target.company);
-    }
+    if (!claimedWork) scanned = withoutApplicationTarget(sentence, target);
     out.push(...checkFreeText(scanned, allow, "personalInfo.summary", false));
     // "Seeking a backend role at Acme" names the application. It is not a claim of past work.
     // Metrics, tools, and employers in the same sentence still flag above.
@@ -416,10 +535,21 @@ function checkFreeText(text: string, allow: Allow, where: string, accomplishment
 function accomplishmentViolation(text: string, allow: Allow, where: string): Violation | null {
   const novel = novelContentTokens(text, allow);
   const content = contentTokens(text);
-  if (content.length > 0 && novel.length >= 2 && novel.length / content.length > 0.4) {
-    return { kind: "accomplishment", value: text, where };
-  }
-  return null;
+  if (!(content.length > 0 && novel.length >= 2 && novel.length / content.length > 0.4)) return null;
+  // A reword that still shares a concrete source word, and adds no employer, school,
+  // credential, tool, number, or date, is the same work said differently.
+  const shared = content.filter((token) => token.length >= 4 && tokenKnown(token, allow));
+  const addsHardFact =
+    unsupportedMetrics(text, allow, where).length > 0 ||
+    unsupportedDatesInText(text, allow, where).length > 0 ||
+    lexiconHits(text).some((skill) => !skillOk(skill, allow)) ||
+    certHits(text).some((cert) => !certOk(cert, allow)) ||
+    schoolHits(text).some((school) => !schoolOk(school, allow)) ||
+    degreeHits(text).some((degree) => !degreeOk(degree, allow)) ||
+    orgHits(text).some((org) => unsupportedEmployer(org, allow)) ||
+    UNGROUNDED_CLAIM.test(text);
+  if (shared.length > 0 && !addsHardFact) return null;
+  return { kind: "accomplishment", value: text, where };
 }
 
 function checkProse(
@@ -435,10 +565,7 @@ function checkProse(
     const loc = `${where}[${i}]`;
     const claimedWork = EMPLOYMENT_CUE.test(sentence);
     let scanned = sentence;
-    if (!claimedWork) {
-      if (target?.role) scanned = removePhrase(scanned, target.role);
-      if (target?.company) scanned = removePhrase(scanned, target.company);
-    }
+    if (!claimedWork) scanned = withoutApplicationTarget(sentence, target);
     out.push(...unsupportedMetrics(scanned, allow, loc));
     out.push(...unsupportedDatesInText(scanned, allow, loc));
     for (const skill of lexiconHits(scanned)) {

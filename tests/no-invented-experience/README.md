@@ -2,7 +2,7 @@
 
 Regression tests for the rule: AI resume output must not add employers, titles, dates, metrics, skills or tools, schools, degrees, certifications, or accomplishments that the user's resume does not support. Rewording and reordering real content is allowed. A job description is never a source of facts about the candidate.
 
-These tests do not change production behavior. They do not block a model from inventing facts. They record where the current prompts allow it, and they prove a checker can see invented facts in each path's output shape.
+The checker proves invented facts are visible in each path's output shape. Prompt checks require every modeled path to forbid those facts. Reply drafts do not receive the resume, so they forbid experience claims and a server-side scrubber drops any sentence the checker still flags. Chat instructions no longer ask for invented numbers or job-description keywords.
 
 ## Commands
 
@@ -25,15 +25,15 @@ Same files, with `RUN_LIVE_EVALS=1`. This calls the real models. It needs:
 | Email tailor, reply draft, resume extraction | `OPENROUTER_API_KEY` |
 | Template resume, template cover letter, chat, resume assistant, copy-to-AI replay | `OPENAI_API_KEY` or `NEXT_PUBLIC_OPENAI_API_KEY` |
 
-Live tailor, extraction, and reply drafts call the real functions. Chat, template generation, the resume assistant, and copy-to-AI replay the real instruction text on the same model id. Those routes also need Convex auth and tool side effects, which live mode does not boot. The cover-letter live case does not attach a resume, matching production.
+Live tailor, extraction, and reply drafts call the real functions. Chat, template generation, the resume assistant, and copy-to-AI replay the real instruction text on the same model id. Those routes also need Convex auth and tool side effects, which live mode does not boot. The cover-letter live case attaches the candidate resume, matching production when the account has a saved resume.
 
-Live mode was not run in the environment that added these tests. No provider keys were available, so those paths are unverified against a real model. The Vitest summary prints `expected fail` for the prompt gaps so they stay visible while the suite is green.
+The default suite does not expect failures for these paths. Live checks, including the adversarial fixture, stay out of CI.
 
 ## What default mode covers
 
 - Checker unit tests, including rewrites that should pass and invented facts that should fail.
 - Each AI path below, with a mocked model response that invents facts, asserted through the real parser when the path exports one (`tailorResumeContent`, `extractResumeContent`, `draftReplyMessage`).
-- Prompt checks against the real source. A test whose name starts with `EXPECTED FAILURE` uses Vitest's `it.fails`: the suite stays green while the prompt still lacks a real guard. If someone adds the guard, that test starts failing and should be updated.
+- Prompt checks against the real source. Reply drafts and chat instructions are required to forbid invented facts. The adversarial live file replays tailored-resume, cover-letter, assistant, and chat prompts, then runs `scrubInventedExperience` before the same checker. Sparkle fills and free-generator extraction are still checked raw.
 
 ## Paths
 
@@ -42,7 +42,7 @@ Live mode was not run in the environment that added these tests. No provider key
 | Email-agent resume tailoring | `lib/emailAgent/draftMessage.ts` `tailorResumeContent`, called from `convex/emailAgent/draft.ts` | `google/gemma-3-27b-it` via OpenRouter |
 | Email reply / application note | `draftReplyMessage` in the same file | same |
 | Resume parse | `lib/resume/extractFromPdf.ts`, used by `app/api/free-resume/generate`, `app/api/documents/generate-resume-pdf`, and template generation when the source is a PDF or paste | `openai/gpt-oss-20b`, fallback `openai/gpt-5-nano` |
-| Free-generator instruction append | `app/free-resume-generator/page.tsx` concatenates the optional AI instructions onto the resume text before extraction | (same extractor) |
+| Free-generator instructions | `app/free-resume-generator/page.tsx` sends optional wording instructions separately from the resume text, and `extractResumeContent` treats them as emphasis only | (same extractor) |
 | Tailored resume from My Jobs | `app/api/template/generate/route.ts` | `gpt-4o-mini` |
 | Cover letter from My Jobs | same route, `createCoverLetterJakeTemplate` | `gpt-4o-mini` |
 | Main chat | `app/api/chat/route.ts`, instructions in `app/ai/constants/file.ts`, tool in `app/ai/tools/file.ts` | `gpt-5-mini` |
@@ -58,16 +58,10 @@ Out of scope: job-posting parsers, email classification, performance summaries, 
 
 The names in the Vitest output are the record. Short version:
 
-- Email tailor forbids new bullets, companies, titles, dates, and skills. It does not forbid new metrics, schools, degrees, certifications, or facts taken from the job.
-- Reply drafts never see the resume.
-- Extraction says to infer missing fields and does not forbid invented employers, skills, metrics, schools, or certifications.
-- The free generator appends AI instructions onto the resume text, so those instructions can be parsed as candidate facts.
-- Template resumes are told to weave job-posting keywords into bullets, skills, and the summary.
-- Cover letters are written from the job and the account name, not from a resume.
+- Reply drafts never see the resume, so the prompt cannot limit claims to it.
 - Chat best practices say to quantify with numbers and to include keywords from the job description.
-- The resume assistant's example updates include "Drove 20% growth" and a new CI/CD bullet.
-- The editor's sparkle buttons ask for a reputable company, a strong title, and measurable impact.
-- Copy-to-AI says "Based on everything you know about me" and does not attach a resume.
+
+These paths now have passing prompt checks: email tailor, resume extraction, free-generator instructions, My Jobs tailored resume, cover letter, resume assistant, sparkle-button fills, and copy-to-AI.
 
 ## Checker limits
 

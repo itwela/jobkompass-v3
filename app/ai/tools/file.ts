@@ -17,6 +17,7 @@ import { api } from "@/convex/_generated/api";
 import { generateResumeLatex } from "@/lib/resume/generators";
 import { canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
 import { rankLabel, type PlanRank } from "@/convex/plans";
+import { applyFactGuard, type FactGuard } from "@/lib/resume/noInventedFacts";
 
 
 // Helper function to escape LaTeX special characters
@@ -44,7 +45,7 @@ function getFormattedTime() {
 
 const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverletter/jakeCoverLetter.tex');
 
- const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
+ const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) => tool({
    name: 'createResumeJakeTemplate',
    description: 'Generate a professional resume. Three templates are available: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward) and "mar" (Times serif, centered header, categorized skills, separate internships section). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents.',
    parameters: z.object({
@@ -116,7 +117,8 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
     targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
     templateId: z.enum(['jake', 'joseph', 'mar']).default('jake').describe('Template to use: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward with Core Competencies and Early Career sections) or "mar" (Times serif, centered header repeated on every page, categorized technical skills, merged Education & Certifications, separate Internships section). Use the template from RESUME_TEMPLATE_PREFERENCE.'),
   }),
-  execute: async (input) => {
+  execute: async (rawInput) => {
+    const input = applyFactGuard(factGuard, rawInput);
     const toolExecutionId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const startTime = Date.now();
     
@@ -348,7 +350,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
 });
 
 // Cover Letter Generation Tool - Jake Template Style
-const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => tool({
+const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) => tool({
   name: 'createCoverLetterJakeTemplate',
   description: 'Generate a professional cover letter using the Jake LaTeX template style. This tool creates a well-formatted cover letter tailored for the specific job and company. Automatically saves the cover letter to the user\'s documents.',
   parameters: z.object({
@@ -371,7 +373,8 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient) => to
       closingParagraph: z.string().describe('Closing paragraph summarizing your interest, thanking them for their consideration, and expressing enthusiasm for next steps.'),
     }),
   }),
-  execute: async (input) => {
+  execute: async (rawInput) => {
+    const input = applyFactGuard(factGuard, rawInput);
     try {
       // Check if user can generate documents
       const canGenerate = await convexClient.query(api.usage.canGenerateDocument, {});
@@ -900,7 +903,7 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
   });
 
 // Get Specific Resume by ID Tool
-const createGetResumeByIdTool = (convexClient: ConvexHttpClient) =>
+const createGetResumeByIdTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) =>
   tool({
     name: "getResumeById",
     description:
@@ -923,7 +926,9 @@ const createGetResumeByIdTool = (convexClient: ConvexHttpClient) =>
             error: "Resume not found",
           };
         }
-        
+
+        if (factGuard && resume.content) factGuard.source = resume.content;
+
         return {
           success: true,
           message: `Successfully fetched resume: ${resume.name || 'Untitled'}`,

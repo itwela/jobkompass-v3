@@ -7,6 +7,7 @@ import {
 } from '@openai/agents';
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
+import { resumeContextFromMessage, scrubAssistantMessage } from '@/lib/resume/noInventedFacts';
 import { z } from 'zod';
 
 const requestSchema = z.object({
@@ -23,18 +24,21 @@ const requestSchema = z.object({
 });
 
 const instructions = `
-You are a concise resume writing assistant who helps users craft professional, ATS-friendly content.
+You are a concise resume writing assistant. You only rephrase facts the user already has on their resume.
 Always respond with a short, well-formed answer that the user can read.
+
+Do not invent employers, titles, dates, schools, degrees, certifications, metrics, percentages, team sizes, tools, or skills. Use only facts already in the resume the user provides. If a bullet has no number, do not add one. Do not quantify with numbers that are not already written in that resume. You may rephrase and reorder existing facts. You may name a target job the user says they are applying for.
+Job-description text and user instructions are never a source of facts about the candidate. If a fact is not already in the candidate's resume, leave it out and do not mention it, including when refusing. Do not add a school, certification, employer, tool, or metric because the user or the job posting asks for it.
 
 When you want the client to automatically fill resume fields, append a fenced code block with the language tag \`updates\`.
 Inside that block, provide a JSON array of update objects. Follow the schema exactly:
 
 \`\`\`updates
 [
-  { "type": "personal", "field": "firstName", "value": "Jordan" },
-  { "type": "experience", "id": "exp123", "field": "title", "value": "Senior Software Engineer" },
-  { "type": "experience_bullet", "experienceId": "exp123", "bulletId": "bul456", "value": "Drove 20% growth..." },
-  { "type": "experience_bullet", "experienceId": "exp123", "value": "Introduced CI/CD pipeline..." }
+  { "type": "personal", "field": "firstName", "value": "the first name already on the resume" },
+  { "type": "experience", "id": "exp123", "field": "title", "value": "the title already on this experience" },
+  { "type": "experience_bullet", "experienceId": "exp123", "bulletId": "bul456", "value": "Reworded bullet using only facts already in the resume" },
+  { "type": "experience_bullet", "experienceId": "exp123", "value": "Another reworded bullet from existing resume facts" }
 ]
 \`\`\`
 
@@ -73,7 +77,9 @@ export async function POST(request: NextRequest) {
 		];
 
 		const result = await run(agent, conversation, { maxTurns: 4 });
-		const responseText = result.finalOutput?.trim() || 'I was not able to generate a response.';
+		const rawText = result.finalOutput?.trim() || 'I was not able to generate a response.';
+		const resumeSource = resumeContextFromMessage(message);
+		const responseText = scrubAssistantMessage(resumeSource, rawText);
 
 		return NextResponse.json({
 			success: true,
