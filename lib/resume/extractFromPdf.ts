@@ -104,6 +104,62 @@ function extractionUserText(resumeBody: string, styleInstructions?: string): str
   return withStyleInstructions(`Extract and format this resume:\n\n${resumeBody}`, styleInstructions);
 }
 
+/** Turn a one-line PDF text layer back into section lines the evidence parser can read. */
+function relineResumeBlob(text: string): string {
+  let lined = text.replace(/\r/g, "\n");
+  if (lined.split("\n").filter((line) => line.trim()).length >= 4) return lined.trim();
+  const month = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
+  lined = lined.replace(/\s+/g, " ");
+  lined = lined.replace(/\s+\b(Experience|Work Experience|Education|Skills|Certifications?|Projects)\b/gi, "\n$1\n");
+  // Hold "Aug 2022 - May 2024" so a later year break or bullet hyphen cannot split it.
+  const heldDates: string[] = [];
+  lined = lined.replace(
+    new RegExp(
+      `((?:${month})[a-z]*\\.?\\s+(?:19|20)\\d{2}(?:\\s*(?:-|–|—|to)\\s*(?:(?:${month})[a-z]*\\.?\\s+)?(?:(?:19|20)\\d{2}|Present|Current))?\\b)`,
+      "gi",
+    ),
+    (value) => {
+      heldDates.push(value);
+      return `\n@@DATE${heldDates.length - 1}@@`;
+    },
+  );
+  lined = lined.replace(/([^\d\n])\s+((?:19|20)\d{2})(?!\s*[-–—])/g, "$1\n$2");
+  lined = lined.replace(/\s+-\s+/g, "\n- ");
+  lined = lined.replace(/@@DATE(\d+)@@/g, (_match, index: string) => heldDates[Number(index)] ?? "");
+  return lined
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line, index, all) => line.length > 0 || (index > 0 && all[index - 1] !== ""))
+    .join("\n")
+    .trim();
+}
+
+function looksLikeResumeText(text: string): boolean {
+  const printable = text.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
+  if (text.length < 40 || printable.length / text.length < 0.9) return false;
+  return /\b(experience|education|certifications?)\b/i.test(text) || /[—–]/.test(text);
+}
+
+/** Last resort when the PDF helper returns nothing but the file still has a text layer. */
+function textLayerFromPdf(resumePdf: string): string {
+  const comma = resumePdf.indexOf(",");
+  const encoded = resumePdf.startsWith("data:") && comma >= 0 ? resumePdf.slice(comma + 1) : resumePdf;
+  let decoded = "";
+  try {
+    decoded = Buffer.from(encoded, "base64").toString("utf8");
+  } catch {
+    return "";
+  }
+  const parts: string[] = [];
+  const re = /\(((?:\\[()\\]|[^\\)])+)\)\s*Tj/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(decoded))) {
+    parts.push(match[1].replace(/\\([()\\])/g, "$1"));
+  }
+  const text = relineResumeBlob(parts.join("\n"));
+  return looksLikeResumeText(text) ? text : "";
+}
+
 export async function extractResumeContent(options: ExtractOptions): Promise<ResumeContentForJake> {
   const { resumePdf, resumeText, fallbackEmail, styleInstructions } = options;
   const trimmedUserText =
@@ -131,6 +187,7 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
 
   if (!hasText && hasPdf) {
     weakLocalText = await extractTextFromPdfBase64(resumePdf!);
+    if (!weakLocalText.trim()) weakLocalText = textLayerFromPdf(resumePdf!);
     if (isLikelyReadableResumeText(weakLocalText)) {
       textForLlm = weakLocalText;
     } else {
@@ -255,7 +312,7 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
 
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content?.trim();
-  const grounding = groundingResumeText(textForLlm);
+  const grounding = groundingResumeText(textForLlm || weakLocalText);
   if (!content) {
     if (grounding) return normalizeExtractedContent(fallbackResumeFromText(grounding, fallbackEmail), fallbackEmail);
     throw new Error('AI did not return valid content');

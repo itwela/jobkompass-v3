@@ -815,10 +815,10 @@ export default function FreeResumeGeneratorPage() {
                           <div className="flex flex-col items-center gap-4 w-full max-w-sm mx-auto">
                             <div className="w-full">
                               <p className="text-sm text-foreground font-medium text-center mb-3">
-                                Not sure what to put? Your AI already knows you.
+                                Not sure what to put? Copy a prompt into an external chat.
                               </p>
                               <p className="text-xs text-muted-foreground text-center mb-4">
-                                Copy the prompt, paste it into your AI, then paste the output back here.
+                                JobKompass cannot guard ChatGPT, Claude, or any other external model. Check the result before you paste it back.
                               </p>
                               <div className="flex flex-col gap-2 items-center">
                                 {COPY_TO_AI_OPTIONS.map((ai) => (
@@ -832,7 +832,7 @@ export default function FreeResumeGeneratorPage() {
                                         const prompt = getCopyPromptForTemplate('resume');
                                         navigator.clipboard.writeText(prompt).then(() => {
                                           toast.success('Prompt copied to clipboard', {
-                                            description: 'Paste into your AI, then copy the output back here.',
+                                            description: 'An external model is not checked by JobKompass. Review the result before you paste it back.',
                                           });
                                         }).catch(() => {
                                           toast.error('Failed to copy');
