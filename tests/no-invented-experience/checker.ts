@@ -234,10 +234,50 @@ const TITLE_PHRASE =
   /\b(senior|staff|principal|lead|director|head|chief)\s+(?:\w+\s+){0,3}(engineer|developer|manager|designer|analyst|scientist|consultant|architect)\b/i;
 
 const DEGREE_WORD =
-  /\b(ph\.?d\.?|doctorate|mba|m\.?\s?s\.?|m\.?\s?sc|master(?:'s)?|b\.?\s?s\.?|b\.?\s?sc|b\.?\s?a\.?|bachelor(?:'s)?|associate(?:'s)?)\b/i;
+  /\b(ph\.?d\.?|doctorate|mba|m\.?\s?s\.?|m\.?\s?sc|master(?:'s)?|b\.?\s?s\.?|b\.?\s?sc|b\.?\s?a\.?|bachelor(?:'s)?|associate(?:'s|s)\s+degree|associate\s+of\s+(?:arts|science|applied(?:\s+science)?)|a\.s\.|a\.a\.)\b/i;
+
+const INSTRUCTION_LINE =
+  /^(you are updating|rewrite|add |i forgot|follow |resume preferences|using only|write |generate |return only|respond with|make me |include |emphasize |mention |the posting|the applicant|candidate notes|quantify )/i;
+
+const POSTING_HEADER = /^(job i am applying|job posting|job description)\b/i;
+
+const EMBEDDED_INVENTION =
+  /\b(already true|already confirmed|hiring manager|treat the following|the candidate also|the applicant has|ignore previous|as already|you previously)\b/i;
+
+/**
+ * Lines that are resume evidence. Instruction lines are skipped.
+ * A job-posting header ends the resume. A new employer header after Skills
+ * or Certifications is a pasted posting, not another job. Prose that tells
+ * the model a fact is already true is not evidence.
+ */
+export function resumeEvidenceLines(text: string): string[] {
+  const kept: string[] = [];
+  let section = "header";
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      kept.push(line);
+      continue;
+    }
+    if (POSTING_HEADER.test(trimmed)) break;
+    if (INSTRUCTION_LINE.test(trimmed) || EMBEDDED_INVENTION.test(line)) continue;
+    if (/^(experience|work experience)$/i.test(trimmed)) section = "experience";
+    else if (/^education$/i.test(trimmed)) section = "education";
+    else if (/^skills$/i.test(trimmed)) section = "skills";
+    else if (/^certifications?$/i.test(trimmed)) section = "certs";
+    else if (/^projects$/i.test(trimmed)) section = "projects";
+    else {
+      const header = trimmed.match(/^(.+?)\s+[—–]\s+(.+)$/);
+      const dateLike = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
+      if (header && !dateLike && section === "skills") break;
+    }
+    kept.push(line);
+  }
+  return kept;
+}
 
 const CERT_RE =
-  /\b((?:aws|google|microsoft|cisco|oracle)\s+certified[\w\s-]{0,40}|certified\s+(?:solutions architect|developer|administrator|kubernetes|scrum master|public accountant)|pmp\b|cissp\b|ckad\b|cka\b|cks\b|comptia\s+[\w+]+|six sigma(?:\s+(?:green|black|yellow)\s+belt)?|(?:green|black) belt)/gi;
+  /\b((?:aws|google|microsoft|cisco|oracle)\s+certified[\w\s-]{0,40}|certified\s+(?:solutions architect|developer|administrator|kubernetes|scrum master|public accountant)|pmp\b|cissp\b|ckad\b|cka\b|cks\b|cdl\b|comptia\s+[\w+]+|six sigma(?:\s+(?:green|black|yellow)\s+belt)?|(?:green|black) belt)/gi;
 
 /** New claims that are not a reword of the source, even with no number attached. */
 const UNGROUNDED_CLAIM =
@@ -296,6 +336,10 @@ function prepareOutput(output: unknown): unknown {
 }
 
 function walkLoose(value: unknown, allow: Allow, target: CheckOptions["applicationTarget"], where: string, out: Violation[]) {
+  if (typeof value === "number") {
+    out.push(...unsupportedMetrics(String(value), allow, where));
+    return;
+  }
   if (typeof value === "string") {
     out.push(...checkProse(value, allow, target, where));
     return;
@@ -548,7 +592,7 @@ function accomplishmentViolation(text: string, allow: Allow, where: string): Vio
     degreeHits(text).some((degree) => !degreeOk(degree, allow)) ||
     orgHits(text).some((org) => unsupportedEmployer(org, allow)) ||
     UNGROUNDED_CLAIM.test(text);
-  if (shared.length > 0 && !addsHardFact) return null;
+  if (shared.length >= 2 && !addsHardFact) return null;
   return { kind: "accomplishment", value: text, where };
 }
 
@@ -599,10 +643,98 @@ function checkProse(
   return out;
 }
 
+type PlainEvidence = {
+  corpus: string;
+  orgs: string[];
+  titles: string[];
+  schools: string[];
+  degreeText: string;
+  certs: string[];
+  skillText: string;
+  experienceDateText: string;
+  educationDateText: string;
+  otherDateText: string;
+};
+
+/** Employers, schools, degrees, and certs come from section lines, not from prose. */
+function plainEvidence(text: string): PlainEvidence {
+  const orgs: string[] = [];
+  const titles: string[] = [];
+  const schools: string[] = [];
+  const degreeLines: string[] = [];
+  const certs: string[] = [];
+  const skillLines: string[] = [];
+  const expDates: string[] = [];
+  const eduDates: string[] = [];
+  const otherDates: string[] = [];
+  let section: "header" | "experience" | "education" | "skills" | "certs" | "projects" = "header";
+  for (const raw of resumeEvidenceLines(text)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^experience$/i.test(line)) {
+      section = "experience";
+      continue;
+    }
+    if (/^education$/i.test(line)) {
+      section = "education";
+      continue;
+    }
+    if (/^skills$/i.test(line)) {
+      section = "skills";
+      continue;
+    }
+    if (/^certifications?$/i.test(line)) {
+      section = "certs";
+      continue;
+    }
+    if (/^projects$/i.test(line)) {
+      section = "projects";
+      continue;
+    }
+    const header = line.match(/^(.+?)\s+[—–]\s+(.+)$/);
+    const looksLikeDate = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header?.[1] ?? "x");
+    if (header && !looksLikeDate && section === "education") {
+      degreeLines.push(header[1].trim());
+      schools.push(header[2].trim());
+      continue;
+    }
+    if (header && !looksLikeDate && section === "certs") {
+      certs.push(header[1].trim(), header[2].trim());
+      continue;
+    }
+    if (header && !looksLikeDate && section !== "skills") {
+      titles.push(header[1].trim());
+      orgs.push(header[2].trim());
+      section = section === "header" || section === "projects" ? "experience" : section;
+      continue;
+    }
+    if (section === "skills") skillLines.push(line);
+    if (section === "certs") certs.push(line);
+    if (/\b(?:19|20)\d{2}\b/.test(line) || /\bpresent\b/i.test(line)) {
+      if (section === "experience") expDates.push(line);
+      else if (section === "education") eduDates.push(line);
+      else otherDates.push(line);
+    }
+  }
+  return {
+    corpus: resumeEvidenceLines(text).join("\n"),
+    orgs,
+    titles,
+    schools,
+    degreeText: degreeLines.join(" "),
+    certs,
+    skillText: skillLines.join("\n"),
+    experienceDateText: expDates.join(" "),
+    educationDateText: eduDates.join(" "),
+    otherDateText: otherDates.join(" "),
+  };
+}
+
 function buildAllow(input: unknown): Allow {
   const textSource = typeof input === "string";
   const resume = textSource ? null : (isResume(input) ? input : null);
-  const corpus = textSource ? input : resume ? resumeCorpus(resume) : "";
+  const evidence = textSource ? plainEvidence(input) : null;
+  const corpus = textSource ? evidence!.corpus : resume ? resumeCorpus(resume) : "";
   const tokens = new Set<string>();
   for (const word of words(corpus)) {
     const stemmed = stem(word);
@@ -624,6 +756,12 @@ function buildAllow(input: unknown): Allow {
       if (job.title) titles.push(job.title);
     }
     for (const school of resume.education ?? []) {
+      if (typeof school === "string") {
+        educationBlob += ` ${school}`;
+        const level = degreeLevel(school);
+        if (level) degreeLevels.add(level);
+        continue;
+      }
       if (school.name) schools.push(school.name);
       const bits = [school.degree, school.field].filter(Boolean).join(" ");
       educationBlob += ` ${bits} ${school.name ?? ""} ${(school.details ?? []).join(" ")}`;
@@ -631,25 +769,31 @@ function buildAllow(input: unknown): Allow {
       if (level) degreeLevels.add(level);
     }
     for (const cert of resume.certifications ?? []) {
-      if (cert.name) certs.push(cert.name);
-      if (cert.issuer) certs.push(cert.issuer);
+      if (typeof cert === "string") certs.push(cert);
+      else {
+        if (cert.name) certs.push(cert.name);
+        if (cert.issuer) certs.push(cert.issuer);
+      }
     }
     for (const project of resume.projects ?? []) {
       if (project.name) projectNames.push(project.name);
     }
-  } else {
-    educationBlob = corpus;
-    const level = degreeLevel(corpus);
-    // A resume can mention more than one level; scan each hit.
-    for (const hit of degreeHits(corpus)) {
+  } else if (evidence) {
+    orgs.push(...evidence.orgs);
+    titles.push(...evidence.titles);
+    schools.push(...evidence.schools);
+    certs.push(...evidence.certs);
+    educationBlob = `${evidence.degreeText} ${evidence.schools.join(" ")}`;
+    for (const hit of degreeHits(evidence.degreeText)) {
       const lvl = degreeLevel(hit);
       if (lvl) degreeLevels.add(lvl);
     }
-    if (level) degreeLevels.add(level);
   }
 
   const skillCanons = new Set<string>();
-  const skillPhrases = resume ? allSkillPhrases(resume) : [];
+  const skillPhrases = resume
+    ? allSkillPhrases(resume)
+    : (evidence?.skillText ?? "").split(/,|\n/).map((part) => part.trim()).filter(Boolean);
   for (const phrase of skillPhrases) {
     const c = canon(normSkill(phrase));
     if (c) skillCanons.add(c);
@@ -668,10 +812,16 @@ function buildAllow(input: unknown): Allow {
     ? [...(resume.experience ?? []), ...(resume.internships ?? []), ...(resume.earlyCareer ?? [])]
         .map((job) => job.date ?? "")
         .join(" ")
-    : corpus;
+    : (evidence?.experienceDateText ?? "");
   const educationDateText = resume
-    ? (resume.education ?? []).map((school) => [school.startDate, school.endDate].filter(Boolean).join(" ")).join(" ")
-    : corpus;
+    ? (resume.education ?? []).map((school) => {
+        if (typeof school === "string") return school;
+        return [school.startDate, school.endDate].filter(Boolean).join(" ");
+      }).join(" ")
+    : (evidence?.educationDateText ?? "");
+  const allDateText = resume
+    ? corpus
+    : [experienceDateText, educationDateText, evidence?.otherDateText ?? ""].join(" ");
 
   return {
     textSource,
@@ -689,19 +839,17 @@ function buildAllow(input: unknown): Allow {
     numbers: extractNumbers(corpus),
     experienceDates: dateFacts(experienceDateText),
     educationDates: dateFacts(educationDateText),
-    allDates: dateFacts(corpus),
+    allDates: dateFacts(allDateText),
   };
 }
 
 function employerSupported(name: string, allow: Allow): boolean {
-  if (allow.orgs.some((org) => orgMatch(name, org, allow))) return true;
-  if (allow.textSource && phraseIn(name, allow.corpus)) return true;
-  return false;
+  return allow.orgs.some((org) => orgMatch(name, org, allow));
 }
 
 function unsupportedEmployer(name: string, allow: Allow): boolean {
   if (isSingleTokenLexicon(name)) return false;
-  return !employerSupported(name, allow) && !schoolOk(name, allow) && !phraseIn(name, allow.corpus);
+  return !employerSupported(name, allow) && !schoolOk(name, allow);
 }
 
 /** "with Kafka" is a tool, not an employer. Multi-word names still count. */
@@ -751,10 +899,9 @@ function titlesCompatible(candidate: string, existing: string): boolean {
 
 function schoolOk(name: string, allow: Allow): boolean {
   if (allow.schools.some((school) => orgMatch(name, school, allow))) return true;
-  if (phraseIn(name, allow.corpus) || phraseIn(name, allow.educationBlob)) return true;
+  if (phraseIn(name, allow.educationBlob)) return true;
   const elite = ELITE_SCHOOLS.find((school) => normOrg(name).includes(school));
-  if (elite && !allow.corpusNorm.includes(elite)) return false;
-  if (allow.textSource && phraseIn(name, allow.corpus)) return true;
+  if (elite && !allow.corpusNorm.includes(elite) && !normOrg(allow.educationBlob).includes(elite)) return false;
   return false;
 }
 
@@ -766,8 +913,7 @@ function degreeOk(text: string, allow: Allow): boolean {
 }
 
 function certOk(name: string, allow: Allow): boolean {
-  if (allow.certs.some((cert) => orgMatch(name, cert, allow) || phraseIn(name, cert) || phraseIn(cert, name))) return true;
-  return phraseIn(name, allow.corpus);
+  return allow.certs.some((cert) => orgMatch(name, cert, allow) || phraseIn(name, cert) || phraseIn(cert, name));
 }
 
 function projectOk(name: string, allow: Allow): boolean {
@@ -908,7 +1054,7 @@ function degreeLevel(text: string): string | null {
   if (/\bph\.?\s?d\b|\bphd\b|\bdoctorate\b|\bdoctor of\b/.test(s)) return "doctorate";
   if (/\bmba\b|\bm\.?\s?s\b|\bm\.?\s?sc\b|\bmaster(?:s|'s)?\b/.test(s)) return "master";
   if (/\bb\.?\s?s\b|\bb\.?\s?a\b|\bb\.?\s?sc\b|\bbachelor(?:s|'s)?\b/.test(s)) return "bachelor";
-  if (/\bassociate(?:s|'s)?\b|\ba\.s\b|\ba\.a\b/.test(s)) return "associate";
+  if (/\bassociate(?:'s|s)\s+degree\b|\bassociate\s+of\s+(?:arts|science|applied(?:\s+science)?)\b|\ba\.s\b|\ba\.a\b/.test(s)) return "associate";
   return null;
 }
 
@@ -985,6 +1131,9 @@ function extractNumbers(text: string): NumTok[] {
   let match: RegExpExecArray | null;
   while ((match = re.exec(cleaned))) {
     const raw = match[0];
+    const prev = match.index > 0 ? cleaned[match.index - 1] : "";
+    // "bul1" and "exp1" are ids, not metrics.
+    if (/[A-Za-z]/.test(prev)) continue;
     const after = cleaned.slice(match.index + raw.length, match.index + raw.length + 12);
     const percent = raw.includes("%") || /^\s*percent\b/i.test(after);
     const money = raw.startsWith("$");
@@ -1013,7 +1162,8 @@ function allSkillPhrases(resume: ResumeShape): string[] {
   return phrases.flatMap(splitSkill).filter(Boolean);
 }
 
-function splitSkill(phrase: string): string[] {
+function splitSkill(phrase: unknown): string[] {
+  if (typeof phrase !== "string") return [];
   const withoutLabel = phrase.includes(":") ? phrase.split(":").slice(1).join(":") : phrase;
   return withoutLabel
     .split(/,|&|\|/)
@@ -1045,7 +1195,8 @@ function words(text: string): string[] {
   return text.toLowerCase().match(/[a-z0-9+#]+(?:\.[a-z0-9+#]+)*/g) ?? [];
 }
 
-function normOrg(value: string): string {
+function normOrg(value: unknown): string {
+  if (typeof value !== "string") return "";
   return value
     .toLowerCase()
     .replace(/&/g, " and ")

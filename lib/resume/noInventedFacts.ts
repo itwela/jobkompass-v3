@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   checkNoInventedExperience,
+  resumeEvidenceLines,
   type CheckOptions,
 } from "../../tests/no-invented-experience/checker";
 
@@ -29,10 +30,44 @@ export type FactGuard = {
 };
 
 export function applyFactGuard<T>(guard: FactGuard | undefined, value: T): T {
-  if (guard?.source == null || guard.source === "") return value;
-  return scrubInventedExperience(guard.source, value, {
+  if (!guard) return value;
+  const source = guard.source == null || guard.source === "" ? EMPTY_CANDIDATE : guard.source;
+  return scrubInventedExperience(source, value, {
     applicationTarget: guard.applicationTarget,
   });
+}
+
+function parseModelPayload(rawText: string): unknown {
+  const trimmed = rawText.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+  if (candidate.startsWith("{") || candidate.startsWith("[")) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      return rawText;
+    }
+  }
+  return rawText;
+}
+
+/**
+ * Guard one chat turn. The source is a saved resume or Resume: JSON in this
+ * message. Earlier conversation turns are not a source. With neither, the
+ * turn is still scrubbed against an empty candidate so invented employers,
+ * dates, and durations are not returned.
+ */
+export function guardChatTurn(input: {
+  message: string;
+  rawText: string;
+  savedResume?: unknown | null;
+}): { saved: unknown; streamed: string; toolArguments: unknown; guardOn: boolean } {
+  const pasted = resumeJsonFromText(input.message);
+  const source = input.savedResume ?? pasted ?? null;
+  const guardOn = source != null;
+  const saved = scrubInventedExperience(guardOn ? source : EMPTY_CANDIDATE, parseModelPayload(input.rawText));
+  const streamed = typeof saved === "string" ? saved : JSON.stringify(saved, null, 2);
+  return { saved, streamed, toolArguments: saved, guardOn };
 }
 
 type JobKey = "experience" | "internships" | "earlyCareer";
@@ -260,25 +295,144 @@ function overlayFromSource(source: Record<string, any>, output: Record<string, a
   return next;
 }
 
-function jobsFromGroundingText(text: string) {
-  const jobs: Array<{ title: string; company: string; date: string; location: string; details: string[] }> = [];
-  let current: (typeof jobs)[number] | null = null;
-  for (const raw of text.split("\n")) {
+type GroundedJob = { title: string; company: string; date: string; location: string; details: string[] };
+type GroundedSchool = { name: string; degree: string; startDate: string; endDate: string; details: string[] };
+type GroundedCert = { name: string; issuer: string; date: string };
+
+function sectionName(line: string): "experience" | "education" | "skills" | "certs" | "projects" | null {
+  if (/^(experience|work experience)$/i.test(line)) return "experience";
+  if (/^education$/i.test(line)) return "education";
+  if (/^skills$/i.test(line)) return "skills";
+  if (/^certifications?$/i.test(line)) return "certs";
+  if (/^projects$/i.test(line)) return "projects";
+  return null;
+}
+
+function headerParts(line: string): { left: string; right: string } | null {
+  const header = line.match(/^(.+?)\s+[—–]\s+(.+)$/);
+  if (!header) return null;
+  if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header[1])) return null;
+  return { left: header[1].trim(), right: header[2].trim() };
+}
+
+function assignYearRange(school: { startDate: string; endDate: string }, line: string) {
+  const years = line.match(/\b(?:19|20)\d{2}\b/g) ?? [];
+  if (years.length >= 2) {
+    school.startDate = years[0] ?? "";
+    school.endDate = years[years.length - 1] ?? "";
+  } else if (years.length === 1 && !school.endDate) {
+    school.endDate = years[0] ?? "";
+  }
+}
+
+/** Experience headers are jobs. Education and certification headers stay in those sections. */
+function parseGrounding(text: string) {
+  const jobs: GroundedJob[] = [];
+  const education: GroundedSchool[] = [];
+  const certifications: GroundedCert[] = [];
+  const skills: string[] = [];
+  let section: "header" | "experience" | "education" | "skills" | "certs" | "projects" = "header";
+  let currentJob: GroundedJob | null = null;
+  let currentSchool: GroundedSchool | null = null;
+  for (const raw of groundingResumeText(text).split("\n")) {
     const line = raw.trim();
     if (!line) continue;
-    if (isCandidateInstruction(line)) break;
-    if (/^(experience|education|skills|projects|certifications)$/i.test(line)) continue;
-    if (/^[-•]\s+/.test(line)) {
-      if (current) current.details.push(line.replace(/^[-•]\s+/, ""));
+    const nextSection = sectionName(line);
+    if (nextSection) {
+      section = nextSection;
+      currentJob = null;
+      currentSchool = null;
       continue;
     }
-    const header = line.match(/^(.+?)\s+[—–]\s+(.+)$/);
-    if (header && !/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d)/i.test(header[1])) {
-      current = { title: header[1].trim(), company: header[2].trim(), date: "", location: "", details: [] };
-      jobs.push(current);
+    if (/^[-•]\s+/.test(line)) {
+      const bullet = line.replace(/^[-•]\s+/, "");
+      if ((section === "experience" || section === "header") && currentJob) currentJob.details.push(bullet);
+      else if (section === "education" && currentSchool) currentSchool.details.push(bullet);
+      continue;
+    }
+    const header = headerParts(line);
+    if (section === "education") {
+      if (header) {
+        currentSchool = { degree: header.left, name: header.right, startDate: "", endDate: "", details: [] };
+        education.push(currentSchool);
+      } else if (currentSchool) assignYearRange(currentSchool, line);
+      continue;
+    }
+    if (section === "certs") {
+      if (header) {
+        certifications.push({ name: header.left, issuer: header.right, date: "" });
+        continue;
+      }
+      const year = line.match(/\b((?:19|20)\d{2})\b/);
+      const last = certifications[certifications.length - 1];
+      if (year && last && !last.date) last.date = year[1];
+      continue;
+    }
+    if (section === "skills") {
+      skills.push(...line.split(",").map((part) => part.trim()).filter(Boolean));
+      continue;
+    }
+    if (section === "projects") continue;
+    if (header) {
+      currentJob = { title: header.left, company: header.right, date: "", location: "", details: [] };
+      jobs.push(currentJob);
+      if (section === "header") section = "experience";
+      continue;
+    }
+    if (currentJob && !currentJob.date && (/\b(?:19|20)\d{2}\b/.test(line) || /\bpresent\b/i.test(line))) {
+      const [date, location] = line.split("|").map((part) => part.trim());
+      currentJob.date = date;
+      if (location) currentJob.location = location;
     }
   }
-  return jobs;
+  return { jobs, education, certifications, skills };
+}
+
+function jobsFromGroundingText(text: string) {
+  return parseGrounding(text).jobs;
+}
+
+function sameLabel(a: unknown, b: unknown): boolean {
+  return String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+}
+
+function educationFromGrounding(education: GroundedSchool[]) {
+  return education.map((school) => ({
+    name: school.name,
+    degree: school.degree,
+    field: null as string | null,
+    startDate: school.startDate || null,
+    endDate: school.endDate,
+    details: school.details,
+  }));
+}
+
+/**
+ * A model (or the text fallback) sometimes files "GED — School" and
+ * "Cert — Issuer" as extra jobs. Put them back in education and certifications.
+ */
+function restoreSectionsFromText(text: string, resume: Record<string, any>) {
+  const parsed = parseGrounding(text);
+  if (Array.isArray(resume.experience)) {
+    resume.experience = resume.experience.filter((job: Record<string, any>) => {
+      const school = parsed.education.some((item) => sameLabel(item.degree, job?.title) && sameLabel(item.name, job?.company));
+      const cert = parsed.certifications.some((item) => sameLabel(item.name, job?.title) && sameLabel(item.issuer, job?.company));
+      return !school && !cert;
+    });
+  }
+  if (!Array.isArray(resume.education) || resume.education.length === 0) {
+    resume.education = educationFromGrounding(parsed.education);
+  }
+  if (!Array.isArray(resume.certifications) || resume.certifications.length === 0) {
+    resume.certifications = parsed.certifications.map((cert) => ({ name: cert.name, issuer: cert.issuer, date: cert.date }));
+  }
+  const technical = Array.isArray(resume.skills?.technical) ? resume.skills.technical : [];
+  const additional = Array.isArray(resume.skills?.additional) ? resume.skills.additional : [];
+  const listed = Array.isArray(resume.skills) ? resume.skills : [];
+  if (technical.length + additional.length + listed.length === 0 && parsed.skills.length > 0) {
+    resume.skills = { technical: [], additional: parsed.skills };
+  }
+  return resume;
 }
 
 /** A resume built only from lines that look like the pasted resume, after instructions are cut off. */
@@ -288,7 +442,7 @@ export function fallbackResumeFromText(text: string, fallbackEmail?: string) {
   const email = lines.find((line) => /@/.test(line)) ?? fallbackEmail ?? "";
   const nameLine = lines.find((line) => line !== email && !/@/.test(line) && !/^[-•]/.test(line)) ?? "";
   const nameParts = nameLine.split(/\s+/).filter(Boolean);
-  const jobs = jobsFromGroundingText(grounding);
+  const parsed = parseGrounding(grounding);
   const summary = lines.find((line) => line.length > 40 && !line.includes("—") && !line.includes("–") && !/^[-•]/.test(line) && line !== nameLine) ?? "";
   return {
     personalInfo: {
@@ -297,26 +451,27 @@ export function fallbackResumeFromText(text: string, fallbackEmail?: string) {
       email,
       summary,
     },
-    experience: jobs,
-    education: [],
+    experience: parsed.jobs,
+    education: educationFromGrounding(parsed.education),
     projects: [],
-    skills: { technical: [], additional: [] as string[] },
-    certifications: [],
+    skills: { technical: [] as string[], additional: parsed.skills },
+    certifications: parsed.certifications.map((cert) => ({ name: cert.name, issuer: cert.issuer, date: cert.date })),
   };
 }
 
 function rehydrateFromText(text: string, resume: Record<string, any>) {
   const parsed = jobsFromGroundingText(text);
-  const bullets = parsed.flatMap((job) => job.details);
   if (!Array.isArray(resume.experience) || resume.experience.length === 0) {
     if (parsed.length > 0) resume.experience = parsed;
     return resume;
   }
   for (const job of resume.experience) {
-    const filled = Array.isArray(job.details) ? job.details.filter((detail: string) => typeof detail === "string" && detail.trim()) : [];
-    if (filled.length > 0) continue;
     const match = parsed.find((item) => orgsMatch(item.company, job.company));
-    job.details = match?.details?.length ? match.details : bullets;
+    if (!match) continue;
+    const filled = Array.isArray(job.details) ? job.details.filter((detail: string) => typeof detail === "string" && detail.trim()) : [];
+    if (filled.length === 0 && match.details.length > 0) job.details = match.details;
+    if (!String(job.date ?? "").trim() && match.date) job.date = match.date;
+    if (!String(job.location ?? "").trim() && match.location) job.location = match.location;
   }
   return resume;
 }
@@ -335,24 +490,152 @@ function dropPostingFields(value: unknown): unknown {
 
 function collapseCopiedJobs(resume: Record<string, any>) {
   if (!Array.isArray(resume.experience)) return resume;
-  const seen = new Set<string>();
-  resume.experience = resume.experience.filter((job: Record<string, any>) => {
-    const key = JSON.stringify([job?.company, job?.title, job?.date, job?.details]).toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const kept: Record<string, any>[] = [];
+  for (const job of resume.experience) {
+    const company = String(job?.company ?? "").trim().toLowerCase();
+    const date = String(job?.date ?? "").trim().toLowerCase();
+    const details = (Array.isArray(job?.details) ? job.details : []).map((detail: unknown) => String(detail).trim().toLowerCase());
+    const sameEmployerAndDates = kept.some((prev) => {
+      const prevCompany = String(prev?.company ?? "").trim().toLowerCase();
+      const prevDate = String(prev?.date ?? "").trim().toLowerCase();
+      return company.length > 0 && company === prevCompany && date.length > 0 && date === prevDate;
+    });
+    const copiedDatesAndBullets = kept.some((prev) => {
+      const prevCompany = String(prev?.company ?? "").trim().toLowerCase();
+      const prevDate = String(prev?.date ?? "").trim().toLowerCase();
+      if (!date || date !== prevDate || !prevCompany || company === prevCompany) return false;
+      const prevDetails = (Array.isArray(prev?.details) ? prev.details : []).map((detail: unknown) => String(detail).trim().toLowerCase());
+      if (details.length === 0) return true;
+      return details.every((bullet: string) => prevDetails.some((prevBullet: string) => prevBullet === bullet || prevBullet.includes(bullet) || bullet.includes(prevBullet)));
+    });
+    if (sameEmployerAndDates || copiedDatesAndBullets) continue;
+    kept.push(job);
+  }
+  resume.experience = kept;
   return resume;
 }
 
+const LOOSE_KNOWN_KEYS = new Set([
+  "personalinfo",
+  "experience",
+  "education",
+  "projects",
+  "skills",
+  "certifications",
+  "internships",
+  "earlycareer",
+  "corecompetencies",
+  "jobinfo",
+  "lettercontent",
+  "targetcompany",
+  "templateid",
+  "additionalinfo",
+  "work",
+  "company",
+  "title",
+  "date",
+  "location",
+  "details",
+  "summary",
+  "name",
+  "degree",
+  "field",
+  "startdate",
+  "enddate",
+  "issuer",
+  "description",
+  "technologies",
+  "technical",
+  "additional",
+  "firstname",
+  "lastname",
+  "email",
+  "phone",
+  "linkedin",
+  "github",
+  "portfolio",
+  "citizenship",
+  "openingparagraph",
+  "bodyparagraphs",
+  "closingparagraph",
+  "position",
+  "hiringmanagername",
+  "companyaddress",
+]);
+
+function isJobLike(item: unknown): boolean {
+  return !!item && typeof item === "object" && ("company" in (item as object) || "title" in (item as object));
+}
+
+function isNestedResume(value: object): boolean {
+  return "experience" in value || "personalInfo" in value || "letterContent" in value || "education" in value;
+}
+
+/** A proper name in an extra field is not evidence just because the model repeated it. */
+function mentionsNameOutsideSource(text: string, source: unknown): boolean {
+  const corpus = JSON.stringify(source ?? "").toLowerCase();
+  const names = text.match(/\b[A-Z][A-Za-z]{2,}\b/g) ?? [];
+  return names.some((name) => !corpus.includes(name.toLowerCase()));
+}
+
+/** Unknown keys, non-English job lists, and numeric durations are not exempt. */
+function scrubLooseFields(source: unknown, value: unknown, options: CheckOptions) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => scrubLooseFields(source, item, options));
+    return;
+  }
+  const record = asRecord(value);
+  if (!record) return;
+  for (const key of Object.keys(record)) {
+    const norm = key.toLowerCase().replace(/[^a-z]/g, "");
+    const child = record[key];
+    if (typeof child === "number") {
+      if (checkNoInventedExperience(source, String(child), options).length > 0) delete record[key];
+      continue;
+    }
+    if (!LOOSE_KNOWN_KEYS.has(norm) && child && typeof child === "object" && !Array.isArray(child)) {
+      const rendered = JSON.stringify(child);
+      if (!isNestedResume(child as object) && (checkNoInventedExperience(source, rendered, options).length > 0 || mentionsNameOutsideSource(rendered, source))) {
+        delete record[key];
+        continue;
+      }
+    }
+    if (!LOOSE_KNOWN_KEYS.has(norm) && typeof child === "string" && mentionsNameOutsideSource(child, source)) {
+      delete record[key];
+      continue;
+    }
+    if (!LOOSE_KNOWN_KEYS.has(norm) && Array.isArray(child) && child.some((item) => isJobLike(item))) {
+      const kept = child.filter((job) => !isJobLike(job) || checkNoInventedExperience(source, { experience: [job] }, options).length === 0);
+      if (kept.length === 0) delete record[key];
+      else record[key] = kept;
+      continue;
+    }
+    if (!LOOSE_KNOWN_KEYS.has(norm) && typeof child === "string") {
+      const asBullet = { experience: [{ details: [child] }] };
+      if (
+        checkNoInventedExperience(source, child, options).length > 0 ||
+        checkNoInventedExperience(source, asBullet, options).length > 0
+      ) {
+        delete record[key];
+      }
+      continue;
+    }
+    if (child && typeof child === "object") scrubLooseFields(source, child, options);
+  }
+}
+
 function scrubResume(source: unknown, output: Record<string, any>, options: CheckOptions) {
-  if (checkNoInventedExperience(source, output, options).length === 0) return collapseCopiedJobs(structuredClone(output));
+  let current = structuredClone(output);
+  if (typeof source === "string" && source.trim()) {
+    rehydrateFromText(source, current);
+    restoreSectionsFromText(source, current);
+  }
+  if (checkNoInventedExperience(source, current, options).length === 0) return collapseCopiedJobs(current);
   const sourceRecord = asRecord(source);
   if (sourceRecord && ("experience" in sourceRecord || "personalInfo" in sourceRecord || "education" in sourceRecord)) {
     const overlaid = collapseCopiedJobs(overlayFromSource(sourceRecord, output, options));
     if (checkNoInventedExperience(source, overlaid, options).length === 0) return overlaid;
   }
-  let current = structuredClone(output);
   for (let pass = 0; pass < 48; pass++) {
     const violations = checkNoInventedExperience(source, current, options);
     if (violations.length === 0) break;
@@ -360,7 +643,10 @@ function scrubResume(source: unknown, output: Record<string, any>, options: Chec
     if (JSON.stringify(next) === JSON.stringify(current)) break;
     current = next;
   }
-  if (typeof source === "string" && source.trim()) rehydrateFromText(source, current);
+  if (typeof source === "string" && source.trim()) {
+    rehydrateFromText(source, current);
+    restoreSectionsFromText(source, current);
+  }
   if (checkNoInventedExperience(source, current, options).length === 0) return current;
   if (sourceRecord && ("experience" in sourceRecord || "personalInfo" in sourceRecord)) {
     const fallback = structuredClone(sourceRecord);
@@ -467,7 +753,13 @@ function unwrapRecord(record: Record<string, any>): { key: string | null; inner:
 
 export function scrubInventedExperience<T>(source: unknown, output: T, options: CheckOptions = {}): T {
   const finish = (value: T) => {
-    const cleaned = (value && typeof value === "object" ? dropPostingFields(value) : value) as T;
+    const dropped = value && typeof value === "object" ? dropPostingFields(value) : value;
+    const record = asRecord(dropped);
+    if (record) {
+      collapseCopiedJobs(record);
+      scrubLooseFields(source, record, options);
+    }
+    const cleaned = (record ?? dropped) as T;
     logScrub("scrub", source, output, cleaned, options);
     return cleaned;
   };
@@ -492,7 +784,23 @@ export function scrubInventedExperience<T>(source: unknown, output: T, options: 
   if ("personalInfo" in record || "experience" in record || "education" in record || "skills" in record || "work" in record) {
     return finish(scrubResume(source, record, options) as T);
   }
-  return finish(scrubGeneric(source, record, options) as T);
+  const wrapped = scrubNestedResumes(source, record, options);
+  return finish(wrapped as T);
+}
+
+function scrubNestedResumes(source: unknown, record: Record<string, any>, options: CheckOptions) {
+  const next: Record<string, any> = {};
+  let nested = false;
+  for (const [key, child] of Object.entries(record)) {
+    const inner = asRecord(child);
+    if (inner && ("experience" in inner || "personalInfo" in inner || "letterContent" in inner || "education" in inner)) {
+      next[key] = scrubInventedExperience(source, inner, options);
+      nested = true;
+      continue;
+    }
+    next[key] = child;
+  }
+  return nested ? next : scrubGeneric(source, record, options);
 }
 
 export function scrubAssistantMessage(source: unknown, message: string, options: CheckOptions = {}): string {
@@ -508,11 +816,11 @@ export function scrubAssistantMessage(source: unknown, message: string, options:
   }
   const kept = updates.filter((update) => {
     const value = update?.value;
-    if (typeof value !== "string") return false;
-    return checkNoInventedExperience(source, value, options).length === 0;
+    if (typeof value !== "string" || !value.trim()) return false;
+    return bulletGrounded(source, value, options);
   });
   const proseSource = match ? message.replace(match[0], " ") : message;
-  const prose = scrubProse(source, proseSource, options);
+  const prose = splitSentences(proseSource).filter((sentence) => bulletGrounded(source, sentence, options)).join(" ");
   const combined = kept.length === 0
     ? prose.trim()
     : `${prose.trim()}\n\n\`\`\`updates\n${JSON.stringify(kept, null, 2)}\n\`\`\``.trim();
@@ -520,6 +828,11 @@ export function scrubAssistantMessage(source: unknown, message: string, options:
   // A one-line field fill (sparkle) must stay empty. A longer reply gets a claim-free note.
   if (message.trim().length <= 160 && !/```/.test(message)) return "";
   return "I can only rephrase facts already on the resume.";
+}
+
+function bulletGrounded(source: unknown, text: string, options: CheckOptions): boolean {
+  if (checkNoInventedExperience(source, text, options).length > 0) return false;
+  return checkNoInventedExperience(source, { experience: [{ details: [text] }] }, options).length === 0;
 }
 
 /** A line the user typed as an instruction, not a line from the resume. */
@@ -534,12 +847,7 @@ export function isCandidateInstruction(line: string): boolean {
  * Those lines are never evidence about the candidate.
  */
 export function groundingResumeText(text: string): string {
-  const kept: string[] = [];
-  for (const line of text.split("\n")) {
-    if (isCandidateInstruction(line)) break;
-    kept.push(line);
-  }
-  return kept.join("\n").trim();
+  return resumeEvidenceLines(text).join("\n").trim();
 }
 
 /** Text under "Resume context:" and before the user's instruction. Job text after that is not evidence. */

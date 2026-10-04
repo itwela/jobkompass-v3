@@ -100,6 +100,17 @@ describe("checker allows harmless rewording", () => {
     ).toEqual([]);
   });
 
+  it("does not crash when a skill value is not a string", () => {
+    const source = {
+      experience: [{ company: "Red Wagon Market", title: "Cashier", date: "Jun 2022 - Aug 2023", details: ["Rang up groceries"] }],
+    };
+    const output = {
+      ...structuredClone(source),
+      skills: { technical: [1 as unknown as string], additional: ["cash handling"] },
+    };
+    expect(() => checkNoInventedExperience(source, output)).not.toThrow();
+  });
+
   it("accepts a cashier bullet rewritten with the same drawer and cash facts", () => {
     const cashier = {
       personalInfo: { summary: "Retail cashier." },
