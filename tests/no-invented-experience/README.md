@@ -29,15 +29,7 @@ Live tailor, extraction, and reply drafts call the real functions. Chat, templat
 
 The default suite does not expect failures for these paths. Live checks, including the adversarial fixture, stay out of CI.
 
-`round3.adversarial.live.test.ts` adds a warehouse resume (Samir Cole: GED and a forklift certification) and asserts the value the production function returns or saves. Deterministic cases in that file run in the default suite.
-
-## What code enforces, and what is prompt-only
-
-Code enforces the checker after the model returns, on these paths: email tailor, reply drafts, resume extraction (including a PDF whose local text is empty, which is scrubbed against an empty candidate so unverified employers are removed), My Jobs tailored resumes and cover letters (including the tool-not-called error body), chat (pasted `Resume:` JSON, a resume loaded with `getResumeById`, or the signed-in user's saved resume looked up on the server), and the resume assistant. Earlier chat turns are not a source. A turn with no saved resume and no pasted resume JSON is still scrubbed against an empty candidate.
-
-Copy-to-AI (`lib/copyToAiPrompts.ts`) is prompt-only. The prompt tells the outside model to treat the job posting as untrusted, never add facts from it, and paste the posting separately from the resume. JobKompass does not see that model's reply, so this rule cannot be enforced. Live tests assert the raw model JSON. A failure there is a real gap, not a scrubber miss.
-
-A PDF with no extractable text has no resume to ground claims in. The scrubber then removes employers it cannot verify, including ones that were really on the page. Paste selectable text when the PDF is a scan.
+`round3.adversarial.live.test.ts` adds a warehouse resume (Samir Cole: GED and a forklift certification) and asserts the value the production function returns or saves. Copy-to-AI is asserted on the raw model text, because that path has no server scrubber. Deterministic cases in that file run in the default suite.
 
 ## What default mode covers
 
@@ -75,4 +67,4 @@ These paths now have passing prompt checks: email tailor, resume extraction, fre
 
 ## Checker limits
 
-The checker is deterministic. It allows date-format changes, degree abbreviations (`B.S.` vs `Bachelor of Science`), skill aliases (`JS` vs `JavaScript`), and bullets that share at least two concrete source words and add no new hard fact. The job word "associate" is not a degree. Employers, schools, degrees, and certifications count only when they appear in structured resume fields (job headers, education lines, certification lines, skill lines), not in a prose sentence. It is not a paraphrase model: a rewrite that swaps in new nouns can be flagged even when a person would call it harmless. Job-description text passed into the checker is ignored on purpose.
+The checker is deterministic. It allows date-format changes, degree abbreviations (`B.S.` vs `Bachelor of Science`), skill aliases (`JS` vs `JavaScript`), and bullets whose content words already appear in the source. It is not a paraphrase model: a rewrite that swaps in new nouns can be flagged even when a person would call it harmless. Job-description text passed into the checker is ignored on purpose.

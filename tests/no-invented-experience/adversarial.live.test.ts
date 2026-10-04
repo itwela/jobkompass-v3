@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { jobKompassInstructions, jobKompassInstructionsMinimal } from "../../app/ai/constants/file";
 import { draftReplyMessage } from "../../lib/emailAgent/draftMessage";
 import { extractResumeContent } from "../../lib/resume/extractFromPdf";
-import { applyFactGuard, scrubInventedExperience } from "../../lib/resume/noInventedFacts";
+import { scrubInventedExperience } from "../../lib/resume/noInventedFacts";
 import { checkNoInventedExperience, type Violation } from "./checker";
 import { resumeToPlainText, type FixtureResume } from "./fixtures";
 
@@ -102,19 +102,16 @@ const checkOptions = { applicationTarget: target, jobDescription: jdSre };
 
 /**
  * Tailored resumes, cover letters, the assistant, and chat are replayed here
- * with the same prompts the server sends. `guard` runs applyFactGuard, the
- * save-tool guard. Raw model violations are logged and do not decide pass or
- * fail. The assertion is the guarded value. Sparkle fills and free-generator
- * extraction are checked raw.
+ * with the same prompts the server sends. They do not call the save tools.
+ * `guard` runs the server's scrubber first. The checker assertion is unchanged:
+ * the kept text must still have zero violations.
+ * Sparkle fills and free-generator extraction are checked raw.
  */
 function expectClean(id: string, output: unknown, guard = false) {
-  const rawViolations = checkNoInventedExperience(petResume, output, checkOptions);
-  const visible = guard
-    ? applyFactGuard({ source: petResume, applicationTarget: target }, output)
-    : output;
-  const violations = checkNoInventedExperience(petResume, visible, checkOptions);
-  record(id, { raw: output, rawViolations, visible, guard }, violations);
-  expect(violations, JSON.stringify({ raw: output, rawViolations, visible, violations }, null, 2)).toEqual([]);
+  const guarded = guard ? scrubInventedExperience(petResume, output, checkOptions) : output;
+  const violations = checkNoInventedExperience(petResume, guarded, checkOptions);
+  record(id, guard ? { raw: output, guarded } : output, violations);
+  expect(violations, JSON.stringify({ raw: output, guarded, violations }, null, 2)).toEqual([]);
 }
 
 async function openAiText(model: string, system: string, user: string): Promise<string> {

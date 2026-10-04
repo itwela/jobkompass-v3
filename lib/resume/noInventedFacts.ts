@@ -8,7 +8,6 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   checkNoInventedExperience,
-  resumeEvidenceLines,
   type CheckOptions,
 } from "../../tests/no-invented-experience/checker";
 
@@ -30,44 +29,10 @@ export type FactGuard = {
 };
 
 export function applyFactGuard<T>(guard: FactGuard | undefined, value: T): T {
-  if (!guard) return value;
-  const source = guard.source == null || guard.source === "" ? EMPTY_CANDIDATE : guard.source;
-  return scrubInventedExperience(source, value, {
+  if (guard?.source == null || guard.source === "") return value;
+  return scrubInventedExperience(guard.source, value, {
     applicationTarget: guard.applicationTarget,
   });
-}
-
-function parseModelPayload(rawText: string): unknown {
-  const trimmed = rawText.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1].trim() : trimmed;
-  if (candidate.startsWith("{") || candidate.startsWith("[")) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      return rawText;
-    }
-  }
-  return rawText;
-}
-
-/**
- * Guard one chat turn. The source is a saved resume or Resume: JSON in this
- * message. Earlier conversation turns are not a source. With neither, the
- * turn is still scrubbed against an empty candidate so invented employers,
- * dates, and durations are not returned.
- */
-export function guardChatTurn(input: {
-  message: string;
-  rawText: string;
-  savedResume?: unknown | null;
-}): { saved: unknown; streamed: string; toolArguments: unknown; guardOn: boolean } {
-  const pasted = resumeJsonFromText(input.message);
-  const source = input.savedResume ?? pasted ?? null;
-  const guardOn = source != null;
-  const saved = scrubInventedExperience(guardOn ? source : EMPTY_CANDIDATE, parseModelPayload(input.rawText));
-  const streamed = typeof saved === "string" ? saved : JSON.stringify(saved, null, 2);
-  return { saved, streamed, toolArguments: saved, guardOn };
 }
 
 type JobKey = "experience" | "internships" | "earlyCareer";
@@ -298,9 +263,10 @@ function overlayFromSource(source: Record<string, any>, output: Record<string, a
 function jobsFromGroundingText(text: string) {
   const jobs: Array<{ title: string; company: string; date: string; location: string; details: string[] }> = [];
   let current: (typeof jobs)[number] | null = null;
-  for (const raw of groundingResumeText(text).split("\n")) {
+  for (const raw of text.split("\n")) {
     const line = raw.trim();
     if (!line) continue;
+    if (isCandidateInstruction(line)) break;
     if (/^(experience|education|skills|projects|certifications)$/i.test(line)) continue;
     if (/^[-•]\s+/.test(line)) {
       if (current) current.details.push(line.replace(/^[-•]\s+/, ""));
@@ -369,138 +335,14 @@ function dropPostingFields(value: unknown): unknown {
 
 function collapseCopiedJobs(resume: Record<string, any>) {
   if (!Array.isArray(resume.experience)) return resume;
-  const kept: Record<string, any>[] = [];
-  for (const job of resume.experience) {
-    const company = String(job?.company ?? "").trim().toLowerCase();
-    const date = String(job?.date ?? "").trim().toLowerCase();
-    const details = (Array.isArray(job?.details) ? job.details : []).map((detail: unknown) => String(detail).trim().toLowerCase());
-    const sameEmployerAndDates = kept.some((prev) => {
-      const prevCompany = String(prev?.company ?? "").trim().toLowerCase();
-      const prevDate = String(prev?.date ?? "").trim().toLowerCase();
-      return company.length > 0 && company === prevCompany && date.length > 0 && date === prevDate;
-    });
-    const copiedDatesAndBullets = kept.some((prev) => {
-      const prevCompany = String(prev?.company ?? "").trim().toLowerCase();
-      const prevDate = String(prev?.date ?? "").trim().toLowerCase();
-      if (!date || date !== prevDate || !prevCompany || company === prevCompany) return false;
-      const prevDetails = (Array.isArray(prev?.details) ? prev.details : []).map((detail: unknown) => String(detail).trim().toLowerCase());
-      if (details.length === 0) return true;
-      return details.every((bullet: string) => prevDetails.some((prevBullet: string) => prevBullet === bullet || prevBullet.includes(bullet) || bullet.includes(prevBullet)));
-    });
-    if (sameEmployerAndDates || copiedDatesAndBullets) continue;
-    kept.push(job);
-  }
-  resume.experience = kept;
+  const seen = new Set<string>();
+  resume.experience = resume.experience.filter((job: Record<string, any>) => {
+    const key = JSON.stringify([job?.company, job?.title, job?.date, job?.details]).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return resume;
-}
-
-const LOOSE_KNOWN_KEYS = new Set([
-  "personalinfo",
-  "experience",
-  "education",
-  "projects",
-  "skills",
-  "certifications",
-  "internships",
-  "earlycareer",
-  "corecompetencies",
-  "jobinfo",
-  "lettercontent",
-  "targetcompany",
-  "templateid",
-  "additionalinfo",
-  "work",
-  "company",
-  "title",
-  "date",
-  "location",
-  "details",
-  "summary",
-  "name",
-  "degree",
-  "field",
-  "startdate",
-  "enddate",
-  "issuer",
-  "description",
-  "technologies",
-  "technical",
-  "additional",
-  "firstname",
-  "lastname",
-  "email",
-  "phone",
-  "linkedin",
-  "github",
-  "portfolio",
-  "citizenship",
-  "openingparagraph",
-  "bodyparagraphs",
-  "closingparagraph",
-  "position",
-  "hiringmanagername",
-  "companyaddress",
-]);
-
-function isJobLike(item: unknown): boolean {
-  return !!item && typeof item === "object" && ("company" in (item as object) || "title" in (item as object));
-}
-
-function isNestedResume(value: object): boolean {
-  return "experience" in value || "personalInfo" in value || "letterContent" in value || "education" in value;
-}
-
-/** A proper name in an extra field is not evidence just because the model repeated it. */
-function mentionsNameOutsideSource(text: string, source: unknown): boolean {
-  const corpus = JSON.stringify(source ?? "").toLowerCase();
-  const names = text.match(/\b[A-Z][A-Za-z]{2,}\b/g) ?? [];
-  return names.some((name) => !corpus.includes(name.toLowerCase()));
-}
-
-/** Unknown keys, non-English job lists, and numeric durations are not exempt. */
-function scrubLooseFields(source: unknown, value: unknown, options: CheckOptions) {
-  if (Array.isArray(value)) {
-    value.forEach((item) => scrubLooseFields(source, item, options));
-    return;
-  }
-  const record = asRecord(value);
-  if (!record) return;
-  for (const key of Object.keys(record)) {
-    const norm = key.toLowerCase().replace(/[^a-z]/g, "");
-    const child = record[key];
-    if (typeof child === "number") {
-      if (checkNoInventedExperience(source, String(child), options).length > 0) delete record[key];
-      continue;
-    }
-    if (!LOOSE_KNOWN_KEYS.has(norm) && child && typeof child === "object" && !Array.isArray(child)) {
-      const rendered = JSON.stringify(child);
-      if (!isNestedResume(child as object) && (checkNoInventedExperience(source, rendered, options).length > 0 || mentionsNameOutsideSource(rendered, source))) {
-        delete record[key];
-        continue;
-      }
-    }
-    if (!LOOSE_KNOWN_KEYS.has(norm) && typeof child === "string" && mentionsNameOutsideSource(child, source)) {
-      delete record[key];
-      continue;
-    }
-    if (!LOOSE_KNOWN_KEYS.has(norm) && Array.isArray(child) && child.some((item) => isJobLike(item))) {
-      const kept = child.filter((job) => !isJobLike(job) || checkNoInventedExperience(source, { experience: [job] }, options).length === 0);
-      if (kept.length === 0) delete record[key];
-      else record[key] = kept;
-      continue;
-    }
-    if (!LOOSE_KNOWN_KEYS.has(norm) && typeof child === "string") {
-      const asBullet = { experience: [{ details: [child] }] };
-      if (
-        checkNoInventedExperience(source, child, options).length > 0 ||
-        checkNoInventedExperience(source, asBullet, options).length > 0
-      ) {
-        delete record[key];
-      }
-      continue;
-    }
-    if (child && typeof child === "object") scrubLooseFields(source, child, options);
-  }
 }
 
 function scrubResume(source: unknown, output: Record<string, any>, options: CheckOptions) {
@@ -625,13 +467,7 @@ function unwrapRecord(record: Record<string, any>): { key: string | null; inner:
 
 export function scrubInventedExperience<T>(source: unknown, output: T, options: CheckOptions = {}): T {
   const finish = (value: T) => {
-    const dropped = value && typeof value === "object" ? dropPostingFields(value) : value;
-    const record = asRecord(dropped);
-    if (record) {
-      collapseCopiedJobs(record);
-      scrubLooseFields(source, record, options);
-    }
-    const cleaned = (record ?? dropped) as T;
+    const cleaned = (value && typeof value === "object" ? dropPostingFields(value) : value) as T;
     logScrub("scrub", source, output, cleaned, options);
     return cleaned;
   };
@@ -656,23 +492,7 @@ export function scrubInventedExperience<T>(source: unknown, output: T, options: 
   if ("personalInfo" in record || "experience" in record || "education" in record || "skills" in record || "work" in record) {
     return finish(scrubResume(source, record, options) as T);
   }
-  const wrapped = scrubNestedResumes(source, record, options);
-  return finish(wrapped as T);
-}
-
-function scrubNestedResumes(source: unknown, record: Record<string, any>, options: CheckOptions) {
-  const next: Record<string, any> = {};
-  let nested = false;
-  for (const [key, child] of Object.entries(record)) {
-    const inner = asRecord(child);
-    if (inner && ("experience" in inner || "personalInfo" in inner || "letterContent" in inner || "education" in inner)) {
-      next[key] = scrubInventedExperience(source, inner, options);
-      nested = true;
-      continue;
-    }
-    next[key] = child;
-  }
-  return nested ? next : scrubGeneric(source, record, options);
+  return finish(scrubGeneric(source, record, options) as T);
 }
 
 export function scrubAssistantMessage(source: unknown, message: string, options: CheckOptions = {}): string {
@@ -688,11 +508,11 @@ export function scrubAssistantMessage(source: unknown, message: string, options:
   }
   const kept = updates.filter((update) => {
     const value = update?.value;
-    if (typeof value !== "string" || !value.trim()) return false;
-    return bulletGrounded(source, value, options);
+    if (typeof value !== "string") return false;
+    return checkNoInventedExperience(source, value, options).length === 0;
   });
   const proseSource = match ? message.replace(match[0], " ") : message;
-  const prose = splitSentences(proseSource).filter((sentence) => bulletGrounded(source, sentence, options)).join(" ");
+  const prose = scrubProse(source, proseSource, options);
   const combined = kept.length === 0
     ? prose.trim()
     : `${prose.trim()}\n\n\`\`\`updates\n${JSON.stringify(kept, null, 2)}\n\`\`\``.trim();
@@ -700,11 +520,6 @@ export function scrubAssistantMessage(source: unknown, message: string, options:
   // A one-line field fill (sparkle) must stay empty. A longer reply gets a claim-free note.
   if (message.trim().length <= 160 && !/```/.test(message)) return "";
   return "I can only rephrase facts already on the resume.";
-}
-
-function bulletGrounded(source: unknown, text: string, options: CheckOptions): boolean {
-  if (checkNoInventedExperience(source, text, options).length > 0) return false;
-  return checkNoInventedExperience(source, { experience: [{ details: [text] }] }, options).length === 0;
 }
 
 /** A line the user typed as an instruction, not a line from the resume. */
@@ -719,7 +534,12 @@ export function isCandidateInstruction(line: string): boolean {
  * Those lines are never evidence about the candidate.
  */
 export function groundingResumeText(text: string): string {
-  return resumeEvidenceLines(text).join("\n").trim();
+  const kept: string[] = [];
+  for (const line of text.split("\n")) {
+    if (isCandidateInstruction(line)) break;
+    kept.push(line);
+  }
+  return kept.join("\n").trim();
 }
 
 /** Text under "Resume context:" and before the user's instruction. Job text after that is not evidence. */

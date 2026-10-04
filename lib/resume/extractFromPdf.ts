@@ -7,7 +7,7 @@ import type { ResumeContentForJake } from './generateJakeLatex';
 import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from '@/lib/aiModels';
 import { extractTextFromPdfBase64, isLikelyReadableResumeText } from './pdfToText';
 import { normalizeExtractedContent } from './normalizeResumeContent';
-import { EMPTY_CANDIDATE, fallbackResumeFromText, groundingResumeText, scrubInventedExperience } from './noInventedFacts';
+import { fallbackResumeFromText, groundingResumeText, scrubInventedExperience } from './noInventedFacts';
 
 /** Per-request cap so a stuck provider does not block resume upload for unbounded time. */
 const OPENROUTER_REQUEST_TIMEOUT_MS = 120_000;
@@ -272,12 +272,9 @@ export async function extractResumeContent(options: ExtractOptions): Promise<Res
     parsed = null;
   }
 
-  let normalized = parsed
+  const normalized = parsed
     ? normalizeExtractedContent(parsed, fallbackEmail)
     : normalizeExtractedContent(fallbackResumeFromText(grounding || textForLlm, fallbackEmail), fallbackEmail);
-  if (!grounding) {
-    normalized = scrubInventedExperience(EMPTY_CANDIDATE, normalized) as typeof normalized;
-  }
   if (!grounding) return normalized;
   const scrubbed = scrubInventedExperience(grounding, normalized);
   const experience = (scrubbed as { experience?: unknown[] }).experience;

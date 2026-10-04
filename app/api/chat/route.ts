@@ -15,35 +15,10 @@ import { jobKompassDescription, resumeBestPractices, jobKompassInstructions, job
 import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool, createGetUserResumePreferencesTool, createGetUserUsageTool } from '@/app/ai/tools/file';
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "@/convex/_generated/api";
 import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
 import { mcpTools } from '@/app/lib/mcp-tools';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
-import { guardChatTurn, resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
-
-/** Saved resume for this signed-in user. Earlier chat turns are not a source. */
-async function loadSignedInResume(
-  client: ConvexHttpClient,
-  contextResumeIds: string[] | undefined,
-): Promise<unknown | null> {
-  try {
-    for (const resumeId of contextResumeIds ?? []) {
-      if (!resumeId) continue;
-      try {
-        const resume = await client.query(api.documents.getResume, { resumeId: resumeId as never });
-        if (resume?.content) return resume.content;
-      } catch {
-        // A bad id is not resume evidence.
-      }
-    }
-    const resumes = await client.query(api.documents.listResumes);
-    if (!Array.isArray(resumes) || resumes.length === 0) return null;
-    const latest = [...resumes].sort((a, b) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0))[0];
-    return latest?.content ?? null;
-  } catch {
-    return null;
-  }
-}
+import { resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -102,12 +77,9 @@ export async function POST(request: NextRequest) {
 
     // Create tool *instances* for client-dependent tools
     // Pass the convexClient directly since it's already instantiated.
-    // Pasted resume JSON, a resume attached to this turn, or the signed-in user's
-    // saved resume. Earlier conversation turns are not a source of facts.
+    // Pasted resume JSON, or a resume loaded later by getResumeById, is the only
+    // source of facts for anything this turn saves or streams.
     const factGuard: FactGuard = { source: resumeJsonFromText(message) };
-    if (!factGuard.source) {
-      factGuard.source = await loadSignedInResume(convexClient, contextResumeIds);
-    }
     const toolInstancesWithConvexClient = [
       createGetUserUsageTool(convexClient), // Always available - check usage first
       createResumeJakeTemplateTool(convexClient, factGuard),
@@ -309,15 +281,6 @@ export async function POST(request: NextRequest) {
       for (const call of toolCalls) {
         if (call.name === "createResumeJakeTemplate" || call.name === "createCoverLetterJakeTemplate") {
           call.arguments = scrubInventedExperience(factGuard.source, call.arguments);
-        }
-      }
-    } else {
-      const guarded = guardChatTurn({ message, rawText: fullMessage });
-      fullMessage = guarded.streamed;
-      for (const call of toolCalls) {
-        if (call.name === "createResumeJakeTemplate" || call.name === "createCoverLetterJakeTemplate") {
-          const rawArgs = typeof call.arguments === "string" ? call.arguments : JSON.stringify(call.arguments ?? "");
-          call.arguments = guardChatTurn({ message, rawText: rawArgs }).toolArguments;
         }
       }
     }

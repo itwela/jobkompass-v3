@@ -7,7 +7,7 @@ import { Agent, run, user } from '@openai/agents';
 import { setDefaultOpenAIKey } from '@openai/agents';
 import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from '@/app/ai/tools/file';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
-import { EMPTY_CANDIDATE, NO_INVENTED_FACTS_RULE, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
+import { EMPTY_CANDIDATE, NO_INVENTED_FACTS_RULE, type FactGuard } from '@/lib/resume/noInventedFacts';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
@@ -400,7 +400,7 @@ ${resumePreferences.length > 0 && templateType === 'resume' ? `\nRESUME PREFEREN
         {
           success: false,
           error: 'Generation tool was not called. The agent may not have been able to generate the document.',
-          agentResponse: scrubInventedExperience(factGuard.source ?? EMPTY_CANDIDATE, result.finalOutput),
+          agentResponse: result.finalOutput,
         },
         { status: 500 }
       );
