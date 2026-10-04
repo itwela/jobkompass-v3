@@ -29,8 +29,6 @@ Live tailor, extraction, and reply drafts call the real functions. Chat, templat
 
 The default suite does not expect failures for these paths. Live checks, including the adversarial fixture, stay out of CI.
 
-`round3.adversarial.live.test.ts` adds a warehouse resume (Samir Cole: GED and a forklift certification) and asserts the value the production function returns or saves. Copy-to-AI is asserted on the raw model text, because that path has no server scrubber. Deterministic cases in that file run in the default suite.
-
 ## What default mode covers
 
 - Checker unit tests, including rewrites that should pass and invented facts that should fail.
