@@ -4,6 +4,7 @@ import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import { getFreeResumeTemplates, isValidResumeTemplateId } from '@/lib/templates';
 import { generateResumeLatex } from '@/lib/resume/generators';
+import { latexCompileRequestBody, latexServiceFailureMessage } from '@/lib/resume/latexCompile';
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 
@@ -160,17 +161,13 @@ export async function POST(request: NextRequest) {
     const compileResponse = await fetch(`${LATEX_SERVICE_URL}/compile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        latex: latexContent,
-        latexContent: latexContent,
-        filename: `resume-${uniqueId}`,
-      }),
+      body: JSON.stringify(latexCompileRequestBody(latexContent, `resume-${uniqueId}`)),
     });
 
     if (!compileResponse.ok) {
       const errorData = await compileResponse.json().catch(() => ({}));
       const log = errorData.log ?? '';
-      const details = log || errorData.error || compileResponse.statusText;
+      const details = latexServiceFailureMessage(errorData, compileResponse.statusText);
       console.error('LaTeX service error', { status: compileResponse.status, error: errorData.error, log });
       return NextResponse.json(
         { error: 'PDF generation failed', details: String(details) },

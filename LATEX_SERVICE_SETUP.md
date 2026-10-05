@@ -1,5 +1,49 @@
 # LaTeX Compilation Service Setup Guide
 
+## Production outage (October 2026)
+
+Resume and cover-letter PDFs compile on a separate service. Vercel `LATEX_SERVICE_URL` (all targets) is:
+
+`https://jobkompass-latex-service-production.up.railway.app`
+
+That Railway app is gone. `GET /health` and `POST /compile` (with either `latex` or `latexContent`) return HTTP 404:
+
+```json
+{"status":"error","code":404,"message":"Application not found"}
+```
+
+The Next.js export route treats any non-OK `/compile` response as `LaTeX compilation failed`, so every template fails the same way, including minimal input. This is not a bad TeX template.
+
+**P0 unblock:** restore a compiler at that exact URL, or deploy a replacement and point `LATEX_SERVICE_URL` at it. PDFs stay broken until `GET /health` is healthy and `POST /compile` returns a PDF. Do not change the Vercel env or Convex until that probe passes.
+
+### Probe (run with the production URL)
+
+```bash
+LATEX_SERVICE_URL=https://jobkompass-latex-service-production.up.railway.app
+
+curl -sS -m 20 -w "\nHTTP %{http_code}\n" "$LATEX_SERVICE_URL/health"
+
+curl -sS -m 60 -w "\nHTTP %{http_code}\n" "$LATEX_SERVICE_URL/compile" \
+  -H "Content-Type: application/json" \
+  -d '{"latex":"\\documentclass{article}\\begin{document}Hello\\end{document}","filename":"probe-latex"}'
+
+curl -sS -m 60 -w "\nHTTP %{http_code}\n" "$LATEX_SERVICE_URL/compile" \
+  -H "Content-Type: application/json" \
+  -d '{"latexContent":"\\documentclass{article}\\begin{document}Hello\\end{document}","filename":"probe-content"}'
+```
+
+Pass: `/health` is not the Railway 404 above, and both `/compile` calls return JSON with a non-empty `pdfBase64`. `latex` alone returning `latexContent is required` means the restored service still reads only `latexContent`. Clients in this repo send both names.
+
+### Restore checklist
+
+The service source is not in this repo. This file's recipe is Google Cloud Run, not Railway. Production was the Railway URL above.
+
+1. Prefer redeploying the existing Railway service `jobkompass-latex-service-production` so the URL does not change. No Vercel env edit in that case. There is no Railway config or Dockerfile in this repository; recover it from the Railway project or rebuild from the `server.js` and `Dockerfile` samples below (`/health` and `/compile`).
+2. If that Railway project cannot be restored, deploy a replacement with Step 5 (Cloud Run) or a new host, using a `server.js` that accepts both `latex` and `latexContent`.
+3. A new host URL must be set as Vercel `LATEX_SERVICE_URL` on Production, Preview, and Development. That env change needs owner approval. Do not do it until the probe against the new URL passes.
+4. Re-run the three curls above. Then generate one Jake resume and one Jake cover letter.
+5. Convex does not call `/compile` itself. It calls the Next.js export routes. A Convex push is only required for the agent hint to read `log` when `details` is missing. This app's export routes now set both. Push Convex only when you want that hint change live.
+
 ## Overview
 
 This guide will help you set up a Google Cloud Run service to handle LaTeX-to-PDF compilation. This solves the problem of `pdflatex` not being available in serverless environments.
@@ -120,10 +164,17 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 app.post('/compile', async (req, res) => {
-  const { latexContent, filename = 'document' } = req.body;
-  
-  if (!latexContent) {
-    return res.status(400).json({ error: 'latexContent is required' });
+  // Accept both names. JobKompass clients send `latex` and `latexContent`
+  // with the same TeX source. A service that reads only `latexContent`
+  // returns 400 for a body that sent only `latex`, which fails every template.
+  const latexContent = req.body.latexContent || req.body.latex;
+  const filename = req.body.filename || 'document';
+
+  if (!latexContent || typeof latexContent !== 'string') {
+    return res.status(400).json({
+      error: 'latexContent is required',
+      log: 'Send the TeX source as JSON field "latexContent" (alias "latex" is also accepted).',
+    });
   }
 
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -282,11 +333,16 @@ docker build -t latex-service .
 docker run -p 3000:3000 latex-service
 ```
 
-3. **Test the service:**
+3. **Test the service.** Both field names must compile. `filename` is optional.
+
 ```bash
 curl -X POST http://localhost:3000/compile \
   -H "Content-Type: application/json" \
   -d '{"latexContent": "\\documentclass{article}\\begin{document}Hello World\\end{document}", "filename": "test"}'
+
+curl -X POST http://localhost:3000/compile \
+  -H "Content-Type: application/json" \
+  -d '{"latex": "\\documentclass{article}\\begin{document}Hello World\\end{document}", "filename": "test"}'
 ```
 
 ### Step 5: Deploy to Google Cloud Run
@@ -385,6 +441,7 @@ try {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      latex: latexTemplate,
       latexContent: latexTemplate,
       filename: `resume-${uniqueId}`
     })
@@ -429,6 +486,7 @@ try {
 ## Troubleshooting
 
 ### Service Not Responding
+- `GET /health` or `POST /compile` returning HTTP 404 `{"status":"error","code":404,"message":"Application not found"}` means the host has no app. That is the current Railway outage, not a TeX error. See "Production outage" at the top of this file.
 - Check Cloud Run logs: `gcloud run services logs read latex-service --region us-central1`
 - Verify the service URL is correct
 - Check if service is deployed: `gcloud run services list`
@@ -437,6 +495,25 @@ try {
 - Check the log content in the error response
 - Verify LaTeX template syntax
 - Check Cloud Run logs for detailed errors
+- A 400 `latexContent is required` means the service received `{ latex }` and does not read that alias yet. Clients in this repo send both `latex` and `latexContent`. Redeploy this service from the `server.js` sample above if a live probe with only `latexContent` succeeds and a probe with only `latex` returns that 400.
+
+### Confirm the live `/compile` contract
+
+The service source is not in this repository. `LATEX_SERVICE_URL` is a Vercel env var. Do not print the secret. Health check, then the same minimal document under each field name:
+
+```bash
+curl -sS -m 20 "$LATEX_SERVICE_URL/health"
+
+curl -sS -m 60 -w "\nHTTP %{http_code}\n" "$LATEX_SERVICE_URL/compile" \
+  -H "Content-Type: application/json" \
+  -d '{"latex":"\\documentclass{article}\\begin{document}Hello\\end{document}","filename":"probe-latex"}'
+
+curl -sS -m 60 -w "\nHTTP %{http_code}\n" "$LATEX_SERVICE_URL/compile" \
+  -H "Content-Type: application/json" \
+  -d '{"latexContent":"\\documentclass{article}\\begin{document}Hello\\end{document}","filename":"probe-content"}'
+```
+
+`latex` alone returning `latexContent is required` confirms the field mismatch. Both calls returning a base64 PDF means the service already accepts either name and a remaining failure is in the TeX log, not the field name.
 
 ### Timeout Issues
 - Increase Cloud Run timeout: `gcloud run services update latex-service --timeout 300`

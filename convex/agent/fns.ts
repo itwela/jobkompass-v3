@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { AgentError } from "./auth";
+import { exportRouteFailureDetails } from "../../lib/resume/latexCompile";
 import { shouldSeedBaseResume } from "../baseResume";
 import { planRank } from "../plans";
 
@@ -321,7 +322,7 @@ export const resumesGenerate = internalAction({
         502,
         "generation_failed",
         `Resume PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
-        errorBody.details
+        exportRouteFailureDetails(errorBody)
       );
     }
     const pdfArrayBuffer = await exportResponse.arrayBuffer();
@@ -452,7 +453,7 @@ export const resumesUpdateContent = internalAction({
         502,
         "generation_failed",
         `Resume PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
-        errorBody.details
+        exportRouteFailureDetails(errorBody)
       );
     }
     const pdfArrayBuffer = await exportResponse.arrayBuffer();
@@ -542,7 +543,7 @@ export const coverLettersGenerate = internalAction({
         502,
         "generation_failed",
         `Cover letter PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
-        errorBody.details
+        exportRouteFailureDetails(errorBody)
       );
     }
     const pdfArrayBuffer = await exportResponse.arrayBuffer();
