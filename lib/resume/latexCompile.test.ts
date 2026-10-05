@@ -3,6 +3,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   exportRouteFailureDetails,
+  latexCompileFailureReport,
   latexCompileRequestBody,
   latexServiceFailureMessage,
 } from "./latexCompile";
@@ -47,6 +48,17 @@ describe("compile callers", () => {
       expect(source, rel).not.toMatch(/JSON\.stringify\(\s*\{[^}]*\blatex\s*:/);
     }
   });
+
+  it("turns a blank compile log into details on resume and cover letter export", () => {
+    for (const rel of [
+      "app/api/resume/export/[templateId]/route.ts",
+      "app/api/coverletter/export/jake/route.ts",
+    ]) {
+      const source = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
+      expect(source, rel).toContain("latexCompileFailureReport(");
+      expect(source, rel).toContain("details");
+    }
+  });
 });
 
 describe("failure text", () => {
@@ -59,24 +71,41 @@ describe("failure text", () => {
     ).toContain("glyphtounicode");
   });
 
-  it("falls back to the service error, then the HTTP status text", () => {
-    expect(latexServiceFailureMessage({ error: "latexContent is required" }, "Bad Request")).toBe(
-      "latexContent is required"
+  it("names the status when the compile log is blank", () => {
+    const railway404 = { status: "error", code: 404, message: "Application not found", log: "", error: undefined };
+    const report = latexCompileFailureReport(railway404, 404, "Not Found");
+
+    expect(report.log).toBe("");
+    expect(report.details).toBe("HTTP 404: empty body / Application not found");
+    expect(latexServiceFailureMessage(railway404, "Not Found", 404)).toBe(report.details);
+  });
+
+  it("uses the same hint for an empty JSON body", () => {
+    expect(latexCompileFailureReport({}, 404, "Not Found").details).toBe(
+      "HTTP 404: empty body / Application not found"
     );
-    expect(latexServiceFailureMessage({}, "Bad Request")).toBe("Bad Request");
   });
 
-  it("keeps a missing-service 404 message instead of the generic compile wrapper", () => {
+  it("keeps a real service error when the log is blank and the status is not a missing app", () => {
+    expect(latexCompileFailureReport({ error: "latexContent is required" }, 400, "Bad Request").details).toBe(
+      "HTTP 400: empty body / Application not found — latexContent is required"
+    );
+  });
+
+  it("forwards a blank export log into agent details", () => {
     expect(
-      latexServiceFailureMessage(
-        { status: "error", code: 404, message: "Application not found" },
-        "Not Found"
-      )
-    ).toBe("Application not found");
-  });
-
-  it("forwards export log into agent details when details is absent", () => {
-    expect(exportRouteFailureDetails({ error: "LaTeX compilation failed" } as { log?: string })).toBeUndefined();
+      exportRouteFailureDetails({
+        error: "LaTeX compilation failed",
+        log: "",
+      })
+    ).toBe("non-OK: empty body / Application not found");
+    expect(
+      exportRouteFailureDetails({
+        error: "LaTeX compilation failed",
+        log: "",
+        details: "HTTP 404: empty body / Application not found",
+      })
+    ).toBe("HTTP 404: empty body / Application not found");
     expect(
       exportRouteFailureDetails({
         error: "LaTeX compilation failed",

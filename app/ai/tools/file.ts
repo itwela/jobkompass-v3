@@ -15,7 +15,7 @@ import os from "os";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { generateResumeLatex } from "@/lib/resume/generators";
-import { latexCompileRequestBody, latexServiceFailureMessage } from "@/lib/resume/latexCompile";
+import { latexCompileFailureReport, latexCompileRequestBody } from "@/lib/resume/latexCompile";
 import { canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
 import { rankLabel, type PlanRank } from "@/convex/plans";
 import { applyFactGuard, type FactGuard } from "@/lib/resume/noInventedFacts";
@@ -196,15 +196,21 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
 
       if (!compileResponse.ok) {
         const errorData = await compileResponse.json().catch(() => ({}));
-        const log = latexServiceFailureMessage(errorData, compileResponse.statusText);
+        const { log, details } = latexCompileFailureReport(
+          errorData,
+          compileResponse.status,
+          compileResponse.statusText
+        );
         console.error(`[${toolExecutionId}] [RESUME_TOOL] LaTeX service error`, {
           status: compileResponse.status,
+          log,
+          details,
         });
         return {
           success: false,
-          error: `LaTeX compilation failed: ${errorData.error || compileResponse.statusText}`,
+          error: `LaTeX compilation failed: ${details}`,
           message: 'LaTeX compilation failed. The PDF could not be generated.',
-          logContent: log.substring(0, 2000),
+          logContent: (log || details).substring(0, 2000),
         };
       }
 
@@ -472,12 +478,16 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factG
 
       if (!compileResponse.ok) {
         const errorData = await compileResponse.json().catch(() => ({}));
-        const log = latexServiceFailureMessage(errorData, compileResponse.statusText);
+        const { log, details } = latexCompileFailureReport(
+          errorData,
+          compileResponse.status,
+          compileResponse.statusText
+        );
         return {
           success: false,
-          error: `LaTeX compilation failed: ${errorData.error || compileResponse.statusText}`,
+          error: `LaTeX compilation failed: ${details}`,
           message: 'LaTeX compilation failed. The PDF could not be generated.',
-          logContent: log.substring(0, 2000),
+          logContent: (log || details).substring(0, 2000),
         };
       }
 

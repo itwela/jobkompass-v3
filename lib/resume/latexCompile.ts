@@ -20,31 +20,66 @@ export function latexCompileRequestBody(source: string, filename: string): {
   };
 }
 
+/** Shown when `/compile` fails without a TeX log. Railway's missing app is this case. */
+export const EMPTY_COMPILE_LOG_HINT = "empty body / Application not found";
+
+type CompileErrorBody = {
+  error?: unknown;
+  log?: unknown;
+  message?: unknown;
+  status?: unknown;
+} | null | undefined;
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 /**
- * Text from a non-OK `/compile` response.
- * Our compiler puts pdflatex output on `log` and a short reason on `error`.
- * A missing host (Railway "Application not found") uses `message` instead.
+ * Split a non-OK `/compile` response into the raw TeX log and the string agents should see.
+ * A real log is kept. A blank log (Vercel: `error: undefined, log: ''` on HTTP 404)
+ * still produces details that name the status and the missing-service hint.
  */
-export function latexServiceFailureMessage(
-  body: { error?: unknown; log?: unknown; message?: unknown } | null | undefined,
+export function latexCompileFailureReport(
+  body: CompileErrorBody,
+  status: number,
   statusText = ""
+): { log: string; details: string } {
+  const log = text(body?.log);
+  if (log) {
+    return { log, details: log.slice(0, 2000) };
+  }
+
+  const statusLabel = status > 0 ? `HTTP ${status}` : text(statusText) || "non-OK";
+  const extras = [text(body?.error), text(body?.message)].filter(
+    (part) => part.length > 0 && part !== "Application not found"
+  );
+  const details = extras.length
+    ? `${statusLabel}: ${EMPTY_COMPILE_LOG_HINT} — ${extras.join(" — ")}`
+    : `${statusLabel}: ${EMPTY_COMPILE_LOG_HINT}`;
+  return { log: "", details: details.slice(0, 2000) };
+}
+
+/** Single string for callers that only store one failure message. */
+export function latexServiceFailureMessage(
+  body: CompileErrorBody,
+  statusText = "",
+  status = 0
 ): string {
-  const log = typeof body?.log === "string" ? body.log : "";
-  const error = typeof body?.error === "string" ? body.error : "";
-  const message = typeof body?.message === "string" ? body.message : "";
-  return log || error || message || statusText;
+  return latexCompileFailureReport(body, status, statusText).details;
 }
 
 /**
  * Hint for AgentError when the Next.js export route fails.
- * That route returns `{ error, log, details }`. Older responses only set `log`,
- * and Convex used to forward `details` alone, so the TeX log never reached the CLI.
+ * The route returns `{ error, log, details }`. A blank `log` must not drop the hint:
+ * older Convex only read `details`, and a 404 from Railway leaves `log` empty.
  */
-export function exportRouteFailureDetails(
-  body: { details?: unknown; log?: unknown } | null | undefined
-): string | undefined {
-  const details = typeof body?.details === "string" ? body.details : "";
-  const log = typeof body?.log === "string" ? body.log : "";
-  const text = (details || log).slice(0, 2000);
-  return text || undefined;
+export function exportRouteFailureDetails(body: CompileErrorBody & { details?: unknown }): string {
+  const details = text(body?.details);
+  const log = text(body?.log);
+  const textValue = (details || log).slice(0, 2000);
+  if (textValue) return textValue;
+  // `error` on this JSON is the route wrapper ("LaTeX compilation failed"), not the
+  // compiler's reason. A blank log still needs the missing-service hint.
+  const status = typeof body?.status === "number" ? body.status : 0;
+  return latexCompileFailureReport({ message: body?.message }, status).details;
 }

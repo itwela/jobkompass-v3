@@ -12,7 +12,7 @@ That Railway app is gone. `GET /health` and `POST /compile` (with either `latex`
 {"status":"error","code":404,"message":"Application not found"}
 ```
 
-The Next.js export route treats any non-OK `/compile` response as `LaTeX compilation failed`, so every template fails the same way, including minimal input. This is not a bad TeX template.
+The Next.js export route treats any non-OK `/compile` response as `LaTeX compilation failed`, so every template fails the same way, including minimal input. Vercel runtime logs on `www.myjobkompass.com` show `LaTeX service error { status: 404, error: undefined, log: '' }` for `POST /api/resume/export/jake`, `POST /api/resume/export/mar`, and `POST /api/coverletter/export/jake` (all HTTP 500). This is not a bad TeX template. A blank compile `log` is now returned to the agent as `HTTP 404: empty body / Application not found`.
 
 **P0 unblock:** restore a compiler at that exact URL, or deploy a replacement and point `LATEX_SERVICE_URL` at it. PDFs stay broken until `GET /health` is healthy and `POST /compile` returns a PDF. Do not change the Vercel env or Convex until that probe passes.
 

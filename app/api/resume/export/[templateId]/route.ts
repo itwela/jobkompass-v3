@@ -4,7 +4,7 @@ import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import { generateResumeLatex, isValidResumeTemplateId } from '@/lib/resume/generators';
-import { latexCompileRequestBody, latexServiceFailureMessage } from '@/lib/resume/latexCompile';
+import { latexCompileFailureReport, latexCompileRequestBody } from '@/lib/resume/latexCompile';
 import { canUseResumeTemplate, resumeTemplateMinRank } from '@/lib/templates';
 import { rankLabel, type PlanRank } from '@/convex/plans';
 import type { ResumeContent } from '@/lib/resume/types';
@@ -108,10 +108,14 @@ export async function POST(
 
     if (!compileResponse.ok) {
       const errorData = await compileResponse.json().catch(() => ({}));
-      const log = latexServiceFailureMessage(errorData, compileResponse.statusText);
-      console.error('LaTeX service error', { status: compileResponse.status, error: errorData.error, log });
+      const { log, details } = latexCompileFailureReport(
+        errorData,
+        compileResponse.status,
+        compileResponse.statusText
+      );
+      console.error('LaTeX service error', { status: compileResponse.status, error: errorData.error, log, details });
       return NextResponse.json(
-        { error: 'LaTeX compilation failed', log, details: log },
+        { error: 'LaTeX compilation failed', log, details },
         { status: 500 }
       );
     }
