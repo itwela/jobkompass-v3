@@ -6,6 +6,7 @@ import { internal } from "../_generated/api";
 import { AgentError } from "./auth";
 import { shouldSeedBaseResume } from "../baseResume";
 import { planRank } from "../plans";
+import { setResumeShared } from "../resumeShares";
 
 /**
  * The caller's plan rank, resolved from their subscription row. Used by the
@@ -179,19 +180,7 @@ export const resumesShare = internalMutation({
   args: { userId: v.string(), id: v.id("resumes"), off: v.optional(v.boolean()) },
   handler: async (ctx, { userId, id, off }) => {
     const resume = await owned<any>(ctx, id, userId, "Resume");
-    if (off) {
-      await ctx.db.patch(id, { shareId: undefined });
-      return { shared: false };
-    }
-    if (!resume.fileId) throw new Error("Resume has no PDF to share");
-    let shareId: string = resume.shareId;
-    if (!shareId) {
-      const bytes = crypto.getRandomValues(new Uint8Array(9));
-      shareId = Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 12);
-      await ctx.db.patch(id, { shareId });
-    }
-    const base = (process.env.APP_BASE_URL || "https://www.myjobkompass.com").replace(/\/$/, "");
-    return { shared: true, shareId, url: `${base}/r/${shareId}` };
+    return await setResumeShared(ctx, resume, off);
   },
 });
 

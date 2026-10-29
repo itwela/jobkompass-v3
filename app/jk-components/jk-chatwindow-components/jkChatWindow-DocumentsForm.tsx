@@ -9,7 +9,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star, FolderPlus } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star, FolderPlus, Link2, Link2Off } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
@@ -189,6 +189,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const updateCoverLetterMetadata = useMutation(api.documents.updateCoverLetterMetadata);
     const deleteCoverLetterMutation = useMutation(api.documents.deleteCoverLetter);
     const duplicateResumeMutation = useMutation(api.documents.duplicateResume);
+    const shareResumeMutation = useMutation(api.resumeShares.shareResume);
     const duplicateCoverLetterMutation = useMutation(api.documents.duplicateCoverLetter);
 
     // Track which document type is being edited for metadata
@@ -1610,6 +1611,43 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             >
                                                                 <Download className="h-4 w-4" />
                                                                 <span>Download PDF</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {documentType === "resume" && resume?.fileId && (
+                                                            <DropdownMenuItem
+                                                                onClick={async (event) => {
+                                                                    event.stopPropagation();
+                                                                    try {
+                                                                        const result = await shareResumeMutation({ resumeId: resume._id });
+                                                                        if (result.shared) {
+                                                                            await navigator.clipboard.writeText(result.url);
+                                                                            toast.success("Share link copied", { description: result.url });
+                                                                        }
+                                                                    } catch (error) {
+                                                                        console.error("Failed to share:", error);
+                                                                        toast.error("Could not create share link");
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Link2 className="h-4 w-4" />
+                                                                <span>Copy share link</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {documentType === "resume" && resume?.shareId && (
+                                                            <DropdownMenuItem
+                                                                onClick={async (event) => {
+                                                                    event.stopPropagation();
+                                                                    try {
+                                                                        await shareResumeMutation({ resumeId: resume._id, off: true });
+                                                                        toast.success("Share link turned off");
+                                                                    } catch (error) {
+                                                                        console.error("Failed to unshare:", error);
+                                                                        toast.error("Could not turn off share link");
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Link2Off className="h-4 w-4" />
+                                                                <span>Stop sharing</span>
                                                             </DropdownMenuItem>
                                                         )}
                                                         <DropdownMenuItem
