@@ -25,7 +25,9 @@ const documentsTables = {
     content: v.optional(v.any()),
     // Track when user has seen/viewed this document
     seenAt: v.optional(v.number()),
-  }).index("by_user", ["userId"]),
+    // Random public id for /r/<shareId>; unset means the resume is private
+    shareId: v.optional(v.string()),
+  }).index("by_user", ["userId"]).index("by_shareId", ["shareId"]),
   resumeIRs: defineTable({
     userId: v.string(),
     name: v.string(),

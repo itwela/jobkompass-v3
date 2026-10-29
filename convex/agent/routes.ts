@@ -119,6 +119,14 @@ export const agentRoutes: AgentRoute[] = [
     description: "Rename a resume",
   },
   {
+    method: "POST", path: "/agent/resumes/share", fn: internal.agent.fns.resumesShare, kind: "mutation",
+    params: [
+      { name: "id", type: "string", required: true },
+      { name: "off", type: "boolean", description: "true makes the resume private again" },
+    ],
+    description: "Make a resume's PDF public at /r/<shareId> (or private with off)",
+  },
+  {
     method: "PATCH", path: "/agent/resumes/content", fn: internal.agent.fns.resumesUpdateContent, kind: "action",
     params: [
       { name: "id", type: "string", required: true },

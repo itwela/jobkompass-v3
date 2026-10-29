@@ -75,6 +75,11 @@ export const commands: CommandSpec[] = [
     ] },
   { name: "resumes duplicate", desc: "Duplicate a resume", method: "POST", path: "/agent/resumes/duplicate",
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
+  { name: "resumes share", desc: "Get a public link to a resume's PDF (--off makes it private)", method: "POST", path: "/agent/resumes/share",
+    opts: [
+      { flag: "--id <id>", api: "id", type: "str", required: true },
+      { flag: "--off", api: "off", type: "bool" },
+    ] },
   { name: "resumes delete", desc: "Delete a resume + stored file", method: "DELETE", path: "/agent/resumes", confirm: true,
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
   { name: "resumes add", desc: "Generate a resume PDF (template: jake, joseph or mar) and save it", method: "POST", path: "/agent/resumes/generate",
