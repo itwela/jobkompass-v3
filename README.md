@@ -28,3 +28,18 @@ Job Kompass is designed to make your career journey smoother, more organized, an
 ---
 
 **Made by Itwela Ibomu x Caveman Creative**
+
+## Deploying the Convex backend
+
+The live site (myjobkompass.com), the `jk` CLI and the Chrome extension all run on the
+Convex deployment `proficient-mammoth-632`, which Convex labels "dev". Ship backend
+changes with:
+
+```
+npm run deploy:backend
+```
+
+Do **not** run `npx convex deploy`: it targets `chatty-ptarmigan-210` (labelled "prod"),
+which nothing points at and which has no environment variables. Moving live traffic there
+is a planned migration (env vars, data export/import, Vercel/OAuth/Stripe/extension/CLI
+URLs, write freeze), not a quick switch.
