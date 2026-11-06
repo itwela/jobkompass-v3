@@ -34,6 +34,28 @@ const jobWriteParams: ParamSpec[] = [
   { name: "notes", type: "string" },
 ];
 
+const prepWriteParams: ParamSpec[] = [
+  { name: "jobId", type: "string" },
+  { name: "interviewerName", type: "string" },
+  { name: "interviewerRole", type: "string" },
+  { name: "interviewerEmail", type: "string" },
+  { name: "interviewDate", type: "string" },
+  { name: "meetingLink", type: "string" },
+  { name: "phoneBackup", type: "string" },
+  { name: "compensationTarget", type: "string" },
+  { name: "resumeUsed", type: "string" },
+  { name: "status", type: "string", description: "upcoming|ready|completed|archived" },
+  { name: "elevatorPitch", type: "string" },
+  { name: "roleSummary", type: "string" },
+  { name: "flashcards", type: "json", description: "[{id,category,front,back,hint?,confidence?,starred?}]" },
+  { name: "stories", type: "json", description: "[{id,title,tag,hook?,situation,action,outcome,takeaway}]" },
+  { name: "requirementMatches", type: "json", description: "[{id,requirement,priority,yourProof,strength}]" },
+  { name: "questionsToAsk", type: "json", description: "[{id,question,whyItMatters?,category?,asked?,answerNotes?}]" },
+  { name: "trapsAndGuardrails", type: "json", description: "[{id,trap,howToHandle}]" },
+  { name: "checklist", type: "json", description: "[{id,label,done}]" },
+  { name: "callNotes", type: "string" },
+];
+
 export const agentRoutes: AgentRoute[] = [
   // ---- jobs ----
   {
@@ -233,6 +255,42 @@ export const agentRoutes: AgentRoute[] = [
     method: "DELETE", path: "/agent/resources", fn: internal.agent.fns.resourcesRemove, kind: "mutation",
     params: [{ name: "id", type: "string", required: true }],
     description: "Delete a resource",
+  },
+
+  // ---- interview preps ----
+  {
+    method: "GET", path: "/agent/interviewpreps", fn: internal.agent.fns.interviewPrepsList, kind: "query",
+    params: [{ name: "jobId", type: "string", description: "Only preps linked to this job" }],
+    description: "List interview prep decks (summary: counts, no card bodies)",
+  },
+  {
+    method: "GET", path: "/agent/interviewpreps/get", fn: internal.agent.fns.interviewPrepsGet, kind: "query",
+    params: [{ name: "id", type: "string", required: true }],
+    description: "Get one interview prep deck with all flashcards, stories, questions, traps and checklist",
+  },
+  {
+    method: "POST", path: "/agent/interviewpreps", fn: internal.agent.fns.interviewPrepsAdd, kind: "mutation",
+    params: [
+      { name: "company", type: "string", required: true },
+      { name: "role", type: "string", required: true },
+      ...prepWriteParams,
+    ],
+    description: "Create an interview prep deck",
+  },
+  {
+    method: "PATCH", path: "/agent/interviewpreps", fn: internal.agent.fns.interviewPrepsUpdate, kind: "mutation",
+    params: [
+      { name: "id", type: "string", required: true },
+      { name: "company", type: "string" },
+      { name: "role", type: "string" },
+      ...prepWriteParams,
+    ],
+    description: "Update an interview prep deck. Array fields (flashcards, stories, ...) REPLACE the whole array: get, edit, send back",
+  },
+  {
+    method: "DELETE", path: "/agent/interviewpreps", fn: internal.agent.fns.interviewPrepsRemove, kind: "mutation",
+    params: [{ name: "id", type: "string", required: true }],
+    description: "Delete an interview prep deck",
   },
 
   // ---- threads (read-only) ----

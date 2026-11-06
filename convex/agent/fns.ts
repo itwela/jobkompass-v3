@@ -7,6 +7,14 @@ import { AgentError } from "./auth";
 import { shouldSeedBaseResume } from "../baseResume";
 import { planRank } from "../plans";
 import { setResumeShared } from "../resumeShares";
+import {
+  flashcardValidator,
+  storyValidator,
+  requirementMatchValidator,
+  questionToAskValidator,
+  trapValidator,
+  checklistItemValidator,
+} from "../interviewPreps";
 
 /**
  * The caller's plan rank, resolved from their subscription row. Used by the
@@ -746,5 +754,92 @@ export const threadsGet = internalQuery({
       .withIndex("by_thread", (q) => q.eq("threadId", id))
       .collect();
     return { thread, messages };
+  },
+});
+
+// ---- interview preps ----
+const prepFields = {
+  jobId: v.optional(v.id("jobs")),
+  interviewerName: v.optional(v.string()),
+  interviewerRole: v.optional(v.string()),
+  interviewerEmail: v.optional(v.string()),
+  interviewDate: v.optional(v.string()),
+  meetingLink: v.optional(v.string()),
+  phoneBackup: v.optional(v.string()),
+  compensationTarget: v.optional(v.string()),
+  resumeUsed: v.optional(v.string()),
+  status: v.optional(v.string()),
+  elevatorPitch: v.optional(v.string()),
+  roleSummary: v.optional(v.string()),
+  flashcards: v.optional(v.array(flashcardValidator)),
+  stories: v.optional(v.array(storyValidator)),
+  requirementMatches: v.optional(v.array(requirementMatchValidator)),
+  questionsToAsk: v.optional(v.array(questionToAskValidator)),
+  trapsAndGuardrails: v.optional(v.array(trapValidator)),
+  checklist: v.optional(v.array(checklistItemValidator)),
+  callNotes: v.optional(v.string()),
+};
+
+export const interviewPrepsList = internalQuery({
+  args: { userId: v.string(), jobId: v.optional(v.id("jobs")) },
+  handler: async (ctx, { userId, jobId }) => {
+    const rows = await ctx.db
+      .query("interviewPreps")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return rows
+      .filter((r) => !jobId || r.jobId === jobId)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((r) => ({
+        _id: r._id, company: r.company, role: r.role, status: r.status, jobId: r.jobId,
+        interviewDate: r.interviewDate, interviewerName: r.interviewerName,
+        flashcards: r.flashcards.length, stories: r.stories.length, updatedAt: r.updatedAt,
+      }));
+  },
+});
+
+export const interviewPrepsGet = internalQuery({
+  args: { userId: v.string(), id: v.id("interviewPreps") },
+  handler: async (ctx, { userId, id }) => owned(ctx, id, userId, "Interview prep"),
+});
+
+export const interviewPrepsAdd = internalMutation({
+  args: { userId: v.string(), company: v.string(), role: v.string(), ...prepFields },
+  handler: async (ctx, args) => {
+    if (args.jobId) await owned(ctx, args.jobId, args.userId, "Job");
+    const now = Date.now();
+    return await ctx.db.insert("interviewPreps", {
+      ...args,
+      status: args.status ?? "upcoming",
+      flashcards: args.flashcards ?? [],
+      stories: args.stories ?? [],
+      questionsToAsk: args.questionsToAsk ?? [],
+      checklist: args.checklist ?? [],
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const interviewPrepsUpdate = internalMutation({
+  args: {
+    userId: v.string(),
+    id: v.id("interviewPreps"),
+    company: v.optional(v.string()),
+    role: v.optional(v.string()),
+    ...prepFields,
+  },
+  handler: async (ctx, { userId, id, ...fields }) => {
+    await owned(ctx, id, userId, "Interview prep");
+    if (fields.jobId) await owned(ctx, fields.jobId, userId, "Job");
+    await ctx.db.patch(id, { ...definedOnly(fields), updatedAt: Date.now() });
+  },
+});
+
+export const interviewPrepsRemove = internalMutation({
+  args: { userId: v.string(), id: v.id("interviewPreps") },
+  handler: async (ctx, { userId, id }) => {
+    await owned(ctx, id, userId, "Interview prep");
+    await ctx.db.delete(id);
   },
 });

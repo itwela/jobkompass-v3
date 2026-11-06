@@ -31,6 +31,28 @@ const jobWriteOpts: OptSpec[] = [
   { flag: "--notes <text>", api: "notes", type: "str" },
 ];
 
+const prepWriteOpts: OptSpec[] = [
+  { flag: "--job-id <id>", api: "jobId", type: "str" },
+  { flag: "--interviewer-name <n>", api: "interviewerName", type: "str" },
+  { flag: "--interviewer-role <r>", api: "interviewerRole", type: "str" },
+  { flag: "--interviewer-email <e>", api: "interviewerEmail", type: "str" },
+  { flag: "--interview-date <d>", api: "interviewDate", type: "str" },
+  { flag: "--meeting-link <url>", api: "meetingLink", type: "str" },
+  { flag: "--phone-backup <p>", api: "phoneBackup", type: "str" },
+  { flag: "--compensation-target <c>", api: "compensationTarget", type: "str" },
+  { flag: "--resume-used <name>", api: "resumeUsed", type: "str" },
+  { flag: "--status <s>", api: "status", type: "str", desc: "upcoming|ready|completed|archived" },
+  { flag: "--elevator-pitch <text>", api: "elevatorPitch", type: "str" },
+  { flag: "--role-summary <text>", api: "roleSummary", type: "str" },
+  { flag: "--flashcards <json>", api: "flashcards", type: "json", desc: "JSON or @file.json; replaces the array" },
+  { flag: "--stories <json>", api: "stories", type: "json", desc: "JSON or @file.json; replaces the array" },
+  { flag: "--requirement-matches <json>", api: "requirementMatches", type: "json", desc: "JSON or @file.json" },
+  { flag: "--questions <json>", api: "questionsToAsk", type: "json", desc: "JSON or @file.json" },
+  { flag: "--traps <json>", api: "trapsAndGuardrails", type: "json", desc: "JSON or @file.json" },
+  { flag: "--checklist <json>", api: "checklist", type: "json", desc: "JSON or @file.json" },
+  { flag: "--call-notes <text>", api: "callNotes", type: "str" },
+];
+
 const resourceWriteOpts: OptSpec[] = [
   { flag: "--description <text>", api: "description", type: "str" },
   { flag: "--notes <text>", api: "notes", type: "str" },
@@ -166,6 +188,27 @@ export const commands: CommandSpec[] = [
       ...resourceWriteOpts,
     ] },
   { name: "resources delete", desc: "Delete a resource", method: "DELETE", path: "/agent/resources", confirm: true,
+    opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
+
+  // interview preps
+  { name: "preps list", desc: "List interview prep decks", method: "GET", path: "/agent/interviewpreps",
+    opts: [{ flag: "--job-id <id>", api: "jobId", type: "str" }] },
+  { name: "preps get", desc: "Get one interview prep deck in full", method: "GET", path: "/agent/interviewpreps/get",
+    opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
+  { name: "preps add", desc: "Create an interview prep deck", method: "POST", path: "/agent/interviewpreps",
+    opts: [
+      { flag: "--company <c>", api: "company", type: "str", required: true },
+      { flag: "--role <r>", api: "role", type: "str", required: true },
+      ...prepWriteOpts,
+    ] },
+  { name: "preps update", desc: "Update an interview prep deck (array flags replace the whole array)", method: "PATCH", path: "/agent/interviewpreps",
+    opts: [
+      { flag: "--id <id>", api: "id", type: "str", required: true },
+      { flag: "--company <c>", api: "company", type: "str" },
+      { flag: "--role <r>", api: "role", type: "str" },
+      ...prepWriteOpts,
+    ] },
+  { name: "preps delete", desc: "Delete an interview prep deck", method: "DELETE", path: "/agent/interviewpreps", confirm: true,
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
 
   // threads (read-only)

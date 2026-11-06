@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { readFileSync } from "node:fs";
 import { commands, type CommandSpec, type OptSpec } from "./commands";
 import { apiRequest, CliError } from "./client";
 import { emit } from "./output";
@@ -25,7 +26,8 @@ function coerceOpt(spec: OptSpec, raw: unknown): unknown {
       return true; // value-less flag
     case "json":
       try {
-        return JSON.parse(String(raw));
+        const text = String(raw);
+        return JSON.parse(text.startsWith("@") ? readFileSync(text.slice(1), "utf8") : text);
       } catch {
         fatal("invalid_option", `Option ${spec.flag.split(" ")[0]} must be valid JSON`, `Example: '${spec.desc ?? "[...]"}'`, 1);
       }
