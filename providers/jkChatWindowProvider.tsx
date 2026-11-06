@@ -56,6 +56,9 @@ interface ChatInteractionStateContextType {
   // File upload modal
   isFileModalOpen: boolean;
   setIsFileModalOpen: (open: boolean) => void;
+  // Interview prep navigation target
+  selectedInterviewPrepJobId: Id<"jobs"> | null;
+  setSelectedInterviewPrepJobId: (id: Id<"jobs"> | null) => void;
 }
 
 interface InputControlContextType {
@@ -84,6 +87,7 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   const [allModes, setAllModes] = useState<ModeType[]>([
     { id: '/my-jobs', name: 'My Jobs', command: 'My Jobs' },
     { id: '/documents', name: 'My Documents', command: 'My Documents' },
+    { id: '/interview-prep', name: 'Interview Prep', command: 'Interview Prep' },
     { id: '/performance', name: 'Performance', command: 'Performance' },
     { id: '/resources', name: 'Links & Resources', command: 'Links & Resources' },
     { id: '/chat', name: 'Chat', command: 'Chat' },
@@ -94,7 +98,9 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   // STUB -----
 
   // NOTE - MODE STUFF
-  const [startingMode, setStartingMode] = useState<ModeType>(allModes[4]); // Chat Mode is default (index 4 after reorder)
+  const [startingMode, setStartingMode] = useState<ModeType>(() => {
+    return allModes.find(m => m.id === '/chat') || allModes[0];
+  });
   const [currentMode, setCurrentMode] = useState<ModeType>(startingMode);
   const [wantsHelp, setWantsHelp] = useState<boolean>(false);
   const [wantsToAddJob, setWantsToAddJob] = useState<boolean>(false);
@@ -154,12 +160,15 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   // Resume template selection for AI creation
   const [selectedResumeTemplateId, setSelectedResumeTemplateId] = useState<string | null>(null);
 
+  // Interview prep navigation target
+  const [selectedInterviewPrepJobId, setSelectedInterviewPrepJobId] = useState<Id<"jobs"> | null>(null);
+
   // NOTE - TEXT AREA STUFF
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const [textValue, setTextValue] = React.useState('')
   const [dynamicTextAreaHeight, setDynamicTextAreaHeight] = React.useState(0)
   // STUB - STEP 2 OF ADDING A NEW MODE/ACTION
-  const commands = ['/help', '/chat', '/documents', '/my-jobs', '/resources', '/settings', '/performance', '/leads']
+  const commands = ['/help', '/chat', '/documents', '/my-jobs', '/interview-prep', '/resources', '/settings', '/performance', '/leads']
   const commandActions: string[] = []
   const allCommandsAndActions = [...commands, ...commandActions]
   // STUB -----
@@ -287,6 +296,8 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     // File upload modal
     isFileModalOpen,
     setIsFileModalOpen,
+    selectedInterviewPrepJobId,
+    setSelectedInterviewPrepJobId,
   };
 
   return (

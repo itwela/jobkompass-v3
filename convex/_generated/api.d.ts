@@ -34,6 +34,7 @@ import type * as extensionSaveJob from "../extensionSaveJob.js";
 import type * as freeResumeStats from "../freeResumeStats.js";
 import type * as http from "../http.js";
 import type * as inputSanitizer from "../inputSanitizer.js";
+import type * as interviewPreps from "../interviewPreps.js";
 import type * as jobLeads from "../jobLeads.js";
 import type * as jobs from "../jobs.js";
 import type * as plans from "../plans.js";
@@ -80,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   freeResumeStats: typeof freeResumeStats;
   http: typeof http;
   inputSanitizer: typeof inputSanitizer;
+  interviewPreps: typeof interviewPreps;
   jobLeads: typeof jobLeads;
   jobs: typeof jobs;
   plans: typeof plans;

@@ -269,6 +269,24 @@ export default function JkSidebar() {
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
 
+              {/* Interview Prep Section */}
+              <button
+                onClick={() => {
+                  const prepMode = allModes.find(mode => mode.id === '/interview-prep');
+                  if (prepMode) setCurrentMode(prepMode);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${currentMode.id === '/interview-prep'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-foreground/80 hover:text-foreground hover:bg-accent'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>Interview Prep</span>
+                  <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">New</span>
+                </div>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+
               {/* Performance Section */}
               <button
                 onClick={() => {

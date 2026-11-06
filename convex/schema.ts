@@ -330,6 +330,89 @@ const schema = defineSchema({
   })
     .index("by_hash", ["keyHash"])
     .index("by_user", ["userId"]),
+
+  interviewPreps: defineTable({
+    userId: v.string(),
+    jobId: v.optional(v.id("jobs")),
+    company: v.string(),
+    role: v.string(),
+    interviewerName: v.optional(v.string()),
+    interviewerRole: v.optional(v.string()),
+    interviewerEmail: v.optional(v.string()),
+    interviewDate: v.optional(v.string()),
+    meetingLink: v.optional(v.string()),
+    phoneBackup: v.optional(v.string()),
+    compensationTarget: v.optional(v.string()),
+    resumeUsed: v.optional(v.string()),
+    status: v.string(), // "upcoming" | "ready" | "completed" | "archived"
+    elevatorPitch: v.optional(v.string()),
+    roleSummary: v.optional(v.string()),
+    flashcards: v.array(
+      v.object({
+        id: v.string(),
+        category: v.string(), // "role" | "technical" | "experience" | "objection" | "behavioral" | "logistics"
+        front: v.string(),
+        back: v.string(),
+        hint: v.optional(v.string()),
+        confidence: v.optional(v.string()), // "new" | "learning" | "mastered"
+        starred: v.optional(v.boolean()),
+      })
+    ),
+    stories: v.array(
+      v.object({
+        id: v.string(),
+        title: v.string(),
+        tag: v.string(),
+        hook: v.optional(v.string()),
+        situation: v.string(),
+        action: v.string(),
+        outcome: v.string(),
+        takeaway: v.string(),
+      })
+    ),
+    requirementMatches: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          requirement: v.string(),
+          priority: v.string(), // "must-have" | "nice-to-have"
+          yourProof: v.string(),
+          strength: v.string(), // "strong" | "moderate" | "pivot"
+        })
+      )
+    ),
+    questionsToAsk: v.array(
+      v.object({
+        id: v.string(),
+        question: v.string(),
+        whyItMatters: v.optional(v.string()),
+        category: v.optional(v.string()),
+        asked: v.optional(v.boolean()),
+        answerNotes: v.optional(v.string()),
+      })
+    ),
+    trapsAndGuardrails: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          trap: v.string(),
+          howToHandle: v.string(),
+        })
+      )
+    ),
+    checklist: v.array(
+      v.object({
+        id: v.string(),
+        label: v.string(),
+        done: v.boolean(),
+      })
+    ),
+    callNotes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_job", ["jobId"]),
 });
 
 export default schema;

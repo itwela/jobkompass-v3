@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun } from "lucide-react";
+import { Menu, Plus, Settings, LogIn, LogOut, Link2, MoreVertical, Type, ChevronDown, Briefcase, MessageSquare, Home, CreditCard, Loader2, TrendingUp, Moon, Sun, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -371,6 +371,24 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                             {pendingLeadsCount}
                                         </span>
                                     )}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const prepMode = allModes.find(mode => mode.id === '/interview-prep');
+                                        if (prepMode) setCurrentMode(prepMode);
+                                        setSidebarOpen(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                        currentMode.id === '/interview-prep'
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <GraduationCap className="h-4 w-4" />
+                                        <span>Interview Prep</span>
+                                    </span>
+                                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">New</span>
                                 </button>
                                 <button
                                     onClick={() => {

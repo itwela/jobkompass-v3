@@ -3,6 +3,7 @@
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
+import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -17,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,7 @@ export default function JkJobExpanded() {
   } = useJobs();
   const { resumes } = useJobKompassResume();
   const { coverLetterList } = useJobKompassDocuments();
+  const { allModes, setCurrentMode, setSelectedInterviewPrepJobId } = useJobKompassChatWindow();
   const markJobAsSeen = useMutation(api.jobs.markJobAsSeen);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(false);
@@ -292,6 +295,21 @@ export default function JkJobExpanded() {
           <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between z-10">
             <h2 className="text-2xl font-bold">Job Details</h2>
             <div className="flex flex-wrap items-center gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => {
+                  if (!job) return;
+                  setSelectedInterviewPrepJobId(job._id);
+                  setSelectedJobId(null);
+                  const prepMode = allModes.find((m) => m.id === "/interview-prep");
+                  if (prepMode) setCurrentMode(prepMode);
+                }}
+              >
+                <GraduationCap className="h-4 w-4" />
+                Prep for Interview
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
