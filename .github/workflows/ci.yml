@@ -40,6 +40,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: No invented experience
+        run: npm run test:no-invented-experience
+
       # PLACEHOLDER: a teammate will drop the "no invented experience"
       # resume-content regression test into tests/no-invented-experience/.
       # This step does not invent resume content and does not run that test.
