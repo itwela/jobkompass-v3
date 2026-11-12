@@ -215,167 +215,92 @@ const JobKompassThemeContext = createContext<JobKompassThemeContextType | null>(
 
 export function JobKompassThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  // False until the saved/OS theme has been read, so the class the pre-paint
+  // script in layout.tsx set is not stripped by the initial 'light' state.
+  const [themeResolved, setThemeResolved] = useState(false);
 
-  const styles: Record<'light' | 'dark', ThemeStyles> = {
-    dark: {
-      background: '#1E2A38',
-      card: {
-        background: '#2A3A4F',
-        border: '1px solid rgba(243, 244, 246, 0.1)',
-        hoverTransform: 'hover:translate-y-[-2px]',
-        accent: 'rgba(243, 244, 246, 0.05)',
-        boxShadow: 'rgba(243, 244, 246, 0.1)'
-      },
-      text: {
-        primary: '#F3F4F6',
-        secondary: 'rgba(243, 244, 246, 0.7)',
-        tertiary: 'rgba(243, 244, 246, 0.4)',
-        title: '#F3F4F6',
-        subtitle: 'rgba(243, 244, 246, 0.7)',
-        error: '#EC4899',
-        success: '#10B981'
-      },
-      icon: {
-        default: 'text-gray-300',
-        hover: 'text-gray-100',
-        accent: '#3B82F6'
-      },
-      nav: {
-        background: '#2A3A4F',
-        border: '1px solid rgba(243, 244, 246, 0.1)',
-        activeColor: '#F3F4F6',
-        inactiveColor: 'rgba(243, 244, 246, 0.7)',
-        hoverTransform: 'hover:translate-y-[-2px]',
-        colors: {
-          home: '#10B981',
-          applications: '#3B82F6',
-          companyHub: '#6D28D9',
-          careerAssistant: '#EC4899',
-          workers: '#3B82F6',
-          blog: '#F3F4F6',
-          settings: '#F3F4F6',
-          landing: '#F3F4F6',
-        }
-      },
-      status: {
-        interested: '#10B981',
-        applied: '#3B82F6',
-        interviewing: '#6D28D9',
-        offer: '#EC4899',
-        rejected: '#EC4899',
-        ghosted: '#1E2A38'
-      },
-      form: {
-        input: {
-          background: 'rgba(243, 244, 246, 0.05)',
-          text: '#F3F4F6',
-          placeholder: 'rgba(243, 244, 246, 0.4)',
-          border: 'rgba(243, 244, 246, 0.1)',
-          focus: '#3B82F6',
-          hover: {
-            background: 'rgba(243, 244, 246, 0.08)',
-            transform: 'translateY(-1px)',
-            shadow: '0 4px 12px rgba(30, 42, 56, 0.1)'
-          }
-        },
-        select: {
-          background: 'rgba(243, 244, 246, 0.05)',
-          text: '#F3F4F6',
-          border: 'rgba(243, 244, 246, 0.1)',
-          hover: {
-            background: 'rgba(243, 244, 246, 0.08)',
-            transform: 'translateY(-1px)'
-          }
-        },
-        popup: {
-          background: 'rgba(42, 58, 79, 0.95)',
-          backdropFilter: 'blur(8px)',
-          shadow: '0 8px 32px rgba(30, 42, 56, 0.2)'
-        }
-      },
-      black: '#1E2A38',
-      white: '#ECEFF0',
+  // One colour table for both themes: every value is a CSS variable from
+  // app/globals.css, so this provider and the stylesheet cannot disagree.
+  const tokenStyles: ThemeStyles = {
+    background: 'var(--background)',
+    card: {
+      background: 'var(--card)',
+      border: '1px solid var(--border)',
+      hoverTransform: 'hover:translate-y-[-2px]',
+      accent: 'var(--accent)',
+      boxShadow: 'var(--border)'
     },
-    light: {
-      background: '#ECEFF0',
-      card: {
-        background: '#FFFFFF',
-        border: '1px solid rgba(30, 42, 56, 0.1)',
-        hoverTransform: 'hover:translate-y-[-2px]',
-        accent: 'rgba(30, 42, 56, 0.05)',
-        boxShadow: 'rgba(30, 42, 56, 0.1)'
-      },
-      text: {
-        primary: '#1E2A38',
-        secondary: '#2A3A4F',
-        tertiary: '#4A5568',
-        title: '#1E2A38',
-        subtitle: '#2A3A4F',
-        error: '#EC4899',
-        success: '#10B981'
-      },
-      icon: {
-        default: 'text-gray-600',
-        hover: 'text-gray-900',
-        accent: '#3B82F6'
-      },
-      nav: {
-        background: '#FFFFFF',
-        border: '1px solid rgba(30, 42, 56, 0.1)',
-        activeColor: '#1E2A38',
-        inactiveColor: 'rgba(30, 42, 56, 0.7)',
-        hoverTransform: 'hover:translate-y-[-2px]',
-        colors: {
-          home: '#10B981',
-          applications: '#3B82F6',
-          companyHub: '#6D28D9',
-          careerAssistant: '#EC4899',
-          workers: '#3B82F6',
-          blog: '#1E2A38',
-          settings: '#1E2A38',
-          landing: '#1E2A38',
-        }
-      },
-      status: {
-        interested: '#10B981',
-        applied: '#3B82F6',
-        interviewing: '#6D28D9',
-        offer: '#EC4899',
-        rejected: '#EC4899',
-        ghosted: '#4A5568'
-      },
-      form: {
-        input: {
-          background: 'rgba(30, 42, 56, 0.02)',
-          text: '#1E2A38',
-          placeholder: 'rgba(30, 42, 56, 0.4)',
-          border: 'rgba(30, 42, 56, 0.1)',
-          focus: '#3B82F6',
-          hover: {
-            background: 'rgba(30, 42, 56, 0.04)',
-            transform: 'translateY(-1px)',
-            shadow: '0 4px 12px rgba(30, 42, 56, 0.05)'
-          }
-        },
-        select: {
-          background: 'rgba(30, 42, 56, 0.02)',
-          text: '#1E2A38',
-          border: 'rgba(30, 42, 56, 0.1)',
-          hover: {
-            background: 'rgba(30, 42, 56, 0.04)',
-            transform: 'translateY(-1px)'
-          }
-        },
-        popup: {
-          background: 'rgba(243, 244, 246, 0.95)',
-          backdropFilter: 'blur(8px)',
-          shadow: '0 8px 32px rgba(30, 42, 56, 0.1)'
-        }
-      },
-      black: '#1E2A38',
-      white: '#ECEFF0',
+    text: {
+      primary: 'var(--foreground)',
+      secondary: 'var(--muted-foreground)',
+      tertiary: 'var(--subtle-foreground)',
+      title: 'var(--foreground)',
+      subtitle: 'var(--muted-foreground)',
+      error: 'var(--destructive)',
+      success: 'var(--ok)'
     },
+    icon: {
+      default: 'text-muted-foreground',
+      hover: 'text-foreground',
+      accent: 'var(--brand)'
+    },
+    nav: {
+      background: 'var(--card)',
+      border: '1px solid var(--border)',
+      activeColor: 'var(--foreground)',
+      inactiveColor: 'var(--muted-foreground)',
+      hoverTransform: 'hover:translate-y-[-2px]',
+      colors: {
+        home: 'var(--ok)',
+        applications: 'var(--brand)',
+        companyHub: 'var(--bar-1)',
+        careerAssistant: 'var(--bar-2)',
+        workers: 'var(--brand)',
+        blog: 'var(--foreground)',
+        settings: 'var(--foreground)',
+        landing: 'var(--foreground)',
+      }
+    },
+    status: {
+      interested: 'var(--status-interested)',
+      applied: 'var(--status-applied)',
+      interviewing: 'var(--status-interviewing)',
+      offer: 'var(--status-offered)',
+      rejected: 'var(--status-rejected)',
+      ghosted: 'var(--status-ghosted)'
+    },
+    form: {
+      input: {
+        background: 'var(--muted)',
+        text: 'var(--foreground)',
+        placeholder: 'var(--subtle-foreground)',
+        border: 'var(--input)',
+        focus: 'var(--brand)',
+        hover: {
+          background: 'var(--accent)',
+          transform: 'translateY(-1px)',
+          shadow: 'none'
+        }
+      },
+      select: {
+        background: 'var(--muted)',
+        text: 'var(--foreground)',
+        border: 'var(--input)',
+        hover: {
+          background: 'var(--accent)',
+          transform: 'translateY(-1px)'
+        }
+      },
+      popup: {
+        background: 'var(--popover)',
+        backdropFilter: 'blur(8px)',
+        shadow: '0 8px 32px var(--scrim)'
+      }
+    },
+    black: 'var(--foreground)',
+    white: 'var(--background)',
   };
+  const styles: Record<'light' | 'dark', ThemeStyles> = { dark: tokenStyles, light: tokenStyles };
 
 
   const utilStyles = {
@@ -508,27 +433,29 @@ export function JobKompassThemeProvider({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark';
-    if (savedTheme) {
+    if (savedTheme === 'light' || savedTheme === 'dark') {
       setTheme(savedTheme);
     } else {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(prefersDark ? 'dark' : 'light');
     }
+    setThemeResolved(true);
   }, []);
 
   useEffect(() => {
+    if (!themeResolved) return;
     localStorage.setItem('theme', theme);
-  }, [theme]);
+  }, [theme, themeResolved]);
 
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || !themeResolved) return;
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-  }, [theme]);
+  }, [theme, themeResolved]);
 
   const value = {
     theme,

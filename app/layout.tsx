@@ -1,15 +1,28 @@
 import { Analytics } from "@vercel/analytics/next"  
 import type { Metadata } from "next";
-import { Ubuntu } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { JobKompassThemeProvider } from "@/providers/jkThemeProvider";
 import "./globals.css";
 
-const ubuntu = Ubuntu({
-  weight: ["300", "400", "500", "700"],
-  subsets: ["latin"],
-  variable: "--font-ubuntu",
+const creato = localFont({
+  src: [
+    { path: "../public/fonts/CreatoDisplay-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/CreatoDisplay-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/CreatoDisplay-Bold.woff2", weight: "700", style: "normal" },
+  ],
+  variable: "--font-creato",
   display: "swap",
 });
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
+});
+
+// Runs before first paint so a returning dark-theme user never sees a light flash.
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})();`;
 import { JobKompassChatWindowProvider } from "@/providers/jkChatWindowProvider";
 import JobKompassResumeProvider from "@/providers/jkResumeProvider";
 import { JobKompassDocumentsProvider } from "@/providers/jkDocumentsProvider";
@@ -125,8 +138,11 @@ export default function RootLayout({
                     <JobKompassDocumentsProvider>
                       <JobKompassChatWindowProvider>
                         <JkToastProvider>
-                      <html lang="en" className={ubuntu.variable}>
-                        <body className={`${ubuntu.className} antialiased min-h-screen bg-background text-foreground`}>
+                      <html lang="en" className={`${creato.variable} ${jetbrains.variable}`} suppressHydrationWarning>
+                        <head>
+                          <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+                        </head>
+                        <body className={`${creato.className} antialiased min-h-screen bg-background text-foreground`}>
                           {children}
                         </body>
                       </html>
