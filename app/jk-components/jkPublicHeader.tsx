@@ -18,11 +18,14 @@ import { useJobKompassTheme } from '@/providers/jkThemeProvider'
 interface JkPublicHeaderProps {
   showPricing?: boolean
   showSignIn?: boolean
+  /** Section links in the middle of the bar (landing page). */
+  showNav?: boolean
 }
 
 export default function JkPublicHeader({ 
   showPricing = false, 
   showSignIn = true,
+  showNav = false,
 }: JkPublicHeaderProps = {}) {
   const { user, isAuthenticated } = useAuth()
   const { planId } = useSubscription()
@@ -43,8 +46,8 @@ export default function JkPublicHeader({
   }
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <nav className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      <div className="mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8">
         <Link href="/" className="flex items-end gap-3">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -64,11 +67,19 @@ export default function JkPublicHeader({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="text-xl font-semibold tracking-tight"
+            className="text-xl font-medium tracking-tight"
           >
             JobKompass
           </motion.span>
         </Link>
+        {showNav && (
+          <div className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
+            <Link href="/#product" className="transition-colors hover:text-foreground">Product</Link>
+            <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
+            <Link href="/#cli" className="transition-colors hover:text-foreground">CLI</Link>
+            <Link href="/free-resume-generator" className="transition-colors hover:text-foreground">Free resume generator</Link>
+          </div>
+        )}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -113,11 +124,7 @@ export default function JkPublicHeader({
                     <span className="truncate max-w-[120px]">{user.name || user.email}</span>
                     {planId && planId !== 'free' && (
                       <span className={`px-1.5 py-0.5 rounded-lg text-xs font-medium ${
-                        planId === 'pro' 
-                          ? 'bg-primary text-primary-foreground' 
-                          : planId === 'plus'
-                          ? 'bg-brand text-on-fill'
-                          : 'bg-ok text-on-fill'
+                        'bg-plan text-plan-foreground'
                       }`}>
                         {planId === 'starter' ? 'Starter' : 
                          planId === 'pro' ? 'Pro' : 
@@ -171,7 +178,7 @@ export default function JkPublicHeader({
             </>
           ) : (
             <>
-              {showPricing && (
+              {showPricing && !showNav && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -192,11 +199,12 @@ export default function JkPublicHeader({
                 >
                   <Link href="/auth">
                     <Button variant="ghost" size="sm">
-                      Sign in
+                      Log in
                     </Button>
                   </Link>
                 </motion.div>
               )}
+              {showNav && <JkGetStartedButton size="default" surface="header" />}
             </>
           )}
         </motion.div>

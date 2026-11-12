@@ -1,45 +1,61 @@
-'use client'
-
 import Link from "next/link"
 import Image from "next/image"
-import { motion } from "framer-motion"
 import { mainAssets } from "../lib/constants"
+
+const COLUMNS: { heading: string; links: { label: string; href: string }[] }[] = [
+  {
+    heading: "Product",
+    links: [
+      { label: "My Jobs", href: "/app?mode=my-jobs" },
+      { label: "My Documents", href: "/app?mode=documents" },
+      { label: "Interview Prep", href: "/app?mode=interview-prep" },
+      { label: "CLI", href: "/#cli" },
+      { label: "Pricing", href: "/pricing" },
+    ],
+  },
+  {
+    heading: "Resources",
+    links: [
+      { label: "Free resume generator", href: "/free-resume-generator" },
+      { label: "FAQ", href: "/#faq" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "Contact", href: "/contact" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
+  },
+]
 
 export default function JkFooter() {
   return (
-    <footer className="relative border-t border-border py-16 px-6" role="contentinfo">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col md:flex-row items-center justify-between gap-6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute inset-0 bg-brand/20 blur-xl rounded-full" />
-              <Image
-                src={mainAssets.logo}
-                alt="JobKompass Logo - Career Management Platform"
-                width={36}
-                height={36}
-                className="object-contain relative"
-              />
+    <footer className="border-t border-border bg-background px-5 py-14 sm:px-8" role="contentinfo">
+      <div className="mx-auto max-w-[1232px]">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_2fr]">
+          <div>
+            <div className="flex items-center gap-3">
+              <Image src={mainAssets.logo} alt="JobKompass logo" width={32} height={32} className="object-contain" />
+              <span className="text-xl font-medium tracking-tight text-foreground">JobKompass</span>
             </div>
-            <span className="text-lg font-semibold">JobKompass</span>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">Job tracking, tailored resumes, and interview prep in one account.</p>
           </div>
-          
-          <div className="flex items-center gap-8 text-sm text-muted-foreground">
-            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+            {COLUMNS.map((c) => (
+              <nav key={c.heading} aria-label={c.heading}>
+                <p className="jk-eyebrow text-subtle-foreground">{c.heading}</p>
+                <ul className="mt-4 space-y-2.5 text-sm">
+                  {c.links.map((l) => (
+                    <li key={l.label}><Link href={l.href} className="text-muted-foreground transition-colors hover:text-foreground">{l.label}</Link></li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
           </div>
-
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} JobKompass. All rights reserved.
-          </p>
-        </motion.div>
+        </div>
+        <p className="mt-12 border-t border-border pt-6 font-mono text-xs text-subtle-foreground">© {new Date().getFullYear()} JobKompass</p>
       </div>
     </footer>
   )

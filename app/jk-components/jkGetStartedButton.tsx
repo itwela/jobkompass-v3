@@ -7,9 +7,10 @@ import { trackCtaClicked } from '@/lib/analytics/client'
 
 interface JkGetStartedButtonProps {
   size?: 'sm' | 'default' | 'lg' | 'icon'
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
+  variant?: 'default' | 'plan' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
   className?: string
   surface?: 'hero' | 'header'
+  label?: string
 }
 
 export default function JkGetStartedButton({ 
@@ -17,6 +18,7 @@ export default function JkGetStartedButton({
   variant = 'default',
   className = '',
   surface = 'header',
+  label = 'Get started',
 }: JkGetStartedButtonProps) {
   const { isAuthenticated } = useAuth()
   
@@ -28,7 +30,7 @@ export default function JkGetStartedButton({
       }}
     >
       <Button size={size} variant={variant} className={className}>
-        Get started
+        {label}
       </Button>
     </Link>
   )

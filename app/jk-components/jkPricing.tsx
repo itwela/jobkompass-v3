@@ -12,7 +12,7 @@ import JkPublicHeader from './jkPublicHeader'
 import { trackCheckoutStarted, trackPlanUpgrade } from '@/lib/analytics/client'
 
 
-interface PlanPricing {
+export interface PlanPricing {
   monthly: {
     price: string
     priceId: string
@@ -25,7 +25,7 @@ interface PlanPricing {
   }
 }
 
-interface Plan {
+export interface Plan {
   id: string
   name: string
   description: string
@@ -37,19 +37,16 @@ interface Plan {
   oneTimePriceId?: string
 }
 
-const plans: Plan[] = [
+export const plans: Plan[] = [
   {
     id: 'starter',
     name: '7-Day Starter',
-    description: 'Try everything for a week - no commitment',
+    description: 'A week of full access, no commitment',
     features: [
-      'Full app access for 7 days',
-      '10 AI-generated documents',
-      'Unlimited edits',
+      'Full access for 7 days',
+      '10 AI documents',
       'Track up to 100 jobs',
-      'Unlimited links & resources',
-      'Full search functionality',
-      'Jake and Joseph resume templates',
+      'Jake and Joseph templates',
     ],
     isOneTime: true,
     oneTimePrice: '$2.99',
@@ -58,15 +55,12 @@ const plans: Plan[] = [
   {
     id: 'plus',
     name: 'Plus',
-    description: 'For active job seekers who need consistent power',
+    description: 'For active job seekers',
     features: [
-      '60 AI-generated documents per month',
-      'Unlimited edits on generated documents',
+      '60 AI documents per month',
       'Track up to 100 jobs',
-      'Unlimited links & resources',
-      'Full search functionality',
-      'Jake and Joseph resume templates',
-      'Chrome extension access',
+      'Jake and Joseph templates',
+      'Chrome extension',
     ],
     pricing: {
       monthly: {
@@ -84,13 +78,13 @@ const plans: Plan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    description: 'For serious professionals managing multiple applications',
+    description: 'For managing many applications',
     features: [
       'Everything in Plus',
-      '180 AI-generated documents per month (vs 60)',
-      'Track unlimited jobs (vs 100)',
-      'Mar template — exclusive to Pro',
-      'Command line & AI agent access (JobKompass CLI)',
+      '180 AI documents per month',
+      'Unlimited jobs',
+      'Mar template',
+      'jk CLI and agent access',
       'Priority support',
     ],
     popular: true,

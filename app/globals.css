@@ -739,8 +739,17 @@ textarea[aria-label="Message input"]:focus-visible {
   mask-composite: intersect;
 }
 .jk-art-fade-soft {
-  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000 45%, transparent 100%);
-  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000 45%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 55%, #000 35%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 55%, #000 35%, transparent 100%);
+}
+/* Full-bleed paintings: fade only where they meet the next surface. */
+.jk-art-fade-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 84%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 84%, transparent);
+}
+.jk-art-fade-b {
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
 }
 .jk-eyebrow {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
