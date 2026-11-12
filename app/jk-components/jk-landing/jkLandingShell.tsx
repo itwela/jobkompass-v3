@@ -6,7 +6,7 @@ import { JkEyebrow, type JkTone } from "../jkBars";
 
 /** Page-width container shared by every landing section. */
 export function LandingContainer({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("mx-auto w-full max-w-[1232px] px-5 sm:px-8", className)}>{children}</div>;
+  return <div className={cn("mx-auto w-full max-w-[1248px] px-5 sm:px-6", className)}>{children}</div>;
 }
 
 /** Fades content up the first time it scrolls into view. */
@@ -28,9 +28,9 @@ export function Reveal({ className, delay = 0, children }: { className?: string;
 export function SectionHeading({ id, eyebrow, tone, title, lead, className }: { id?: string; eyebrow: string; tone: JkTone; title: React.ReactNode; lead?: string; className?: string }) {
   return (
     <Reveal className={cn("mb-10 sm:mb-12", className)}>
-      <JkEyebrow tone={tone}>{eyebrow}</JkEyebrow>
-      <h2 id={id} className="mt-4 text-balance text-3xl font-medium tracking-tight text-foreground sm:text-5xl">{title}</h2>
-      {lead && <p className="mt-4 max-w-3xl text-base text-muted-foreground sm:text-lg">{lead}</p>}
+      <JkEyebrow tone={tone} className="text-muted-foreground">{eyebrow}</JkEyebrow>
+      <h2 id={id} className="mt-[7px] text-balance text-[clamp(28px,5.4vw,52px)] font-medium leading-[1.19] tracking-[-0.022em] text-foreground">{title}</h2>
+      {lead && <p className="mt-4 max-w-3xl text-pretty text-base text-muted-foreground sm:text-lg">{lead}</p>}
     </Reveal>
   );
 }

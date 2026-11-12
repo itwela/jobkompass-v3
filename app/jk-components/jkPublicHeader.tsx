@@ -50,7 +50,7 @@ export default function JkPublicHeader({
 
   return (
     <nav className={overlay ? "absolute inset-x-0 top-0 z-50 w-full" : "sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70"}>
-      <div className={overlay ? "relative mx-auto flex h-[92px] max-w-[1248px] items-center justify-between px-6" : "mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8"}>
+      <div className={overlay ? "relative mx-auto flex h-[76px] max-w-[1248px] items-center justify-between gap-3 px-5 sm:px-6 lg:h-[92px]" : "mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8"}>
         <Link href="/" className="flex items-end gap-3">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -211,7 +211,7 @@ export default function JkPublicHeader({
                   </Link>
                 </motion.div>
               )}
-              {showNav && <JkGetStartedButton size="default" surface="header" className={overlay ? "h-10 px-[26px] text-[15.5px]" : ""} />}
+              {showNav && <JkGetStartedButton size="default" surface="header" className={overlay ? "jk-fx jk-fx-cream h-10 px-[26px] text-[15.5px]" : ""} />}
             </>
           )}
         </motion.div>

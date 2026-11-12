@@ -19,11 +19,11 @@ export default function JkLandingPricing() {
             renderAction={(plan, { highlighted }) =>
               plan.id === "free" ? (
                 <Link href={isAuthenticated ? "/app" : "/auth"} onClick={() => { if (!isAuthenticated) trackCtaClicked({ cta: "signup", surface: "hero" }); }}>
-                  <Button variant="secondary" size="lg" className="w-full bg-transparent">Get started</Button>
+                  <Button variant="secondary" size="lg" className="jk-fx jk-fx-navy w-full bg-transparent"><span className="relative z-[2]">Get started</span></Button>
                 </Link>
               ) : (
                 <Link href="/pricing">
-                  <Button variant={highlighted ? "plan" : "secondary"} size="lg" className={highlighted ? "w-full" : "w-full bg-transparent"}>{plan.isOneTime ? "Start" : "Start free trial"}</Button>
+                  <Button variant={highlighted ? "plan" : "secondary"} size="lg" className={highlighted ? "jk-fx jk-fx-gold w-full" : "jk-fx jk-fx-navy w-full bg-transparent"}><span className="relative z-[2]">{plan.isOneTime ? "Start" : "Start free trial"}</span></Button>
                 </Link>
               )
             }

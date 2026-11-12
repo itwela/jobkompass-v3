@@ -64,7 +64,7 @@ export default function JkLandingFreeGenerator() {
             <h2 id="free-heading" className="mt-4 text-3xl font-medium tracking-tight text-foreground sm:text-4xl lg:whitespace-nowrap">Try it without signing up</h2>
             <p className="mt-3 max-w-sm text-muted-foreground">Paste your resume text or upload a PDF and get it formatted.</p>
             <Link href="/free-resume-generator" onClick={() => trackCtaClicked({ cta: "free_generator", surface: "midpage" })} className="mt-6 inline-block">
-              <Button size="lg" className="h-13 px-7 text-base">Try the free generator</Button>
+              <Button size="lg" className="jk-fx jk-fx-cream h-[52px] px-[26px] text-[15.5px]">Try the free generator</Button>
             </Link>
           </div>
           <ol className="divide-y divide-border">

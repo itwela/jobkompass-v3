@@ -3,42 +3,38 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import JkGetStartedButton from "../jkGetStartedButton";
+import JkPaintingLoop from "../jkPaintingLoop";
+import { HERO_LOOP_FRAGMENT, HERO_LOOP_SECONDS } from "./jkHeroLoopShader";
 
 /**
- * Hero, measured from the v4.5 frame (1440 x 1100):
- * a 292px sky band, then the painting at its own 16:9 shape across the full
- * width, with the copy laid over both. Past 1440 the painting keeps its shape
- * and the section grows with it, so nothing is cropped.
+ * Hero, measured from the v4.5 frame (1440 x 1100): a 290px sky band, then the
+ * painting at its own 16:9 shape across the full width, with the copy laid
+ * over both. On wider windows the copy keeps its size and the painting grows
+ * (see .jk-painting in globals.css).
  */
 export default function JkLandingHero() {
   return (
-    <section className="relative isolate overflow-hidden bg-sky pb-[calc(56.25vw-150px)] lg:h-[calc(290px+56.25vw)] lg:pb-0" aria-labelledby="hero-heading">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-20 h-[292px] bg-gradient-to-b from-sky-top to-sky" />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-20 aspect-[16/9]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/v4/hero-night.webp" alt="" fetchPriority="high" draggable={false} className="hidden size-full select-none object-cover dark:block" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/v4/hero-day.webp" alt="" draggable={false} className="block size-full select-none object-cover dark:hidden" />
-        <div className="absolute inset-x-0 top-0 h-[150px] bg-gradient-to-b from-sky to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-[200px] bg-gradient-to-b from-transparent to-background" />
-      </div>
+    <section className="relative isolate overflow-hidden bg-sky" aria-labelledby="hero-heading">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[292px] bg-gradient-to-b from-sky-top to-sky" />
 
-      <div className="relative mx-auto max-w-[1440px] px-5 pt-[120px] text-center lg:px-0 lg:pt-[150px]">
-        <a href="#cli" className="group inline-flex h-[34px] items-center gap-[11px] rounded-full border border-on-fill/25 bg-on-fill/10 pl-[5px] pr-[11px] text-[13.5px] font-medium text-on-fill transition-colors hover:bg-on-fill/15">
-          <span className="flex h-6 w-11 items-center justify-center rounded-full bg-plan font-mono text-[9.5px] font-bold tracking-[0.6px] text-plan-foreground">NEW</span>
+      <div className="relative z-10 mx-auto max-w-[1440px] px-5 pt-[112px] text-center lg:absolute lg:inset-x-0 lg:top-0 lg:px-0 lg:pt-[150px]">
+        <a href="#cli" className="group inline-flex h-[34px] max-w-full items-center gap-[11px] rounded-full border border-on-fill/25 bg-on-fill/10 pl-[5px] pr-[11px] text-[13.5px] font-medium text-on-fill transition-colors hover:bg-on-fill/15">
+          <span className="flex h-6 w-11 shrink-0 items-center justify-center rounded-full bg-plan font-mono text-[9.5px] font-bold tracking-[0.6px] text-plan-foreground">NEW</span>
           <span className="truncate">jk CLI is here: let your AI agent run your job search</span>
           <ArrowRight className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </a>
-        <h1 id="hero-heading" className="mt-[13px] text-[44px] font-medium leading-[1.05] tracking-[-1px] text-on-fill sm:text-[64px] lg:text-[80px] lg:leading-[84px] lg:tracking-[-1.76px]">
-          A tailored resume <br className="hidden sm:block" />for every job you apply to
+        {/* 80px at 1440 and scaling down with the window, so the two-line break always holds. */}
+        <h1 id="hero-heading" className="mt-[13px] text-[clamp(30px,7.2vw,80px)] font-medium leading-[1.05] tracking-[-0.022em] text-on-fill lg:text-[80px] lg:leading-[84px]">
+          <span className="block">A tailored resume</span>
+          <span className="block">for every job you apply to</span>
         </h1>
-        <p className="mx-auto mt-[18px] max-w-[720px] text-[17px] leading-[27px] text-on-fill/85 lg:text-[19px]">
+        <p className="mx-auto mt-[18px] max-w-[720px] text-balance text-[clamp(15px,2.1vw,19px)] leading-[1.42] text-on-fill/85 lg:text-[19px] lg:leading-[27px]">
           Paste a posting. JobKompass saves the job, writes the resume and cover letter for it, <br className="hidden lg:block" />and keeps your whole search in one list.
         </p>
         <div className="mt-[28px] flex flex-wrap items-center justify-center gap-3">
-          <JkGetStartedButton size="lg" className="h-[52px] px-[26px] text-[15.5px]" surface="hero" label="Get started free" />
-          <Link href="/pricing" className="inline-flex h-[52px] items-center rounded-full border border-on-fill/35 bg-on-fill/10 px-[26px] text-[15.5px] font-medium text-on-fill transition-colors hover:bg-on-fill/20">
-            See pricing
+          <JkGetStartedButton size="lg" className="jk-fx jk-fx-cream h-[52px] px-[26px] text-[15.5px]" surface="hero" label="Get started free" />
+          <Link href="/pricing" className="jk-fx jk-fx-navy inline-flex h-[52px] items-center rounded-full border border-on-fill/35 bg-on-fill/10 px-[26px] text-[15.5px] font-medium text-on-fill">
+            <span className="relative z-[2]">See pricing</span>
           </Link>
         </div>
 
@@ -60,6 +56,18 @@ export default function JkLandingHero() {
           </div>
           <p className="mt-[10px] font-mono text-[9.5px] uppercase tracking-[1px] text-on-fill/75">Resume written · 1 page</p>
         </div>
+      </div>
+
+      {/* Sky band (desktop), then the painting at its own shape. */}
+      <div aria-hidden className="hidden h-[290px] lg:block" />
+      <div aria-hidden className="jk-painting pointer-events-none relative -z-10 -mt-[12%] w-full lg:mt-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/v4/hero-night.webp" alt="" fetchPriority="high" draggable={false} className="absolute inset-0 hidden size-full select-none object-cover dark:block" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/v4/hero-day.webp" alt="" draggable={false} className="absolute inset-0 block size-full select-none object-cover dark:hidden" />
+        <JkPaintingLoop src="/images/v4/hero-night.webp" fragment={HERO_LOOP_FRAGMENT} loopSeconds={HERO_LOOP_SECONDS} className="absolute inset-0 hidden size-full dark:block" />
+        <div className="absolute inset-x-0 top-0 h-[150px] bg-gradient-to-b from-sky to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-[200px] bg-gradient-to-b from-transparent to-background" />
       </div>
     </section>
   );

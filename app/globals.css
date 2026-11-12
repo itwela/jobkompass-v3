@@ -56,6 +56,7 @@
   --color-sky: var(--sky);
   --color-on-fill: var(--on-fill);
   --color-paper: var(--paper);
+  --color-paper-warm: var(--paper-warm);
   --color-paper-foreground: var(--paper-foreground);
   --color-status-interested: var(--status-interested);
   --color-status-applied: var(--status-applied);
@@ -172,6 +173,7 @@ textarea[aria-label="Message input"]:focus-visible {
   --chart-5: var(--plan);
   --on-fill: #FFFFFF;
   --paper: #FFFFFF;
+  --paper-warm: #FAF7EE;
   --paper-foreground: #111111;
 }
 
@@ -233,6 +235,7 @@ textarea[aria-label="Message input"]:focus-visible {
   --chart-5: var(--plan);
   --on-fill: #FFFFFF;
   --paper: #FFFFFF;
+  --paper-warm: #FAF7EE;
   --paper-foreground: #111111;
   color-scheme: dark;
 }
@@ -763,3 +766,73 @@ textarea[aria-label="Message input"]:focus-visible {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+
+/* ─── Landing ─────────────────────────────────────────────────────────────── */
+/*
+ * Wider than the 1440 design: copy, buttons and cards keep their design size
+ * in a centred column. Only the full-bleed paintings grow, cropped from the
+ * top (plain sky) so the water and everything on it stays in view.
+ */
+.jk-landing { overflow-x: clip; }
+.jk-painting { aspect-ratio: 16 / 9; }
+@media (min-width: 1024px) {
+  .jk-painting { aspect-ratio: auto; height: clamp(810px, 42vw, 1000px); }
+}
+.jk-painting > img, .jk-painting > canvas { object-fit: cover; object-position: center bottom; }
+
+/* ─── Button effects, from figcraft-work/jobkompass/motion (btnfx) ─────────── */
+@property --jk-ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.jk-fx {
+  position: relative; overflow: hidden; isolation: isolate; -webkit-tap-highlight-color: transparent;
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .35s, filter .3s, background-color .2s;
+  transform: translate(var(--mx, 0px), var(--my, 0px));
+}
+.jk-fx:hover { transform: translate(var(--mx, 0px), calc(var(--my, 0px) - 1px)); }
+.jk-fx:active { transform: translate(var(--mx, 0px), var(--my, 0px)) scale(.955); transition-duration: .08s; }
+/* cream: a lantern-coloured light crosses the button */
+.jk-fx-cream::before {
+  content: ""; position: absolute; z-index: 1; top: -30%; bottom: -30%; left: -70%; width: 48%;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--plan) 67%, transparent) 45%, rgb(255 255 255 / .53) 55%, transparent);
+  transform: skewX(-18deg); transition: left 0s; pointer-events: none;
+}
+.jk-fx-cream:hover::before { left: 125%; transition: left .75s cubic-bezier(.3,.6,.2,1); }
+.jk-fx-cream:hover { box-shadow: 0 10px 30px -10px color-mix(in srgb, var(--plan) 60%, transparent); }
+/* gold: breathes like a lantern, lights up under the pointer */
+.jk-fx-gold { animation: jk-halo 2.8s ease-out infinite; }
+@keyframes jk-halo {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--plan) 50%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 14px transparent; }
+}
+.jk-fx-gold:hover { filter: brightness(1.06); }
+.jk-fx-gold::before {
+  content: ""; position: absolute; z-index: 1; inset: 0; opacity: 0; transition: opacity .3s; pointer-events: none;
+  background: radial-gradient(120px circle at var(--px, 50%) var(--py, 50%), rgb(255 255 255 / .47), transparent 70%);
+}
+.jk-fx-gold:hover::before { opacity: 1; }
+/* navy: the sea rises inside it, and the four logo colours run round the edge */
+.jk-fx-navy::before {
+  content: ""; position: absolute; z-index: 1; left: -50%; width: 200%; aspect-ratio: 1; top: 135%; border-radius: 43%; pointer-events: none;
+  background: linear-gradient(color-mix(in srgb, var(--bar-3) 33%, transparent), color-mix(in srgb, var(--bar-2) 47%, transparent) 40%, color-mix(in srgb, var(--bar-1) 53%, transparent));
+  transition: top .9s cubic-bezier(.3,.7,.2,1); animation: jk-spin 7s linear infinite;
+}
+.jk-fx-navy:hover::before { top: -18%; }
+@keyframes jk-spin { to { transform: rotate(360deg); } }
+.jk-fx-navy::after {
+  content: ""; position: absolute; z-index: 3; inset: -1px; border-radius: inherit; padding: 1.6px; opacity: 0; transition: opacity .35s; pointer-events: none;
+  background: conic-gradient(from var(--jk-ang), var(--bar-1), var(--bar-2), var(--bar-3), var(--bar-4), var(--bar-1));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: jk-ring 3s linear infinite;
+}
+.jk-fx-navy:hover::after { opacity: 1; }
+@keyframes jk-ring { to { --jk-ang: 360deg; } }
+/* click ripple */
+.jk-rip {
+  position: absolute; z-index: 1; border-radius: 50%; width: 12px; height: 12px; margin: -6px; background: currentColor; opacity: .28;
+  pointer-events: none; animation: jk-rip .7s cubic-bezier(.2,.7,.2,1) forwards;
+}
+@keyframes jk-rip { to { transform: scale(34); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .jk-fx, .jk-fx::before, .jk-fx::after { animation: none !important; transition: none !important; }
+}
+
+/* v4 landing styles end */

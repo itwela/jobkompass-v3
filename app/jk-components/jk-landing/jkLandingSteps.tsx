@@ -19,34 +19,48 @@ const SAMPLE_COUNTS = [
   { status: "Offered", count: 4 }, { status: "Rejected", count: 12 }, { status: "Ghosted", count: 30 },
 ];
 
+// Each mock is drawn for the reference's 262px-square panel.
+
 function SaveMock() {
   return (
-    <div className="flex h-full flex-col px-4 py-5">
-      <p className="jk-eyebrow text-subtle-foreground">Add job</p>
-      <p className="mt-2.5 truncate rounded-full border-2 border-plan px-4 py-2.5 font-mono text-xs text-foreground">careers.blackrock.com/job/22417<span className="ml-px inline-block h-3.5 w-px translate-y-0.5 bg-foreground" /></p>
-      <ArrowDown className="mx-auto my-3 size-5 text-border-strong" strokeWidth={1.5} />
-      <div className="rounded-2xl border border-input bg-card px-4 py-3">
-        <p className="jk-eyebrow text-ok">JK-237 · Saved</p>
-        <p className="mt-2 font-medium text-foreground">AI Engineer</p>
-        <p className="text-xs text-muted-foreground">BlackRock · New York</p>
-        <p className="mt-2 flex items-center justify-between text-xs text-foreground">
+    <div className="flex h-full flex-col px-[18px] pt-[31px]">
+      <p className="font-mono text-[9.5px] uppercase tracking-[1.6px] text-subtle-foreground">Add job</p>
+      <p className="mt-[9px] flex h-[38px] items-center truncate rounded-full border-[1.5px] border-plan px-3.5 font-mono text-[11px] text-foreground">
+        careers.blackrock.com/job/22417<span className="ml-px inline-block h-3.5 w-px bg-foreground" />
+      </p>
+      <ArrowDown className="mx-auto my-[13px] size-[18px] text-border-strong" strokeWidth={1.5} />
+      <div className="rounded-[14px] border border-input bg-card px-3.5 pb-3 pt-[13px]">
+        <p className="font-mono text-[9.5px] uppercase tracking-[1.4px] text-ok">JK-237 · Saved</p>
+        <p className="mt-[7px] text-[15px] font-medium leading-5 text-foreground">AI Engineer</p>
+        <p className="text-[11.5px] text-muted-foreground">BlackRock · New York</p>
+        <p className="mt-[7px] flex items-center justify-between text-[11.5px] text-foreground">
           <span className="flex items-center gap-2"><JkStatusGlyph status="Interested" className="size-3.5" />Interested</span>
-          <span className="font-mono">$$$$</span>
+          <span className="font-mono text-[11px]">$$$$</span>
         </p>
       </div>
     </div>
   );
 }
 
+// Pill and connector geometry from the frame's 262px panel.
+const CHANGES = [
+  { top: 34, from: 56, lines: ["Claude Code", "leads"] },
+  { top: 78, from: 80, lines: ["MCP first", "in skills"] },
+  { top: 132, from: 108, lines: ["Projects", "on top"] },
+];
+
 function ResumeMock() {
   return (
-    <div className="relative flex h-full items-start gap-2.5 px-3 pt-3.5">
-      <JkDocPreview width={143} className="rounded-sm" />
-      <ul className="mt-4 min-w-0 flex-1 space-y-1.5">
-        {[["Claude Code", "leads"], ["MCP first", "in skills"], ["Projects", "on top"]].map(([a, b]) => (
-          <li key={a} className="relative rounded-xl border border-bar-3 bg-background px-2 py-1.5 before:absolute before:-left-3 before:top-1/2 before:h-px before:w-3 before:bg-bar-3">
-            <p className="font-mono text-[8px] uppercase tracking-wider text-bar-4">Changed</p>
-            <p className="text-[11px] leading-tight text-foreground">{a}<br />{b}</p>
+    <div className="relative h-full">
+      <JkDocPreview width={143} height={227} highlight className="absolute left-[18px] top-[18px] rounded-[3px] bg-paper-warm" />
+      <svg aria-hidden className="absolute inset-0 size-full text-bar-3" fill="none" stroke="currentColor" strokeWidth={0.9}>
+        {CHANGES.map((c) => <line key={c.top} x1={161} y1={c.from} x2={170} y2={c.top + 23} />)}
+      </svg>
+      <ul>
+        {CHANGES.map((c) => (
+          <li key={c.lines[0]} className="absolute left-[170px] flex h-[46px] w-[74px] flex-col items-center justify-center rounded-[10px] border border-bar-3 bg-card text-center" style={{ top: c.top }}>
+            <span className="font-mono text-[7px] font-bold uppercase leading-[9px] tracking-[0.6px] text-bar-4">Changed</span>
+            <span className="mt-[2px] text-[9.5px] leading-[12px] text-foreground">{c.lines[0]}<br />{c.lines[1]}</span>
           </li>
         ))}
       </ul>
@@ -56,21 +70,21 @@ function ResumeMock() {
 
 function TrackMock() {
   return (
-    <div className="h-full px-4 py-5">
+    <div className="h-full px-[18px] pt-[26px]">
       <div className="flex items-center justify-between">
-        <p className="jk-eyebrow text-subtle-foreground">My Jobs</p>
-        <p className="font-mono text-xs text-muted-foreground">236</p>
+        <p className="font-mono text-[9.5px] uppercase tracking-[1.6px] text-subtle-foreground">My Jobs</p>
+        <p className="font-mono text-[10.5px] text-muted-foreground">236</p>
       </div>
-      <JkStatusBar counts={SAMPLE_COUNTS} className="-mt-5 [&>div:last-child]:h-1.5" />
-      <ul className="mt-2.5">
+      <JkStatusBar counts={SAMPLE_COUNTS} className="-mt-[19px] [&>div:last-child]:h-[5px]" />
+      <ul className="mt-[13px]">
         {SAMPLE_JOBS.map((j, i) => (
-          <li key={j.title} className={cn("flex items-center gap-2.5 rounded-lg px-1.5 py-1.5", i === 0 && "bg-accent/70")}>
-            <JkStatusGlyph status={j.status} className="size-4" />
+          <li key={j.title} className={cn("-mx-2 flex h-9 items-center gap-2.5 rounded-[9px] px-2", i === 0 ? "bg-accent/70" : "border-t border-border first:border-0", i === 1 && "border-0")}>
+            <JkStatusGlyph status={j.status} className="size-[15px]" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-foreground">{j.title}</p>
-              <p className={cn("text-[10px] leading-tight", STATUS_TEXT[statusKey(j.status)])}>{j.status}</p>
+              <p className="truncate text-[11.5px] font-medium leading-[14px] text-foreground">{j.title}</p>
+              <p className={cn("text-[9px] leading-[11px]", STATUS_TEXT[statusKey(j.status)])}>{j.status}</p>
             </div>
-            <span className="font-mono text-[10px] text-subtle-foreground">{j.date}</span>
+            <span className="font-mono text-[9.5px] text-subtle-foreground">{j.date}</span>
           </li>
         ))}
       </ul>
@@ -80,20 +94,20 @@ function TrackMock() {
 
 function PrepMock() {
   return (
-    <div className="flex h-full flex-col px-3 py-5">
-      <div className="rounded-2xl border border-input bg-card px-3.5 py-3.5">
-        <p className="jk-eyebrow text-plan-text">Card 7 of 24 · Proof</p>
-        <p className="mt-3 font-medium leading-snug text-foreground">Tell me about a time you connected company data to an LLM.</p>
-        <p className="jk-eyebrow mt-4 border-t border-dashed border-input pt-3 text-subtle-foreground">Space to flip</p>
+    <div className="flex h-full flex-col px-[17px] pt-[22px]">
+      <div className="h-[150px] rounded-[14px] border border-input bg-card px-3.5 pt-[15px]">
+        <p className="font-mono text-[9px] uppercase tracking-[1.3px] text-plan-text">Card 7 of 24 · Proof</p>
+        <p className="mt-[13px] text-[14.5px] font-medium leading-5 text-foreground">Tell me about a time<br />you connected company<br />data to an LLM.</p>
+        <p className="mt-[14px] border-t border-dashed border-input pt-[13px] font-mono text-[8.5px] uppercase tracking-[1.6px] text-subtle-foreground">Space to flip</p>
       </div>
-      <div className="mt-3 flex gap-1.5">
+      <div className="mt-[12px] flex gap-[7px]">
         {[["Reps", "bg-destructive"], ["Getting", "bg-warn"], ["Locked", "bg-ok"]].map(([l, c]) => (
-          <span key={l} className="inline-flex flex-1 items-center gap-1.5 rounded-full border border-input px-2.5 py-1.5 text-[11px] text-foreground">
+          <span key={l} className="inline-flex h-[26px] flex-1 items-center gap-1.5 rounded-full border border-input px-2.5 text-[10px] text-foreground">
             <span className={cn("size-1.5 rounded-full", c)} />{l}
           </span>
         ))}
       </div>
-      <div className="mt-3.5 flex gap-1">
+      <div className="mt-[19px] flex gap-[3px]">
         {Array.from({ length: 24 }, (_, i) => (
           <span key={i} className={cn("h-1 flex-1 rounded-full", i < 9 ? "bg-ok" : i < 15 ? "bg-warn" : "bg-border-strong")} />
         ))}
@@ -114,15 +128,15 @@ export default function JkLandingSteps() {
     <section id="product" className="scroll-mt-24 pb-24 pt-20 sm:pt-28" aria-labelledby="steps-heading">
       <LandingContainer>
         <SectionHeading id="steps-heading" eyebrow="01 / How it works" tone={1} title="Four steps from posting to interview" />
-        <ol className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <ol className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((s, i) => (
             <Reveal key={s.title} delay={i * 0.06} className="h-full">
-              <li className="flex h-full flex-col rounded-modal border border-border-strong/70 bg-card p-2.5">
-                <div aria-hidden className="h-[260px] overflow-hidden rounded-[1.4rem] border border-border bg-background">{s.mock}</div>
-                <div className="px-4 pb-7 pt-7">
-                  <p className={cn("font-mono text-xs", jkToneText((i + 1) as 1 | 2 | 3 | 4))}>0{i + 1}</p>
-                  <h3 className="mt-3 text-[1.4rem] font-medium tracking-tight text-foreground">{s.title}</h3>
-                  <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">{s.body}</p>
+              <li className="flex h-full flex-col rounded-[28px] border border-input bg-card p-[10px] lg:h-[480px]">
+                <div aria-hidden className="mx-auto h-[262px] w-full max-w-[262px] overflow-hidden rounded-[22px] border border-border bg-background">{s.mock}</div>
+                <div className="px-4 pb-6 pt-[25px]">
+                  <p className={cn("font-mono text-xs font-medium", jkToneText((i + 1) as 1 | 2 | 3 | 4))}>0{i + 1}</p>
+                  <h3 className="mt-[9px] text-[22px] font-medium leading-[26px] tracking-[-0.3px] text-foreground">{s.title}</h3>
+                  <p className="mt-[11px] text-[15px] leading-[22.5px] text-muted-foreground">{s.body}</p>
                 </div>
               </li>
             </Reveal>
