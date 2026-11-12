@@ -171,7 +171,7 @@ export default function JkTemplateSelector({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute !no-scrollbar inset-0 z-50 flex items-center justify-center bg-black/0 backdrop-blur-sm p-4"
+                    className="absolute !no-scrollbar inset-0 z-50 flex items-center justify-center bg-scrim backdrop-blur-sm p-4"
                     onClick={onClose}
                 >
                     <motion.div
@@ -185,8 +185,8 @@ export default function JkTemplateSelector({
                         {/* Header */}
                         <div className="p-5 !no-scrollbar flex items-center justify-between px-5 py-4 border-b w-full">
                             <div className="flex items-center gap-3">
-                                <div className="p-1.5 bg-primary/10 rounded-md">
-                                    <Icon className="h-4 w-4 text-primary" />
+                                <div className="p-1.5 bg-brand/10 rounded-md">
+                                    <Icon className="h-4 w-4 text-brand" />
                                 </div>
                                 <div>
                                     <h2 className="text-base font-semibold">Select {typeLabel} Template</h2>
@@ -223,8 +223,8 @@ export default function JkTemplateSelector({
                                                     onClick={() => setSelectedTemplateId(template.id)}
                                                     className={`relative flex flex-col flex-shrink-0 w-[180px] rounded-xl border-2 overflow-hidden transition-colors duration-200 text-left group ${
                                                         isSelected
-                                                            ? 'border-primary ring-2 ring-primary/40'
-                                                            : 'border-border hover:border-primary/60'
+                                                            ? 'border-brand ring-2 ring-brand/40'
+                                                            : 'border-border hover:border-brand/60'
                                                     }`}
                                                     initial={{ opacity: 0 }}
                                                     animate={{ opacity: 1 }}
@@ -238,15 +238,15 @@ export default function JkTemplateSelector({
                                                             className="object-cover object-top"
                                                             sizes="180px"
                                                         />
-                                                        <div className="absolute inset-0 bg-transparent group-hover:bg-black/5 transition-opacity" />
+                                                        <div className="absolute inset-0 bg-transparent group-hover:bg-scrim transition-opacity" />
                                                     </div>
                                                     <div className="p-2.5 bg-background/95 backdrop-blur-sm flex-shrink-0">
                                                         <div className="flex items-center gap-1.5">
                                                             <p className="font-medium text-xs truncate flex-1">{template.name}</p>
-                                                            {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                                            {isSelected && <Check className="h-3.5 w-3.5 text-brand shrink-0" />}
                                                         </div>
                                                         {isSelected && restoredFromPreference && (
-                                                            <span className="mt-1 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary">
+                                                            <span className="mt-1 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-brand/10 text-brand">
                                                                 Last used
                                                             </span>
                                                         )}
@@ -332,7 +332,7 @@ export default function JkTemplateSelector({
                                             />
                                             {resumePdf ? (
                                                 <div className="flex items-center gap-2 p-2 rounded-lg border bg-background">
-                                                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                                                    <FileText className="h-4 w-4 text-brand shrink-0" />
                                                     <span className="text-sm truncate flex-1">{resumePdfName || 'resume.pdf'}</span>
                                                     <Button type="button" variant="ghost" size="sm" onClick={clearPdf}>Remove</Button>
                                                 </div>

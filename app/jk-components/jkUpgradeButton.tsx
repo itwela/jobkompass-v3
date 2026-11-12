@@ -22,9 +22,9 @@ export default function JkUpgradeButton() {
       <Button
         variant="outline"
         size="sm"
-        className="gap-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+        className="gap-2 border-brand/20 hover:border-brand/40 hover:bg-brand/5"
       >
-        <Sparkles className="h-3.5 w-3.5 text-primary" />
+        <Sparkles className="h-3.5 w-3.5 text-brand" />
         <span className="text-xs font-medium">Upgrade</span>
       </Button>
     </Link>

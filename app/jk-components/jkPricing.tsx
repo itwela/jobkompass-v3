@@ -242,7 +242,7 @@ export default function JkPricing() {
             Or{' '}
             <Link
               href="/app"
-              className="text-primary hover:underline font-medium"
+              className="text-brand hover:underline font-medium"
             >
               stay on the free plan
             </Link>
@@ -276,7 +276,7 @@ export default function JkPricing() {
                 Switch to annual to save 25%
               </span>
             ) : (
-              <span className="text-xs text-green-600 font-medium">
+              <span className="text-xs text-ok font-medium">
                 You're saving 25% with annual billing
               </span>
             )}
@@ -302,10 +302,10 @@ export default function JkPricing() {
                 onClick={() => !isCurrentPlan(plan) && setSelectedPlanId(plan.id)}
                 className={`group/card relative border rounded-2xl p-8 bg-card cursor-pointer transition-all duration-200 flex flex-col ${
                   isSelected
-                    ? 'border-primary shadow-lg scale-105'
+                    ? 'border-brand shadow-lg scale-105'
                     : plan.popular
-                    ? 'border-primary/50 shadow-md hover:border-primary hover:shadow-lg hover:scale-105'
-                    : 'border-border hover:border-primary/50 hover:shadow-md hover:scale-[1.02]'
+                    ? 'border-brand/50 shadow-md hover:border-brand hover:shadow-lg hover:scale-105'
+                    : 'border-border hover:border-brand/50 hover:shadow-md hover:scale-[1.02]'
                 }`}
               >
                 {plan.popular && (
@@ -318,7 +318,7 @@ export default function JkPricing() {
 
                 {isAnnual && currentPricing && savings && (
                   <div className="absolute -top-4 right-4">
-                    <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                    <span className="bg-ok text-on-fill px-3 py-1 rounded-full text-xs font-medium">
                       Save ${savings.toFixed(0)}/yr
                     </span>
                   </div>
@@ -357,7 +357,7 @@ export default function JkPricing() {
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-brand mt-0.5 flex-shrink-0" />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}

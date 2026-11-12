@@ -5,11 +5,15 @@ import { describe, expect, it } from "vitest";
 const ROOT = path.resolve(__dirname, "..");
 
 // Ceilings only ever go down. Lower them in the commit that removes usages.
-export const PALETTE_CEILING = 555;
-export const HEX_CEILING = 33;
+export const PALETTE_CEILING = 0;
+export const HEX_CEILING = 0;
 
 // Files allowed to hold colour literals (brand SVG art, resume paper previews).
-const ALLOWLIST: string[] = [];
+const ALLOWLIST: string[] = [
+  "app/global-error.tsx", // renders without the stylesheet
+  "app/jk-icons/chatBubble1.tsx", // third-party SVG art
+  "app/jk-icons/chatBubble2.tsx",
+];
 
 const REQUIRED = [
   "background", "foreground", "card", "card-foreground", "popover", "popover-foreground",

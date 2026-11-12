@@ -99,8 +99,8 @@ export default function JkTemplateSelectionModal({
               {/* Header */}
               <div className="flex items-center justify-between px-8 py-6 border-b border-border flex-shrink-0 bg-muted/30">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Sparkles className="h-5 w-5 text-primary" />
+                  <div className="p-2 bg-brand/10 rounded-lg">
+                    <Sparkles className="h-5 w-5 text-brand" />
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold">Generate Document</h2>
@@ -137,13 +137,13 @@ export default function JkTemplateSelectionModal({
                         whileHover={{ scale: 1.02, y: -4 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleDocumentTypeSelect("resume")}
-                        className="group p-8 border-2 border-border rounded-2xl hover:border-primary hover:bg-primary/5 transition-all text-left relative overflow-hidden"
+                        className="group p-8 border-2 border-border rounded-2xl hover:border-brand hover:bg-brand/5 transition-all text-left relative overflow-hidden"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="relative">
                           <div className="flex items-center gap-4 mb-4">
-                            <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
-                              <FileText className="h-7 w-7 text-primary" />
+                            <div className="p-3 bg-brand/10 rounded-xl group-hover:bg-brand/20 transition-colors">
+                              <FileText className="h-7 w-7 text-brand" />
                             </div>
                             <h3 className="font-semibold text-2xl">Resume</h3>
                           </div>
@@ -157,13 +157,13 @@ export default function JkTemplateSelectionModal({
                         whileHover={{ scale: 1.02, y: -4 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => handleDocumentTypeSelect("cover-letter")}
-                        className="group p-8 border-2 border-border rounded-2xl hover:border-primary hover:bg-primary/5 transition-all text-left relative overflow-hidden"
+                        className="group p-8 border-2 border-border rounded-2xl hover:border-brand hover:bg-brand/5 transition-all text-left relative overflow-hidden"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="relative">
                           <div className="flex items-center gap-4 mb-4">
-                            <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
-                              <FileCheck className="h-7 w-7 text-primary" />
+                            <div className="p-3 bg-brand/10 rounded-xl group-hover:bg-brand/20 transition-colors">
+                              <FileCheck className="h-7 w-7 text-brand" />
                             </div>
                             <h3 className="font-semibold text-2xl">Cover Letter</h3>
                           </div>
@@ -202,12 +202,12 @@ export default function JkTemplateSelectionModal({
                           whileHover={{ scale: 1.01, y: -2 }}
                           whileTap={{ scale: 0.99 }}
                           onClick={() => handleTemplateSelect(template.id)}
-                          className="group p-6 border-2 border-border rounded-xl hover:border-primary hover:bg-primary/5 transition-all text-left relative overflow-hidden"
+                          className="group p-6 border-2 border-border rounded-xl hover:border-brand hover:bg-brand/5 transition-all text-left relative overflow-hidden"
                         >
-                          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-brand/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                           <div className="relative flex items-start gap-4">
                             {template.icon && (
-                              <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors flex-shrink-0">
+                              <div className="p-3 bg-brand/10 rounded-xl group-hover:bg-brand/20 transition-colors flex-shrink-0">
                                 {template.icon}
                               </div>
                             )}

@@ -90,9 +90,9 @@ export default function JkPublicHeader({
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             >
               {theme === 'dark' ? (
-                <Sun className="h-4 w-4 text-amber-300" />
+                <Sun className="h-4 w-4 text-warn" />
               ) : (
-                <Moon className="h-4 w-4 text-slate-700" />
+                <Moon className="h-4 w-4 text-foreground" />
               )}
             </motion.span>
           </Button>
@@ -116,8 +116,8 @@ export default function JkPublicHeader({
                         planId === 'pro' 
                           ? 'bg-primary text-primary-foreground' 
                           : planId === 'plus'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-green-500 text-white'
+                          ? 'bg-brand text-on-fill'
+                          : 'bg-ok text-on-fill'
                       }`}>
                         {planId === 'starter' ? 'Starter' : 
                          planId === 'pro' ? 'Pro' : 

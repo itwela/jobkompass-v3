@@ -334,7 +334,7 @@ export default function AuthPage() {
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 {signInStep === "signIn" ? "Don't have an account? " : "Already have an account? "}
-                <span className="text-primary font-medium">
+                <span className="text-brand font-medium">
                   {signInStep === "signIn" ? "Sign up" : "Sign in"}
                 </span>
               </button>

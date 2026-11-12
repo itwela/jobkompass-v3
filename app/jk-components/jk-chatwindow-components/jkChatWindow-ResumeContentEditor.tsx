@@ -154,8 +154,8 @@ export default function JkCW_ResumeContentEditor({
                 onClick={handleClick}
                 className={cn(
                     "p-1.5 rounded-md transition-all",
-                    "text-muted-foreground hover:text-violet-500 hover:bg-violet-500/10",
-                    "focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                    "text-muted-foreground hover:text-bar-1 hover:bg-bar-1/10",
+                    "focus:outline-none focus:ring-2 focus:ring-bar-1/20"
                 )}
                 title="Enhance with AI (Coming Soon)"
             >
@@ -711,7 +711,7 @@ export default function JkCW_ResumeContentEditor({
                 {resume?.template && (
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">Template:</span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 capitalize">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand border border-brand/20 capitalize">
                             {resume.template}
                         </span>
                     </div>

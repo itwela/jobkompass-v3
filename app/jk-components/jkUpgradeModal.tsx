@@ -31,7 +31,7 @@ export default function JkUpgradeModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/0 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-scrim backdrop-blur-sm"
           />
 
           {/* Modal */}
@@ -48,7 +48,7 @@ export default function JkUpgradeModal({
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
+                    <Sparkles className="h-5 w-5 text-brand" />
                     <h2 className="text-lg font-semibold">Upgrade Required</h2>
                   </div>
                   <Button

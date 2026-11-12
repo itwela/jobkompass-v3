@@ -24,8 +24,8 @@ export default function GlobalError({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0a0a0a",
-          color: "#fafafa",
+          background: "#080E20",
+          color: "#F3EEE0",
         }}
       >
         <div style={{ maxWidth: 420, textAlign: "center", padding: 24 }}>
@@ -35,7 +35,7 @@ export default function GlobalError({
           <button
             type="button"
             onClick={() => reset()}
-            style={{ marginTop: 16, padding: "8px 16px", borderRadius: 8, border: "1px solid #444", background: "transparent", color: "inherit" }}
+            style={{ marginTop: 16, padding: "8px 16px", borderRadius: 8, border: "1px solid #33426E", background: "transparent", color: "inherit" }}
           >
             Try again
           </button>

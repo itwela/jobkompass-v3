@@ -298,7 +298,7 @@ export default function JkJobExpanded() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                className="gap-1.5 border-brand/30 text-brand hover:bg-brand/10"
                 onClick={() => {
                   if (!job) return;
                   setSelectedInterviewPrepJobId(job._id);
@@ -414,7 +414,7 @@ export default function JkJobExpanded() {
                     href={formState.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-400 hover:underline text-sm"
+                    className="inline-flex items-center gap-1 text-brand  hover:text-brand  hover:underline text-sm"
                   >
                     Visit <ExternalLink className="h-4 w-4" />
                   </a>
@@ -444,7 +444,7 @@ export default function JkJobExpanded() {
                       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
                       handleFieldChange("dateApplied")(today);
                     }}
-                    className="text-xs text-primary hover:text-primary/80 hover:underline transition-colors"
+                    className="text-xs text-brand hover:text-brand/80 hover:underline transition-colors"
                   >
                     Today?
                   </button>
@@ -601,7 +601,7 @@ export default function JkJobExpanded() {
                     key={keyword}
                     type="button"
                     onClick={() => removeKeyword(keyword)}
-                    className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-1 hover:bg-blue-200 transition dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500"
+                    className="px-3 py-1 bg-brand/10 text-brand rounded-full text-sm flex items-center gap-1 hover:bg-brand/20 transition   "
                   >
                     {keyword}
                     <X className="h-3 w-3" />
@@ -658,7 +658,7 @@ export default function JkJobExpanded() {
                 <p>Last updated {new Date(job.updatedAt).toLocaleDateString()}</p>
               </div>
               {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-              {saveMessage && <p className="text-sm text-green-600">{saveMessage}</p>}
+              {saveMessage && <p className="text-sm text-ok">{saveMessage}</p>}
             </div>
           </div>
 
@@ -673,7 +673,7 @@ export default function JkJobExpanded() {
                 <Button
                   onClick={handleScrollClick}
                   size="icon"
-                  className="h-10 w-10 rounded-full shadow-lg hover:shadow-xl transition-shadow bg-[#FFA726] text-white hover:bg-[#FB8C00]"
+                  className="h-10 w-10 rounded-full shadow-lg hover:shadow-xl transition-shadow bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {isAtBottom ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </Button>

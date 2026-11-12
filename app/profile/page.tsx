@@ -70,9 +70,9 @@ export default function ProfilePage() {
 
               {migrationStatus.message && (
                 <div 
-                  className={`mt-4 p-4 rounded-md border ${migrationStatus.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}
+                  className={`mt-4 p-4 rounded-md border ${migrationStatus.success ? 'bg-ok/10 border-ok/30' : 'bg-destructive/10 border-destructive/30'}`}
                 >
-                  <p className={`text-sm font-medium ${migrationStatus.success ? 'text-green-800' : 'text-red-800'}`}>
+                  <p className={`text-sm font-medium ${migrationStatus.success ? 'text-ok' : 'text-destructive'}`}>
                     {migrationStatus.message}
                   </p>
                   {migrationStatus.breakdown && (

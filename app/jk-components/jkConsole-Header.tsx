@@ -223,7 +223,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                     {/* Mode Switcher */}
                     <DropdownMenu open={isModeMenuOpen} onOpenChange={setIsModeMenuOpen}>
                         <DropdownMenuTrigger asChild>
-                            <button className={`flex items-center gap-2 text-base font-semibold hover:text-primary transition-colors rounded-md px-2 py-1 ${nooutline}`}>
+                            <button className={`flex items-center gap-2 text-base font-semibold hover:text-brand transition-colors rounded-md px-2 py-1 ${nooutline}`}>
                                 {currentMode.name}
                                 <ChevronDown className="h-4 w-4 opacity-50" />
                             </button>
@@ -243,9 +243,9 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                         aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                     >
                         {theme === 'dark' ? (
-                            <Sun className="h-4 w-4 text-amber-300" />
+                            <Sun className="h-4 w-4 text-warn" />
                         ) : (
-                            <Moon className="h-4 w-4 text-slate-700" />
+                            <Moon className="h-4 w-4 text-foreground" />
                         )}
                     </Button>
                     {/* Actions dropdown - only show in chat mode with active thread */}
@@ -388,7 +388,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                         <GraduationCap className="h-4 w-4" />
                                         <span>Interview Prep</span>
                                     </span>
-                                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">New</span>
+                                    <span className="text-xs font-medium text-brand bg-brand/10 px-2 py-0.5 rounded">New</span>
                                 </button>
                                 <button
                                     onClick={() => {
@@ -406,7 +406,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                         <TrendingUp className="h-4 w-4" />
                                         <span>Performance</span>
                                     </span>
-                                    <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">New</span>
+                                    <span className="text-xs font-medium text-brand bg-brand/10 px-2 py-0.5 rounded">New</span>
                                 </button>
                                 <button
                                     onClick={() => {
@@ -590,12 +590,12 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                                 className="px-2 py-0.5 rounded-full text-xs font-medium shrink-0"
                                                 style={
                                                     subscription?.status === 'canceled'
-                                                        ? { backgroundColor: 'var(--chart-4)', color: 'white' }
+                                                        ? { backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }
                                                         : planId === 'pro' || planId === 'pro-annual'
-                                                        ? { backgroundColor: '#9333ea', color: 'white' }
+                                                        ? { backgroundColor: 'var(--plan)', color: 'var(--plan-foreground)' }
                                                         : planId === 'plus' || planId === 'plus-annual'
-                                                        ? { backgroundColor: '#3b82f6', color: 'white' }
-                                                        : { backgroundColor: '#22c55e', color: 'white' }
+                                                        ? { backgroundColor: 'var(--plan)', color: 'var(--plan-foreground)' }
+                                                        : { backgroundColor: 'var(--accent)', color: 'var(--foreground)' }
                                                 }
                                             >
                                                 {subscription?.status === 'canceled' ? (
@@ -742,7 +742,7 @@ export default function JkConsoleHeader({ sidebarOpen, setSidebarOpen }: JkConso
                                             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                             {signInStep === "signIn" ? "Don't have an account? " : "Already have an account? "}
-                                            <span className="text-primary font-medium">
+                                            <span className="text-brand font-medium">
                                                 {signInStep === "signIn" ? "Sign up" : "Sign in"}
                                             </span>
                                         </button>

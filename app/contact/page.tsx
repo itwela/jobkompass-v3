@@ -111,7 +111,7 @@ export default function ContactPage() {
           <div className="space-y-8">
             <div className="bg-card border border-border rounded-xl p-8">
               <h2 className="text-2xl font-semibold mb-6 flex items-center gap-3">
-                <MessageSquare className="h-6 w-6 text-primary" />
+                <MessageSquare className="h-6 w-6 text-brand" />
                 Send us a message
               </h2>
               
@@ -219,7 +219,7 @@ export default function ContactPage() {
                 <h3 className="font-semibold mb-4">Common topics</h3>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="h-6 w-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium">1</span>
                     </div>
                     <div>
@@ -230,7 +230,7 @@ export default function ContactPage() {
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="h-6 w-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium">2</span>
                     </div>
                     <div>
@@ -241,7 +241,7 @@ export default function ContactPage() {
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="h-6 w-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium">3</span>
                     </div>
                     <div>
@@ -252,7 +252,7 @@ export default function ContactPage() {
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="h-6 w-6 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium">4</span>
                     </div>
                     <div>
@@ -269,8 +269,8 @@ export default function ContactPage() {
                 <h3 className="font-semibold mb-4">Other ways to reach us</h3>
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Mail className="h-5 w-5 text-primary" />
+                    <div className="h-10 w-10 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+                      <Mail className="h-5 w-5 text-brand" />
                     </div>
                     <div>
                       <p className="font-medium">Email</p>
@@ -281,8 +281,8 @@ export default function ContactPage() {
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Mail className="h-5 w-5 text-primary" />
+                    <div className="h-10 w-10 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+                      <Mail className="h-5 w-5 text-brand" />
                     </div>
                     <div>
                       <p className="font-medium">Legal Inquiries</p>

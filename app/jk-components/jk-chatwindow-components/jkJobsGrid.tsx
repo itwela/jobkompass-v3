@@ -91,15 +91,15 @@ function JobCard({
   };
 
   const statusColors: Record<string, string> = {
-    Interested: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-600 dark:text-white dark:border-blue-500',
-    Applied: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    Callback: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-    Interviewing: 'bg-purple-100 text-purple-800 border-purple-200',
-    Rejected: 'bg-red-100 text-red-800 border-red-200',
-    Offered: 'bg-green-100 text-green-800 border-green-200',
+    Interested: 'bg-brand/10 text-brand border-brand/30   ',
+    Applied: 'bg-warn/10 text-warn border-warn/30',
+    Callback: 'bg-brand/10 text-brand border-brand/30',
+    Interviewing: 'bg-bar-1/10 text-bar-1 border-bar-1/30',
+    Rejected: 'bg-destructive/10 text-destructive border-destructive/30',
+    Offered: 'bg-ok/10 text-ok border-ok/30',
   };
 
-  const statusColor = statusColors[job.status] || 'bg-gray-100 text-gray-800 border-gray-200';
+  const statusColor = statusColors[job.status] || 'bg-muted text-foreground border-border';
 
   // Check if job is new (never seen)
   const isNew = !job.seenAt;
@@ -139,7 +139,7 @@ const handleGenerateResume = (event: MouseEvent) => {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-xs text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-400 hover:underline shrink-0"
+            className="flex items-center gap-1 text-xs text-brand  hover:text-brand  hover:underline shrink-0"
           >
             View Job <ExternalLink className="h-3 w-3" />
           </a>
@@ -148,7 +148,7 @@ const handleGenerateResume = (event: MouseEvent) => {
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >
               <Sparkles className="h-3 w-3" />
               Generate
@@ -179,9 +179,9 @@ const handleGenerateResume = (event: MouseEvent) => {
         <div
           className={`bg-card border rounded-lg p-6 h-full min-h-[230px] flex flex-col hover:shadow-lg transition-shadow ${
             selectionMode && selected 
-              ? 'border-blue-400 ring-2 ring-blue-200' 
+              ? 'border-brand ring-2 ring-brand/30' 
               : isNew 
-                ? 'border-primary border-2' 
+                ? 'border-brand border-2' 
                 : 'border-border'
           }`}
         >
@@ -195,11 +195,11 @@ const handleGenerateResume = (event: MouseEvent) => {
                   event.stopPropagation();
                   onToggleSelect();
                 }}
-                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-blue-600 hover:bg-blue-100/40 transition-colors"
+                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-brand hover:bg-brand/40 transition-colors"
                 aria-pressed={selected}
               >
                 {selected ? (
-                  <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                  <CheckCircle2 className="h-4 w-4 text-brand" />
                 ) : (
                   <Circle className="h-4 w-4" />
                 )}

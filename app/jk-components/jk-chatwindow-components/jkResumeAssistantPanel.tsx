@@ -48,7 +48,7 @@ export default function ResumeAssistantPanel({ messages, onSend, isLoading }: Re
 							className={`max-w-full rounded-lg px-3 py-2 ${
 								message.role === 'assistant'
 									? 'bg-muted text-foreground'
-									: 'bg-primary/10 text-foreground'
+									: 'bg-brand/10 text-foreground'
 							}`}
 						>
 							{message.content}

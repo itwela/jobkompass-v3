@@ -43,7 +43,7 @@ export default function JkContextPanel() {
   // Get status color class
   const getStatusColor = (status: string) => {
     const option = statusOptions.find(opt => opt.value === status);
-    return option?.colorClass || "bg-gray-100 text-gray-800";
+    return option?.colorClass || "bg-muted text-foreground";
   };
 
   // Get current tab count for header
@@ -103,7 +103,7 @@ export default function JkContextPanel() {
           onClick={() => setActiveTab('resumes')}
           className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
             activeTab === 'resumes'
-              ? 'border-b-2 border-primary text-primary'
+              ? 'border-b-2 border-brand text-brand'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -116,7 +116,7 @@ export default function JkContextPanel() {
           onClick={() => setActiveTab('coverLetters')}
           className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
             activeTab === 'coverLetters'
-              ? 'border-b-2 border-primary text-primary'
+              ? 'border-b-2 border-brand text-brand'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -129,7 +129,7 @@ export default function JkContextPanel() {
           onClick={() => setActiveTab('jobs')}
           className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
             activeTab === 'jobs'
-              ? 'border-b-2 border-primary text-primary'
+              ? 'border-b-2 border-brand text-brand'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -161,15 +161,15 @@ export default function JkContextPanel() {
                     className={`
                       p-3 rounded-lg border transition-all cursor-pointer
                       ${isAttached 
-                        ? 'border-primary bg-primary/10 hover:bg-primary/15' 
+                        ? 'border-brand bg-brand/10 hover:bg-brand/15' 
                         : 'border-border bg-background hover:bg-muted/50'}
                     `}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <FileText className={`h-4 w-4 shrink-0 ${isAttached ? 'text-primary' : 'text-muted-foreground'}`} />
-                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-primary' : ''}`}>
+                          <FileText className={`h-4 w-4 shrink-0 ${isAttached ? 'text-brand' : 'text-muted-foreground'}`} />
+                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-brand' : ''}`}>
                             {resume.name || `Untitled ${resume._id.slice(-6)}`}
                           </p>
                         </div>
@@ -180,7 +180,7 @@ export default function JkContextPanel() {
                         )}
                       </div>
                       {isAttached && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <Check className="h-4 w-4 text-brand shrink-0" />
                       )}
                     </div>
                   </div>
@@ -213,15 +213,15 @@ export default function JkContextPanel() {
                     className={`
                       p-3 rounded-lg border transition-all cursor-pointer
                       ${isAttached 
-                        ? 'border-primary bg-primary/10 hover:bg-primary/15' 
+                        ? 'border-brand bg-brand/10 hover:bg-brand/15' 
                         : 'border-border bg-background hover:bg-muted/50'}
                     `}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <Mail className={`h-4 w-4 shrink-0 ${isAttached ? 'text-primary' : 'text-muted-foreground'}`} />
-                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-primary' : ''}`}>
+                          <Mail className={`h-4 w-4 shrink-0 ${isAttached ? 'text-brand' : 'text-muted-foreground'}`} />
+                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-brand' : ''}`}>
                             {coverLetter.name || `Untitled ${coverLetter._id.slice(-6)}`}
                           </p>
                         </div>
@@ -232,7 +232,7 @@ export default function JkContextPanel() {
                         )}
                       </div>
                       {isAttached && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <Check className="h-4 w-4 text-brand shrink-0" />
                       )}
                     </div>
                   </div>
@@ -265,15 +265,15 @@ export default function JkContextPanel() {
                     className={`
                       p-3 rounded-lg border transition-all cursor-pointer
                       ${isAttached 
-                        ? 'border-primary bg-primary/10 hover:bg-primary/15' 
+                        ? 'border-brand bg-brand/10 hover:bg-brand/15' 
                         : 'border-border bg-background hover:bg-muted/50'}
                     `}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <Briefcase className={`h-4 w-4 shrink-0 ${isAttached ? 'text-primary' : 'text-muted-foreground'}`} />
-                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-primary' : ''}`}>{job.title}</p>
+                          <Briefcase className={`h-4 w-4 shrink-0 ${isAttached ? 'text-brand' : 'text-muted-foreground'}`} />
+                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-brand' : ''}`}>{job.title}</p>
                         </div>
                         <p className="text-xs text-muted-foreground ml-6 mb-1">
                           {job.company}
@@ -290,7 +290,7 @@ export default function JkContextPanel() {
                         </div>
                       </div>
                       {isAttached && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <Check className="h-4 w-4 text-brand shrink-0" />
                       )}
                     </div>
                   </div>

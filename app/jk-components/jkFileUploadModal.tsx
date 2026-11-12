@@ -93,7 +93,7 @@ export default function JkFileUploadModal({ isOpen, onClose, onFileSelect }: JkF
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                 <div className="flex items-center gap-2">
-                  <Upload className="h-5 w-5 text-primary" />
+                  <Upload className="h-5 w-5 text-brand" />
                   <h2 className="text-lg font-semibold">Upload File</h2>
                 </div>
                 <Button
@@ -116,8 +116,8 @@ export default function JkFileUploadModal({ isOpen, onClose, onFileSelect }: JkF
                     relative border-2 border-dashed rounded-xl p-12
                     transition-all duration-200 cursor-pointer
                     ${isDragOver 
-                      ? 'border-primary bg-primary/10 scale-[1.02]' 
-                      : 'border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/50'
+                      ? 'border-brand bg-brand/10 scale-[1.02]' 
+                      : 'border-border bg-muted/30 hover:bg-muted/50 hover:border-brand/50'
                     }
                   `}
                   onClick={() => document.getElementById('modal-file-input')?.click()}
@@ -125,9 +125,9 @@ export default function JkFileUploadModal({ isOpen, onClose, onFileSelect }: JkF
                   <div className="flex flex-col items-center justify-center gap-4 text-center">
                     <div className={`
                       rounded-full p-4 transition-colors
-                      ${isDragOver ? 'bg-primary/20' : 'bg-background'}
+                      ${isDragOver ? 'bg-brand/20' : 'bg-background'}
                     `}>
-                      <FileText className={`h-12 w-12 ${isDragOver ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <FileText className={`h-12 w-12 ${isDragOver ? 'text-brand' : 'text-muted-foreground'}`} />
                     </div>
                     
                     <div>

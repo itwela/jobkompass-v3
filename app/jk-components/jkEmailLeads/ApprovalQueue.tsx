@@ -163,19 +163,19 @@ export function ApprovalQueue() {
             const isError = lead.resumeStatus === "error" && !pendingIds.has(key);
             return (
               <div className="text-xs flex flex-col gap-1">
-                <div className="text-amber-600 flex items-center gap-2 flex-wrap">
+                <div className="text-warn flex items-center gap-2 flex-wrap">
                   <span>⚠ No resume attached — this reply will send as text only.</span>
                   {isError ? (
                     <>
                       <button
-                        className="px-2 py-0.5 rounded border border-red-500/60 bg-red-50 text-red-700 hover:bg-red-100 font-medium"
+                        className="px-2 py-0.5 rounded border border-destructive/60 bg-destructive/10 text-destructive hover:bg-destructive/10 font-medium"
                         onClick={() => setExpandedErrorId((prev) => (prev === key ? null : key))}
                         title="Click to see what went wrong"
                       >
                         ⚠ Error — {expandedErrorId === key ? "hide" : "details"}
                       </button>
                       <button
-                        className="px-2 py-0.5 rounded border border-amber-600/50 text-amber-700 hover:bg-amber-50"
+                        className="px-2 py-0.5 rounded border border-warn/50 text-warn hover:bg-warn/10"
                         onClick={() => handleGenerateResume(lead._id)}
                       >
                         Try again
@@ -183,19 +183,19 @@ export function ApprovalQueue() {
                     </>
                   ) : (
                     <button
-                      className="px-2 py-0.5 rounded border border-amber-600/50 text-amber-700 hover:bg-amber-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                      className="px-2 py-0.5 rounded border border-warn/50 text-warn hover:bg-warn/10 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1"
                       disabled={isGenerating}
                       onClick={() => handleGenerateResume(lead._id)}
                     >
                       {isGenerating && (
-                        <span className="inline-block h-3 w-3 rounded-full border-2 border-amber-600/40 border-t-amber-700 animate-spin" />
+                        <span className="inline-block h-3 w-3 rounded-full border-2 border-warn/40 border-t-warn animate-spin" />
                       )}
                       {isGenerating ? "Generating…" : "Generate résumé"}
                     </button>
                   )}
                 </div>
                 {isError && expandedErrorId === key && (
-                  <div className="rounded border border-red-500/40 bg-red-50 text-red-800 p-2 whitespace-pre-wrap break-words">
+                  <div className="rounded border border-destructive/40 bg-destructive/10 text-destructive p-2 whitespace-pre-wrap break-words">
                     {lead.resumeError || "No error detail was recorded."}
                   </div>
                 )}
@@ -213,7 +213,7 @@ export function ApprovalQueue() {
             <p className="text-sm whitespace-pre-wrap">{lead.draftMessage}</p>
           )}
           {lead.sendError && lead.status !== "sending" && !approvingIds.has(lead._id) && (
-            <div className="rounded border border-red-500/40 bg-red-50 text-red-800 text-xs p-2 whitespace-pre-wrap break-words">
+            <div className="rounded border border-destructive/40 bg-destructive/10 text-destructive text-xs p-2 whitespace-pre-wrap break-words">
               ⚠ {lead.sendError}
             </div>
           )}
@@ -241,7 +241,7 @@ export function ApprovalQueue() {
             )}
             {lead.senderEmail ? (
               <button
-                className="text-sm px-3 py-1 rounded bg-green-600 text-white disabled:cursor-not-allowed disabled:opacity-70"
+                className="text-sm px-3 py-1 rounded bg-ok text-on-fill disabled:cursor-not-allowed disabled:opacity-70"
                 disabled={lead.status === "sending" || approvingIds.has(lead._id)}
                 onClick={() => handleApprove(lead._id)}
               >
@@ -251,7 +251,7 @@ export function ApprovalQueue() {
               // Job-board listing: nothing to send a reply to — the draft is for
               // pasting into the application (open listing link is in the header).
               <button
-                className="text-sm px-3 py-1 rounded bg-green-600 text-white"
+                className="text-sm px-3 py-1 rounded bg-ok text-on-fill"
                 onClick={async () => {
                   await navigator.clipboard.writeText(lead.draftMessage || "");
                   setCopiedId(lead._id);
@@ -262,7 +262,7 @@ export function ApprovalQueue() {
               </button>
             )}
             <button
-              className="text-sm px-3 py-1 rounded bg-red-600 text-white"
+              className="text-sm px-3 py-1 rounded bg-destructive text-on-fill"
               onClick={() => reject({ leadId: lead._id })}
             >
               Reject

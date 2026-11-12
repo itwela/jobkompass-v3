@@ -18,7 +18,7 @@ export default function JkFooter() {
         >
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+              <div className="absolute inset-0 bg-brand/20 blur-xl rounded-full" />
               <Image
                 src={mainAssets.logo}
                 alt="JobKompass Logo - Career Management Platform"

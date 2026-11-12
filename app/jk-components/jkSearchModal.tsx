@@ -171,7 +171,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             subtitle: job.company,
             company: job.company,
             status: job.status,
-            statusColorClass: statusOption?.colorClass || 'bg-gray-100 text-gray-800 border-gray-200',
+            statusColorClass: statusOption?.colorClass || 'bg-muted text-foreground border-border',
             icon: Briefcase,
           })
         }
@@ -365,7 +365,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
                     <p className="text-muted-foreground mb-2">Search is only available on paid plans</p>
                     <Link
                       href="/pricing"
-                      className="text-primary hover:underline"
+                      className="text-brand hover:underline"
                       onClick={() => trackUpgradeClicked({ surface: 'search', authenticated: true })}
                     >
                       Upgrade to access search
@@ -404,7 +404,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
                             )}
                             {result.type === 'job' && result.status && (
                               <div className="mt-1.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${result.statusColorClass || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${result.statusColorClass || 'bg-muted text-foreground border-border'}`}>
                                   {result.status}
                                 </span>
                               </div>

@@ -53,19 +53,19 @@ function DocumentPreviewThumbnail({
 
     if (!fileId || !url) {
         return (
-            <div className={cn("flex items-center justify-center w-full h-full bg-white", className)}>
+            <div className={cn("flex items-center justify-center w-full h-full bg-card", className)}>
                 {documentType === "resume" ? (
                     <FileText className="h-12 w-12 text-muted-foreground/60" />
                 ) : (
-                    <FileCheck className="h-12 w-12 text-purple-500/60" />
+                    <FileCheck className="h-12 w-12 text-bar-1/60" />
                 )}
             </div>
         );
     }
     return (
-        <div className={cn("relative w-full h-full overflow-hidden bg-white", className)}>
+        <div className={cn("relative w-full h-full overflow-hidden bg-card", className)}>
             {!isIframeLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                <div className="absolute inset-0 flex items-center justify-center bg-card z-10">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
                 </div>
             )}
@@ -744,7 +744,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
             <div className="space-y-6">
                 <section className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-8 py-14 text-center">
                     <div className="mx-auto flex max-w-xl flex-col items-center gap-5">
-                        <div className="inline-flex size-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
+                        <div className="inline-flex size-12 items-center justify-center rounded-full bg-brand/10 text-brand">
                             <FileText className="h-5 w-5" />
                         </div>
                         <div className="space-y-3">
@@ -786,7 +786,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 py-10 px-4 transition-colors"
+                                        className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-brand/50 hover:bg-muted/30 py-10 px-4 transition-colors"
                                     >
                                         <Upload className="h-10 w-10 text-muted-foreground" />
                                         <span className="text-sm font-medium text-foreground">Choose PDF file</span>
@@ -846,13 +846,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             {uploadTags.map((tag, idx) => (
                                                 <span
                                                     key={idx}
-                                                    className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
+                                                    className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
                                                 >
                                                     {tag}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveUploadTag(tag)}
-                                                        className="hover:text-blue-900"
+                                                        className="hover:text-brand"
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </button>
@@ -889,7 +889,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             <div className="flex items-center gap-3">
                                                 <div className="h-2 flex-1 rounded-full bg-muted">
                                                     <div
-                                                        className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                                                        className="h-2 rounded-full bg-brand transition-all duration-300"
                                                         style={{ width: `${uploadProgress}%` }}
                                                     />
                                                 </div>
@@ -990,13 +990,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     {uploadTags.map((tag, idx) => (
                                         <span
                                             key={idx}
-                                            className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
+                                            className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
                                         >
                                             {tag}
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveUploadTag(tag)}
-                                                className="hover:text-blue-900"
+                                                className="hover:text-brand"
                                             >
                                                 <X className="h-3 w-3" />
                                             </button>
@@ -1035,7 +1035,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                 <div className="flex items-center gap-3">
                                     <div className="h-2 flex-1 rounded-full bg-muted">
                                         <div 
-                                            className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                                            className="h-2 rounded-full bg-brand transition-all duration-300"
                                             style={{ width: `${uploadProgress}%` }}
                                         />
                                     </div>
@@ -1136,7 +1136,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     <div className="flex items-center gap-3">
                         <div className="h-2 flex-1 rounded-full bg-muted">
                             <div 
-                                className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                                className="h-2 rounded-full bg-brand transition-all duration-300"
                                 style={{ width: `${uploadProgress}%` }}
                             />
                         </div>
@@ -1385,14 +1385,14 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     }
                                 }}
                                 className={cn(
-                                    "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 min-w-0 overflow-hidden",
-                                    !selectionMode && isNew && "border-primary border-2",
-                                    selectionMode && isSelectedForBulk && "border-blue-500 ring-2 ring-blue-200",
+                                    "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-brand/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand min-w-0 overflow-hidden",
+                                    !selectionMode && isNew && "border-brand border-2",
+                                    selectionMode && isSelectedForBulk && "border-brand ring-2 ring-brand/30",
                                     // Favorite: purple border, kept distinct from the blue
                                     // bulk-selection border above. Base resume still wins.
-                                    isFavorite && !isBaseResume && "border-purple-600 border-2",
+                                    isFavorite && !isBaseResume && "border-bar-1 border-2",
                                     // Base resume treatment wins over new/selected styling
-                                    isBaseResume && "border-amber-400 border-2 ring-1 ring-amber-300 hover:border-amber-400"
+                                    isBaseResume && "border-warn border-2 ring-1 ring-warn/30 hover:border-warn"
                                 )}
                             >
                                 {/* Document preview thumbnail with job count badge and type indicator */}
@@ -1405,12 +1405,12 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     {/* Document type badge - top right */}
                                     <div className="absolute top-2 right-2 z-10">
                                         {documentType === "resume" ? (
-                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm">
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground shadow-sm backdrop-blur-sm">
                                                 <FileText className="h-3 w-3" />
                                                 Resume
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-white shadow-sm backdrop-blur-sm">
+                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground shadow-sm backdrop-blur-sm">
                                                 <FileCheck className="h-3 w-3" />
                                                 Cover Letter
                                             </span>
@@ -1419,7 +1419,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                     {/* Job count badge - top left */}
                                     {totalJobs > 0 && (
                                         <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-                                            <div className="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+                                            <div className="flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-[10px] font-semibold text-on-fill shadow-sm">
                                                 <Briefcase className="h-3 w-3" />
                                                 <span>{totalJobs} job{totalJobs !== 1 ? 's' : ''}</span>
                                             </div>
@@ -1440,13 +1440,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                 toast.error("Could not update favorite. Please try again.");
                                             });
                                         }}
-                                        className="absolute bottom-2 right-2 z-10 rounded-full bg-white/90 p-1.5 shadow-sm transition-colors hover:bg-white"
+                                        className="absolute bottom-2 right-2 z-10 rounded-full bg-card/90 p-1.5 shadow-sm transition-colors hover:bg-card"
                                     >
                                         <Star
                                             className={cn(
                                                 "h-3.5 w-3.5",
                                                 isFavorite
-                                                    ? "fill-purple-600 text-purple-600"
+                                                    ? "fill-bar-1 text-bar-1"
                                                     : "text-muted-foreground"
                                             )}
                                         />
@@ -1458,7 +1458,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         <div className="min-w-0 flex-1 space-y-1.5">
                                             <div>
                                                 {isBaseResume && (
-                                                    <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-300">
+                                                    <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-semibold text-warn border border-warn/30">
                                                         ⭐ Base resume · used for job leads
                                                     </span>
                                                 )}
@@ -1468,11 +1468,11 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                 )}
                                             </div>
                                             {resume?.label && (
-                                                <p className="text-xs font-medium text-blue-600">{resume.label}</p>
+                                                <p className="text-xs font-medium text-brand">{resume.label}</p>
                                             )}
                                             <div className="flex flex-wrap gap-1 items-center">
                                                 {resume?.template && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700 border border-purple-200">
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-bar-1/10 px-2 py-0.5 text-[10px] font-medium text-bar-1 border border-bar-1/30">
                                                         {resume.template}
                                                     </span>
                                                 )}
@@ -1481,7 +1481,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         {resume.tags.slice(0, 3).map((tag: string, tagIdx: number) => (
                                                             <span
                                                                 key={tagIdx}
-                                                                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700"
+                                                                className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand"
                                                             >
                                                                 <Tag className="h-2.5 w-2.5" />
                                                                 {tag}
@@ -1499,31 +1499,31 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0 || callback > 0) && (
                                                 <div className="flex flex-wrap gap-1.5 pt-1">
                                                     {offered > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-ok/10 px-2 py-0.5 text-[10px] font-semibold text-ok">
                                                             <TrendingUp className="h-2.5 w-2.5" />
                                                             {offered} offered
                                                         </span>
                                                     )}
                                                     {callback > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
                                                             <Phone className="h-2.5 w-2.5" />
                                                             {callback} callback
                                                         </span>
                                                     )}
                                                     {interviewing > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-800">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-bar-1/10 px-2 py-0.5 text-[10px] font-semibold text-bar-1">
                                                             <Users className="h-2.5 w-2.5" />
                                                             {interviewing} interviewing
                                                         </span>
                                                     )}
                                                     {rejected > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
                                                             <TrendingDown className="h-2.5 w-2.5" />
                                                             {rejected} rejected
                                                         </span>
                                                     )}
                                                     {ghosted > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                                                             <Ghost className="h-2.5 w-2.5" />
                                                             {ghosted} ghosted
                                                         </span>
@@ -1539,9 +1539,9 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                         variant="ghost"
                                                         size="icon"
                                                         className={cn(
-                                                            "h-8 w-8 text-muted-foreground hover:text-blue-600",
+                                                            "h-8 w-8 text-muted-foreground hover:text-brand",
                                                             "transition-colors",
-                                                            isSelectedForBulk && "text-blue-600"
+                                                            isSelectedForBulk && "text-brand"
                                                         )}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
@@ -1759,13 +1759,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                     {editingTags.map((tag, idx) => (
                                                         <span
                                                             key={idx}
-                                                            className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
+                                                            className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
                                                         >
                                                             {tag}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleRemoveTag(tag)}
-                                                                className="hover:text-blue-900"
+                                                                className="hover:text-brand"
                                                             >
                                                                 <X className="h-3 w-3" />
                                                             </button>
@@ -1856,7 +1856,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             type="button"
                                             onClick={(event) => handleSetBaseResume(resumeId, event)}
                                             disabled={settingBaseId === resumeId}
-                                            className="mt-1 inline-flex items-center justify-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-60"
+                                            className="mt-1 inline-flex items-center justify-center gap-1 rounded-lg border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs font-medium text-warn transition-colors hover:bg-warn/10 disabled:opacity-60"
                                         >
                                             {settingBaseId === resumeId ? "Setting…" : "⭐ Make this my base resume"}
                                         </button>
@@ -1908,7 +1908,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 py-10 px-4 transition-colors"
+                                    className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-brand/50 hover:bg-muted/30 py-10 px-4 transition-colors"
                                 >
                                     <Upload className="h-10 w-10 text-muted-foreground" />
                                     <span className="text-sm font-medium text-foreground">Choose PDF file</span>
@@ -1968,13 +1968,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         {uploadTags.map((tag, idx) => (
                                             <span
                                                 key={idx}
-                                                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
+                                                className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
                                             >
                                                 {tag}
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveUploadTag(tag)}
-                                                    className="hover:text-blue-900"
+                                                    className="hover:text-brand"
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>
@@ -2011,7 +2011,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         <div className="flex items-center gap-3">
                                             <div className="h-2 flex-1 rounded-full bg-muted">
                                                 <div
-                                                    className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                                                    className="h-2 rounded-full bg-brand transition-all duration-300"
                                                     style={{ width: `${uploadProgress}%` }}
                                                 />
                                             </div>
@@ -2109,13 +2109,13 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         {uploadTags.map((tag, idx) => (
                                             <span
                                                 key={idx}
-                                                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700"
+                                                className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
                                             >
                                                 {tag}
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveUploadTag(tag)}
-                                                    className="hover:text-blue-900"
+                                                    className="hover:text-brand"
                                                 >
                                                     <X className="h-3 w-3" />
                                                 </button>
@@ -2153,7 +2153,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                         <div className="flex items-center gap-3">
                                             <div className="h-2 flex-1 rounded-full bg-muted">
                                                 <div 
-                                                    className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                                                    className="h-2 rounded-full bg-brand transition-all duration-300"
                                                     style={{ width: `${uploadProgress}%` }}
                                                 />
                                             </div>

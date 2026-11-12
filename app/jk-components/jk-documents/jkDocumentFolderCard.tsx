@@ -37,9 +37,9 @@ export type JkFolder = {
  * and keeps its labels legible.
  */
 const folderColor = {
-  bg: '#93C5FD',                    // blue-300
-  border: '#3B82F6',                // blue-500
-  shadow: 'rgba(59, 130, 246, 0.3)',
+  bg: 'var(--accent)',
+  border: 'var(--border-strong)',
+  shadow: 'var(--scrim)',
 };
 
 export default function JkDocumentFolderCard({
@@ -126,8 +126,8 @@ export default function JkDocumentFolderCard({
           }
         }}
         className={cn(
-          "flex min-h-[104px] cursor-pointer flex-col justify-between rounded-b-xl rounded-tr-xl p-4 text-black transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600",
-          isDropTarget && "ring-4 ring-blue-600/40"
+          "flex min-h-[104px] cursor-pointer flex-col justify-between rounded-b-xl rounded-tr-xl p-4 text-foreground transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+          isDropTarget && "ring-4 ring-brand/40"
         )}
         style={{
           backgroundColor: folderColor.bg,
@@ -152,7 +152,7 @@ export default function JkDocumentFolderCard({
                   setIsRenaming(false);
                 }
               }}
-              className="h-8 bg-white/80 text-black"
+              className="h-8 bg-card/80 text-foreground"
             />
           ) : (
             <p className="min-w-0 flex-1 truncate text-sm font-semibold">
@@ -165,7 +165,7 @@ export default function JkDocumentFolderCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-black/70 hover:bg-black/10 hover:text-black"
+                className="h-7 w-7 text-foreground/70 hover:bg-scrim hover:text-foreground"
                 onClick={(event) => event.stopPropagation()}
               >
                 <MoreVertical className="h-4 w-4" />
@@ -212,7 +212,7 @@ export default function JkDocumentFolderCard({
             />
           </div>
         ) : (
-          <p className="mt-2 text-xs text-black/70">
+          <p className="mt-2 text-xs text-foreground/70">
             {count} document{count === 1 ? '' : 's'}
           </p>
         )}

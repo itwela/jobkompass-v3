@@ -44,12 +44,12 @@ export function leadLink(
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending_approval: "bg-amber-500/15 text-amber-600",
-  sending: "bg-blue-500/15 text-blue-600",
-  sent: "bg-green-500/15 text-green-600",
-  followed_up: "bg-green-500/15 text-green-600",
-  replied: "bg-violet-500/15 text-violet-600",
-  promoted: "bg-primary/10 text-primary",
+  pending_approval: "bg-warn/15 text-warn",
+  sending: "bg-brand/15 text-brand",
+  sent: "bg-ok/15 text-ok",
+  followed_up: "bg-ok/15 text-ok",
+  replied: "bg-bar-1/15 text-bar-1",
+  promoted: "bg-brand/10 text-brand",
   extracted: "bg-muted text-muted-foreground",
   new: "bg-muted text-muted-foreground",
 };
@@ -207,7 +207,7 @@ export function LeadsList({
                       </button>
                     )}
                     <button
-                      className="text-xs px-2 py-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
+                      className="text-xs px-2 py-1 rounded border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors"
                       onClick={() => setLeadToDelete(lead)}
                     >
                       Delete
@@ -243,7 +243,7 @@ export function LeadsList({
               Cancel
             </button>
             <button
-              className="text-sm px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-70"
+              className="text-sm px-3 py-1.5 rounded bg-destructive text-on-fill hover:bg-destructive transition-colors disabled:opacity-70"
               onClick={confirmDelete}
               disabled={deleting}
             >

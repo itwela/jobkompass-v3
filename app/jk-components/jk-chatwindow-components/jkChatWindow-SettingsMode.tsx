@@ -397,13 +397,13 @@ export default function JkCW_SettingsMode() {
 
         {/* Thank You Message for Plan Members */}
         {planId && planId !== 'free' && (
-          <div className="mt-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="mt-6 p-4 rounded-lg bg-brand/10 border border-brand/20">
             <p className="text-sm font-medium text-foreground">
-              Thank you for being a <span className="font-bold text-primary">{getPlanDisplayName()}</span> member! 🎉
+              Thank you for being a <span className="font-bold text-brand">{getPlanDisplayName()}</span> member! 🎉
             </p>
             {subscription?.status === 'canceled' && (
               <p className="text-sm text-muted-foreground mt-2">
-                Your subscription is canceled. <Link href="/pricing" className="text-primary hover:underline font-medium" onClick={() => trackUpgradeClicked({ surface: 'settings', authenticated: true, plan_id: planId })}>Renew today</Link> to continue enjoying all benefits.
+                Your subscription is canceled. <Link href="/pricing" className="text-brand hover:underline font-medium" onClick={() => trackUpgradeClicked({ surface: 'settings', authenticated: true, plan_id: planId })}>Renew today</Link> to continue enjoying all benefits.
               </p>
             )}
           </div>
@@ -533,8 +533,8 @@ export default function JkCW_SettingsMode() {
                 {saveMessage && (
                   <div className={`text-sm px-3 py-2 rounded-lg ${
                     saveMessage.type === 'success' 
-                      ? 'bg-green-50 text-green-800 border border-green-200' 
-                      : 'bg-red-50 text-red-800 border border-red-200'
+                      ? 'bg-ok/10 text-ok border border-ok/30' 
+                      : 'bg-destructive/10 text-destructive border border-destructive/30'
                   }`}>
                     {saveMessage.text}
                   </div>
@@ -569,7 +569,7 @@ export default function JkCW_SettingsMode() {
                   {preferences.map((pref, index) => (
                     <div 
                       key={index}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border group hover:border-primary/50 transition-colors"
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border group hover:border-brand/50 transition-colors"
                     >
                       <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                       
@@ -585,17 +585,17 @@ export default function JkCW_SettingsMode() {
                           <div className="flex gap-1 flex-shrink-0">
                             <button
                               onClick={() => handleSaveEdit(index)}
-                              className="p-1 hover:bg-green-100 rounded transition-colors"
+                              className="p-1 hover:bg-ok/10 rounded transition-colors"
                               title="Save"
                             >
-                              <Check className="h-4 w-4 text-green-600" />
+                              <Check className="h-4 w-4 text-ok" />
                             </button>
                             <button
                               onClick={handleCancelEdit}
-                              className="p-1 hover:bg-red-100 rounded transition-colors"
+                              className="p-1 hover:bg-destructive/10 rounded transition-colors"
                               title="Cancel"
                             >
-                              <X className="h-4 w-4 text-red-600" />
+                              <X className="h-4 w-4 text-destructive" />
                             </button>
                           </div>
                         </>
@@ -606,17 +606,17 @@ export default function JkCW_SettingsMode() {
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                             <button
                               onClick={() => handleStartEdit(index)}
-                              className="p-1 hover:bg-blue-100 rounded transition-colors"
+                              className="p-1 hover:bg-brand/10 rounded transition-colors"
                               title="Edit"
                             >
-                              <Edit2 className="h-4 w-4 text-blue-600" />
+                              <Edit2 className="h-4 w-4 text-brand" />
                             </button>
                             <button
                               onClick={() => handleRemovePreference(index)}
-                              className="p-1 hover:bg-red-100 rounded transition-colors"
+                              className="p-1 hover:bg-destructive/10 rounded transition-colors"
                               title="Delete"
                             >
-                              <X className="h-4 w-4 text-red-600" />
+                              <X className="h-4 w-4 text-destructive" />
                             </button>
                           </div>
                         </>
@@ -680,7 +680,7 @@ export default function JkCW_SettingsMode() {
                 // Key exists — show it
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                    <Key className="h-4 w-4 text-primary flex-shrink-0" />
+                    <Key className="h-4 w-4 text-brand flex-shrink-0" />
                     <code className="flex-1 text-sm font-mono break-all">
                       {showApiKey
                         ? extensionApiKey.key
@@ -779,15 +779,15 @@ export default function JkCW_SettingsMode() {
 
               {/* Freshly created key — shown exactly once */}
               {freshCliKey && (
-                <div className="space-y-2 rounded-lg border-2 border-primary bg-primary/5 p-4">
+                <div className="space-y-2 rounded-lg border-2 border-brand bg-brand/5 p-4">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-4 w-4 text-brand flex-shrink-0 mt-0.5" />
                     <p className="text-sm font-medium">
                       Copy this key now. JobKompass only stores a hashed version, so it can never be shown again.
                     </p>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
-                    <Key className="h-4 w-4 text-primary flex-shrink-0" />
+                    <Key className="h-4 w-4 text-brand flex-shrink-0" />
                     <code className="flex-1 text-sm font-mono break-all">{freshCliKey}</code>
                     <button
                       onClick={handleCopyCliKey}
@@ -883,20 +883,20 @@ export default function JkCW_SettingsMode() {
               </p>
 
               {gmailConnected === "1" && (
-                <div className="p-3 rounded-lg border bg-green-50 border-green-200">
-                  <p className="text-sm font-medium text-green-800">Gmail account connected successfully.</p>
+                <div className="p-3 rounded-lg border bg-ok/10 border-ok/30">
+                  <p className="text-sm font-medium text-ok">Gmail account connected successfully.</p>
                 </div>
               )}
               {gmailError && (
-                <div className="p-3 rounded-lg border bg-red-50 border-red-200 space-y-1">
-                  <p className="text-sm font-medium text-red-800">
+                <div className="p-3 rounded-lg border bg-destructive/10 border-destructive/30 space-y-1">
+                  <p className="text-sm font-medium text-destructive">
                     {GMAIL_ERROR_MESSAGES[gmailError]
                       ?? (gmailError.startsWith("google_")
                         ? `Google declined the connection (${gmailError.slice("google_".length)}). If this is a test/unverified app, make sure this Gmail address is added as a test user in the Google Cloud OAuth consent screen.`
                         : "Something went wrong connecting Gmail. Please try again.")}
                   </p>
                   {gmailErrorDetail && (
-                    <p className="text-xs font-mono text-red-700 break-all">{gmailErrorDetail}</p>
+                    <p className="text-xs font-mono text-destructive break-all">{gmailErrorDetail}</p>
                   )}
                 </div>
               )}
@@ -918,14 +918,14 @@ export default function JkCW_SettingsMode() {
                           {account.status === "active" ? (
                             <span className="text-muted-foreground">Connected</span>
                           ) : account.status === "paused" ? (
-                            <span className="font-medium text-amber-600">
+                            <span className="font-medium text-warn">
                               Scanning paused
                               {account.pausedAt
                                 ? ` since ${new Date(account.pausedAt).toLocaleDateString()}`
                                 : ""}
                             </span>
                           ) : (
-                            <span className="font-medium text-red-600">Disconnected — reconnect to keep sending</span>
+                            <span className="font-medium text-destructive">Disconnected — reconnect to keep sending</span>
                           )}
                           <span className="text-muted-foreground">
                             {" · since "}

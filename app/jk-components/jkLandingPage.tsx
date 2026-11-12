@@ -71,7 +71,7 @@ function AnimatedBackground() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [mouseX, mouseY]);
 
-  const background = useMotionTemplate`radial-gradient(600px circle at ${mouseX}% ${mouseY}%, rgba(33, 150, 243, 0.06), transparent 40%)`;
+  const background = useMotionTemplate`radial-gradient(600px circle at ${mouseX}% ${mouseY}%, color-mix(in srgb, var(--brand) 6%, transparent), transparent 40%)`;
 
   return (
     <motion.div
@@ -100,7 +100,7 @@ function FloatingParticles() {
       {particles.map((particle) => (
         <motion.div
           key={particle.id}
-          className="absolute rounded-full bg-primary/20"
+          className="absolute rounded-full bg-brand/20"
           style={{
             width: `${particle.size}px`,
             height: `${particle.size}px`,
@@ -134,11 +134,11 @@ function FAQItem({ item, isOpen, onToggle, index }: { item: FAQItem; isOpen: boo
       transition={{ duration: 0.5, delay: index * 0.1, ease: [0.16, 1, 0.3, 1] }}
       className="group"
     >
-      <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5">
+      <div className="relative overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-brand/20 hover:shadow-lg hover:shadow-primary/5">
         <dt>
           <button
             onClick={onToggle}
-            className="w-full py-6 px-6 text-left flex items-center justify-between gap-4 transition-colors group-hover:text-primary"
+            className="w-full py-6 px-6 text-left flex items-center justify-between gap-4 transition-colors group-hover:text-brand"
             aria-expanded={isOpen}
             aria-controls={`faq-answer-${item.question.replace(/\s+/g, '-').toLowerCase()}`}
           >
@@ -227,7 +227,7 @@ function FreeResumeStats() {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6"
+        className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-4 py-1.5 text-sm font-medium text-brand mb-6"
       >
         <FileText className="h-4 w-4" />
         <span>Free Resume Generator</span>
@@ -271,7 +271,7 @@ function ModelsWeUse() {
     >
       <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
         <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Sparkles className="h-4 w-4 text-primary" />
+          <Sparkles className="h-4 w-4 text-brand" />
           Powered by
         </span>
       </div>
@@ -280,7 +280,7 @@ function ModelsWeUse() {
           {models.map((model) => (
             <Tooltip key={model.id}>
               <TooltipTrigger asChild>
-                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5">
+                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:border-brand/30 hover:bg-brand/5">
                   <Avatar className="h-5 w-5">
                     {model.logoUrl ? (
                       <AvatarImage src={model.logoUrl} alt="" />
@@ -337,19 +337,19 @@ function CapabilityCard({ capability, index }: { capability: { title: string; de
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-8 transition-all duration-500 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/10"
+      className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-8 transition-all duration-500 hover:border-brand/30 hover:shadow-2xl hover:shadow-primary/10"
     >
       {/* Spotlight effect */}
       <motion.div
         className="pointer-events-none absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{
-          background: useMotionTemplate`radial-gradient(400px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(33, 150, 243, 0.15), transparent 40%)`,
+          background: useMotionTemplate`radial-gradient(400px circle at ${mousePosition.x}px ${mousePosition.y}px, color-mix(in srgb, var(--brand) 15%, transparent), transparent 40%)`,
         }}
       />
       
       {/* Icon */}
       <motion.div
-        className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-500 group-hover:scale-110 group-hover:bg-primary/20"
+        className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-brand/10 text-brand transition-transform duration-500 group-hover:scale-110 group-hover:bg-brand/20"
         whileHover={{ rotate: [0, -5, 5, 0] }}
         transition={{ duration: 0.5 }}
       >
@@ -357,7 +357,7 @@ function CapabilityCard({ capability, index }: { capability: { title: string; de
       </motion.div>
 
       {/* Content */}
-      <h3 className="mb-3 text-xl font-semibold tracking-tight transition-colors group-hover:text-primary">
+      <h3 className="mb-3 text-xl font-semibold tracking-tight transition-colors group-hover:text-brand">
         {capability.title}
       </h3>
       <p className="text-muted-foreground leading-relaxed">
@@ -365,7 +365,7 @@ function CapabilityCard({ capability, index }: { capability: { title: string; de
       </p>
 
       {/* Decorative corner gradient */}
-      <div className="absolute -bottom-20 -right-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl transition-all duration-500 group-hover:bg-primary/10" />
+      <div className="absolute -bottom-20 -right-20 h-40 w-40 rounded-full bg-brand/5 blur-3xl transition-all duration-500 group-hover:bg-brand/10" />
     </motion.article>
   );
 }
@@ -414,7 +414,7 @@ function CliSection() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-4 py-1.5 text-sm font-medium text-brand mb-6">
             <Terminal className="h-4 w-4" />
             <span>For developers &amp; AI agents</span>
           </div>
@@ -424,7 +424,7 @@ function CliSection() {
             className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight mb-6"
           >
             Let your AI agent{" "}
-            <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand to-brand/40 bg-clip-text text-transparent">
               run your job search
             </span>
           </h2>
@@ -447,7 +447,7 @@ function CliSection() {
           >
             {CLI_STEPS.map((step, index) => (
               <li key={step.command} className="flex gap-4">
-                <span className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                <span className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-brand/10 text-brand font-semibold text-sm">
                   {index + 1}
                 </span>
                 <div className="flex-1 min-w-0 space-y-2">
@@ -460,7 +460,7 @@ function CliSection() {
                       aria-label={`Copy command: ${step.command}`}
                     >
                       {copiedIndex === index ? (
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                        <CheckCircle2 className="h-4 w-4 text-brand" />
                       ) : (
                         <Copy className="h-4 w-4 text-muted-foreground" />
                       )}
@@ -481,15 +481,15 @@ function CliSection() {
             className="rounded-xl border border-border bg-card overflow-hidden shadow-lg"
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/50">
-              <span className="h-3 w-3 rounded-full bg-red-400" />
-              <span className="h-3 w-3 rounded-full bg-yellow-400" />
-              <span className="h-3 w-3 rounded-full bg-green-400" />
+              <span className="h-3 w-3 rounded-full bg-destructive/40" />
+              <span className="h-3 w-3 rounded-full bg-warn/40" />
+              <span className="h-3 w-3 rounded-full bg-ok/40" />
               <span className="ml-2 text-xs text-muted-foreground font-mono">jk</span>
             </div>
 
             <div className="p-4 font-mono text-sm overflow-x-auto">
               <div className="flex items-start gap-2 mb-4 text-muted-foreground">
-                <Bot className="h-4 w-4 flex-shrink-0 mt-0.5 text-primary" />
+                <Bot className="h-4 w-4 flex-shrink-0 mt-0.5 text-brand" />
                 <span className="italic">
                   &quot;Track this posting and tailor my resume for it.&quot;
                 </span>
@@ -502,13 +502,13 @@ function CliSection() {
               <p className="whitespace-pre pl-4">
                 --title &quot;Engineer&quot; --status Interested
               </p>
-              <p className="text-primary mb-3">✓ job added · k97f05pq</p>
+              <p className="text-brand mb-3">✓ job added · k97f05pq</p>
 
               <p className="whitespace-pre">
                 <span className="text-muted-foreground">$ </span>
                 jk resumes add --job-id k97f05pq
               </p>
-              <p className="text-primary mb-3">✓ resume generated · Anthropic — Engineer.pdf</p>
+              <p className="text-brand mb-3">✓ resume generated · Anthropic — Engineer.pdf</p>
 
               <p className="whitespace-pre">
                 <span className="text-muted-foreground">$ </span>
@@ -560,8 +560,8 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
       <FloatingParticles />
 
       {/* Gradient orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/20 rounded-full blur-[120px] animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-brand/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
 
       {/* Hand Backdrop Visual - hidden on small screens, aligned to bottom */}
       <div className="absolute inset-0 hidden md:flex items-end justify-center pointer-events-none">
@@ -646,7 +646,7 @@ function HeroSection({ scrollToWaitlist }: { scrollToWaitlist: (e: React.MouseEv
                     delay: 0.85 + index * 0.05,
                     ease: [0.16, 1, 0.3, 1]
                   }}
-                  className="inline-block bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent"
+                  className="inline-block bg-gradient-to-r from-brand to-brand/40 bg-clip-text text-transparent"
                 >
                   {char === ' ' ? '\u00A0' : char}
                 </motion.span>
@@ -961,7 +961,7 @@ export default function JkLandingPage() {
         <section className="relative pt-12 pb-32 px-6" aria-labelledby="capabilities-heading">
           {/* Background decoration */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-primary/5 to-transparent rounded-full blur-3xl" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-brand/5 to-transparent rounded-full blur-3xl" />
           </div>
 
           <div className="max-w-6xl mx-auto relative">
@@ -978,7 +978,7 @@ export default function JkLandingPage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-6"
+                className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-4 py-1.5 text-sm font-medium text-brand mb-6"
               >
                 <Zap className="h-4 w-4" />
                 <span>Features</span>
@@ -994,7 +994,7 @@ export default function JkLandingPage() {
               >
                 <span>Track 100 Jobs.</span>
                 <span>Generate 60 Documents.</span>
-                <span className="bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent">Land Your Dream Role.</span>
+                <span className="bg-gradient-to-r from-brand to-brand/40 bg-clip-text text-transparent">Land Your Dream Role.</span>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1035,7 +1035,7 @@ export default function JkLandingPage() {
         {/* Waitlist Section - commented out
         <section id="waitlist" className="relative py-32 px-6 overflow-hidden" aria-labelledby="waitlist-heading">
           <div className="absolute inset-0 bg-gradient-to-b from-muted/30 via-background to-muted/30" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[150px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand/10 rounded-full blur-[150px]" />
           <div className="max-w-2xl mx-auto relative">
             <motion.div ... >
               <h2 id="waitlist-heading">Stay in the loop</h2>
@@ -1063,7 +1063,7 @@ export default function JkLandingPage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary"
+                className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-4 py-1.5 text-sm font-medium text-brand"
               >
                 <MessageSquare className="h-4 w-4" />
                 <span>FAQ</span>
@@ -1103,7 +1103,7 @@ export default function JkLandingPage() {
             >
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+                  <div className="absolute inset-0 bg-brand/20 blur-xl rounded-full" />
                   <Image
                     src={mainAssets.logo}
                     alt="JobKompass Logo - Career Management Platform"
@@ -1138,7 +1138,7 @@ export default function JkLandingPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                className="fixed inset-0 z-50 bg-scrim backdrop-blur-sm"
                 onClick={() => setShowThankYouModal(false)}
               />
 
@@ -1153,7 +1153,7 @@ export default function JkLandingPage() {
               >
                 <div className="relative bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
                   {/* Decorative gradient */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-blue-400 to-primary" />
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-brand/40 to-brand" />
                   
                   {/* Header */}
                   <div className="flex items-center justify-end p-4">
@@ -1175,8 +1175,8 @@ export default function JkLandingPage() {
                       transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
                       className="flex justify-center"
                     >
-                      <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-                        <CheckCircle2 className="h-10 w-10 text-primary" />
+                      <div className="h-20 w-20 rounded-full bg-brand/10 flex items-center justify-center">
+                        <CheckCircle2 className="h-10 w-10 text-brand" />
                       </div>
                     </motion.div>
                     
@@ -1213,10 +1213,10 @@ export default function JkLandingPage() {
           <Link
             href="/free-resume-generator"
             onClick={() => trackCtaClicked({ cta: "free_generator", surface: "sticky" })}
-            className="flex items-center gap-3 px-4 py-3 rounded-full shadow-lg border border-border bg-card/95 backdrop-blur-sm hover:border-primary/40 hover:shadow-xl transition-all duration-300 group"
+            className="flex items-center gap-3 px-4 py-3 rounded-full shadow-lg border border-border bg-card/95 backdrop-blur-sm hover:border-brand/40 hover:shadow-xl transition-all duration-300 group"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-              <FileText className="h-5 w-5 text-primary" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 group-hover:bg-brand/20 transition-colors">
+              <FileText className="h-5 w-5 text-brand" />
             </div>
             <div className="pr-1">
               <p className="text-sm font-semibold text-foreground leading-tight">Free Resume Generator</p>

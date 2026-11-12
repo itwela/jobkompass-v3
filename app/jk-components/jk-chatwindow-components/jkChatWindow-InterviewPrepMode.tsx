@@ -51,39 +51,39 @@ const FLASHCARD_CATEGORIES: Record<
 > = {
   role: {
     label: 'Role & Fit',
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-600 dark:text-blue-400',
-    border: 'border-blue-500/20',
+    bg: 'bg-brand/10',
+    text: 'text-brand ',
+    border: 'border-brand/20',
   },
   technical: {
     label: 'Technical & Stack',
-    bg: 'bg-purple-500/10',
-    text: 'text-purple-600 dark:text-purple-400',
-    border: 'border-purple-500/20',
+    bg: 'bg-bar-1/10',
+    text: 'text-bar-1 ',
+    border: 'border-bar-1/20',
   },
   experience: {
     label: 'Proof & Experience',
-    bg: 'bg-emerald-500/10',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    border: 'border-emerald-500/20',
+    bg: 'bg-ok/10',
+    text: 'text-ok ',
+    border: 'border-ok/20',
   },
   objection: {
     label: 'Pivot / Guardrail',
-    bg: 'bg-amber-500/10',
-    text: 'text-amber-600 dark:text-amber-400',
-    border: 'border-amber-500/20',
+    bg: 'bg-warn/10',
+    text: 'text-warn ',
+    border: 'border-warn/20',
   },
   behavioral: {
     label: 'Behavioral',
-    bg: 'bg-cyan-500/10',
-    text: 'text-cyan-600 dark:text-cyan-400',
-    border: 'border-cyan-500/20',
+    bg: 'bg-brand/10',
+    text: 'text-brand ',
+    border: 'border-brand/20',
   },
   logistics: {
     label: 'Rate & Logistics',
-    bg: 'bg-rose-500/10',
-    text: 'text-rose-600 dark:text-rose-400',
-    border: 'border-rose-500/20',
+    bg: 'bg-destructive/10',
+    text: 'text-destructive ',
+    border: 'border-destructive/20',
   },
 }
 
@@ -383,7 +383,7 @@ export default function JkCW_InterviewPrepMode() {
                 <h1 className="text-3xl font-bold tracking-tight">
                   Interview Prep
                 </h1>
-                <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-semibold text-brand bg-brand/10 px-2.5 py-0.5 rounded-full">
                   Command Center
                 </span>
               </div>
@@ -437,10 +437,10 @@ export default function JkCW_InterviewPrepMode() {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="rounded-xl border border-primary/30 bg-card p-6 space-y-4 shadow-sm">
+              <div className="rounded-xl border border-brand/30 bg-card p-6 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
+                    <Sparkles className="h-5 w-5 text-brand" />
                     <h3 className="font-semibold text-base">
                       Generate AI Interview Prep Deck
                     </h3>
@@ -561,19 +561,19 @@ export default function JkCW_InterviewPrepMode() {
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ok/15 text-ok  border border-ok/30">
                         {activePrep.status === 'upcoming'
                           ? '● Upcoming Interview'
                           : activePrep.status}
                       </span>
                       {activePrep.interviewDate && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-warn/15 text-warn  border border-warn/30">
                           <Calendar className="h-3.5 w-3.5" />
                           {activePrep.interviewDate}
                         </span>
                       )}
                       {activePrep.compensationTarget && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand">
                           <DollarSign className="h-3.5 w-3.5" />
                           {activePrep.compensationTarget}
                         </span>
@@ -628,7 +628,7 @@ export default function JkCW_InterviewPrepMode() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t border-border/60 text-xs">
                   {activePrep.interviewerName && (
                     <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30">
-                      <User className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <User className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
                       <div className="min-w-0">
                         <div className="font-semibold text-foreground truncate">
                           {activePrep.interviewerName}
@@ -647,7 +647,7 @@ export default function JkCW_InterviewPrepMode() {
 
                   {activePrep.phoneBackup && (
                     <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30">
-                      <Phone className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <Phone className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
                       <div>
                         <div className="font-semibold text-foreground">
                           Phone Backup
@@ -661,7 +661,7 @@ export default function JkCW_InterviewPrepMode() {
 
                   {activePrep.resumeUsed && (
                     <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30 sm:col-span-2">
-                      <FileText className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <FileText className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
                       <div className="min-w-0">
                         <div className="font-semibold text-foreground">
                           Resume Sent to Interviewer
@@ -734,10 +734,10 @@ export default function JkCW_InterviewPrepMode() {
                 <div className="lg:col-span-2 space-y-6">
                   {/* 90-Second Opener */}
                   {activePrep.elevatorPitch && (
-                    <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-6 space-y-3">
+                    <div className="rounded-xl border border-brand/30 bg-gradient-to-br from-brand/5 via-card to-card p-6 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Sparkles className="h-5 w-5 text-primary" />
+                          <Sparkles className="h-5 w-5 text-brand" />
                           <h3 className="font-semibold text-base">
                             Your 60-Second Spoken Opener (&ldquo;Tell me about
                             yourself&rdquo;)
@@ -752,7 +752,7 @@ export default function JkCW_InterviewPrepMode() {
                           className="gap-1.5 h-8 text-xs"
                         >
                           {copiedId === 'pitch' ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            <Check className="h-3.5 w-3.5 text-ok" />
                           ) : (
                             <Copy className="h-3.5 w-3.5" />
                           )}
@@ -773,12 +773,12 @@ export default function JkCW_InterviewPrepMode() {
                   <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-base flex items-center gap-2">
-                        <Award className="h-5 w-5 text-primary" />
+                        <Award className="h-5 w-5 text-brand" />
                         Core Proof Stories to Lead With
                       </h3>
                       <button
                         onClick={() => setActiveTab('stories')}
-                        className="text-xs text-primary font-medium hover:underline"
+                        className="text-xs text-brand font-medium hover:underline"
                       >
                         Open full STAR breakdowns →
                       </button>
@@ -793,7 +793,7 @@ export default function JkCW_InterviewPrepMode() {
                             <span className="font-semibold text-sm">
                               {idx + 1}. {story.title}
                             </span>
-                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand/10 text-brand font-medium">
                               {story.tag}
                             </span>
                           </div>
@@ -814,8 +814,8 @@ export default function JkCW_InterviewPrepMode() {
                   {/* Critical Traps & Guardrails */}
                   {activePrep.trapsAndGuardrails &&
                     activePrep.trapsAndGuardrails.length > 0 && (
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 space-y-4">
-                        <h3 className="font-semibold text-base flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                      <div className="rounded-xl border border-warn/30 bg-warn/5 p-6 space-y-4">
+                        <h3 className="font-semibold text-base flex items-center gap-2 text-warn ">
                           <ShieldAlert className="h-5 w-5" />
                           Call Guardrails & Pivot Rules (Do Not Trip Here)
                         </h3>
@@ -823,13 +823,13 @@ export default function JkCW_InterviewPrepMode() {
                           {activePrep.trapsAndGuardrails.map((t) => (
                             <div
                               key={t.id}
-                              className="p-3.5 rounded-lg bg-background/80 border border-amber-500/20 space-y-1"
+                              className="p-3.5 rounded-lg bg-background/80 border border-warn/20 space-y-1"
                             >
-                              <div className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                              <div className="text-xs font-bold text-warn ">
                                 ⚠️ {t.trap}
                               </div>
                               <div className="text-xs text-foreground/90 leading-relaxed">
-                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                <span className="font-semibold text-ok ">
                                   Play:{' '}
                                 </span>
                                 {t.howToHandle}
@@ -846,7 +846,7 @@ export default function JkCW_InterviewPrepMode() {
                   <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-base flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        <CheckCircle2 className="h-5 w-5 text-ok" />
                         Pre-Call Readiness Checklist
                       </h3>
                       <span className="text-xs text-muted-foreground">
@@ -865,12 +865,12 @@ export default function JkCW_InterviewPrepMode() {
                           }
                           className={`w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left text-xs transition ${
                             item.done
-                              ? 'bg-emerald-500/10 text-muted-foreground line-through'
+                              ? 'bg-ok/10 text-muted-foreground line-through'
                               : 'bg-muted/40 hover:bg-muted text-foreground'
                           }`}
                         >
                           {item.done ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                            <CheckCircle2 className="h-4 w-4 text-ok flex-shrink-0 mt-0.5" />
                           ) : (
                             <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                           )}
@@ -884,12 +884,12 @@ export default function JkCW_InterviewPrepMode() {
                   <div className="rounded-xl border border-border bg-card p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-base flex items-center gap-2">
-                        <HelpCircle className="h-5 w-5 text-primary" />
+                        <HelpCircle className="h-5 w-5 text-brand" />
                         Questions for Jared
                       </h3>
                       <button
                         onClick={() => setActiveTab('questions')}
-                        className="text-xs text-primary font-medium hover:underline"
+                        className="text-xs text-brand font-medium hover:underline"
                       >
                         Take live notes →
                       </button>
@@ -906,14 +906,14 @@ export default function JkCW_InterviewPrepMode() {
                           }
                           className={`w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left text-xs border transition ${
                             q.asked
-                              ? 'bg-emerald-500/10 border-emerald-500/20 text-muted-foreground line-through'
-                              : 'bg-background border-border hover:border-primary/40 text-foreground'
+                              ? 'bg-ok/10 border-ok/20 text-muted-foreground line-through'
+                              : 'bg-background border-border hover:border-brand/40 text-foreground'
                           }`}
                         >
                           {q.asked ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                            <CheckCircle2 className="h-4 w-4 text-ok flex-shrink-0 mt-0.5" />
                           ) : (
-                            <Circle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                            <Circle className="h-4 w-4 text-brand flex-shrink-0 mt-0.5" />
                           )}
                           <div className="space-y-0.5">
                             <div className="font-medium leading-snug">
@@ -1023,7 +1023,7 @@ export default function JkCW_InterviewPrepMode() {
                   <div className="max-w-3xl mx-auto space-y-4">
                     <div
                       onClick={() => setIsFlipped((prev) => !prev)}
-                      className="cursor-pointer select-none rounded-2xl border-2 border-border hover:border-primary/50 bg-card p-8 min-h-[300px] flex flex-col justify-between shadow-md transition-all"
+                      className="cursor-pointer select-none rounded-2xl border-2 border-border hover:border-brand/50 bg-card p-8 min-h-[300px] flex flex-col justify-between shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -1066,7 +1066,7 @@ export default function JkCW_InterviewPrepMode() {
                             <Star
                               className={`h-4 w-4 ${
                                 currentCard.starred
-                                  ? 'fill-amber-400 text-amber-400'
+                                  ? 'fill-warn text-warn'
                                   : 'text-muted-foreground'
                               }`}
                             />
@@ -1083,7 +1083,7 @@ export default function JkCW_InterviewPrepMode() {
                             {currentCard.hint && (
                               <div>
                                 {showHint ? (
-                                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 inline-block px-3 py-1 rounded-full">
+                                  <p className="text-xs text-warn  font-medium bg-warn/10 inline-block px-3 py-1 rounded-full">
                                     💡 Cue: {currentCard.hint}
                                   </p>
                                 ) : (
@@ -1121,7 +1121,7 @@ export default function JkCW_InterviewPrepMode() {
                             e.stopPropagation()
                             handleCopy(currentCard.back, currentCard.id)
                           }}
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                          className="inline-flex items-center gap-1 text-brand hover:underline"
                         >
                           {copiedId === currentCard.id ? (
                             <Check className="h-3.5 w-3.5" />
@@ -1178,19 +1178,19 @@ export default function JkCW_InterviewPrepMode() {
                             id: 'new',
                             label: 'Needs Reps',
                             activeClass:
-                              'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/40',
+                              'bg-destructive/20 text-destructive  border-destructive/40',
                           },
                           {
                             id: 'learning',
                             label: 'Getting There',
                             activeClass:
-                              'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40',
+                              'bg-warn/20 text-warn  border-warn/40',
                           },
                           {
                             id: 'mastered',
                             label: 'Locked In ✓',
                             activeClass:
-                              'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40',
+                              'bg-ok/20 text-ok  border-ok/40',
                           },
                         ].map((lvl) => {
                           const isCurrent =
@@ -1240,9 +1240,9 @@ export default function JkCW_InterviewPrepMode() {
                             setIsFlipped(true)
                             window.scrollTo({ top: 0, behavior: 'smooth' })
                           }}
-                          className={`p-4 rounded-xl border bg-card hover:border-primary/40 cursor-pointer transition space-y-2 ${
+                          className={`p-4 rounded-xl border bg-card hover:border-brand/40 cursor-pointer transition space-y-2 ${
                             currentCard?.id === card.id
-                              ? 'border-primary ring-1 ring-primary/30'
+                              ? 'border-brand ring-1 ring-brand/30'
                               : 'border-border'
                           }`}
                         >
@@ -1258,12 +1258,12 @@ export default function JkCW_InterviewPrepMode() {
                             </span>
                             <div className="flex items-center gap-1.5">
                               {card.confidence === 'mastered' && (
-                                <span className="text-[11px] font-medium text-emerald-500">
+                                <span className="text-[11px] font-medium text-ok">
                                   ✓ Locked In
                                 </span>
                               )}
                               {card.starred && (
-                                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                <Star className="h-3.5 w-3.5 fill-warn text-warn" />
                               )}
                             </div>
                           </div>
@@ -1292,7 +1292,7 @@ export default function JkCW_InterviewPrepMode() {
                     <div className="space-y-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand">
                             Story #{idx + 1} · {story.tag}
                           </span>
                           <h3 className="text-lg font-bold mt-2">
@@ -1311,7 +1311,7 @@ export default function JkCW_InterviewPrepMode() {
                           className="h-8 gap-1 text-xs"
                         >
                           {copiedId === story.id ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            <Check className="h-3.5 w-3.5 text-ok" />
                           ) : (
                             <Copy className="h-3.5 w-3.5" />
                           )}
@@ -1320,8 +1320,8 @@ export default function JkCW_InterviewPrepMode() {
                       </div>
 
                       {story.hook && (
-                        <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs font-medium text-foreground">
-                          <span className="text-primary font-bold uppercase tracking-wider block mb-1">
+                        <div className="p-3 rounded-lg bg-brand/5 border border-brand/20 text-xs font-medium text-foreground">
+                          <span className="text-brand font-bold uppercase tracking-wider block mb-1">
                             Spoken Lead-In (Outcome-First Hook)
                           </span>
                           &ldquo;{story.hook}&rdquo;
@@ -1341,8 +1341,8 @@ export default function JkCW_InterviewPrepMode() {
                           </span>
                           <p className="text-foreground/90">{story.action}</p>
                         </div>
-                        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-0.5">
+                        <div className="p-3 rounded-lg bg-ok/10 border border-ok/20">
+                          <span className="font-bold text-ok  uppercase tracking-wider block mb-0.5">
                             Measurable Outcome
                           </span>
                           <p className="text-foreground font-medium">
@@ -1388,7 +1388,7 @@ export default function JkCW_InterviewPrepMode() {
                             <span
                               className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
                                 rm.priority === 'must-have'
-                                  ? 'bg-primary/15 text-primary'
+                                  ? 'bg-brand/15 text-brand'
                                   : 'bg-muted text-muted-foreground'
                               }`}
                             >
@@ -1397,10 +1397,10 @@ export default function JkCW_InterviewPrepMode() {
                             <span
                               className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                                 rm.strength === 'strong'
-                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                  ? 'bg-ok/15 text-ok '
                                   : rm.strength === 'pivot'
-                                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                  : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                  ? 'bg-warn/15 text-warn '
+                                  : 'bg-brand/15 text-brand '
                               }`}
                             >
                               {rm.strength === 'strong'
@@ -1449,16 +1449,16 @@ export default function JkCW_InterviewPrepMode() {
                         }
                         className={`p-4 rounded-xl border cursor-pointer transition space-y-1.5 ${
                           q.asked
-                            ? 'bg-emerald-500/10 border-emerald-500/30 opacity-75'
-                            : 'bg-background border-border hover:border-primary/40'
+                            ? 'bg-ok/10 border-ok/30 opacity-75'
+                            : 'bg-background border-border hover:border-brand/40'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-2.5">
                             {q.asked ? (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                              <CheckCircle2 className="h-4 w-4 text-ok mt-0.5 flex-shrink-0" />
                             ) : (
-                              <Circle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                              <Circle className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
                             )}
                             <span
                               className={`text-sm font-semibold ${
@@ -1489,7 +1489,7 @@ export default function JkCW_InterviewPrepMode() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-base flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4 text-primary" />
+                        <MessageSquare className="h-4 w-4 text-brand" />
                         Live Call Scratchpad
                       </h3>
                       <p className="text-xs text-muted-foreground mt-0.5">

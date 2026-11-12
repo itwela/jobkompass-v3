@@ -43,7 +43,7 @@ export default function JkMoveToFolderMenu({
             onClick={() => onMove(folder._id)}
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-50"
           >
-            <Folder className="h-4 w-4 text-blue-500" />
+            <Folder className="h-4 w-4 text-brand" />
             <span className="min-w-0 flex-1 truncate">{folder.name}</span>
             {isCurrent && (
               <span className="text-[10px] text-muted-foreground">current</span>

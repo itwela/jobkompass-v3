@@ -26,7 +26,7 @@ export default function JkConfirmDelete({
   return (
     <div
       className={cn(
-        "w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex flex-col gap-2",
+        "w-full rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive flex flex-col gap-2",
         className
       )}
     >
@@ -36,7 +36,7 @@ export default function JkConfirmDelete({
           onClick={onConfirm}
           disabled={isLoading}
           className={cn(
-            "flex-1 rounded bg-red-600 py-1 text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70",
+            "flex-1 rounded bg-destructive py-1 text-on-fill transition-colors hover:bg-destructive disabled:cursor-not-allowed disabled:opacity-70",
             isLoading && "flex items-center justify-center gap-2"
           )}
         >
@@ -52,7 +52,7 @@ export default function JkConfirmDelete({
         <button
           onClick={onCancel}
           disabled={isLoading}
-          className="flex-1 rounded border border-red-200 bg-white/90 py-1 text-red-600 transition-colors hover:border-red-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+          className="flex-1 rounded border border-destructive/30 bg-card/90 py-1 text-destructive transition-colors hover:border-destructive/30 hover:bg-card disabled:cursor-not-allowed disabled:opacity-70"
         >
           {cancelLabel}
         </button>

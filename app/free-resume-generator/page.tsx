@@ -64,7 +64,7 @@ function AnimatedBackground() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [mouseX, mouseY]);
 
-  const background = useMotionTemplate`radial-gradient(600px circle at ${mouseX}% ${mouseY}%, rgba(33, 150, 243, 0.06), transparent 40%)`;
+  const background = useMotionTemplate`radial-gradient(600px circle at ${mouseX}% ${mouseY}%, color-mix(in srgb, var(--brand) 6%, transparent), transparent 40%)`;
 
   return (
     <motion.div
@@ -94,7 +94,7 @@ function FloatingParticles() {
       {particles.map((particle) => (
         <motion.div
           key={particle.id}
-          className="absolute rounded-full bg-primary/20"
+          className="absolute rounded-full bg-brand/20"
           style={{
             width: `${particle.size}px`,
             height: `${particle.size}px`,
@@ -429,8 +429,8 @@ export default function FreeResumeGeneratorPage() {
           <AnimatedBackground />
           <FloatingParticles />
           {/* Subtle gradient orbs */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/10 rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-brand/5 rounded-full blur-[100px] pointer-events-none" />
 
           <div className="max-w-7xl mx-auto relative">
             <motion.div
@@ -490,7 +490,7 @@ export default function FreeResumeGeneratorPage() {
                   {resumePdf ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-2">
                       <div className="flex items-center gap-2 p-4 rounded-lg border border-border bg-muted/30 w-full max-w-sm">
-                        <FileText className="h-5 w-5 text-primary shrink-0" />
+                        <FileText className="h-5 w-5 text-brand shrink-0" />
                         <span className="truncate flex-1 text-sm">{resumePdfName || 'resume.pdf'}</span>
                         <Button variant="ghost" size="sm" onClick={clearPdf} className="shrink-0">
                           <X className="h-4 w-4" />
@@ -592,7 +592,7 @@ export default function FreeResumeGeneratorPage() {
                   </Button>
                   {emailVerified && storedEmail && (
                     <span className="text-sm text-muted-foreground flex items-center gap-1 w-full justify-center">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <CheckCircle2 className="h-4 w-4 text-ok" />
                       {storedEmail}
                     </span>
                   )}
@@ -654,7 +654,7 @@ export default function FreeResumeGeneratorPage() {
                           key={template.id}
                           type="button"
                           onClick={() => handleSelectTemplate(template.id)}
-                          className="flex flex-col flex-shrink-0 w-full max-w-[400px] h-full rounded-xl border-2 border-border hover:border-primary overflow-hidden transition-colors duration-200 text-left group"
+                          className="flex flex-col flex-shrink-0 w-full max-w-[400px] h-full rounded-xl border-2 border-border hover:border-brand overflow-hidden transition-colors duration-200 text-left group"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ duration: 0.4, delay: 0.1 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
@@ -667,7 +667,7 @@ export default function FreeResumeGeneratorPage() {
                               className="object-cover object-top"
                               sizes="280px"
                             />
-                            <div className="absolute inset-0 bg-transparent group-hover:bg-black/5 transition-opacity" />
+                            <div className="absolute inset-0 bg-transparent group-hover:bg-scrim transition-opacity" />
                           </div>
                           <div className="p-3 bg-background/95 backdrop-blur-sm flex-shrink-0 rounded-b-xl overflow-hidden">
                             <p className="font-medium text-sm truncate">{template.name}</p>
@@ -788,9 +788,9 @@ export default function FreeResumeGeneratorPage() {
                       <div className="flex-1 min-h-[320px] flex flex-col items-center justify-center overflow-hidden p-4">
                         {pdfBase64 ? (
                           <div className="w-full h-full flex flex-col min-h-0">
-                            <div className="relative flex-1 min-h-[320px] w-full bg-white overflow-hidden">
+                            <div className="relative flex-1 min-h-[320px] w-full bg-card overflow-hidden">
                               {!isPdfIframeLoaded && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+                                <div className="absolute inset-0 flex items-center justify-center bg-card z-10">
                                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
                                 </div>
                               )}
@@ -838,7 +838,7 @@ export default function FreeResumeGeneratorPage() {
                                           toast.error('Failed to copy');
                                         });
                                       }}
-                                      className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors text-left"
+                                      className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 hover:border-brand/30 transition-colors text-left"
                                     >
                                       <Avatar className="h-5 w-5 shrink-0">
                                         <AvatarImage src={ai.logoUrl} alt="" />
@@ -853,7 +853,7 @@ export default function FreeResumeGeneratorPage() {
                                       href={ai.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="p-2 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/30 transition-colors shrink-0"
+                                      className="p-2 rounded-lg border border-border hover:bg-muted/50 hover:border-brand/30 transition-colors shrink-0"
                                       aria-label={`Open ${ai.name}`}
                                     >
                                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -875,7 +875,7 @@ export default function FreeResumeGeneratorPage() {
             </div>
 
             <motion.div
-              className="mt-12 p-6 rounded-xl border border-primary/20 bg-primary/5 text-center"
+              className="mt-12 p-6 rounded-xl border border-brand/20 bg-brand/5 text-center"
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-50px' }}
@@ -940,7 +940,7 @@ export default function FreeResumeGeneratorPage() {
               onClick={() => setGateMode('signup')}
               className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
                 gateMode === 'signup'
-                  ? 'border-primary text-foreground'
+                  ? 'border-brand text-foreground'
                   : 'border-transparent text-muted-foreground'
               }`}
             >
@@ -951,7 +951,7 @@ export default function FreeResumeGeneratorPage() {
               onClick={() => setGateMode('verify')}
               className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
                 gateMode === 'verify'
-                  ? 'border-primary text-foreground'
+                  ? 'border-brand text-foreground'
                   : 'border-transparent text-muted-foreground'
               }`}
             >

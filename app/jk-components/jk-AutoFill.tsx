@@ -26,7 +26,7 @@ export default function Jk_AutoFill({ onSelect }: AutoFillProps = {}) {
                 >
                     <span className="text-sm font-medium text-foreground">{mode.name}</span>
                     {(mode.id === '/performance' || mode.id === '/interview-prep') && (
-                      <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
+                      <span className="text-xs font-medium text-brand bg-brand/10 px-2 py-0.5 rounded">
                         New
                       </span>
                     )}

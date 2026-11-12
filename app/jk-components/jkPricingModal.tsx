@@ -256,7 +256,7 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
                   Switch to annual to save 25%
                 </span>
               ) : (
-                <span className="text-xs text-green-600 font-medium">
+                <span className="text-xs text-ok font-medium">
                   You're saving 25% with annual billing
                 </span>
               )}
@@ -282,10 +282,10 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
                   onClick={() => !isCurrentPlan(plan) && setSelectedPlanId(plan.id)}
                   className={`relative border rounded-2xl p-6 bg-card cursor-pointer transition-all duration-200 ${
                     isSelected
-                      ? 'border-primary shadow-lg scale-105'
+                      ? 'border-brand shadow-lg scale-105'
                       : plan.popular
-                      ? 'border-primary/50 shadow-md hover:border-primary hover:shadow-lg hover:scale-105'
-                      : 'border-border hover:border-primary/50 hover:shadow-md hover:scale-[1.02]'
+                      ? 'border-brand/50 shadow-md hover:border-brand hover:shadow-lg hover:scale-105'
+                      : 'border-border hover:border-brand/50 hover:shadow-md hover:scale-[1.02]'
                   }`}
                 >
                   {plan.popular && (
@@ -298,7 +298,7 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
 
                   {isAnnual && currentPricing && savings && (
                     <div className="absolute -top-3 right-3">
-                      <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                      <span className="bg-ok text-on-fill px-2 py-1 rounded-full text-xs font-medium">
                         Save ${savings.toFixed(0)}/yr
                       </span>
                     </div>
@@ -337,7 +337,7 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
                   <ul className="space-y-2 mb-6 flex-1">
                     {plan.features.map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <Check className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
                         <span className="text-xs">{feature}</span>
                       </li>
                     ))}
@@ -355,7 +355,7 @@ export default function JkPricingModal({ isOpen, onClose }: JkPricingModalProps)
                     className={`w-full text-sm ${
                       isSelected
                         ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                        : 'bg-primary/50 hover:bg-primary text-primary-foreground opacity-100'
+                        : 'bg-brand/50 hover:bg-primary text-primary-foreground opacity-100'
                     }`}
                     variant="default"
                   >

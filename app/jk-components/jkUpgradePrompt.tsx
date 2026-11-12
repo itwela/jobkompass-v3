@@ -21,8 +21,8 @@ export default function JkUpgradePrompt({
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center p-8 rounded-xl border border-border bg-muted/30"
     >
-      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-        <Sparkles className="h-8 w-8 text-primary" />
+      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-brand/10 mb-4">
+        <Sparkles className="h-8 w-8 text-brand" />
       </div>
       
       <h3 className="text-xl font-semibold mb-2">Upgrade to {requiredPlan === 'pro' ? 'Pro' : 'Plus'}</h3>

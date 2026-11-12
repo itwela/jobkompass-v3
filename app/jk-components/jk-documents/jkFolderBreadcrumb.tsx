@@ -24,7 +24,7 @@ export default function JkFolderBreadcrumb({
     <div
       className={cn(
         "flex items-center gap-1 rounded-lg border border-transparent px-1 py-1 text-sm",
-        isDropTarget && "border-blue-500 bg-blue-50 dark:bg-blue-950/40"
+        isDropTarget && "border-brand bg-brand/10 "
       )}
       onDragOver={(event) => {
         if (!onDropDocument) return;

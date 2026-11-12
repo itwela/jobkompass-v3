@@ -179,7 +179,7 @@ export default function JkCW_LeadsMode() {
             </div>
           )}
           {selectionMode && bulkDeleteError && (
-            <p className="mb-4 text-sm text-red-600">{bulkDeleteError}</p>
+            <p className="mb-4 text-sm text-destructive">{bulkDeleteError}</p>
           )}
           <LeadsList
             selectionMode={selectionMode}

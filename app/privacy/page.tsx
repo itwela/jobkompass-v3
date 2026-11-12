@@ -184,7 +184,7 @@ export default function PrivacyPage() {
             <div className="mt-4 p-4 bg-muted rounded-lg">
               <p className="font-medium">JobKompass</p>
               <p>Email: myjobkompass@gmail.com</p>
-              <p>For general inquiries, visit our <Link href="/contact" className="text-primary underline">Contact Page</Link></p>
+              <p>For general inquiries, visit our <Link href="/contact" className="text-brand underline">Contact Page</Link></p>
             </div>
           </section>
         </div>

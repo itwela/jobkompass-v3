@@ -52,7 +52,7 @@ export default function StripeSuccessPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-brand" />
           <p className="text-muted-foreground">Processing your payment...</p>
         </div>
       </div>
@@ -82,7 +82,7 @@ export default function StripeSuccessPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-4 max-w-md">
-        <CheckCircle className="h-16 w-16 mx-auto text-green-500" />
+        <CheckCircle className="h-16 w-16 mx-auto text-ok" />
         <h1 className="text-2xl font-bold">Payment Successful!</h1>
         <p className="text-muted-foreground">
           Your subscription has been activated. Redirecting you to the app...

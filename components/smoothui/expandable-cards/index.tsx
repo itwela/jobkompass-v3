@@ -117,8 +117,8 @@ export default function ExpandableCards({
                 src={card.image || "/placeholder.svg"}
                 width={200}
               />
-              <div className="absolute inset-0 bg-black/20" />
-              <div className="absolute inset-0 flex flex-col justify-between p-6 text-white">
+              <div className="absolute inset-0 bg-scrim" />
+              <div className="absolute inset-0 flex flex-col justify-between p-6 text-on-fill">
                 <h2 className="font-bold text-2xl">{card.title}</h2>
                 <div className="flex items-center gap-2">
                   <button
@@ -126,7 +126,7 @@ export default function ExpandableCards({
                     className="flex h-12 w-12 items-center justify-center rounded-full bg-background/30 backdrop-blur-sm transition-transform hover:scale-110"
                     type="button"
                   >
-                    <Play className="h-6 w-6 text-white" />
+                    <Play className="h-6 w-6 text-on-fill" />
                   </button>
                   <span className="font-medium text-sm">Play video</span>
                 </div>

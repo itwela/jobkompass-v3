@@ -107,7 +107,7 @@ export default function JkInputSection({
         className={`
           relative w-full rounded-2xl border border-border bg-card
           transition-all duration-200 ease-out
-          ${isDragOver ? 'border-primary bg-muted/50' : ''}
+          ${isDragOver ? 'border-brand bg-muted/50' : ''}
           ${textValue ? 'shadow-lg' : 'shadow-sm'}
         `}
         onDragOver={handleDragOver}
@@ -116,8 +116,8 @@ export default function JkInputSection({
       >
         {/* Drag Overlay */}
         {isDragOver && (
-          <div className="absolute inset-0 flex items-center justify-center bg-primary/5 rounded-2xl z-10 pointer-events-none">
-            <div className="text-lg font-medium text-primary">Drop file here to switch to File Mode</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-brand/5 rounded-2xl z-10 pointer-events-none">
+            <div className="text-lg font-medium text-brand">Drop file here to switch to File Mode</div>
           </div>
         )}
 
@@ -149,13 +149,13 @@ export default function JkInputSection({
               return (
                 <div 
                   key={resumeId}
-                  className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-primary/10 text-primary border border-primary/20 rounded-md"
+                  className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-brand/10 text-brand border border-brand/20 rounded-md"
                 >
                   <FileText className="h-3 w-3" />
                   <span>{resume.name || `Resume ${resumeId.slice(-6)}`}</span>
                   <button 
                     onClick={() => removeResumeAttachment(resumeId)}
-                    className="hover:bg-primary/20 rounded px-1 transition-colors"
+                    className="hover:bg-brand/20 rounded px-1 transition-colors"
                     aria-label="Remove resume"
                   >
                     <X className="h-3 w-3" />
@@ -171,13 +171,13 @@ export default function JkInputSection({
               return (
                 <div 
                   key={jobId}
-                  className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-primary/10 text-primary border border-primary/20 rounded-md"
+                  className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-brand/10 text-brand border border-brand/20 rounded-md"
                 >
                   <Briefcase className="h-3 w-3" />
                   <span>{job.title} @ {job.company}</span>
                   <button 
                     onClick={() => removeJobAttachment(jobId)}
-                    className="hover:bg-primary/20 rounded px-1 transition-colors"
+                    className="hover:bg-brand/20 rounded px-1 transition-colors"
                     aria-label="Remove job"
                   >
                     <X className="h-3 w-3" />
@@ -233,7 +233,7 @@ export default function JkInputSection({
             aria-label="Send message"
             disabled={inputValue.trim().length <= 2}
           >
-            <Send className="h-4 w-4 text-white" />
+            <Send className="h-4 w-4 text-on-fill" />
           </Button>
           )}
         </div>

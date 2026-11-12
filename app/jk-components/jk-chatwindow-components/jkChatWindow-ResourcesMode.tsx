@@ -26,21 +26,21 @@ interface Resource {
 
 // Classic sticky note color
 const stickyNoteColor = {
-  bg: '#FFD180', // orange sticky note (light orange)
-  border: '#FFA726', // deeper orange for border
-  shadow: 'rgba(255, 152, 0, 0.3)', // soft orange shadow
+  bg: 'var(--muted)',
+  border: 'var(--border-strong)',
+  shadow: 'var(--scrim)',
 };
 
 // Predefined categories with job status colors
 const CATEGORIES = [
-  { value: 'job-board', label: 'Job Board', color: '#DBEAFE', bgColor: 'bg-blue-100', textColor: 'text-blue-800', borderColor: 'border-blue-200', emoji: '💼' }, // Interested
-  { value: 'job', label: 'Job', color: '#FEF3C7', bgColor: 'bg-yellow-100', textColor: 'text-yellow-800', borderColor: 'border-yellow-200', emoji: '👨‍💻' }, // Applied
-  { value: 'company', label: 'Company', color: '#F3E8FF', bgColor: 'bg-purple-100', textColor: 'text-purple-800', borderColor: 'border-purple-200', emoji: '🏢' }, // Interviewing
-  { value: 'networking', label: 'Networking', color: '#D1FAE5', bgColor: 'bg-green-100', textColor: 'text-green-800', borderColor: 'border-green-200', emoji: '🤝' }, // Offered
-  { value: 'learning', label: 'Learning', color: '#FEE2E2', bgColor: 'bg-red-100', textColor: 'text-red-800', borderColor: 'border-red-200', emoji: '📚' }, // Rejected
-  { value: 'tools', label: 'Tools', color: '#DBEAFE', bgColor: 'bg-blue-100', textColor: 'text-blue-800', borderColor: 'border-blue-200', emoji: '🔧' }, // Interested
-  { value: 'job-questions', label: 'Job Questions', color: '#ECFDF5', bgColor: 'bg-emerald-100', textColor: 'text-emerald-800', borderColor: 'border-emerald-200', emoji: '❓' },
-  { value: 'other', label: 'Other', color: '#FEF3C7', bgColor: 'bg-yellow-100', textColor: 'text-yellow-800', borderColor: 'border-yellow-200', emoji: '📌' }, // Applied
+  { value: 'job-board', label: 'Job Board', color: 'var(--accent)', bgColor: 'bg-brand/10', textColor: 'text-brand', borderColor: 'border-brand/30', emoji: '💼' }, // Interested
+  { value: 'job', label: 'Job', color: 'var(--accent)', bgColor: 'bg-warn/10', textColor: 'text-warn', borderColor: 'border-warn/30', emoji: '👨‍💻' }, // Applied
+  { value: 'company', label: 'Company', color: 'var(--accent)', bgColor: 'bg-bar-1/10', textColor: 'text-bar-1', borderColor: 'border-bar-1/30', emoji: '🏢' }, // Interviewing
+  { value: 'networking', label: 'Networking', color: 'var(--accent)', bgColor: 'bg-ok/10', textColor: 'text-ok', borderColor: 'border-ok/30', emoji: '🤝' }, // Offered
+  { value: 'learning', label: 'Learning', color: 'var(--accent)', bgColor: 'bg-destructive/10', textColor: 'text-destructive', borderColor: 'border-destructive/30', emoji: '📚' }, // Rejected
+  { value: 'tools', label: 'Tools', color: 'var(--accent)', bgColor: 'bg-brand/10', textColor: 'text-brand', borderColor: 'border-brand/30', emoji: '🔧' }, // Interested
+  { value: 'job-questions', label: 'Job Questions', color: 'var(--accent)', bgColor: 'bg-ok/10', textColor: 'text-ok', borderColor: 'border-ok/30', emoji: '❓' },
+  { value: 'other', label: 'Other', color: 'var(--accent)', bgColor: 'bg-warn/10', textColor: 'text-warn', borderColor: 'border-warn/30', emoji: '📌' }, // Applied
 ] as const;
 
 // Format date in plain English
@@ -181,8 +181,8 @@ function StickyNote({
       className="relative h-full"
     >
       <div
-        className={`relative flex h-full min-h-[200px] max-h-[400px] flex-col rounded-tl-xl rounded-br-xl rounded-bl-xl p-5 cursor-pointer transition-transform duration-200 text-black ${
-          selectionMode && isSelected ? "outline outline-2 outline-blue-400 shadow-[0_0_0_4px_rgba(37,99,235,0.15)]" : ""
+        className={`relative flex h-full min-h-[200px] max-h-[400px] flex-col rounded-tl-xl rounded-br-xl rounded-bl-xl p-5 cursor-pointer transition-transform duration-200 text-foreground ${
+          selectionMode && isSelected ? "outline outline-2 outline-brand ring-4 ring-brand/15" : ""
         }`}
         style={{
           backgroundColor: colors.bg,
@@ -210,11 +210,11 @@ function StickyNote({
               event.stopPropagation();
               onToggleSelection();
             }}
-            className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-foreground/80 shadow-sm transition-colors hover:text-blue-500"
+            className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-foreground/80 shadow-sm transition-colors hover:text-brand"
             aria-pressed={isSelected}
           >
             {isSelected ? (
-              <CheckCircle2 className="h-4 w-4 text-blue-500" />
+              <CheckCircle2 className="h-4 w-4 text-brand" />
             ) : (
               <Circle className="h-4 w-4" />
             )}
@@ -308,7 +308,7 @@ function StickyNote({
                       e.stopPropagation();
                       handleSave();
                     }}
-                    className="flex-1 px-3 py-1.5 text-xs font-medium bg-black/10 hover:bg-black/20 rounded transition-colors"
+                    className="flex-1 px-3 py-1.5 text-xs font-medium bg-scrim hover:bg-scrim rounded transition-colors"
                   >
                     Save
                   </button>
@@ -317,7 +317,7 @@ function StickyNote({
                       e.stopPropagation();
                       onCancel();
                     }}
-                    className="px-3 py-1.5 text-xs font-medium bg-black/10 hover:bg-black/20 rounded transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium bg-scrim hover:bg-scrim rounded transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -326,7 +326,7 @@ function StickyNote({
                       e.stopPropagation();
                       setShowDeleteConfirm(true);
                     }}
-                    className="px-3 py-1.5 text-xs font-medium bg-red-200 hover:bg-red-300 rounded transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium bg-destructive/20 hover:bg-destructive/40 rounded transition-colors"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -341,7 +341,7 @@ function StickyNote({
               {resource.category && (
                 <div className="flex items-center gap-1.5 mb-2">
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORIES.find(c => c.value === resource.category)?.bgColor || 'bg-gray-100'} ${CATEGORIES.find(c => c.value === resource.category)?.textColor || 'text-gray-800'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORIES.find(c => c.value === resource.category)?.bgColor || 'bg-muted'} ${CATEGORIES.find(c => c.value === resource.category)?.textColor || 'text-foreground'}`}
                   >
                     {CATEGORIES.find(c => c.value === resource.category)?.emoji}{' '}
                     {CATEGORIES.find(c => c.value === resource.category)?.label}
@@ -350,11 +350,11 @@ function StickyNote({
               )}
               
               {resource.title ? (
-                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words text-black">
+                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words text-foreground">
                   {resource.title}
                 </h3>
               ) : (
-                <h3 className="font-semibold text-lg leading-tight text-black/60 italic">
+                <h3 className="font-semibold text-lg leading-tight text-foreground/60 italic">
                   Untitled
                 </h3>
               )}
@@ -365,11 +365,11 @@ function StickyNote({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm underline text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-400 flex items-center gap-1"
+                    className="text-sm underline text-brand  hover:text-brand  flex items-center gap-1"
                   >
                     Visit <ExternalLink className="h-3 w-3 flex-shrink-0" />
                   </a>
-                  <p className="text-xs text-black/70 break-all line-clamp-2">
+                  <p className="text-xs text-foreground/70 break-all line-clamp-2">
                     {resource.url}
                   </p>
                 </div>
@@ -380,19 +380,19 @@ function StickyNote({
                     isEditing ? "max-h-[210px]" : "max-h-[180px]"
                   }`}
                 >
-                  <p className="text-sm text-black leading-relaxed whitespace-pre-wrap break-words">
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
                     {resource.description}
                   </p>
                 </div>
               )}
               {!resource.title && !resource.url && !resource.description && (
-                <p className="text-sm text-black/60 italic">
+                <p className="text-sm text-foreground/60 italic">
                   Click to edit...
                 </p>
               )}
             </div>
             <div className="mt-auto pt-3 border-t border-border/40 flex-shrink-0">
-              <p className="text-xs text-black/70 truncate">
+              <p className="text-xs text-foreground/70 truncate">
                 Last edited {formatDate(resource.updatedAt)}
               </p>
             </div>
@@ -510,7 +510,7 @@ export default function JkCW_ResourcesMode() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={() => { void handleAddNew(); }}
-              className="gap-2 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500"
+              className="gap-2 bg-brand/10 text-brand border-brand/30 hover:bg-brand/10    "
               disabled={selectionMode}
             >
               <Plus className="h-4 w-4" />
@@ -605,7 +605,7 @@ export default function JkCW_ResourcesMode() {
               variant={selectedCategory === null ? "outline" : "outline"}
               size="sm"
               onClick={() => setSelectedCategory(null)}
-              className={`gap-2 ${selectedCategory === null ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500' : ''}`}
+              className={`gap-2 ${selectedCategory === null ? 'bg-brand/10 text-brand border-brand/30 hover:bg-brand/10    ' : ''}`}
             >
               All ({allResources.length})
             </Button>
@@ -623,12 +623,7 @@ export default function JkCW_ResourcesMode() {
                       ? {
                           backgroundColor: category.color,
                           borderColor: category.color,
-                          color: category.value === 'job-board' || category.value === 'tools' ? '#1E40AF' // blue-800
-                            : category.value === 'job' || category.value === 'other' ? '#92400E' // yellow-800
-                            : category.value === 'company' ? '#6B21A8' // purple-800
-                            : category.value === 'networking' ? '#065F46' // green-800
-                            : category.value === 'learning' ? '#991B1B' // red-800
-                            : '#1E40AF',
+                          color: 'var(--foreground)',
                         }
                       : {}
                   }
@@ -706,7 +701,7 @@ export default function JkCW_ResourcesMode() {
             <p className="text-muted-foreground mb-6">
               Click "New Note" to add your first resource
             </p>
-            <Button onClick={handleAddNew} size="lg" className="gap-2 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500">
+            <Button onClick={handleAddNew} size="lg" className="gap-2 bg-brand/10 text-brand border-brand/30 hover:bg-brand/10    ">
               <Plus className="h-4 w-4" />
               Create Your First Note
             </Button>

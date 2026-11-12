@@ -22,8 +22,8 @@ function GuideCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${isActive
-          ? 'border-primary bg-primary/5 shadow-md'
-          : 'border-border hover:border-primary/50 bg-card hover:shadow-sm'
+          ? 'border-brand bg-brand/5 shadow-md'
+          : 'border-border hover:border-brand/50 bg-card hover:shadow-sm'
         }`}
       onClick={onSelect}
     >
@@ -38,7 +38,7 @@ function GuideCard({
           </div>
         </div>
         {isActive && (
-          <ChevronLeft className="h-5 w-5 text-primary flex-shrink-0" />
+          <ChevronLeft className="h-5 w-5 text-brand flex-shrink-0" />
         )}
       </div>
     </motion.div>
@@ -84,7 +84,7 @@ function GuideContent({ guide }: { guide: HelpGuide }) {
                 transition={{ delay: idx * 0.05 }}
                 className="flex items-start gap-3"
               >
-                <ArrowRight className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
+                <ArrowRight className="h-4 w-4 text-brand mt-1 flex-shrink-0" />
                 <div className="flex-1">
                   {item.title && (
                     <h4 className="font-semibold mb-1">{item.title}</h4>
@@ -139,7 +139,7 @@ function GuideContent({ guide }: { guide: HelpGuide }) {
                 transition={{ delay: idx * 0.05 }}
                 className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border"
               >
-                <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                <Lightbulb className="h-5 w-5 text-brand flex-shrink-0 mt-0.5" />
                 <p className="text-muted-foreground text-sm flex-1">{item.description}</p>
               </motion.div>
             ))}

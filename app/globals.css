@@ -52,6 +52,7 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-scrim: var(--scrim);
+  --color-on-fill: var(--on-fill);
   --color-paper: var(--paper);
   --color-paper-foreground: var(--paper-foreground);
   --color-status-interested: var(--status-interested);
@@ -165,6 +166,7 @@ textarea[aria-label="Message input"]:focus-visible {
   --chart-3: var(--bar-1);
   --chart-4: var(--bar-4);
   --chart-5: var(--plan);
+  --on-fill: #FFFFFF;
   --paper: #FFFFFF;
   --paper-foreground: #111111;
 }
@@ -223,6 +225,7 @@ textarea[aria-label="Message input"]:focus-visible {
   --chart-3: var(--bar-1);
   --chart-4: var(--bar-4);
   --chart-5: var(--plan);
+  --on-fill: #FFFFFF;
   --paper: #FFFFFF;
   --paper-foreground: #111111;
   color-scheme: dark;

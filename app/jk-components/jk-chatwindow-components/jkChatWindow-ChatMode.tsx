@@ -564,7 +564,7 @@ export default function JkCW_ChatMode() {
                                                 setCurrentMode(helpMode);
                                             }
                                         }}
-                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 border border-brand/20 transition-colors"
                                     >
                                         Head over to the help section
                                     </button>
@@ -619,8 +619,8 @@ export default function JkCW_ChatMode() {
                                 <div className={`
                                     max-w-[85%]
                                     ${message.type === 'user' 
-                                        ? 'bg-primary text-white border border-primary rounded-2xl px-4 py-3' 
-                                        : 'bg-card dark:bg-transparent px-6 py-4'
+                                        ? 'bg-primary text-primary-foreground border border-brand rounded-2xl px-4 py-3' 
+                                        : 'bg-transparent px-6 py-4'
                                     }
                                 `}>
                                     {/* File Indicator for User Messages */}
@@ -661,8 +661,8 @@ export default function JkCW_ChatMode() {
                                                             <code className="block bg-muted p-3 rounded-lg overflow-x-auto text-sm font-mono" {...props} />
                                                         ),
                                                     pre: ({...props}: any) => <pre className="bg-muted p-3 rounded-lg overflow-x-auto mb-3 border border-border" {...props} />,
-                                                    blockquote: ({...props}: any) => <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-3" {...props} />,
-                                                    a: ({...props}: any) => <a className="text-primary underline underline-offset-2 hover:text-primary/80" target="_blank" rel="noopener noreferrer" {...props} />,
+                                                    blockquote: ({...props}: any) => <blockquote className="border-l-4 border-brand pl-4 italic text-muted-foreground my-3" {...props} />,
+                                                    a: ({...props}: any) => <a className="text-brand underline underline-offset-2 hover:text-brand/80" target="_blank" rel="noopener noreferrer" {...props} />,
                                                     table: ({...props}: any) => <div className="overflow-x-auto my-4"><table className="min-w-full border-collapse" {...props} /></div>,
                                                     th: ({...props}: any) => <th className="border border-border px-3 py-2 bg-muted font-semibold text-left" {...props} />,
                                                     td: ({...props}: any) => <td className="border border-border px-3 py-2" {...props} />,
@@ -713,7 +713,7 @@ export default function JkCW_ChatMode() {
                                             <>
                                                 {/* Prominent File Downloads Section */}
                                                 {pdfResults.length > 0 && (
-                                                    <div className="bg-background border-2 border-blue-200 rounded-xl p-4 my-2">
+                                                    <div className="bg-background border-2 border-brand/30 rounded-xl p-4 my-2">
                                                         <div className="font-bold text-foreground mb-2 flex items-center gap-2">
                                                              <Image src={mainAssets.logo} alt="JobKompass Logo" width={20} height={20} /> Generated Files - Ready to Download
                                                         </div>
@@ -850,7 +850,7 @@ export default function JkCW_ChatMode() {
                                                             <div key={index} className="pt-1.5 border-t border-border/30 first:border-t-0 first:pt-0">
                                                                 <strong className="text-xs font-semibold text-foreground">{tool.name}</strong>
                                                                 <div className="text-xs mt-0.5 flex items-center gap-1 text-muted-foreground">
-                                                                    <Check className="size-3 text-green-500" /> Completed successfully
+                                                                    <Check className="size-3 text-ok" /> Completed successfully
                                                                 </div>
                                                             </div>
                                                         ))}

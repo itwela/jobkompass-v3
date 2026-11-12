@@ -324,7 +324,7 @@ export default function JkCW_MyJobsMode() {
                 variant={selectedStatus === null ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedStatus(null)}
-                className={`gap-2 ${selectedStatus === null ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 dark:bg-blue-600 dark:text-white dark:border-blue-500 dark:hover:bg-blue-500' : ''}`}
+                className={`gap-2 ${selectedStatus === null ? 'bg-brand/10 text-brand border-brand/30 hover:bg-brand/10    ' : ''}`}
               >
                 All ({allJobs.length})
               </Button>

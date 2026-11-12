@@ -226,7 +226,7 @@ export default function JkSidebar() {
                 </div>
                 <div className="flex items-center gap-2">
                   {newJobsCount > 0 && (
-                    <span className="bg-primary text-white text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
                       {newJobsCount}
                     </span>
                   )}
@@ -247,7 +247,7 @@ export default function JkSidebar() {
                 </div>
                 <div className="flex items-center gap-2">
                   {newDocumentsCount > 0 && (
-                    <span className="bg-primary text-white text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
                       {newDocumentsCount}
                     </span>
                   )}
@@ -282,7 +282,7 @@ export default function JkSidebar() {
               >
                 <div className="flex items-center gap-2">
                   <span>Interview Prep</span>
-                  <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">New</span>
+                  <span className="text-[10px] font-medium text-brand bg-brand/10 px-1.5 py-0.5 rounded">New</span>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -300,7 +300,7 @@ export default function JkSidebar() {
               >
                 <div className="flex items-center gap-2">
                   <span>Performance</span>
-                  <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded">New</span>
+                  <span className="text-[10px] font-medium text-brand bg-brand/10 px-1.5 py-0.5 rounded">New</span>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -433,12 +433,12 @@ export default function JkSidebar() {
                       className="px-2 py-0.5 rounded-full text-xs font-medium"
                       style={
                         subscription?.status === 'canceled'
-                          ? { backgroundColor: 'var(--chart-4)', color: 'white' }
+                          ? { backgroundColor: 'var(--muted)', color: 'var(--muted-foreground)' }
                           : planId === 'pro' || planId === 'pro-annual'
-                          ? { backgroundColor: '#9333ea', color: 'white' } // Purple for Pro
+                          ? { backgroundColor: 'var(--plan)', color: 'var(--plan-foreground)' } // Purple for Pro
                           : planId === 'plus' || planId === 'plus-annual'
-                          ? { backgroundColor: '#3b82f6', color: 'white' }
-                          : { backgroundColor: '#22c55e', color: 'white' }
+                          ? { backgroundColor: 'var(--plan)', color: 'var(--plan-foreground)' }
+                          : { backgroundColor: 'var(--accent)', color: 'var(--foreground)' }
                       }
                     >
                       {subscription?.status === 'canceled' ? (
@@ -523,7 +523,7 @@ export default function JkSidebar() {
                   className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border"
                 >
                   {theme === 'dark' ? (
-                    <Sun className="h-4 w-4 text-amber-300" />
+                    <Sun className="h-4 w-4 text-warn" />
                   ) : (
                     <Moon className="h-4 w-4 text-muted-foreground" />
                   )}

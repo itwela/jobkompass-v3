@@ -115,34 +115,34 @@ function ResumePerformanceCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg bg-green-100 p-3 border border-green-200">
-          <div className="text-2xl font-bold text-green-800">{successRate}%</div>
-          <div className="text-xs text-green-700 mt-0.5">Offer rate</div>
+        <div className="rounded-lg bg-ok/10 p-3 border border-ok/30">
+          <div className="text-2xl font-bold text-ok">{successRate}%</div>
+          <div className="text-xs text-ok mt-0.5">Offer rate</div>
           <div className="text-xs text-muted-foreground mt-1">{stats.offered} offers</div>
         </div>
 
-        <div className="rounded-lg bg-purple-100 p-3 border border-purple-200">
-          <div className="text-2xl font-bold text-purple-800">{interviewRate}%</div>
-          <div className="text-xs text-purple-700 mt-0.5">Interview rate</div>
+        <div className="rounded-lg bg-bar-1/10 p-3 border border-bar-1/30">
+          <div className="text-2xl font-bold text-bar-1">{interviewRate}%</div>
+          <div className="text-xs text-bar-1 mt-0.5">Interview rate</div>
           <div className="text-xs text-muted-foreground mt-1">{stats.interviewing} interviews</div>
         </div>
       </div>
 
       <div className="pt-3 border-t border-border/50 grid grid-cols-4 gap-2 text-xs">
         <div className="text-center">
-          <div className="font-medium text-amber-800">{stats.applied}</div>
+          <div className="font-medium text-warn">{stats.applied}</div>
           <div className="text-muted-foreground">Applied</div>
         </div>
         <div className="text-center">
-          <div className="font-medium text-cyan-800">{stats.callback ?? 0}</div>
+          <div className="font-medium text-brand">{stats.callback ?? 0}</div>
           <div className="text-muted-foreground">Callback</div>
         </div>
         <div className="text-center">
-          <div className="font-medium text-red-800">{stats.rejected}</div>
+          <div className="font-medium text-destructive">{stats.rejected}</div>
           <div className="text-muted-foreground">Rejected</div>
         </div>
         <div className="text-center">
-          <div className="font-medium text-gray-600">{stats.ghosted}</div>
+          <div className="font-medium text-muted-foreground">{stats.ghosted}</div>
           <div className="text-muted-foreground">Ghosted</div>
         </div>
       </div>
@@ -257,7 +257,7 @@ export default function JkCW_PerformanceMode() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center min-h-[60vh] text-center"
           >
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 text-primary mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-brand/10 text-brand mb-6">
               <TrendingUp className="h-10 w-10" />
             </div>
             <h2 className="text-2xl font-semibold mb-2">Unlock Performance</h2>
@@ -289,7 +289,7 @@ export default function JkCW_PerformanceMode() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center min-h-[60vh] text-center"
           >
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 text-primary mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-brand/10 text-brand mb-6">
               <TrendingUp className="h-10 w-10" />
             </div>
             <h2 className="text-2xl font-semibold mb-2">No jobs tracked yet</h2>
@@ -341,10 +341,10 @@ export default function JkCW_PerformanceMode() {
 
         {/* AI Summary Card */}
         <BlurFade delay={0.1} inView={false}>
-          <div className="mb-6 rounded-xl border border-border bg-gradient-to-br from-primary/5 via-primary/3 to-background p-6">
+          <div className="mb-6 rounded-xl border border-border bg-gradient-to-br from-brand/5 via-brand/3 to-background p-6">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-primary/10 p-2.5 flex-shrink-0">
-                <Sparkles className="h-5 w-5 text-primary" />
+              <div className="rounded-lg bg-brand/10 p-2.5 flex-shrink-0">
+                <Sparkles className="h-5 w-5 text-brand" />
               </div>
               <div className="flex-1 min-w-0 overflow-visible">
                 <h2 className="font-semibold text-base mb-2">AI Performance Insights</h2>
@@ -407,7 +407,7 @@ export default function JkCW_PerformanceMode() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="rounded-xl border border-border bg-card p-5">
               <div className="flex items-center justify-between mb-3">
-                <Target className="h-5 w-5 text-primary" />
+                <Target className="h-5 w-5 text-brand" />
                 <span className="text-2xl font-bold text-foreground">{stats.totalJobs}</span>
               </div>
               <div className="text-sm font-medium text-foreground">Total Applications</div>
@@ -416,7 +416,7 @@ export default function JkCW_PerformanceMode() {
 
             <div className="rounded-xl border border-border bg-card p-5">
               <div className="flex items-center justify-between mb-3">
-                <TrendingUp className="h-5 w-5 text-primary" />
+                <TrendingUp className="h-5 w-5 text-brand" />
                 <span className="text-2xl font-bold text-foreground">{overallSuccessRate}%</span>
               </div>
               <div className="text-sm font-medium text-foreground">Offer Rate</div>
@@ -425,7 +425,7 @@ export default function JkCW_PerformanceMode() {
 
             <div className="rounded-xl border border-border bg-card p-5">
               <div className="flex items-center justify-between mb-3">
-                <Award className="h-5 w-5 text-primary" />
+                <Award className="h-5 w-5 text-brand" />
                 <span className="text-2xl font-bold text-foreground">{overallInterviewRate}%</span>
               </div>
               <div className="text-sm font-medium text-foreground">Interview Rate</div>
@@ -446,15 +446,15 @@ export default function JkCW_PerformanceMode() {
                 const count = stats.statusCounts[status.value] || 0;
                 // Bar colors matching My Jobs status badges (softer 200 variants for progress fill)
                 const barColors: Record<string, string> = {
-                  Interested: 'bg-blue-200',
-                  Applied: 'bg-amber-200',
-                  Callback: 'bg-cyan-200',
-                  Interviewing: 'bg-purple-200',
-                  Offered: 'bg-green-200',
-                  Rejected: 'bg-red-200',
-                  Ghosted: 'bg-gray-200',
+                  Interested: 'bg-brand/20',
+                  Applied: 'bg-warn/20',
+                  Callback: 'bg-brand/20',
+                  Interviewing: 'bg-bar-1/20',
+                  Offered: 'bg-ok/20',
+                  Rejected: 'bg-destructive/20',
+                  Ghosted: 'bg-accent',
                 };
-                const barColor = barColors[status.value] ?? 'bg-gray-200';
+                const barColor = barColors[status.value] ?? 'bg-accent';
 
                 return (
                   <StatusBar
