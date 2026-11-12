@@ -22,8 +22,8 @@ const COUNTS = [
 
 export default function JkLandingApp() {
   return (
-    <section className="relative isolate overflow-hidden py-20 sm:py-28" aria-labelledby="app-heading">
-      <JkArt name="waves" fade="y" className="-z-10 opacity-35" />
+    <section className="relative isolate overflow-hidden pb-16 pt-20 sm:pb-[72px] sm:pt-[88px]" aria-labelledby="app-heading">
+      <JkArt name="waves" fade="y" className="-z-10 opacity-20" />
       <LandingContainer>
         <SectionHeading id="app-heading" eyebrow="02 / The app" tone={2} title="Stop losing track of where you applied" lead="Every job, document, and conversation sits in one account, and the chat can read all of it." />
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">

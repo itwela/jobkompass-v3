@@ -20,12 +20,15 @@ interface JkPublicHeaderProps {
   showSignIn?: boolean
   /** Section links in the middle of the bar (landing page). */
   showNav?: boolean
+  /** Sit transparently on top of the hero painting, as the landing design does. */
+  overlay?: boolean
 }
 
 export default function JkPublicHeader({ 
   showPricing = false, 
   showSignIn = true,
   showNav = false,
+  overlay = false,
 }: JkPublicHeaderProps = {}) {
   const { user, isAuthenticated } = useAuth()
   const { planId } = useSubscription()
@@ -46,8 +49,8 @@ export default function JkPublicHeader({
   }
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      <div className="mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8">
+    <nav className={overlay ? "absolute inset-x-0 top-0 z-50 w-full" : "sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70"}>
+      <div className={overlay ? "relative mx-auto flex h-[92px] max-w-[1248px] items-center justify-between px-6" : "mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8"}>
         <Link href="/" className="flex items-end gap-3">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -67,13 +70,13 @@ export default function JkPublicHeader({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="text-xl font-medium tracking-tight"
+            className={overlay ? "text-xl font-bold tracking-[-0.2px] text-on-fill" : "text-xl font-medium tracking-tight"}
           >
             JobKompass
           </motion.span>
         </Link>
         {showNav && (
-          <div className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
+          <div className={overlay ? "absolute left-1/2 hidden -translate-x-1/2 items-center gap-[33px] text-[15px] font-medium text-on-fill/90 lg:flex [&>a:hover]:text-on-fill" : "hidden items-center gap-8 text-sm text-muted-foreground md:flex"}>
             <Link href="/#product" className="transition-colors hover:text-foreground">Product</Link>
             <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
             <Link href="/#cli" className="transition-colors hover:text-foreground">CLI</Link>
@@ -86,6 +89,8 @@ export default function JkPublicHeader({
           transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           className="flex items-center gap-2 sm:gap-4"
         >
+          {!overlay && (
+          <>
           {/* Theme toggle always visible on public header */}
           <Button
             variant="ghost"
@@ -107,6 +112,8 @@ export default function JkPublicHeader({
               )}
             </motion.span>
           </Button>
+          </>
+          )}
 
           {isAuthenticated && user ? (
             <>
@@ -198,13 +205,13 @@ export default function JkPublicHeader({
                   transition={{ duration: 0.5, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
                 >
                   <Link href="/auth">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className={overlay ? "px-3 text-[15px] text-on-fill hover:bg-on-fill/10 hover:text-on-fill" : undefined}>
                       Log in
                     </Button>
                   </Link>
                 </motion.div>
               )}
-              {showNav && <JkGetStartedButton size="default" surface="header" />}
+              {showNav && <JkGetStartedButton size="default" surface="header" className={overlay ? "h-10 px-[26px] text-[15.5px]" : ""} />}
             </>
           )}
         </motion.div>

@@ -40,8 +40,8 @@ function SaveMock() {
 
 function ResumeMock() {
   return (
-    <div className="relative flex h-full items-start gap-3 px-3 pt-4">
-      <JkDocPreview width={150} className="rounded-sm" />
+    <div className="relative flex h-full items-start gap-2.5 px-3 pt-3.5">
+      <JkDocPreview width={143} className="rounded-sm" />
       <ul className="mt-4 min-w-0 flex-1 space-y-1.5">
         {[["Claude Code", "leads"], ["MCP first", "in skills"], ["Projects", "on top"]].map(([a, b]) => (
           <li key={a} className="relative rounded-xl border border-bar-3 bg-background px-2 py-1.5 before:absolute before:-left-3 before:top-1/2 before:h-px before:w-3 before:bg-bar-3">

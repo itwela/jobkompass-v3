@@ -14,7 +14,7 @@ const SESSION: { kind: "cmd" | "ok" | "out"; text: string }[] = [
 export default function JkLandingCli() {
   return (
     <section id="cli" className="relative isolate scroll-mt-24 overflow-hidden border-t border-border bg-card/60 py-20 sm:py-28" aria-labelledby="cli-heading">
-      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-[38%] opacity-55 lg:block"><JkArt name="signal" position="right top" /></div>
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-[31%] opacity-45 lg:block"><JkArt name="signal" position="right top" /></div>
       <LandingContainer>
         <SectionHeading id="cli-heading" eyebrow="04 / Command line" tone={4} title="Let your AI agent run your job search" lead="Your coding agent can already read a posting and write a resume. The jk CLI lets it save the result to your account." />
         <div className="grid gap-8 lg:grid-cols-[1.45fr_1fr] lg:gap-12">

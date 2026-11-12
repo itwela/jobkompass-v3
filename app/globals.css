@@ -52,6 +52,8 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-scrim: var(--scrim);
+  --color-sky-top: var(--sky-top);
+  --color-sky: var(--sky);
   --color-on-fill: var(--on-fill);
   --color-paper: var(--paper);
   --color-paper-foreground: var(--paper-foreground);
@@ -140,6 +142,8 @@ textarea[aria-label="Message input"]:focus-visible {
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(10 18 40 / 0.45);
+  --sky-top: #0B1430;
+  --sky: #11204A;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #0A1228;
   --sidebar-primary: #0A1228;
@@ -199,6 +203,8 @@ textarea[aria-label="Message input"]:focus-visible {
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(4 7 15 / 0.72);
+  --sky-top: #0B1430;
+  --sky: #11204A;
   --sidebar: #0C1530;
   --sidebar-foreground: #F3EEE0;
   --sidebar-primary: #F6F0DF;

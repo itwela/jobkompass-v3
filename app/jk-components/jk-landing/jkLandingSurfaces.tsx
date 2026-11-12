@@ -10,9 +10,9 @@ const SURFACES = [
 
 export default function JkLandingSurfaces() {
   return (
-    <section aria-label="Where JobKompass works" className="relative z-10 -mt-32 sm:-mt-40">
-      <LandingContainer className="max-w-[1352px]">
-        <Reveal className="rounded-modal border border-border-strong bg-background/95 px-6 py-9 backdrop-blur sm:px-12">
+    <section aria-label="Where JobKompass works" className="relative z-10 -mt-10 lg:-mt-[110px]">
+      <LandingContainer className="max-w-[1360px] px-5 sm:px-5">
+        <Reveal className="rounded-[36px] border border-border-strong/80 bg-background px-6 py-9 sm:px-12 lg:h-[200px] lg:py-[38px]">
           <p className="jk-eyebrow text-subtle-foreground">Works where you work</p>
           <ul className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {SURFACES.map((s, i) => (

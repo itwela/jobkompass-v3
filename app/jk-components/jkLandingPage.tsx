@@ -16,7 +16,7 @@ import JkLandingStart from "./jk-landing/jkLandingStart";
 export default function JkLandingPage() {
   return (
     <>
-      <JkPublicHeader showPricing showNav />
+      <JkPublicHeader showPricing showNav overlay />
       <main className="flex min-h-screen flex-col bg-background" role="main">
         <JkLandingHero />
         <JkLandingSurfaces />
