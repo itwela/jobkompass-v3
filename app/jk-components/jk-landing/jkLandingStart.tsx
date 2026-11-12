@@ -16,7 +16,7 @@ export default function JkLandingStart() {
           <h2 id="start-heading" className="text-5xl font-medium leading-[1.08] tracking-tight text-foreground sm:text-7xl">
             Try us on the next job <br className="hidden sm:block" />you apply to.
           </h2>
-          <p className="mt-5 max-w-3xl text-base text-foreground/90 sm:text-lg">
+          <p className="mt-5 max-w-4xl text-base text-foreground/90 sm:text-lg">
             The free plan writes 3 resumes or cover letters a month. Paste one posting and judge the result yourself.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
