@@ -9,6 +9,8 @@ interface JkPaintingLoopProps {
   /** Fragment shader with uniforms u_tex, u_res, u_img, u_t (0..1 through the loop) and u_focus. */
   fragment: string;
   loopSeconds?: number;
+  /** Size of the coordinate space the shader was written in. Defaults to the image's own size. */
+  space?: [number, number];
   className?: string;
 }
 
@@ -17,7 +19,7 @@ interface JkPaintingLoopProps {
  * <img> of the same painting, so if WebGL is missing, the image fails to load,
  * or the visitor prefers reduced motion, the still painting simply stays.
  */
-export default function JkPaintingLoop({ src, fragment, loopSeconds = 10, className }: JkPaintingLoopProps) {
+export default function JkPaintingLoop({ src, fragment, loopSeconds = 10, space, className }: JkPaintingLoopProps) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function JkPaintingLoop({ src, fragment, loopSeconds = 10, classN
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = (n: string) => gl.getUniformLocation(program, n);
 
+    const [spaceW, spaceH] = space ?? [undefined, undefined];
     let ready = false;
     let visible = true;
     let raf = 0;
@@ -66,7 +69,9 @@ export default function JkPaintingLoop({ src, fragment, loopSeconds = 10, classN
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
-      gl.uniform2f(U("u_img"), img.naturalWidth, img.naturalHeight);
+      // The shader addresses the painting in its authored pixel space; the texture
+      // itself is sampled normalised, so its real resolution does not matter.
+      gl.uniform2f(U("u_img"), spaceW ?? img.naturalWidth, spaceH ?? img.naturalHeight);
       ready = true;
       cv.dataset.ready = "true";
     };
@@ -99,7 +104,8 @@ export default function JkPaintingLoop({ src, fragment, loopSeconds = 10, classN
       io.disconnect();
       img.onload = null;
     };
-  }, [src, fragment, loopSeconds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, fragment, loopSeconds, space?.[0], space?.[1]]);
 
   // Invisible until the first frame is drawable, so the <img> underneath shows first.
   return <canvas ref={ref} aria-hidden className={cn("pointer-events-none opacity-0 transition-opacity duration-700 data-[ready=true]:opacity-100", className)} />;

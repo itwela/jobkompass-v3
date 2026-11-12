@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import JkGetStartedButton from "../jkGetStartedButton";
 import JkPaintingLoop from "../jkPaintingLoop";
-import { HERO_LOOP_FRAGMENT, HERO_LOOP_SECONDS } from "./jkHeroLoopShader";
+import { HERO_LOOP_FRAGMENT, HERO_LOOP_SECONDS, HERO_LOOP_SPACE } from "./jkHeroLoopShader";
 
 /**
  * Hero, measured from the v4.5 frame (1440 x 1100): a 290px sky band, then the
@@ -65,7 +65,7 @@ export default function JkLandingHero() {
         <img src="/images/v4/hero-night.webp" alt="" fetchPriority="high" draggable={false} className="absolute inset-0 hidden size-full select-none object-cover dark:block" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/v4/hero-day.webp" alt="" draggable={false} className="absolute inset-0 block size-full select-none object-cover dark:hidden" />
-        <JkPaintingLoop src="/images/v4/hero-night.webp" fragment={HERO_LOOP_FRAGMENT} loopSeconds={HERO_LOOP_SECONDS} className="absolute inset-0 hidden size-full dark:block" />
+        <JkPaintingLoop src="/images/v4/hero-night.webp" fragment={HERO_LOOP_FRAGMENT} loopSeconds={HERO_LOOP_SECONDS} space={HERO_LOOP_SPACE} className="absolute inset-0 hidden size-full dark:block" />
         <div className="absolute inset-x-0 top-0 h-[150px] bg-gradient-to-b from-sky to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-[200px] bg-gradient-to-b from-transparent to-background" />
       </div>

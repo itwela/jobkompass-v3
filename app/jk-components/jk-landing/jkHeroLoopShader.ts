@@ -2,6 +2,8 @@
 // Coordinates are in pixels of the 1672 x 941 night painting. Every motion completes a whole
 // number of cycles per loop, so the last frame equals the first.
 export const HERO_LOOP_SECONDS = 10;
+/** The pixel space every coordinate below is written in. */
+export const HERO_LOOP_SPACE: [number, number] = [1672, 941];
 
 export const HERO_LOOP_FRAGMENT = `precision highp float;
 uniform sampler2D u_tex; uniform vec2 u_res; uniform vec2 u_img; uniform float u_t; uniform float u_focus;
