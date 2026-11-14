@@ -13,6 +13,7 @@ const ALLOWLIST: string[] = [
   "app/global-error.tsx", // renders without the stylesheet
   "app/jk-icons/chatBubble1.tsx", // third-party SVG art
   "app/jk-icons/chatBubble2.tsx",
+  "app/jk-icons/googleG.tsx", // Google brand mark
 ];
 
 const REQUIRED = [
