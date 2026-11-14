@@ -1,16 +1,33 @@
 'use client'
 
+/**
+ * The app shell. Desktop (lg+): fixed 264px rail (jkSIdebar.tsx) + a content surface that
+ * scrolls on its own. Below lg: sticky phone header, full-screen menu and bottom tab bar
+ * (jk-app/jkAppMobile.tsx).
+ *
+ * Every mode renders inside <JkChatWindow/>, wrapped in a [data-enter] surface keyed by mode,
+ * so the shared entrance (JkEnter + .jk-enter / .jk-stagger) replays on every switch.
+ *
+ * CSS var for screens: --jk-tabbar-h on the shell root = height of the phone tab bar (0 on
+ * desktop). Fixed bottom UI uses `bottom: calc(var(--jk-tabbar-h) + …)`.
+ */
 import JkInputSection from "./jkInputSection";
 import JkChatWindow from "./jkChatWindow";
-import JkSidebar from "./jkSIdebar";
-import JkConsoleHeader from "./jkConsole-Header";
+import JkSidebar, { useJkOpenSearch } from "./jkSIdebar";
 import JkFileUploadModal from "./jkFileUploadModal";
-import { useState, useCallback, useEffect } from "react";
+import JkEnter from "./jkEnter";
+import JkSearchModal from "./jkSearchModal";
+import JkUpgradeModal from "./jkUpgradeModal";
+import JkChatThreadMenu from "./jk-app/jkChatThreadMenu";
+import { JkAppMobileHeader, JkAppMobileMenu, JkAppTabBar } from "./jk-app/jkAppMobile";
+import { JK_TOP_LEVEL } from "./jk-app/jkAppNav";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 
 export default function JkConsole() {
-    const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [menuOpen, setMenuOpen] = useState(false)
     const searchParams = useSearchParams()
     const {
         currentMode,
@@ -22,9 +39,22 @@ export default function JkConsole() {
         setCurrentMode,
         allModes
     } = useJobKompassChatWindow()
+    const { upgradeModal, setUpgradeModal } = useFeatureAccess()
+    const { searchOpen, setSearchOpen, openSearch } = useJkOpenSearch(setUpgradeModal)
 
     // Only show input in chat mode
     const shouldShowInput = currentMode.id === '/chat'
+
+    // Phone back arrow returns to the last of Jobs / Docs / Chat the person was on.
+    const lastTop = useRef<string>('/chat')
+    useEffect(() => {
+        if (JK_TOP_LEVEL.includes(currentMode.id)) lastTop.current = currentMode.id
+    }, [currentMode.id])
+    const goBack = useCallback(() => {
+        const target = allModes.find(m => m.id === lastTop.current)
+        if (target) setCurrentMode(target)
+    }, [allModes, setCurrentMode])
+    const closeMenu = useCallback(() => setMenuOpen(false), [])
 
     // Land in a specific mode on load, e.g. after a redirect like the Gmail
     // OAuth callback (/app?mode=settings&gmail_connected=1)
@@ -42,7 +72,6 @@ export default function JkConsole() {
         setDroppedFile(file);
         setFileName(file.name);
         setIsFileMode(true);
-        // Switch to file mode
         const fileMode = allModes.find(mode => mode.id === '/file');
         if (fileMode) {
             setCurrentMode(fileMode);
@@ -50,40 +79,63 @@ export default function JkConsole() {
     }, [setDroppedFile, setFileName, setIsFileMode, setCurrentMode, allModes]);
 
     return (
-        <div className="flex h-screen w-full bg-background">
-            {/* Desktop Sidebar - Using JkSidebar component */}
-            <aside className="hidden lg:flex">
+        <div className="jk-app-shell flex h-dvh w-full overflow-hidden bg-background">
+            <JkEnter />
+
+            {/* Desktop rail: fixed, never scrolls with the content */}
+            <aside className="hidden h-full shrink-0 lg:flex">
                 <JkSidebar />
             </aside>
 
-            {/* Main Content Area */}
-            <main className="flex-1 flex flex-col min-w-0 bg-transparent">
-                {/* Headers (Desktop & Mobile) */}
-                <JkConsoleHeader sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+            {/* Content surface */}
+            <main className="relative flex min-w-0 flex-1 flex-col bg-background">
+                <JkAppMobileHeader
+                    onBack={goBack}
+                    onMenu={() => setMenuOpen(true)}
+                    onSearch={openSearch}
+                    menuOpen={menuOpen}
+                    extra={<JkChatThreadMenu />}
+                />
 
-                {/* Chat Window */}
-                <div className="flex-1 overflow-hidden flex flex-col relative">
-                    {/* File Upload Modal - Positioned relative to this container */}
+                {/* Desktop: thread options float top-right (the frames have no top bar) */}
+                <div className="absolute right-5 top-4 z-20 hidden lg:block">
+                    <JkChatThreadMenu />
+                </div>
+
+                <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[var(--jk-tabbar-h)]">
                     <JkFileUploadModal
                         isOpen={isFileModalOpen}
                         onClose={() => setIsFileModalOpen(false)}
                         onFileSelect={handleFileSelect}
                     />
-                    <JkChatWindow />
-              
-                    {/* Input Section - Only show in home and chat modes */}
-                    {shouldShowInput && (
-                    <div className="bg-transparent px-6 pt-2 translate-y-[-20px] fixed bottom-0 place-self-center w-full max-w-3xl">
-                        <div className="max-w-3xl mx-auto w-full">
-                            <JkInputSection />
+                    {/* Keyed by mode: the surface remounts and its entrance replays on every switch. */}
+                    <div key={currentMode.id} data-enter className="jk-stagger flex min-h-0 flex-1 flex-col">
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <JkChatWindow />
                         </div>
                     </div>
+
+                    {shouldShowInput && (
+                        <div className="fixed bottom-[calc(var(--jk-tabbar-h)+20px)] w-full max-w-3xl place-self-center bg-transparent px-6 pt-2">
+                            <div className="mx-auto w-full max-w-3xl">
+                                <JkInputSection />
+                            </div>
+                        </div>
                     )}
-              
                 </div>
-
-
             </main>
+
+            <JkAppTabBar onMore={() => setMenuOpen(true)} moreOpen={menuOpen} />
+            <JkAppMobileMenu open={menuOpen} onClose={closeMenu} />
+
+            <JkSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+            <JkUpgradeModal
+                isOpen={upgradeModal.isOpen}
+                onClose={() => setUpgradeModal((prev) => ({ ...prev, isOpen: false }))}
+                feature={upgradeModal.feature}
+                currentLimit={upgradeModal.currentLimit}
+                currentPlan={upgradeModal.currentPlan}
+            />
         </div>
     )
 }
