@@ -18,6 +18,7 @@ import JkFileUploadModal from "./jkFileUploadModal";
 import JkEnter from "./jkEnter";
 import JkSearchModal from "./jkSearchModal";
 import JkUpgradeModal from "./jkUpgradeModal";
+import { JkSettingsRail } from "./jk-chatwindow-components/jkChatWindow-SettingsMode";
 import JkChatThreadMenu from "./jk-app/jkChatThreadMenu";
 import { JkAppMobileHeader, JkAppMobileMenu, JkAppTabBar } from "./jk-app/jkAppMobile";
 import { JK_TOP_LEVEL } from "./jk-app/jkAppNav";
@@ -84,7 +85,8 @@ export default function JkConsole() {
 
             {/* Desktop rail: fixed, never scrolls with the content */}
             <aside className="hidden h-full shrink-0 lg:flex">
-                <JkSidebar />
+                {/* Settings brings its own rail: Back to My Jobs + section nav (D13) */}
+                {currentMode.id === '/settings' ? <JkSettingsRail key="settings-rail" /> : <JkSidebar />}
             </aside>
 
             {/* Content surface */}

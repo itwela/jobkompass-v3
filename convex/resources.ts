@@ -26,7 +26,7 @@ export const add = mutation({
   args: {
     type: v.string(),
     title: v.string(),
-    url: v.string(),
+    url: v.optional(v.string()),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -56,7 +56,7 @@ export const update = mutation({
     id: v.id("resources"),
     type: v.string(),
     title: v.string(),
-    url: v.string(),
+    url: v.optional(v.string()),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -117,7 +117,7 @@ export const addInternal = internalMutation({
     userId: v.string(), // Required: convex_user_id
     type: v.string(),
     title: v.string(),
-    url: v.string(),
+    url: v.optional(v.string()),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -142,7 +142,7 @@ export const addForAgent = mutation({
     userId: v.string(), // Required: convex_user_id
     type: v.string(),
     title: v.string(),
-    url: v.string(),
+    url: v.optional(v.string()),
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),

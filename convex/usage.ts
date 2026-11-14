@@ -1,4 +1,5 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { planRank } from "./plans";
@@ -8,26 +9,28 @@ import { planRank } from "./plans";
  * rank to the resume export route. Read-only: job-limit behavior below is
  * untouched by this.
  */
+/** The signed-in user's plan rank (0 when signed out). Shared by queries and mutations. */
+export async function planRankForUser(ctx: QueryCtx, userId: Id<"users"> | null) {
+  if (!userId) return 0;
+  const user = await ctx.db.get(userId);
+  if (!user) return 0;
+  const convexUserId = (user as any).convex_user_id || userId;
+  let subscription = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_user", (q) => q.eq("userId", convexUserId))
+    .first();
+  if (!subscription && convexUserId !== userId) {
+    subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+  }
+  return planRank(subscription);
+}
+
 export const currentPlanRank = query({
   args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return 0;
-    const user = await ctx.db.get(userId);
-    if (!user) return 0;
-    const convexUserId = (user as any).convex_user_id || userId;
-    let subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", (q) => q.eq("userId", convexUserId))
-      .first();
-    if (!subscription && convexUserId !== userId) {
-      subscription = await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
-    }
-    return planRank(subscription);
-  },
+  handler: async (ctx) => planRankForUser(ctx, await getAuthUserId(ctx)),
 });
 
 // Get user's usage stats for feature gating

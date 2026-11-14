@@ -94,7 +94,7 @@ const documentsTables = {
     username: v.optional(v.string()), // Username for user identification
     type: v.string(), // 'resource', 'link', etc.
     title: v.string(),
-    url: v.string(),
+    url: v.optional(v.string()), // Optional: a "note" entry has no URL
     description: v.optional(v.string()),
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
@@ -243,6 +243,7 @@ const schema = defineSchema({
     isAnonymous: v.optional(v.boolean()),
     username: v.optional(v.string()), // Username field (optional for backward compatibility)
     resumePreferences: v.optional(v.array(v.string())), // User's resume generation preferences
+    defaultTemplate: v.optional(v.string()), // Resume template id used when none is chosen (jake | joseph | mar)
     lastSignInAt: v.optional(v.number()), // Timestamp of last sign-in
     convex_user_id: v.optional(v.string()), // Convex user ID stored as string for subscription matching
   })

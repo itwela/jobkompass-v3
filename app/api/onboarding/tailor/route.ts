@@ -48,7 +48,11 @@ export async function POST(request: NextRequest) {
     })) as ResumeContent | null;
     if (!tailored) return NextResponse.json({ error: "The resume could not be written this time. Try again." }, { status: 502 });
 
-    const templateId = base.template && canUseResumeTemplate(base.template, rank as PlanRank) ? base.template : "jake";
+    // The default template from Settings wins, then the base resume's own template, then Jake.
+    // getDefaultTemplate already drops a template above the user's plan.
+    const preferred = await convex.query(api.auth.getDefaultTemplate, {}).catch(() => null);
+    const templateId = preferred
+      ?? (base.template && canUseResumeTemplate(base.template, rank as PlanRank) ? base.template : "jake");
     const pdf = await compileResumePdf(tailored, templateId);
     const uploadUrl = await convex.mutation(api.documents.generateUploadUrl, {});
     const upload = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": "application/pdf" }, body: new Uint8Array(pdf) });

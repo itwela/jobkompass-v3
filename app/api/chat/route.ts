@@ -1,3 +1,4 @@
+import { getResumeTemplateById } from '@/lib/templates';
 import {
   Agent,
   AgentInputItem,
@@ -135,14 +136,19 @@ export async function POST(request: NextRequest) {
     const hasContextAttachments = contextResumeIds?.length || contextJobIds?.length;
     // "jake" is the only template in active use, so default to it instead of
     // blocking resume creation on a manual Context panel selection.
-    const effectiveResumeTemplateId = contextResumeTemplateId || 'jake';
+    // Order: a template picked in the Context panel, then the default from Settings, then Jake.
+    const userDefaultTemplateId = contextResumeTemplateId
+      ? null
+      : await convexClient.query(api.auth.getDefaultTemplate, {}).catch(() => null);
+    const effectiveResumeTemplateId = contextResumeTemplateId || userDefaultTemplateId || 'jake';
+    const effectiveTemplateName = getResumeTemplateById(effectiveResumeTemplateId)?.name ?? 'JobKompass Jake';
 
     // Build context-aware instructions
     let contextInstructions = isFirstTurn ? jobKompassInstructions : jobKompassInstructionsMinimal;
 
     // Resume template preference - CRITICAL for resume creation
     contextInstructions += "\n\n[[RESUME_TEMPLATE_PREFERENCE]]";
-    contextInstructions += `\nThe resume template is "${effectiveResumeTemplateId}" (JobKompass Jake). When creating resumes, you MUST call createResumeJakeTemplate with templateId: "${effectiveResumeTemplateId}". Do not ask the user to open the Context panel or select a template first - it already defaults to Jake.`;
+    contextInstructions += `\nThe resume template is "${effectiveResumeTemplateId}" (${effectiveTemplateName}). When creating resumes, you MUST call createResumeJakeTemplate with templateId: "${effectiveResumeTemplateId}". Do not ask the user to open the Context panel or select a template first - it is already set.`;
     
     if (hasContextAttachments) {
       contextInstructions += "\n\n[[CONTEXT_ATTACHMENTS]]";

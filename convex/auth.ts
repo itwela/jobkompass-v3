@@ -7,6 +7,9 @@ import { ConvexError, v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { ResendOTPPasswordReset } from "./authPasswordReset";
 import { decideLink, EMAIL_TAKEN_MESSAGE } from "./authLinking";
+import { planRankForUser } from "./usage";
+import { canUseResumeTemplate, isValidResumeTemplateId, resolveResumeTemplateId } from "../lib/templates";
+import type { PlanRank } from "./plans";
 
 /** Where OAuth may send people back to: the live site, or a local dev server. */
 function allowedRedirect(redirectTo: string): string {
@@ -217,6 +220,37 @@ export const updateResumePreferences = mutation({
       resumePreferences: args.preferences,
     });
 
+    return { success: true };
+  },
+});
+
+/**
+ * The resume template used whenever none is chosen (chat tool, onboarding tailor, new
+ * resumes in the editor). Returns null when unset. A stored template above the user's
+ * current plan is ignored (returns null) so a lapsed plan falls back to the app default.
+ */
+export const getDefaultTemplate = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    const stored = (user as any)?.defaultTemplate as string | undefined;
+    if (!stored || !isValidResumeTemplateId(stored)) return null;
+    const rank = (await planRankForUser(ctx, userId)) as PlanRank;
+    return canUseResumeTemplate(stored, rank) ? resolveResumeTemplateId(stored) : null;
+  },
+});
+
+export const setDefaultTemplate = mutation({
+  args: { templateId: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    if (!isValidResumeTemplateId(args.templateId)) throw new ConvexError("Unknown template");
+    const rank = (await planRankForUser(ctx, userId)) as PlanRank;
+    if (!canUseResumeTemplate(args.templateId, rank)) throw new ConvexError("That template is not on your plan");
+    await ctx.db.patch(userId, { defaultTemplate: resolveResumeTemplateId(args.templateId) } as any);
     return { success: true };
   },
 });

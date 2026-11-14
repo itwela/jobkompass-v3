@@ -122,7 +122,7 @@ export default function JkPublicHeader({
           {isAuthenticated && user ? (
             <>
               {showPricing && (
-                <Link href="/pricing">
+                <Link href="/pricing" className="max-sm:hidden">
                   <Button variant="ghost" size="sm">
                     Pricing
                   </Button>
@@ -132,7 +132,7 @@ export default function JkPublicHeader({
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
                     <User className="h-4 w-4" />
-                    <span className="truncate max-w-[120px]">{user.name || user.email}</span>
+                    <span className="truncate max-w-[120px] max-[380px]:max-w-[56px]">{user.name || user.email}</span>
                     {planId && planId !== 'free' && (
                       <span className={`px-1.5 py-0.5 rounded-lg text-xs font-medium ${
                         'bg-plan text-plan-foreground'

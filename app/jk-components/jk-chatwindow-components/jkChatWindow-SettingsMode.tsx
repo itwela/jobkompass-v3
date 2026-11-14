@@ -1,1020 +1,456 @@
 'use client'
 
-import { useState, useEffect } from "react"
+/**
+ * D13 / M11 Settings. Five sections on one scrolling page: Account, Plan and usage, Resume
+ * preferences (default template + writing preferences), Chrome extension, CLI keys.
+ * On desktop the app rail is swapped for JkSettingsRail (Back to My Jobs + section nav that
+ * follows the scroll); jkConsole.tsx renders it while this mode is open.
+ */
+import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
+import Link from "next/link"
+import { useAction, useMutation, useQuery } from "convex/react"
+import { useAuthActions } from "@convex-dev/auth/react"
+import { ChevronLeft, Copy, KeyRound, X } from "lucide-react"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
-import { useAction, useMutation, useQuery } from "convex/react"
-import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
-import { User, Mail, AtSign, CreditCard, Save, FileText, X, Plus, Edit2, Check, Key, Copy, RefreshCw, Eye, EyeOff, Puzzle, Terminal, AlertTriangle, Pause, Play } from "lucide-react"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
+import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/lib/toast"
-import Link from "next/link"
-import { trackUpgradeClicked } from "@/lib/analytics/client"
-import { useSearchParams } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { mainAssets } from "@/app/lib/constants"
+import { RESUME_TEMPLATES, canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates"
+import { rankLabel, RANK_PLUS, RANK_PRO, type PlanRank } from "@/convex/plans"
+import { basePlanId, planName } from "@/lib/upgradeOffer"
+import { plans } from "../jkPricing"
+import JkAppPageHeader from "../jk-app/jkAppPageHeader"
+import JkSectionLabel from "../jk-app/jkSectionLabel"
+import { useJkAppNav } from "../jk-app/jkAppNav"
+import { JkNavRow, JkUserChipBody } from "../jkSIdebar"
+import { JkFieldLabel, jkFieldCls } from "../jkField"
+import JkUpgradeModal from "../jkUpgradeModal"
+import JkArt from "../jkArt"
+import { JkDefaultTemplateProbe } from "../jkDefaultTemplate"
 
-const GMAIL_ERROR_MESSAGES: Record<string, string> = {
-  missing_code: "Google didn't return an authorization code. Please try connecting again.",
-  no_refresh_token: "Google didn't grant offline access. Try disconnecting the app's access in your Google Account settings, then reconnect.",
-  no_email: "Couldn't read your Gmail address from Google. Please try again.",
-  config_error: "Gmail connection isn't configured on the server yet.",
-  no_session: "Your JobKompass session wasn't recognized when Google redirected back. Please make sure you're signed in, then try connecting again.",
-  token_exchange_failed: "Google's token exchange failed.",
-  connect_failed: "Saving the connected account failed.",
+export const JK_SETTINGS_SECTIONS = [
+  { id: "account", label: "Account" },
+  { id: "plan", label: "Plan and usage" },
+  { id: "resume", label: "Resume preferences" },
+  { id: "extension", label: "Chrome extension" },
+  { id: "cli", label: "CLI keys" },
+] as const
+
+const SCROLL_ID = "jk-settings-scroll"
+const sectionDomId = (id: string) => `jk-settings-${id}`
+
+/** Which section is in view: the last one whose top has passed the upper third of the scroller. */
+function useActiveSection() {
+  const [active, setActive] = useState<string>(JK_SETTINGS_SECTIONS[0].id)
+  useEffect(() => {
+    let scroller: HTMLElement | null = null
+    let raf = 0
+    const onScroll = () => {
+      if (!scroller) return
+      const top = scroller.getBoundingClientRect().top + scroller.clientHeight / 3
+      let current: string = JK_SETTINGS_SECTIONS[0].id
+      for (const s of JK_SETTINGS_SECTIONS) {
+        const el = document.getElementById(sectionDomId(s.id))
+        if (el && el.getBoundingClientRect().top <= top) current = s.id
+      }
+      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4) current = JK_SETTINGS_SECTIONS[JK_SETTINGS_SECTIONS.length - 1].id
+      setActive(current)
+    }
+    // The content mounts beside the rail; wait for its scroller if it is not there yet.
+    const attach = () => {
+      scroller = document.getElementById(SCROLL_ID)
+      if (!scroller) { raf = requestAnimationFrame(attach); return }
+      onScroll()
+      scroller.addEventListener("scroll", onScroll, { passive: true })
+    }
+    attach()
+    return () => { cancelAnimationFrame(raf); scroller?.removeEventListener("scroll", onScroll) }
+  }, [])
+  return active
+}
+
+const goToSection = (id: string) =>
+  document.getElementById(sectionDomId(id))?.scrollIntoView({ behavior: "smooth", block: "start" })
+
+/** Desktop rail while Settings is open (D13): back, section nav, sign out, user chip. */
+export function JkSettingsRail() {
+  const nav = useJkAppNav()
+  const active = useActiveSection()
+  const { signOut } = useAuthActions()
+  const { setCurrentThreadId } = useJobKompassChatWindow()
+  return (
+    <div className="relative flex h-full w-[264px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
+      <div className="mt-[22px] flex h-[30px] shrink-0 items-center pl-[22px]">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="JobKompass home">
+          <Image src={mainAssets.logo} alt="" width={32} height={30} className="h-[30px] w-8 object-contain" />
+          <span className="text-[18px] font-bold leading-[21px] tracking-[-0.2px] text-foreground">JobKompass</span>
+        </Link>
+      </div>
+      <div className="mt-8 px-3.5">
+        <button type="button" onClick={() => nav.go("/my-jobs")}
+          className="flex h-[38px] w-full items-center gap-3.5 rounded-xl border border-input px-4 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+          <ChevronLeft className="size-4" strokeWidth={1.8} />Back to My Jobs
+        </button>
+      </div>
+      <JkSectionLabel as="h2" className="mt-8 px-[26px]">Settings</JkSectionLabel>
+      <nav aria-label="Settings sections" className="mt-3 flex flex-col gap-0.5 px-3.5">
+        {JK_SETTINGS_SECTIONS.map((s) => (
+          <JkNavRow key={s.id} label={s.label} count={null} tick="var(--plan)" active={active === s.id} onClick={() => goToSection(s.id)} />
+        ))}
+      </nav>
+      <div className="mt-auto px-[26px] pb-5">
+        <button type="button" onClick={async () => { setCurrentThreadId(null); await signOut() }} className="text-[14px] text-destructive hover:underline">Sign out</button>
+      </div>
+      <div className="mx-[18px] shrink-0 border-t border-border pb-[22px] pt-[21px]">
+        <span className="block pl-[6px] pr-[3px]"><JkUserChipBody /></span>
+      </div>
+    </div>
+  )
+}
+
+function JkSettingsSection({ id, title, sub, action, children, index, className }: {
+  id: string; title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode; index: number; className?: string
+}) {
+  return (
+    <section id={sectionDomId(id)} aria-labelledby={`${sectionDomId(id)}-h`}
+      className={cn("jk-enter scroll-mt-6 border-t border-border py-7 first:border-t-0 first:pt-0 lg:py-[30px]", className)}
+      style={{ "--i": index + 2 } as React.CSSProperties}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 id={`${sectionDomId(id)}-h`} className="text-[22px] font-medium leading-[26px] tracking-[-0.3px] text-foreground lg:text-[18px] lg:leading-[21px] lg:tracking-[-0.2px]">{title}</h2>
+          {sub && <p className="mt-1.5 text-[13px] leading-[15px] text-muted-foreground max-lg:hidden">{sub}</p>}
+        </div>
+        {action}
+      </div>
+      <div className="mt-5 lg:mt-[17px]">{children}</div>
+    </section>
+  )
+}
+
+function JkUsageBar({ label, value, ratio, tone }: { label: string; value: string; ratio: number; tone: string }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-[10px] font-medium uppercase tracking-[1.2px] text-muted-foreground max-lg:text-[11px] max-lg:tracking-[2.5px]">{label}</span>
+        <span className="font-mono text-[12px] font-medium text-foreground max-lg:text-[13px]">{value}</span>
+      </div>
+      <div className="mt-2.5 h-[6px] w-full overflow-hidden rounded-full bg-accent">
+        <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.max(0, Math.min(1, ratio)) * 100}%`, background: tone }} />
+      </div>
+    </div>
+  )
+}
+
+const TEMPLATE_BLURB: Record<string, string> = {
+  jake: "Clean single column",
+  joseph: "Calibri, core competencies",
+  mar: "Times, early career",
+}
+
+const fmtDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+const fmtDate = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+function fmtUsed(ms?: number) {
+  if (!ms) return "never used"
+  const today = new Date(); const d = new Date(ms)
+  return d.toDateString() === today.toDateString() ? "last used today" : `last used ${fmtDay(ms)}`
+}
+/** jkx_live_4f9a…c21e with a dotted middle, as the frame shows it. */
+const maskKey = (key: string) => key.length <= 16 ? key : `${key.slice(0, 13)}${"·".repeat(16)}${key.slice(-4)}`
+
+async function copy(text: string, what: string) {
+  try { await navigator.clipboard.writeText(text); toast.success("Copied", { description: `${what} copied`, duration: 2000 }) }
+  catch { toast.error("Copy failed", { description: "Could not copy to the clipboard", duration: 2000 }) }
 }
 
 export default function JkCW_SettingsMode() {
-  const searchParams = useSearchParams()
-  const gmailConnected = searchParams.get("gmail_connected")
-  const gmailError = searchParams.get("gmail_error")
-  const gmailErrorDetail = searchParams.get("detail")
   const { user, isAuthenticated } = useAuth()
-  const { subscription, planId, isFree, isStarter, isPlus, isPro, isPlusAnnual, isProAnnual } = useSubscription()
+  const { subscription, planId, rank } = useSubscription()
   const { getUsageStats } = useFeatureAccess()
   const usage = getUsageStats()
+  const { signOut } = useAuthActions()
+  const { setCurrentThreadId } = useJobKompassChatWindow()
+
   const updateProfile = useMutation(api.auth.updateUserProfile)
+  const resumePreferences = useQuery(api.auth.getResumePreferences, isAuthenticated ? {} : "skip")
   const updateResumePreferences = useMutation(api.auth.updateResumePreferences)
-  const resumePreferences = useQuery(api.auth.getResumePreferences)
-  
-  // Extension API key
+  const [defaultTemplate, setDefaultTemplateState] = useState<string | null>(null)
+  const setDefaultTemplate = useMutation(api.auth.setDefaultTemplate)
+
   const extensionApiKey = useQuery(api.extensionApiKeys.get, isAuthenticated ? {} : "skip")
   const generateApiKey = useMutation(api.extensionApiKeys.generate)
   const revokeApiKey = useMutation(api.extensionApiKeys.revoke)
 
-  // CLI / agent keys (hashed server-side — plaintext is shown once, at creation)
   const cliKeys = useQuery(api.agent.keys.listMine, isAuthenticated ? {} : "skip")
   const generateCliKey = useAction(api.agent.keys.generateMine)
   const revokeCliKey = useMutation(api.agent.keys.revokeMine)
-  const [cliKeyName, setCliKeyName] = useState("")
+
+  const [upgrade, setUpgrade] = useState<{ feature: string; requiredPlan?: "plus" | "pro" } | null>(null)
+  const [profile, setProfile] = useState({ name: "", username: "", email: "" })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [newPref, setNewPref] = useState("")
+  const [cliName, setCliName] = useState("")
+  const [cliOpen, setCliOpen] = useState(false)
   const [freshCliKey, setFreshCliKey] = useState<string | null>(null)
-  const [isGeneratingCliKey, setIsGeneratingCliKey] = useState(false)
-  const [revokingCliKeyId, setRevokingCliKeyId] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
-  // Gmail accounts
-  const gmailAccounts = useQuery(api.emailAccounts.list, isAuthenticated ? {} : "skip")
-  const disconnectGmailAccount = useMutation(api.emailAccounts.disconnect)
-  const setGmailAccountPaused = useMutation(api.emailAccounts.setPaused)
-  const [isGeneratingKey, setIsGeneratingKey] = useState(false)
-  const [isRevokingKey, setIsRevokingKey] = useState(false)
-  const [showApiKey, setShowApiKey] = useState(false)
-
-  const [name, setName] = useState(user?.name || "")
-  const [email, setEmail] = useState(user?.email || "")
-  const [username, setUsername] = useState(user?.username || "")
-  const [preferences, setPreferences] = useState<string[]>([])
-  const [newPreference, setNewPreference] = useState("")
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editingText, setEditingText] = useState("")
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  
-  // Update local state when user data changes
   useEffect(() => {
-    if (user) {
-      setName(user.name || "")
-      setEmail(user.email || "")
-      setUsername(user.username || "")
-    }
+    if (user) setProfile({ name: user.name || "", username: user.username || "", email: user.email || "" })
   }, [user])
 
-  // Update preferences when they load
-  useEffect(() => {
-    if (resumePreferences) {
-      setPreferences(resumePreferences)
-    }
-  }, [resumePreferences])
+  const dirty = !!user && (profile.name !== (user.name || "") || profile.username !== (user.username || "") || profile.email !== (user.email || ""))
+  const prefs: string[] = resumePreferences ?? []
+  const effectiveDefault = defaultTemplate ?? "jake"
+  const base = basePlanId(planId)
+  const paid = base !== "free" && rank > 0
+  const isAnnualPlan = (planId || "").toLowerCase().endsWith("-annual")
 
-  const handleSave = async () => {
-    if (!user) return
-    
-    setIsSaving(true)
-    setSaveMessage(null)
-    
+  const billingLine = useMemo(() => {
+    if (!paid) return "No card on file. Upgrade any time."
+    const p = plans.find((x) => x.id === base)
+    const price = base === "starter" ? `${p?.oneTimePrice ?? ""} for 7 days` : isAnnualPlan ? `${p?.pricing?.annual.price} a year` : `${p?.pricing?.monthly.price} a month`
+    const end = subscription?.currentPeriodEnd as number | undefined
+    const trialEnd = subscription?.trialEnd as number | undefined
+    if (trialEnd && trialEnd > Date.now()) return `${price} · trial ends ${fmtDate(trialEnd)}`
+    if (!end) return price
+    return `${price} · ${subscription?.cancelAtPeriodEnd || subscription?.status === "canceled" ? "ends" : base === "starter" ? "ends" : "renews"} ${fmtDate(end)}`
+  }, [paid, base, isAnnualPlan, subscription])
+
+  const saveProfile = async () => {
+    setSavingProfile(true)
     try {
-      await updateProfile({
-        name: name.trim() || undefined,
-        email: email.trim() || undefined,
-        username: username.trim() || undefined,
-      })
-      setSaveMessage({ type: 'success', text: 'Profile updated successfully' })
-      setTimeout(() => setSaveMessage(null), 3000)
-    } catch (error) {
-      setSaveMessage({ 
-        type: 'error', 
-        text: error instanceof Error ? error.message : 'Failed to update profile' 
-      })
-    } finally {
-      setIsSaving(false)
-    }
+      await updateProfile({ name: profile.name.trim() || undefined, username: profile.username.trim() || undefined, email: profile.email.trim() || undefined })
+      toast.success("Saved", { description: "Your account details are updated", duration: 2000 })
+    } catch (e) {
+      toast.error("Not saved", { description: e instanceof Error ? e.message.replace(/^.*Error: /, "") : "Try again", duration: 3000 })
+    } finally { setSavingProfile(false) }
   }
 
-  const getPlanDisplayName = () => {
-    // Use planId directly to get accurate plan name even if canceled
-    if (planId === 'pro-annual') return 'Pro Annual'
-    if (planId === 'pro') return 'Pro'
-    if (planId === 'plus-annual') return 'Plus Annual'
-    if (planId === 'plus') return 'Plus'
-    if (planId === 'starter') return 'Starter'
-    return 'Free'
-  }
-
-  const handleManageBilling = async () => {
-    if (!subscription?.stripeCustomerId) {
-      toast.error('Billing Error', {
-        description: 'No billing information found. Please contact support.',
-        duration: 3000,
-      })
-      return
-    }
-
+  const manageBilling = async () => {
+    if (!subscription?.stripeCustomerId) { setUpgrade({ feature: "Plans" }); return }
+    setBusy("billing")
     try {
-      const res = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: subscription.stripeCustomerId,
-        }),
-      })
-
+      const res = await fetch("/api/stripe/portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customerId: subscription.stripeCustomerId }) })
       const data = await res.json()
-
-      if (data.url) {
-        // Redirect to Stripe Customer Portal
-        window.location.href = data.url
-      } else {
-        toast.error('Billing Error', {
-          description: 'Failed to open billing portal. Please try again.',
-          duration: 3000,
-        })
-      }
-    } catch (error) {
-      console.error('Portal error:', error)
-      toast.error('Billing Error', {
-        description: 'Something went wrong. Please try again.',
-        duration: 3000,
-      })
-    }
+      if (data.url) { window.location.href = data.url; return }
+      throw new Error()
+    } catch { toast.error("Billing did not open", { description: "Try again in a moment.", duration: 3000 }) }
+    setBusy(null)
   }
 
-  const handleAddPreference = async () => {
-    const trimmedPref = newPreference.trim()
-    if (!trimmedPref) return
-    
-    if (preferences.includes(trimmedPref)) {
-      toast.error('Duplicate Preference', {
-        description: 'This preference already exists',
-        duration: 2000,
-      })
+  const pickTemplate = async (id: string) => {
+    if (!canUseResumeTemplate(id, rank as PlanRank)) {
+      const need = resumeTemplateMinRank(id)
+      const t = RESUME_TEMPLATES.find((x) => x.id === id)
+      setUpgrade({ feature: `${t?.name.replace("JobKompass ", "") ?? id} resume template`, requiredPlan: need >= RANK_PRO ? "pro" : "plus" })
       return
     }
-    
-    const newPrefs = [...preferences, trimmedPref]
-    setPreferences(newPrefs)
-    setNewPreference("")
-    
-    // Auto-save
+    const before = defaultTemplate
+    setDefaultTemplateState(id)
+    try { await setDefaultTemplate({ templateId: id }) }
+    catch (e) { setDefaultTemplateState(before); toast.error("Not saved", { description: e instanceof Error ? e.message.replace(/^.*Error: /, "") : "Try again", duration: 3000 }) }
+  }
+
+  const savePrefs = async (next: string[]) => {
+    try { await updateResumePreferences({ preferences: next }) }
+    catch { toast.error("Not saved", { description: "Try again", duration: 3000 }) }
+  }
+
+  const newExtensionKey = async () => {
+    if (rank < RANK_PLUS) { setUpgrade({ feature: "Chrome extension" }); return }
+    setBusy("ext")
+    try { await generateApiKey() } catch (e) { toast.error("Key not created", { description: e instanceof Error ? e.message : "Try again", duration: 3000 }) }
+    setBusy(null)
+  }
+
+  const createCliKey = async () => {
+    setBusy("cli")
     try {
-      await updateResumePreferences({ preferences: newPrefs })
-      toast.success('Preference Added', {
-        description: 'Your preference has been saved',
-        duration: 2000,
-      })
-    } catch (error) {
-      toast.error('Save Failed', {
-        description: 'Failed to save preference',
-        duration: 3000,
-      })
-      // Revert on error
-      setPreferences(preferences)
-    }
+      const r = await generateCliKey({ name: cliName.trim() || undefined })
+      setFreshCliKey(r.key); setCliName(""); setCliOpen(false)
+    } catch (e) { toast.error("Key not created", { description: e instanceof Error ? e.message : "Try again", duration: 3000 }) }
+    setBusy(null)
   }
-
-  const handleRemovePreference = async (index: number) => {
-    const newPrefs = preferences.filter((_, i) => i !== index)
-    setPreferences(newPrefs)
-    
-    // Auto-save
-    try {
-      await updateResumePreferences({ preferences: newPrefs })
-      toast.success('Preference Removed', {
-        description: 'Your preference has been removed',
-        duration: 2000,
-      })
-    } catch (error) {
-      toast.error('Save Failed', {
-        description: 'Failed to remove preference',
-        duration: 3000,
-      })
-      // Revert on error
-      setPreferences(preferences)
-    }
-  }
-
-  const handleStartEdit = (index: number) => {
-    setEditingIndex(index)
-    setEditingText(preferences[index])
-  }
-
-  const handleCancelEdit = () => {
-    setEditingIndex(null)
-    setEditingText("")
-  }
-
-  const handleSaveEdit = async (index: number) => {
-    const trimmedText = editingText.trim()
-    if (!trimmedText) return
-    
-    if (trimmedText === preferences[index]) {
-      setEditingIndex(null)
-      return
-    }
-    
-    if (preferences.includes(trimmedText) && preferences[index] !== trimmedText) {
-      toast.error('Duplicate Preference', {
-        description: 'This preference already exists',
-        duration: 2000,
-      })
-      return
-    }
-    
-    const newPrefs = [...preferences]
-    newPrefs[index] = trimmedText
-    setPreferences(newPrefs)
-    setEditingIndex(null)
-    setEditingText("")
-    
-    // Auto-save
-    try {
-      await updateResumePreferences({ preferences: newPrefs })
-      toast.success('Preference Updated', {
-        description: 'Your preference has been updated',
-        duration: 2000,
-      })
-    } catch (error) {
-      toast.error('Save Failed', {
-        description: 'Failed to update preference',
-        duration: 3000,
-      })
-      // Revert on error
-      setPreferences(preferences)
-    }
-  }
-
-  const handleGenerateApiKey = async () => {
-    setIsGeneratingKey(true)
-    try {
-      const key = await generateApiKey()
-      setShowApiKey(true)
-      toast.success('API Key Generated', {
-        description: 'Copy it now — you won\'t be able to see it again after leaving this page.',
-        duration: 5000,
-      })
-    } catch (error) {
-      toast.error('Failed to Generate Key', {
-        description: error instanceof Error ? error.message : 'Something went wrong',
-        duration: 3000,
-      })
-    } finally {
-      setIsGeneratingKey(false)
-    }
-  }
-
-  const handleRevokeApiKey = async () => {
-    setIsRevokingKey(true)
-    try {
-      await revokeApiKey()
-      setShowApiKey(false)
-      toast.success('API Key Revoked', {
-        description: 'Your extension API key has been deactivated.',
-        duration: 3000,
-      })
-    } catch (error) {
-      toast.error('Failed to Revoke Key', {
-        description: error instanceof Error ? error.message : 'Something went wrong',
-        duration: 3000,
-      })
-    } finally {
-      setIsRevokingKey(false)
-    }
-  }
-
-  const handleCopyApiKey = async () => {
-    if (!extensionApiKey?.key) return
-    try {
-      await navigator.clipboard.writeText(extensionApiKey.key)
-      toast.success('Copied!', {
-        description: 'API key copied to clipboard',
-        duration: 2000,
-      })
-    } catch {
-      toast.error('Copy Failed', {
-        description: 'Could not copy to clipboard',
-        duration: 2000,
-      })
-    }
-  }
-
-  const handleGenerateCliKey = async () => {
-    setIsGeneratingCliKey(true)
-    try {
-      const result = await generateCliKey({ name: cliKeyName.trim() || undefined })
-      setFreshCliKey(result.key)
-      setCliKeyName("")
-      toast.success('CLI Key Created', {
-        description: 'Copy it now — it cannot be shown again.',
-        duration: 5000,
-      })
-    } catch (error) {
-      toast.error('Failed to Create Key', {
-        description: error instanceof Error ? error.message : 'Something went wrong',
-        duration: 3000,
-      })
-    } finally {
-      setIsGeneratingCliKey(false)
-    }
-  }
-
-  const handleRevokeCliKey = async (id: string) => {
-    setRevokingCliKeyId(id)
-    try {
-      await revokeCliKey({ id: id as Id<"agentApiKeys"> })
-      toast.success('Key Revoked', {
-        description: 'Any CLI or agent using that key is now locked out.',
-        duration: 3000,
-      })
-    } catch (error) {
-      toast.error('Failed to Revoke Key', {
-        description: error instanceof Error ? error.message : 'Something went wrong',
-        duration: 3000,
-      })
-    } finally {
-      setRevokingCliKeyId(null)
-    }
-  }
-
-  const handleCopyCliKey = async () => {
-    if (!freshCliKey) return
-    try {
-      await navigator.clipboard.writeText(freshCliKey)
-      toast.success('Copied!', {
-        description: 'CLI key copied to clipboard',
-        duration: 2000,
-      })
-    } catch {
-      toast.error('Copy Failed', {
-        description: 'Could not copy to clipboard',
-        duration: 2000,
-      })
-    }
-  }
-
-  const hasChanges = name !== (user?.name || "") || email !== (user?.email || "")
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center space-y-2">
-          <p className="text-muted-foreground">Please sign in to view your settings</p>
-        </div>
-      </div>
-    )
+    return <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">Sign in to see your settings</div>
   }
 
+  const field = (key: "name" | "username" | "email", label: string, cls?: string) => (
+    <div className={cls}>
+      <JkFieldLabel htmlFor={`jk-set-${key}`} className="max-lg:mb-2.5 max-lg:[&_label]:text-[11px] max-lg:[&_label]:tracking-[2.5px]">{label}</JkFieldLabel>
+      <input id={`jk-set-${key}`} type={key === "email" ? "email" : "text"} value={profile[key]}
+        onChange={(e) => setProfile({ ...profile, [key]: e.target.value })}
+        onKeyDown={(e) => { if (e.key === "Enter" && dirty) void saveProfile() }}
+        className={cn(jkFieldCls, "h-[45px] rounded-[12px] bg-card max-lg:h-11 max-lg:text-[16px]")} />
+    </div>
+  )
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto chat-scroll bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="max-w-7xl mx-auto w-full px-6 py-8">
-        {/* Header */}
-        <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your account information and preferences
-          </p>
-        </div>
+    <div id={SCROLL_ID} className="chat-scroll relative flex h-full flex-col overflow-y-auto">
+      <JkDefaultTemplateProbe onChange={setDefaultTemplateState} />
+      <JkAppPageHeader title="Settings" sub="Account, plan, and keys" art="cabin" artHeight={170} artPosition="right 30%" live={false} divider={false}
+        className="lg:pl-[max(32px,calc((100%-880px)/2))]" />
 
-        {/* Thank You Message for Plan Members */}
-        {planId && planId !== 'free' && (
-          <div className="mt-6 p-4 rounded-lg bg-brand/10 border border-brand/20">
-            <p className="text-sm font-medium text-foreground">
-              Thank you for being a <span className="font-bold text-brand">{getPlanDisplayName()}</span> member! 🎉
-            </p>
-            {subscription?.status === 'canceled' && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Your subscription is canceled. <Link href="/pricing" className="text-brand hover:underline font-medium" onClick={() => trackUpgradeClicked({ surface: 'settings', authenticated: true, plan_id: planId })}>Renew today</Link> to continue enjoying all benefits.
-              </p>
+      <div className="mx-auto w-full max-w-[944px] px-5 pb-24 pt-6 lg:px-8 lg:pt-[42px]">
+        {/* Account */}
+        <JkSettingsSection id="account" index={0} title="Account" sub="How you show up on resumes and in the app"
+          action={dirty ? <Button className="h-9 px-5" disabled={savingProfile} onClick={saveProfile}>{savingProfile ? "Saving…" : "Save"}</Button> : null}>
+          <div className="grid gap-5 lg:grid-cols-[260px_260px_1fr] lg:gap-4">
+            {field("name", "Name")}
+            {field("username", "Username", "max-lg:hidden")}
+            {field("email", "Email", "lg:max-w-[269px]")}
+          </div>
+        </JkSettingsSection>
+
+        {/* Plan and usage */}
+        <JkSettingsSection id="plan" index={1} title="Plan and usage" sub="What you are on and how much of it is used this month"
+          action={<>
+            <span className={cn("rounded-full px-3 py-1 font-mono text-[11px] font-bold tracking-[1px] lg:hidden", paid ? "bg-plan/15 text-plan-text" : "bg-muted text-muted-foreground")}>{planName(planId).toUpperCase()}</span>
+            <Button variant="outline" className="h-10 px-8 text-[13.5px] max-lg:hidden" disabled={busy === "billing"} onClick={paid ? manageBilling : () => setUpgrade({ feature: "Plans" })}>
+              {paid ? "Manage billing" : "Upgrade"}
+            </Button>
+          </>}>
+          <p className="-mt-2 mb-6 text-[15px] text-muted-foreground lg:hidden">{billingLine}</p>
+          <div className={cn("relative overflow-hidden lg:rounded-[20px] lg:border lg:px-6 lg:pb-6 lg:pt-[22px]", paid ? "lg:border-plan lg:bg-accent" : "lg:border-input lg:bg-card")}>
+            <div className="relative z-10 lg:max-w-[630px]">
+              <div className="flex items-center gap-3 max-lg:hidden">
+                <span aria-hidden className="h-4 w-[3px] rounded-full bg-bar-4" />
+                <span className="text-[20px] font-medium tracking-[-0.3px] text-foreground">{planName(planId)}</span>
+                <span className={cn("rounded-full px-2 py-[3px] font-mono text-[9.5px] font-bold tracking-[0.8px]", paid ? "bg-plan/15 text-plan-text" : "bg-muted text-muted-foreground")}>CURRENT PLAN</span>
+              </div>
+              <p className="mt-1.5 text-[13px] text-muted-foreground max-lg:hidden">{billingLine}</p>
+              <div className="flex flex-col gap-6 lg:mt-7 lg:gap-[22px]">
+                <JkUsageBar label="AI documents" value={`${usage.documentsUsed} / ${usage.documentsLimit}`}
+                  ratio={usage.documentsUsed / Math.max(1, usage.documentsLimit)} tone={paid ? "var(--plan)" : "var(--bar-3)"} />
+                <div className="max-lg:hidden">
+                  <JkUsageBar label="Jobs tracked" value={usage.jobsLimit === null ? `${usage.jobsUsed} · unlimited` : `${usage.jobsUsed} / ${usage.jobsLimit}`}
+                    ratio={usage.jobsLimit === null ? 1 : usage.jobsUsed / Math.max(1, usage.jobsLimit)} tone={usage.jobsLimit === null ? "var(--border-strong)" : "var(--bar-3)"} />
+                </div>
+              </div>
+            </div>
+            <div aria-hidden className="absolute right-6 top-1/2 hidden size-[164px] -translate-y-1/2 xl:block">
+              <JkArt name="ship4" variant="spot" />
+            </div>
+          </div>
+          <Button variant="outline" className="mt-7 h-12 w-full text-[16px] lg:hidden" disabled={busy === "billing"} onClick={paid ? manageBilling : () => setUpgrade({ feature: "Plans" })}>
+            {paid ? "Manage billing" : "Upgrade"}
+          </Button>
+        </JkSettingsSection>
+
+        {/* Resume preferences */}
+        <JkSettingsSection id="resume" index={2} title="Resume preferences" sub="Used every time JobKompass writes for you">
+          <div role="radiogroup" aria-label="Default resume template" className="grid grid-cols-1 gap-3 min-[460px]:grid-cols-3 lg:flex lg:gap-3">
+            {RESUME_TEMPLATES.map((t) => {
+              const short = t.name.replace("JobKompass ", "")
+              const need = resumeTemplateMinRank(t.id)
+              const on = effectiveDefault === t.id
+              const locked = !canUseResumeTemplate(t.id, rank as PlanRank)
+              return (
+                <button key={t.id} type="button" role="radio" aria-checked={on} onClick={() => pickTemplate(t.id)}
+                  className={cn("flex min-h-[84px] flex-col rounded-[16px] border px-4 pb-3 pt-3.5 text-left transition-colors lg:w-[188px]",
+                    on ? "border-[1.5px] border-plan bg-accent" : "border-input bg-card hover:bg-accent/60")}>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-[15px] font-medium text-foreground">{short}</span>
+                    <span className={cn("rounded-full px-[7px] py-[3px] font-mono text-[9.5px] font-bold tracking-[0.8px]",
+                      need === 0 ? "bg-muted text-muted-foreground" : "bg-plan/15 text-plan-text")}>{rankLabel(need).toUpperCase()}</span>
+                  </span>
+                  <span className="mt-1.5 text-[12px] text-muted-foreground">{TEMPLATE_BLURB[t.id] ?? t.tags?.join(", ")}</span>
+                  <span className={cn("mt-2.5 flex items-center gap-2 text-[11px]", on ? "text-plan-text" : "text-subtle-foreground")}>
+                    <span aria-hidden className={cn("size-3 rounded-full", on ? "bg-plan" : "border border-border-strong")} />
+                    {on ? "Default" : locked ? `Needs ${rankLabel(need)}` : "Use as default"}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Writing preferences the AI reads on every resume (kept from v3) */}
+          <div className="mt-7">
+            <JkFieldLabel htmlFor="jk-set-pref">Writing preferences</JkFieldLabel>
+            {prefs.length > 0 && (
+              <ul className="mb-3 flex flex-wrap gap-2">
+                {prefs.map((p, i) => (
+                  <li key={`${p}-${i}`} className="flex max-w-full items-center gap-2 rounded-full border border-input bg-card py-1.5 pl-3.5 pr-2 text-[13px] text-foreground">
+                    <span className="truncate">{p}</span>
+                    <button type="button" aria-label={`Remove ${p}`} onClick={() => savePrefs(prefs.filter((_, j) => j !== i))} className="rounded-full p-0.5 text-subtle-foreground hover:text-foreground"><X className="size-3.5" /></button>
+                  </li>
+                ))}
+              </ul>
             )}
+            <form className="flex gap-2.5" onSubmit={(e) => { e.preventDefault(); const v = newPref.trim(); if (!v || prefs.includes(v)) return; setNewPref(""); void savePrefs([...prefs, v]) }}>
+              <input id="jk-set-pref" value={newPref} onChange={(e) => setNewPref(e.target.value)} placeholder="Keep it to one page" className={cn(jkFieldCls, "h-11 flex-1")} />
+              <Button type="submit" variant="outline" className="h-11 px-5" disabled={!newPref.trim()}>Add</Button>
+            </form>
           </div>
-        )}
+        </JkSettingsSection>
 
-        {/* Usage Stats */}
-        {isAuthenticated && planId && (
-          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
-            <h3 className="text-sm font-semibold mb-4">Usage This Month</h3>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">AI-Generated Documents</span>
-                  <span className="font-medium text-foreground">
-                    {usage.documentsUsed} / {usage.documentsLimit}
+        {/* Chrome extension */}
+        <JkSettingsSection id="extension" index={3} title="Chrome extension" sub="Save a posting from any site in one click" className="max-lg:hidden">
+          {extensionApiKey?.key ? (
+            <div className="flex h-14 items-center gap-3 rounded-[16px] border border-input bg-card pl-[18px] pr-3">
+              <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground">{maskKey(extensionApiKey.key)}</code>
+              <button type="button" aria-label="Copy extension key" onClick={() => copy(extensionApiKey.key, "Extension key")} className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><Copy className="size-4" /></button>
+              <button type="button" disabled={busy === "extr"} onClick={async () => { setBusy("extr"); try { await revokeApiKey() } finally { setBusy(null) } }} className="px-2 text-[12.5px] text-subtle-foreground hover:text-destructive">Revoke</button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-dashed border-input px-[18px] py-4">
+              <p className="text-[13.5px] text-muted-foreground">{rank < RANK_PLUS ? "The extension is part of Plus." : "Create a key, then paste it into the extension."}</p>
+              <Button variant="outline" className="h-9 px-5" disabled={busy === "ext"} onClick={newExtensionKey}>{rank < RANK_PLUS ? "See Plus" : "Create key"}</Button>
+            </div>
+          )}
+        </JkSettingsSection>
+
+        {/* CLI keys */}
+        <JkSettingsSection id="cli" index={4} title="CLI keys" sub="Let Claude Code, Cursor, or any agent run jk for you"
+          action={<Button variant="outline" className="h-10 px-8 text-[13.5px] max-lg:hidden" onClick={() => rank < RANK_PRO ? setUpgrade({ feature: "jk CLI" }) : setCliOpen(true)}>New key</Button>}>
+          {freshCliKey && (
+            <div className="mb-4 rounded-[16px] border border-plan/60 bg-accent p-4">
+              <p className="text-[13px] text-muted-foreground">Copy this key now. It is shown once.</p>
+              <div className="mt-2 flex items-center gap-2">
+                <code className="min-w-0 flex-1 break-all font-mono text-[13px] text-foreground">{freshCliKey}</code>
+                <button type="button" aria-label="Copy CLI key" onClick={() => copy(freshCliKey, "CLI key")} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><Copy className="size-4" /></button>
+                <button type="button" aria-label="Hide key" onClick={() => setFreshCliKey(null)} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><X className="size-4" /></button>
+              </div>
+            </div>
+          )}
+          {cliOpen && (
+            <form className="mb-4 flex gap-2.5" onSubmit={(e) => { e.preventDefault(); void createCliKey() }}>
+              <input autoFocus value={cliName} onChange={(e) => setCliName(e.target.value)} placeholder="Name it, e.g. laptop" aria-label="Key name" className={cn(jkFieldCls, "h-11 flex-1 font-mono text-[13px]")} />
+              <Button type="submit" className="h-11 px-5" disabled={busy === "cli"}>{busy === "cli" ? "Creating…" : "Create"}</Button>
+              <Button type="button" variant="ghost" className="h-11 px-4" onClick={() => setCliOpen(false)}>Cancel</Button>
+            </form>
+          )}
+          {cliKeys && cliKeys.length > 0 ? (
+            <ul className="flex flex-col gap-5 lg:gap-[17px]">
+              {cliKeys.map((k, i) => (
+                <li key={k._id} className="grid grid-cols-[28px_1fr_auto] items-center gap-x-3 lg:grid-cols-[28px_152px_1fr_auto]">
+                  <KeyRound className="size-4 -scale-x-100" style={{ color: i % 2 ? "var(--bar-4)" : "var(--bar-2)" }} />
+                  <span className="truncate font-mono text-[13px] text-foreground max-lg:text-[15px]">{k.name}</span>
+                  <span className="text-[12.5px] text-muted-foreground max-lg:col-start-2 max-lg:row-start-2 max-lg:mt-0.5 max-lg:text-[14px]">
+                    <span className="max-lg:hidden">created {fmtDay(k.createdAt)} · </span>{fmtUsed(k.lastUsedAt)}
                   </span>
-                </div>
-                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{
-                      width: `${Math.min(100, (usage.documentsUsed / usage.documentsLimit) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {usage.documentsLimit - usage.documentsUsed} documents remaining
-                </p>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Jobs Tracked</span>
-                  <span className="font-medium text-foreground">
-                    {usage.jobsUsed}
-                    {usage.jobsLimit !== null ? ` / ${usage.jobsLimit}` : (planId === 'pro' || planId === 'pro-annual' ? ' / ∞' : ' / Unlimited')}
-                  </span>
-                </div>
-                {usage.jobsLimit !== null && (
-                  <>
-                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{
-                          width: `${Math.min(100, (usage.jobsUsed / usage.jobsLimit) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {usage.jobsLimit - usage.jobsUsed} jobs remaining
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+                  <button type="button" disabled={busy === k._id} onClick={async () => { setBusy(k._id); try { await revokeCliKey({ id: k._id as Id<"agentApiKeys"> }) } finally { setBusy(null) } }}
+                    className="text-[12.5px] text-subtle-foreground transition-colors hover:text-destructive max-lg:col-start-3 max-lg:row-span-2 max-lg:row-start-1 max-lg:text-[14px]">Revoke</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[13.5px] text-muted-foreground">No keys yet. {rank < RANK_PRO ? "The jk CLI is part of Pro." : "Create one to use jk from your terminal or an agent."}</p>
+          )}
+          <Button variant="outline" className="mt-7 h-12 w-full text-[16px] lg:hidden" onClick={() => rank < RANK_PRO ? setUpgrade({ feature: "jk CLI" }) : setCliOpen(true)}>New key</Button>
+        </JkSettingsSection>
 
-        <Separator className="mt-6" />
-
-        {/* User Information Section */}
-        <div className="space-y-6">
-          <div className="space-y-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              {/* <User className="h-4 w-4 text-muted-foreground" /> */}
-              {/* <h2 className="text-lg font-semibold">Account Information</h2> */}
-            </div>
-
-            <div className="space-y-4 pl-6">
-              {/* Name */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Name
-                </label>
-                <div className="flex items-center gap-3">
-                  <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <Input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Email
-                </label>
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your.email@example.com"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-
-              {/* Username */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Username
-                </label>
-                <div className="flex items-center gap-3">
-                  <AtSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <Input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
-                    placeholder="username"
-                    className="flex-1"
-                    minLength={3}
-                    maxLength={30}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Username must be 3-30 characters, lowercase letters, numbers, dots, underscores, and hyphens only.
-                </p>
-              </div>
-
-              {/* Save button and message */}
-              <div className="space-y-2 pt-2">
-                {saveMessage && (
-                  <div className={`text-sm px-3 py-2 rounded-lg ${
-                    saveMessage.type === 'success' 
-                      ? 'bg-ok/10 text-ok border border-ok/30' 
-                      : 'bg-destructive/10 text-destructive border border-destructive/30'
-                  }`}>
-                    {saveMessage.text}
-                  </div>
-                )}
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving || !hasChanges}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Resume Preferences Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-lg font-semibold">Resume Preferences</h2>
-            </div>
-            <div className="pl-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Add preferences that the AI will automatically consider when generating your resumes. Each preference will be applied without asking you.
-              </p>
-              
-              {/* Preferences List */}
-              {preferences.length > 0 && (
-                <div className="space-y-2">
-                  {preferences.map((pref, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 border border-border group hover:border-brand/50 transition-colors"
-                    >
-                      <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      
-                      {editingIndex === index ? (
-                        // Edit mode
-                        <>
-                          <Textarea
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            className="flex-1 min-h-[60px] resize-none text-sm"
-                            autoFocus
-                          />
-                          <div className="flex gap-1 flex-shrink-0">
-                            <button
-                              onClick={() => handleSaveEdit(index)}
-                              className="p-1 hover:bg-ok/10 rounded transition-colors"
-                              title="Save"
-                            >
-                              <Check className="h-4 w-4 text-ok" />
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                              title="Cancel"
-                            >
-                              <X className="h-4 w-4 text-destructive" />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        // View mode
-                        <>
-                          <p className="flex-1 text-sm">{pref}</p>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                            <button
-                              onClick={() => handleStartEdit(index)}
-                              className="p-1 hover:bg-brand/10 rounded transition-colors"
-                              title="Edit"
-                            >
-                              <Edit2 className="h-4 w-4 text-brand" />
-                            </button>
-                            <button
-                              onClick={() => handleRemovePreference(index)}
-                              className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <X className="h-4 w-4 text-destructive" />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Add New Preference */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Add New Preference
-                </label>
-                <div className="flex flex-col gap-2">
-                  <Textarea
-                    value={newPreference}
-                    onChange={(e) => setNewPreference(e.target.value)}
-                    placeholder="e.g., Always use a clean, minimalist format with clear section headings"
-                    className="w-full min-h-[80px] resize-none"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault()
-                        handleAddPreference()
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={handleAddPreference}
-                    disabled={!newPreference.trim()}
-                    variant="outline"
-                    size="sm"
-                    className="w-fit"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Preference
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Press Cmd/Ctrl+Enter to add quickly
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Chrome Extension API Key Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Puzzle className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-lg font-semibold">Chrome Extension</h2>
-            </div>
-            <div className="pl-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Save job listings from any website with the JobKompass Chrome Extension.
-                Generate an API key to connect the extension to your account.
-              </p>
-
-              {extensionApiKey ? (
-                // Key exists — show it
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                    <Key className="h-4 w-4 text-brand flex-shrink-0" />
-                    <code className="flex-1 text-sm font-mono break-all">
-                      {showApiKey
-                        ? extensionApiKey.key
-                        : extensionApiKey.key.substring(0, 6) + '•'.repeat(20) + extensionApiKey.key.substring(extensionApiKey.key.length - 4)
-                      }
-                    </code>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="p-1.5 hover:bg-muted rounded transition-colors"
-                        title={showApiKey ? 'Hide key' : 'Show key'}
-                      >
-                        {showApiKey
-                          ? <EyeOff className="h-4 w-4 text-muted-foreground" />
-                          : <Eye className="h-4 w-4 text-muted-foreground" />
-                        }
-                      </button>
-                      <button
-                        onClick={handleCopyApiKey}
-                        className="p-1.5 hover:bg-muted rounded transition-colors"
-                        title="Copy to clipboard"
-                      >
-                        <Copy className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Last used: {new Date(extensionApiKey.lastUsedAt).toLocaleDateString()}
-                  </p>
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleGenerateApiKey}
-                      disabled={isGeneratingKey}
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${isGeneratingKey ? 'animate-spin' : ''}`} />
-                      {isGeneratingKey ? 'Regenerating...' : 'Regenerate Key'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleRevokeApiKey}
-                      disabled={isRevokingKey}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      {isRevokingKey ? 'Revoking...' : 'Revoke Key'}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                // No key — show generate button
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleGenerateApiKey}
-                    disabled={isGeneratingKey}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <Key className="h-4 w-4" />
-                    {isGeneratingKey ? 'Generating...' : 'Generate API Key'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    After generating, paste the key into the extension settings to connect your account.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* CLI / AI Agent Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-lg font-semibold">Command Line &amp; AI Agents</h2>
-            </div>
-            <div className="pl-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                The <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">jk</code> CLI lets you
-                run your job search from the terminal — and lets an AI agent like Claude Code do it for you.
-                Create a key below, then connect it with <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">jk auth login</code>.
-              </p>
-
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Install
-                </p>
-                <code className="block text-sm font-mono">npm install -g jobkompass-cli</code>
-                <code className="block text-sm font-mono">jk auth login &lt;your-key&gt;</code>
-              </div>
-
-              {/* Freshly created key — shown exactly once */}
-              {freshCliKey && (
-                <div className="space-y-2 rounded-lg border-2 border-brand bg-brand/5 p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-brand flex-shrink-0 mt-0.5" />
-                    <p className="text-sm font-medium">
-                      Copy this key now. JobKompass only stores a hashed version, so it can never be shown again.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-background border border-border">
-                    <Key className="h-4 w-4 text-brand flex-shrink-0" />
-                    <code className="flex-1 text-sm font-mono break-all">{freshCliKey}</code>
-                    <button
-                      onClick={handleCopyCliKey}
-                      className="p-1.5 hover:bg-muted rounded transition-colors flex-shrink-0"
-                      title="Copy to clipboard"
-                    >
-                      <Copy className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setFreshCliKey(null)}>
-                    I&apos;ve saved it
-                  </Button>
-                </div>
-              )}
-
-              {/* Existing keys */}
-              {cliKeys === undefined ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : cliKeys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No CLI keys yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {cliKeys.map((key) => (
-                    <div
-                      key={key._id}
-                      className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/50 border border-border"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{key.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Created {new Date(key.createdAt).toLocaleDateString()}
-                          {key.lastUsedAt
-                            ? ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}`
-                            : " · Never used"}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRevokeCliKey(key._id)}
-                        disabled={revokingCliKeyId === key._id}
-                        className="text-destructive hover:text-destructive flex-shrink-0"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        {revokingCliKeyId === key._id ? 'Revoking...' : 'Revoke'}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Input
-                  value={cliKeyName}
-                  onChange={(e) => setCliKeyName(e.target.value)}
-                  placeholder="Key name (e.g., laptop, claude-code)"
-                  className="max-w-xs"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleGenerateCliKey()
-                    }
-                  }}
-                />
-                <Button
-                  onClick={handleGenerateCliKey}
-                  disabled={isGeneratingCliKey}
-                  variant="outline"
-                  className="gap-2 flex-shrink-0"
-                >
-                  <Key className="h-4 w-4" />
-                  {isGeneratingCliKey ? 'Creating...' : 'Create CLI Key'}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Name each key after where it lives, so you can revoke just that one later.
-                A revoked key stops working immediately.
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Gmail Accounts Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-lg font-semibold">Connected Gmail Accounts</h2>
-            </div>
-            <div className="pl-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Connect a Gmail account so the job lead agent can watch it for recruiter outreach and job digests. Connect at least two accounts for full coverage.
-              </p>
-
-              {gmailConnected === "1" && (
-                <div className="p-3 rounded-lg border bg-ok/10 border-ok/30">
-                  <p className="text-sm font-medium text-ok">Gmail account connected successfully.</p>
-                </div>
-              )}
-              {gmailError && (
-                <div className="p-3 rounded-lg border bg-destructive/10 border-destructive/30 space-y-1">
-                  <p className="text-sm font-medium text-destructive">
-                    {GMAIL_ERROR_MESSAGES[gmailError]
-                      ?? (gmailError.startsWith("google_")
-                        ? `Google declined the connection (${gmailError.slice("google_".length)}). If this is a test/unverified app, make sure this Gmail address is added as a test user in the Google Cloud OAuth consent screen.`
-                        : "Something went wrong connecting Gmail. Please try again.")}
-                  </p>
-                  {gmailErrorDetail && (
-                    <p className="text-xs font-mono text-destructive break-all">{gmailErrorDetail}</p>
-                  )}
-                </div>
-              )}
-
-              {gmailAccounts === undefined ? (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : gmailAccounts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No Gmail accounts connected yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {gmailAccounts.map((account) => (
-                    <div
-                      key={account._id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{account.email}</p>
-                        <p className="text-xs">
-                          {account.status === "active" ? (
-                            <span className="text-muted-foreground">Connected</span>
-                          ) : account.status === "paused" ? (
-                            <span className="font-medium text-warn">
-                              Scanning paused
-                              {account.pausedAt
-                                ? ` since ${new Date(account.pausedAt).toLocaleDateString()}`
-                                : ""}
-                            </span>
-                          ) : (
-                            <span className="font-medium text-destructive">Disconnected — reconnect to keep sending</span>
-                          )}
-                          <span className="text-muted-foreground">
-                            {" · since "}
-                            {new Date(account.connectedAt).toLocaleDateString()}
-                          </span>
-                        </p>
-                      </div>
-                      {account.status === "revoked" ? (
-                        <Button asChild size="sm" className="gap-2">
-                          <a href={`/api/gmail/oauth/start?login_hint=${encodeURIComponent(account.email)}`}>
-                            <Mail className="h-4 w-4" />
-                            Reconnect
-                          </a>
-                        </Button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            title={
-                              account.status === "paused"
-                                ? "Resume scanning. The next scan catches up on everything that arrived while paused."
-                                : "Stop scanning this inbox for new leads. Stays connected, so you can resume anytime."
-                            }
-                            onClick={() =>
-                              setGmailAccountPaused({
-                                accountId: account._id,
-                                paused: account.status !== "paused",
-                              })
-                            }
-                          >
-                            {account.status === "paused" ? (
-                              <>
-                                <Play className="h-4 w-4" />
-                                Resume
-                              </>
-                            ) : (
-                              <>
-                                <Pause className="h-4 w-4" />
-                                Pause
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => disconnectGmailAccount({ accountId: account._id })}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            Disconnect
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Button asChild variant="outline" className="gap-2">
-                <a href="/api/gmail/oauth/start">
-                  <Mail className="h-4 w-4" />
-                  Connect Gmail Account
-                </a>
-              </Button>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Billing Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-lg font-semibold">Billing</h2>
-            </div>
-            <div className="pl-6">
-              <Button
-                variant="outline"
-                onClick={handleManageBilling}
-                className="gap-2"
-              >
-                <CreditCard className="h-4 w-4" />
-                Manage Billing
-              </Button>
-            </div>
-          </div>
-        </div>
+        <button type="button" onClick={async () => { setCurrentThreadId(null); await signOut() }} className="mt-6 text-[16px] text-destructive hover:underline lg:hidden">Sign out</button>
       </div>
+
+      <JkUpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} feature={upgrade?.feature ?? ""} requiredPlan={upgrade?.requiredPlan} />
     </div>
   )
 }

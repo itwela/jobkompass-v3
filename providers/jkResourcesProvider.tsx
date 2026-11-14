@@ -10,13 +10,24 @@ interface Resource {
   _id: Id<"resources">;
   type: string;
   title: string;
-  url: string;
+  /** Absent on note entries (no link). */
+  url?: string;
   description?: string;
   notes?: string;
   tags?: string[];
   category?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export type JkResource = Resource;
+
+export interface JkResourceInput {
+  title: string;
+  /** Empty = a note entry with no link. */
+  url: string;
+  description?: string;
+  category?: string;
 }
 
 interface ResourcesContextType {
@@ -45,6 +56,8 @@ interface ResourcesContextType {
     category?: string 
   }) => Promise<void>;
   handleDelete: (id: Id<"resources">) => Promise<void>;
+  /** Create a link or note in one step (the Add link sheet). Returns the new id or null. */
+  handleCreate: (data: JkResourceInput) => Promise<Id<"resources"> | null>;
   handleBulkDelete: (ids?: Id<"resources">[]) => Promise<void>;
   toggleResourceSelection: (id: Id<"resources">) => void;
   selectAllResources: (ids?: Id<"resources">[]) => void;
@@ -179,10 +192,34 @@ export function JkResourcesProvider({ children }: { children: ReactNode }) {
         setEditingId(null);
         return;
       }
-      await updateResource({ id, ...data, type: 'resource' });
+      const url = data.url.trim();
+      await updateResource({ id, ...data, url: url || undefined, type: url ? 'resource' : 'note' });
       setEditingId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save note. Please try again.');
+    }
+  };
+
+  const handleCreate = async (data: JkResourceInput) => {
+    if (!isAuthenticated) {
+      setError('Please sign in to add links');
+      return null;
+    }
+    const title = data.title.trim();
+    const url = data.url.trim();
+    if (!title && !url) return null;
+    try {
+      setError(null);
+      return await addResource({
+        type: url ? 'resource' : 'note',
+        title: title || url,
+        url: url || undefined,
+        description: data.description?.trim() || undefined,
+        category: data.category || undefined,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
+      return null;
     }
   };
 
@@ -237,6 +274,7 @@ export function JkResourcesProvider({ children }: { children: ReactNode }) {
     handleAddNew,
     handleSave,
     handleDelete,
+    handleCreate,
     handleBulkDelete,
     toggleResourceSelection,
     selectAllResources,
