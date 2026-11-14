@@ -9,7 +9,8 @@ import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider"
 import { useJobs } from "@/providers/jkJobsProvider"
 import { useResources } from "@/providers/jkResourcesProvider"
-import { Search, MessageSquare, FileText, Briefcase, Link2, X, Calendar, Filter } from "lucide-react"
+import { Search, MessageSquare, FileText, Briefcase, Link2, X, CornerDownLeft } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { Id } from "@/convex/_generated/dataModel"
 import Link from "next/link"
@@ -95,7 +96,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             id: thread._id,
             type: 'chat',
             title: thread.title,
-            subtitle: `Chat conversation`,
+            subtitle: `Chat · ${new Date(thread.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
             icon: MessageSquare,
           })
         }
@@ -112,7 +113,9 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             id: doc._id,
             type: 'document',
             title: name,
-            subtitle: doc.documentType === 'resume' ? 'Resume' : 'Cover Letter',
+            subtitle: doc.documentType === 'resume'
+              ? `Resume · ${(doc as any).template ? `${String((doc as any).template).replace(/^./, (c: string) => c.toUpperCase())} template` : `written ${new Date(docDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}`
+              : 'Cover letter',
             icon: FileText,
           })
         }
@@ -139,7 +142,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             id: resource._id,
             type: 'resource',
             title: resource.title,
-            subtitle: resource.url,
+            subtitle: resource.url || resource.description || 'Note',
             icon: Link2,
           })
         }
@@ -168,7 +171,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             id: job._id,
             type: 'job',
             title: job.title,
-            subtitle: job.company,
+            subtitle: [job.company, job.status].filter(Boolean).join(' · '),
             company: job.company,
             status: job.status,
             statusColorClass: statusOption?.colorClass || 'bg-muted text-foreground border-border',
@@ -238,189 +241,104 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
     }
   }
 
+  // Grouped as the frame shows them; one flat order for arrow keys.
+  const groups = useMemo(() => {
+    const order: { type: SearchResult['type']; label: string; tag: string; tick: string }[] = [
+      { type: 'job', label: 'Jobs', tag: 'JOB', tick: 'var(--bar-4)' },
+      { type: 'document', label: 'Documents', tag: 'PDF', tick: 'var(--bar-2)' },
+      { type: 'resource', label: 'Links', tag: 'LINK', tick: 'var(--bar-3)' },
+      { type: 'chat', label: 'Conversations', tag: 'CHAT', tick: 'var(--bar-1)' },
+    ]
+    return order.map((g) => ({ ...g, items: searchResults.filter((r) => r.type === g.type).slice(0, 6) })).filter((g) => g.items.length)
+  }, [searchResults])
+  const flat = useMemo(() => groups.flatMap((g) => g.items), [groups])
+  const [active, setActive] = useState(0)
+  useEffect(() => { setActive(0) }, [searchQuery])
+  useEffect(() => {
+    document.getElementById(`jk-search-opt-${active}`)?.scrollIntoView({ block: 'nearest' })
+  }, [active])
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose()
-    }
+    if (e.key === 'Escape') onClose()
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (flat.length ? (a + 1) % flat.length : 0)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => (flat.length ? (a - 1 + flat.length) % flat.length : 0)) }
+    else if (e.key === 'Enter' && flat[active]) { e.preventDefault(); void handleResultClick(flat[active]) }
   }
 
+  let n = -1
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-background/0 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 bg-background/70"
             onClick={onClose}
           />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-2xl px-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-              <style dangerouslySetInnerHTML={{ __html: `
-                .jk-search-modal-input,
-                .jk-search-modal-input:focus,
-                .jk-search-modal-input:focus-visible,
-                .jk-search-modal-input:active {
-                  outline: none !important;
-                  box-shadow: none !important;
-                  border-color: transparent !important;
-                }
-              ` }}></style>
-              {/* Header */}
-              <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
-                <div className="flex items-center gap-3 flex-1">
-                  <Search className="h-5 w-5 text-muted-foreground" />
-                  <input
-                    ref={inputRef}
-                    data-search-modal-input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Search chats, documents, resources, or jobs..."
-                    className="jk-search-modal-input flex-1 border-0 bg-transparent text-base px-0 placeholder:text-muted-foreground"
-                  />
-                </div>
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                    showFilters || dateFrom || dateTo
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  }`}
-                  title="Filters"
-                >
-                  <Filter className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={onClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <X className="h-4 w-4" />
+          <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center sm:px-6 sm:pt-[120px]">
+            <motion.div
+              role="dialog" aria-modal="true" aria-label="Search"
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="pointer-events-auto flex h-dvh w-full flex-col overflow-hidden bg-card sm:h-auto sm:max-h-[560px] sm:min-h-[400px] sm:max-w-[700px] sm:rounded-[28px] sm:border sm:border-input"
+            >
+              <div className="flex h-[68px] shrink-0 items-center gap-4 border-b border-border px-6">
+                <Search className="size-[18px] shrink-0 text-plan" strokeWidth={2} />
+                <input
+                  ref={inputRef}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Search jobs, documents, links, chats"
+                  role="combobox" aria-expanded={flat.length > 0} aria-controls="jk-search-list"
+                  aria-activedescendant={flat.length ? `jk-search-opt-${active}` : undefined}
+                  className="min-w-0 flex-1 bg-transparent text-[19px] text-foreground caret-plan outline-none placeholder:text-subtle-foreground max-sm:text-[17px]"
+                />
+                <button type="button" onClick={onClose} className="rounded-md bg-accent px-2 py-1 font-mono text-[9.5px] font-medium tracking-[0.8px] text-muted-foreground hover:text-foreground">
+                  <span className="max-sm:hidden">ESC</span><X className="size-4 sm:hidden" />
                 </button>
               </div>
 
-              {/* Filters */}
-              {showFilters && (
-                <div className="px-6 py-4 border-b border-border bg-muted/30">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 flex-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Date Range</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground">From</label>
-                        <input
-                          type="date"
-                          value={dateFrom}
-                          onChange={(e) => setDateFrom(e.target.value)}
-                          className="px-2 py-1 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs text-muted-foreground">To</label>
-                        <input
-                          type="date"
-                          value={dateTo}
-                          onChange={(e) => setDateTo(e.target.value)}
-                          className="px-2 py-1 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                      </div>
-                      {(dateFrom || dateTo) && (
-                        <button
-                          onClick={() => {
-                            setDateFrom('')
-                            setDateTo('')
-                          }}
-                          className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
+              <div id="jk-search-list" role="listbox" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3">
+                {isFree ? (
+                  <div className="px-3 py-10 text-center">
+                    <p className="text-[15px] text-foreground">Search is part of Plus</p>
+                    <Link href="/pricing" onClick={() => { trackUpgradeClicked({ surface: 'search', authenticated: true }); onClose() }} className="mt-2 inline-block text-[13.5px] text-muted-foreground underline underline-offset-4">See plans</Link>
                   </div>
-                </div>
-              )}
-
-              {/* Results */}
-              <div className="max-h-[60vh] overflow-y-auto">
-                {!isAuthenticated ? (
-                  <div className="px-6 py-8 text-center text-muted-foreground">
-                    Sign in to search
-                  </div>
-                ) : isFree ? (
-                  <div className="px-6 py-8 text-center">
-                    <p className="text-muted-foreground mb-2">Search is only available on paid plans</p>
-                    <Link
-                      href="/pricing"
-                      className="text-brand hover:underline"
-                      onClick={() => trackUpgradeClicked({ surface: 'search', authenticated: true })}
-                    >
-                      Upgrade to access search
-                    </Link>
-                  </div>
-                ) : searchQuery.trim() === '' ? (
-                  <div className="px-6 py-8 text-center text-muted-foreground">
-                    Start typing to search...
-                  </div>
-                ) : searchResults.length === 0 ? (
-                  <div className="px-6 py-8 text-center text-muted-foreground">
-                    No results found
-                  </div>
-                ) : (
-                  <div className="py-2">
-                    {searchResults.map((result, index) => {
-                      const Icon = result.icon
+                ) : !searchQuery.trim() ? (
+                  <p className="px-3 py-10 text-center text-[13.5px] text-subtle-foreground">Type to search. Use ↑ ↓ to move, Enter to open.</p>
+                ) : flat.length === 0 ? (
+                  <p className="px-3 py-10 text-center text-[13.5px] text-subtle-foreground">Nothing matches &ldquo;{searchQuery}&rdquo;</p>
+                ) : groups.map((g) => (
+                  <div key={g.type} className="mb-1">
+                    <p className="px-3.5 pb-2 pt-3 font-mono text-[9.5px] font-medium tracking-[2px] text-subtle-foreground">{g.label.toUpperCase()}</p>
+                    {g.items.map((r) => {
+                      n += 1
+                      const i = n
+                      const on = i === active
                       return (
-                        <motion.button
-                          key={`${result.type}-${result.id}`}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.02 }}
-                          onClick={() => handleResultClick(result)}
-                          className="w-full flex items-center gap-3 px-6 py-3 hover:bg-accent transition-colors text-left"
+                        <button
+                          key={`${r.type}-${r.id}`} id={`jk-search-opt-${i}`} type="button" role="option" aria-selected={on}
+                          onMouseMove={() => setActive(i)} onClick={() => handleResultClick(r)}
+                          className={cn("flex h-[52px] w-full items-center gap-3.5 rounded-[14px] px-3.5 text-left transition-colors", on && "bg-accent")}
                         >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                            <Icon className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">{result.title}</div>
-                            {result.subtitle && (
-                              <div className="text-sm text-muted-foreground truncate">
-                                {result.subtitle}
-                              </div>
-                            )}
-                            {result.type === 'job' && result.status && (
-                              <div className="mt-1.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${result.statusColorClass || 'bg-muted text-foreground border-border'}`}>
-                                  {result.status}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </motion.button>
+                          <span aria-hidden className="h-3.5 w-[3px] shrink-0 rounded-full" style={{ background: g.tick }} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px] leading-[18px] text-foreground">{r.title || 'Untitled'}</span>
+                            {r.subtitle && <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted-foreground">{r.subtitle}</span>}
+                          </span>
+                          <span className="font-mono text-[9.5px] tracking-[1.2px] text-subtle-foreground">{g.tag}</span>
+                          <CornerDownLeft aria-hidden className={cn("size-3.5 shrink-0 text-plan", !on && "invisible")} />
+                        </button>
                       )
                     })}
                   </div>
-                )}
+                ))}
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
   )
 }
-
