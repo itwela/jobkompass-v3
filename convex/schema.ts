@@ -64,9 +64,6 @@ const documentsTables = {
     content: v.optional(v.any()),
     // Track when user has seen/viewed this document
     seenAt: v.optional(v.number()),
-    // Every status the job has been in, oldest first. Recorded from v4 onward;
-    // older jobs have none (Performance treats that as "unknown", never guesses).
-    statusHistory: v.optional(v.array(v.object({ status: v.string(), at: v.number() }))),
   }).index("by_user", ["userId"]),
 
   documentFolders: defineTable({
