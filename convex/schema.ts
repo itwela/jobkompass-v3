@@ -1,6 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
+import { tailoringValidator } from "./tailoring";
 
 const documentsTables = {
   resumes: defineTable({
@@ -27,6 +28,9 @@ const documentsTables = {
     seenAt: v.optional(v.number()),
     // Random public id for /r/<shareId>; unset means the resume is private
     shareId: v.optional(v.string()),
+    // Set when chat tailored this resume to a saved job: what changed (derived by
+    // diffing against the base resume), the marks on the page, and must-haves coverage.
+    tailoring: v.optional(tailoringValidator),
   }).index("by_user", ["userId"]).index("by_shareId", ["shareId"]),
   resumeIRs: defineTable({
     userId: v.string(),

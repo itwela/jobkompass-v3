@@ -1,319 +1,135 @@
 'use client'
 
-import { useState, useEffect } from "react";
+/**
+ * Chat context: what the next message can see (D01 / D02).
+ * - JkContextChip: one attached item, "Resume · Software Engineer, base" with a logo-colour tick.
+ * - JkContextChips: every attached resume, cover letter and job as chips.
+ * - JkContextPanel (default): the picker that opens above the composer to attach items.
+ */
+import { useEffect, useState } from "react";
+import { Check, Upload, X } from "lucide-react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
-import { ChevronDown, ChevronUp, Radar, FileText, Briefcase, X, Check, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import JkSegmented from "./jk-app/jkSegmented";
+import JkCompanyLogo from "./jkCompanyLogo";
+import { cn } from "@/lib/utils";
 
-export default function JkContextPanel() {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'resumes' | 'coverLetters' | 'jobs'>('resumes');
+type Tone = "bar-2" | "bar-3" | "bar-4";
+const TICK: Record<Tone, string> = { "bar-2": "bg-bar-2", "bar-3": "bg-bar-3", "bar-4": "bg-bar-4" };
+
+export function JkContextChip({ tone, label, onRemove, className }: { tone: Tone; label: string; onRemove?: () => void; className?: string }) {
+  return (
+    <span className={cn("group inline-flex h-[26px] min-w-0 max-w-full shrink items-center gap-[10px] rounded-full border border-input bg-popover pl-3 pr-[14px]", className)}>
+      <span aria-hidden className={cn("h-3 w-[3px] shrink-0 rounded-full", TICK[tone])} />
+      <span className="truncate text-[12.5px] font-medium leading-[15px] text-muted-foreground">{label}</span>
+      {onRemove && (
+        <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="-mr-1.5 flex size-4 shrink-0 items-center justify-center rounded-full text-subtle-foreground hover:text-foreground">
+          <X className="size-3" />
+        </button>
+      )}
+    </span>
+  );
+}
+
+/** "Job · PTC GTM AI": company first, then the title, short enough for a chip. */
+export function jobChipLabel(job: { company?: string; title?: string }) {
+  return `Job · ${[job.company, job.title].filter(Boolean).join(" ")}`;
+}
+
+export function JkContextChips({ removable = true, className }: { removable?: boolean; className?: string }) {
   const { resumes } = useJobKompassResume();
   const { coverLetterList } = useJobKompassDocuments();
-  const { allJobs, statusOptions } = useJobs();
-  const { 
-    attachedResumeIds, 
-    attachedCoverLetterIds,
-    attachedJobIds,
-    addResumeAttachment,
-    removeResumeAttachment,
-    addCoverLetterAttachment,
-    removeCoverLetterAttachment,
-    addJobAttachment,
-    removeJobAttachment,
+  const { allJobs } = useJobs();
+  const { attachedResumeIds, attachedCoverLetterIds, attachedJobIds, removeResumeAttachment, removeCoverLetterAttachment, removeJobAttachment } = useJobKompassChatWindow();
+  const chips: React.ReactNode[] = [];
+  attachedResumeIds.forEach((id) => {
+    const r = resumes?.find((x: any) => x._id === id);
+    if (r) chips.push(<JkContextChip key={id} tone="bar-2" label={`Resume · ${r.name || "Untitled"}`} onRemove={removable ? () => removeResumeAttachment(id) : undefined} />);
+  });
+  attachedCoverLetterIds.forEach((id) => {
+    const c = coverLetterList?.find((x: any) => x._id === id);
+    if (c) chips.push(<JkContextChip key={id} tone="bar-3" label={`Letter · ${c.name || "Untitled"}`} onRemove={removable ? () => removeCoverLetterAttachment(id) : undefined} />);
+  });
+  attachedJobIds.forEach((id) => {
+    const j = allJobs?.find((x: any) => x._id === id);
+    if (j) chips.push(<JkContextChip key={id} tone="bar-4" label={jobChipLabel(j)} onRemove={removable ? () => removeJobAttachment(id) : undefined} />);
+  });
+  if (!chips.length) return null;
+  return <div className={cn("flex min-w-0 flex-wrap items-center gap-2", className)}>{chips}</div>;
+}
+
+type Tab = "resumes" | "coverLetters" | "jobs";
+
+/** Picker for what the next message can see. Opens above the composer. */
+export default function JkContextPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [tab, setTab] = useState<Tab>("resumes");
+  const { resumes } = useJobKompassResume();
+  const { coverLetterList } = useJobKompassDocuments();
+  const { allJobs } = useJobs();
+  const {
+    attachedResumeIds, attachedCoverLetterIds, attachedJobIds,
+    addResumeAttachment, removeResumeAttachment, addCoverLetterAttachment, removeCoverLetterAttachment,
+    addJobAttachment, removeJobAttachment, setIsFileModalOpen,
   } = useJobKompassChatWindow();
 
-  // Close context panel when message is sent
+  // Close when a message is sent or Escape is pressed.
   useEffect(() => {
-    const handler = () => {
-      setIsExpanded(false);
-    };
-    window.addEventListener('jk:sendChat', handler);
-    return () => window.removeEventListener('jk:sendChat', handler);
-  }, []);
+    if (!open) return;
+    const close = () => onClose();
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("jk:sendChat", close);
+    window.addEventListener("keydown", key);
+    return () => { window.removeEventListener("jk:sendChat", close); window.removeEventListener("keydown", key); };
+  }, [open, onClose]);
 
-  const resumesList = resumes || [];
-  const coverLettersList = coverLetterList || [];
-  const jobsList = allJobs || [];
+  if (!open) return null;
 
-  // Get status color class
-  const getStatusColor = (status: string) => {
-    const option = statusOptions.find(opt => opt.value === status);
-    return option?.colorClass || "bg-muted text-foreground";
-  };
-
-  // Get current tab count for header
-  const getTabCount = () => {
-    switch (activeTab) {
-      case 'resumes': return resumesList.length;
-      case 'coverLetters': return coverLettersList.length;
-      case 'jobs': return jobsList.length;
-      default: return 0;
-    }
-  };
-
-  if (!isExpanded) {
-    return (
-      <div className="w-full mb-2 bg-card">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsExpanded(true)}
-          className="w-full flex items-center justify-between gap-2 bg-card/50 hover:bg-card"
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Radar className="h-4 w-4 shrink-0" />
-            <span className="text-sm font-medium truncate">
-              Context ({resumesList.length} resumes, {coverLettersList.length} cover letters, {jobsList.length} jobs)
-            </span>
-          </div>
-          <ChevronDown className="h-4 w-4 shrink-0" />
-        </Button>
-      </div>
-    );
-  }
+  const resumeRows = (resumes ?? []).map((r: any) => ({ id: r._id, title: r.name || "Untitled", sub: r.isActive ? "Base resume" : new Date(r.createdAt ?? r._creationTime).toLocaleDateString(), on: attachedResumeIds.includes(r._id), toggle: () => (attachedResumeIds.includes(r._id) ? removeResumeAttachment(r._id) : addResumeAttachment(r._id)) }));
+  const letterRows = (coverLetterList ?? []).map((c: any) => ({ id: c._id, title: c.name || "Untitled", sub: new Date(c.createdAt ?? c._creationTime).toLocaleDateString(), on: attachedCoverLetterIds.includes(c._id), toggle: () => (attachedCoverLetterIds.includes(c._id) ? removeCoverLetterAttachment(c._id) : addCoverLetterAttachment(c._id)) }));
+  const jobRows = (allJobs ?? []).map((j: any) => ({ id: j._id, title: j.title, sub: [j.company, j.status].filter(Boolean).join(" · "), company: j.company, on: attachedJobIds.includes(j._id), toggle: () => (attachedJobIds.includes(j._id) ? removeJobAttachment(j._id) : addJobAttachment(j._id)) }));
+  const rows = tab === "resumes" ? resumeRows : tab === "coverLetters" ? letterRows : jobRows;
+  const empty = tab === "resumes" ? "No resumes yet." : tab === "coverLetters" ? "No cover letters yet." : "No saved jobs yet.";
 
   return (
-    <div className="w-full mb-2 rounded-2xl border border-border bg-card shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">Context</h3>
-          <span className="text-xs text-muted-foreground">
-            ({getTabCount()} items)
-          </span>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsExpanded(false)}
-          className="h-6 w-6"
-        >
-          <ChevronUp className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-border">
-        <button
-          onClick={() => setActiveTab('resumes')}
-          className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'resumes'
-              ? 'border-b-2 border-brand text-brand'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Resumes</span> ({resumesList.length})
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('coverLetters')}
-          className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'coverLetters'
-              ? 'border-b-2 border-brand text-brand'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-1.5">
-            <Mail className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Cover Letters</span> ({coverLettersList.length})
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('jobs')}
-          className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'jobs'
-              ? 'border-b-2 border-brand text-brand'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-1.5">
-            <Briefcase className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Jobs</span> ({jobsList.length})
-          </div>
+    <div className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 overflow-hidden rounded-[20px] border border-input bg-card shadow-2xl">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <JkSegmented<Tab>
+          size="sm"
+          ariaLabel="Context type"
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "resumes", label: `Resumes ${resumeRows.length}` },
+            { value: "coverLetters", label: `Letters ${letterRows.length}` },
+            { value: "jobs", label: `Jobs ${jobRows.length}` },
+          ]}
+        />
+        <button type="button" onClick={onClose} aria-label="Close context" className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground">
+          <X className="size-4" />
         </button>
       </div>
-
-      {/* Content */}
-      <ScrollArea className="h-[200px]">
-        <div className="p-3 space-y-2">
-          {/* Resumes Tab */}
-          {activeTab === 'resumes' && (
-            resumesList.length > 0 ? (
-              resumesList.map((resume: any) => {
-                const isAttached = attachedResumeIds.includes(resume._id);
-                return (
-                  <div
-                    key={resume._id}
-                    onClick={() => {
-                      if (isAttached) {
-                        removeResumeAttachment(resume._id);
-                      } else {
-                        addResumeAttachment(resume._id);
-                      }
-                    }}
-                    className={`
-                      p-3 rounded-lg border transition-all cursor-pointer
-                      ${isAttached 
-                        ? 'border-brand bg-brand/10 hover:bg-brand/15' 
-                        : 'border-border bg-background hover:bg-muted/50'}
-                    `}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <FileText className={`h-4 w-4 shrink-0 ${isAttached ? 'text-brand' : 'text-muted-foreground'}`} />
-                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-brand' : ''}`}>
-                            {resume.name || `Untitled ${resume._id.slice(-6)}`}
-                          </p>
-                        </div>
-                        {resume.createdAt && (
-                          <p className="text-xs text-muted-foreground mt-1 ml-6">
-                            Created: {new Date(resume.createdAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      {isAttached && (
-                        <Check className="h-4 w-4 text-brand shrink-0" />
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No resumes yet</p>
-                <p className="text-xs mt-1">Create your first resume to get started</p>
-              </div>
-            )
-          )}
-
-          {/* Cover Letters Tab */}
-          {activeTab === 'coverLetters' && (
-            coverLettersList.length > 0 ? (
-              coverLettersList.map((coverLetter: any) => {
-                const isAttached = attachedCoverLetterIds.includes(coverLetter._id);
-                return (
-                  <div
-                    key={coverLetter._id}
-                    onClick={() => {
-                      if (isAttached) {
-                        removeCoverLetterAttachment(coverLetter._id);
-                      } else {
-                        addCoverLetterAttachment(coverLetter._id);
-                      }
-                    }}
-                    className={`
-                      p-3 rounded-lg border transition-all cursor-pointer
-                      ${isAttached 
-                        ? 'border-brand bg-brand/10 hover:bg-brand/15' 
-                        : 'border-border bg-background hover:bg-muted/50'}
-                    `}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Mail className={`h-4 w-4 shrink-0 ${isAttached ? 'text-brand' : 'text-muted-foreground'}`} />
-                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-brand' : ''}`}>
-                            {coverLetter.name || `Untitled ${coverLetter._id.slice(-6)}`}
-                          </p>
-                        </div>
-                        {coverLetter.createdAt && (
-                          <p className="text-xs text-muted-foreground mt-1 ml-6">
-                            Created: {new Date(coverLetter.createdAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      {isAttached && (
-                        <Check className="h-4 w-4 text-brand shrink-0" />
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No cover letters yet</p>
-                <p className="text-xs mt-1">Generate a cover letter using the AI chat</p>
-              </div>
-            )
-          )}
-
-          {/* Jobs Tab */}
-          {activeTab === 'jobs' && (
-            jobsList.length > 0 ? (
-              jobsList.map((job: any) => {
-                const isAttached = attachedJobIds.includes(job._id);
-                return (
-                  <div
-                    key={job._id}
-                    onClick={() => {
-                      if (isAttached) {
-                        removeJobAttachment(job._id);
-                      } else {
-                        addJobAttachment(job._id);
-                      }
-                    }}
-                    className={`
-                      p-3 rounded-lg border transition-all cursor-pointer
-                      ${isAttached 
-                        ? 'border-brand bg-brand/10 hover:bg-brand/15' 
-                        : 'border-border bg-background hover:bg-muted/50'}
-                    `}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Briefcase className={`h-4 w-4 shrink-0 ${isAttached ? 'text-brand' : 'text-muted-foreground'}`} />
-                          <p className={`text-sm font-medium truncate ${isAttached ? 'text-brand' : ''}`}>{job.title}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground ml-6 mb-1">
-                          {job.company}
-                        </p>
-                        <div className="flex items-center gap-2 ml-6">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(job.status)}`}>
-                            {job.status}
-                          </span>
-                          {job.dateApplied && (
-                            <span className="text-xs text-muted-foreground">
-                              Applied: {job.dateApplied}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isAttached && (
-                        <Check className="h-4 w-4 text-brand shrink-0" />
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Briefcase className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No jobs tracked yet</p>
-                <p className="text-xs mt-1">Add jobs to track your applications</p>
-              </div>
-            )
-          )}
-        </div>
-      </ScrollArea>
-
-      {/* Footer hint */}
-      <div className="px-4 py-2 border-t border-border bg-muted/30">
-        <p className="text-xs text-muted-foreground text-center">
-          💡 Click items to attach them to your message • Attached items will be visible to the AI
-        </p>
+      <div className="chat-scroll max-h-[min(300px,45dvh)] overflow-y-auto p-2">
+        {rows.length === 0 && <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">{empty}</p>}
+        {rows.map((row: any) => (
+          <button key={row.id} type="button" onClick={row.toggle} data-on={row.on ? "" : undefined}
+            className="flex w-full items-center gap-3 rounded-[12px] px-3 py-[9px] text-left transition-colors hover:bg-accent data-[on]:bg-accent">
+            {tab === "jobs" ? <JkCompanyLogo company={row.company || row.title} size="sm" /> : <span aria-hidden className={cn("h-4 w-[3px] shrink-0 rounded-full", tab === "resumes" ? "bg-bar-2" : "bg-bar-3")} />}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] leading-[18px] text-foreground">{row.title}</span>
+              <span className="block truncate font-mono text-[11px] leading-[15px] text-subtle-foreground">{row.sub}</span>
+            </span>
+            {row.on && <Check className="size-4 shrink-0 text-bar-3" />}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-[10px]">
+        <p className="text-[12px] text-subtle-foreground">Attached items are read with your next message.</p>
+        <button type="button" onClick={() => { onClose(); setIsFileModalOpen(true); }} className="inline-flex shrink-0 items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground hover:text-foreground">
+          <Upload className="size-3.5" /> Upload a file
+        </button>
       </div>
     </div>
   );
 }
-

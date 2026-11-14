@@ -11,7 +11,6 @@
  * CSS var for screens: --jk-tabbar-h on the shell root = height of the phone tab bar (0 on
  * desktop). Fixed bottom UI uses `bottom: calc(var(--jk-tabbar-h) + …)`.
  */
-import JkInputSection from "./jkInputSection";
 import JkChatWindow from "./jkChatWindow";
 import JkSidebar, { useJkOpenSearch } from "./jkSIdebar";
 import JkFileUploadModal from "./jkFileUploadModal";
@@ -41,9 +40,6 @@ export default function JkConsole() {
     } = useJobKompassChatWindow()
     const { upgradeModal, setUpgradeModal } = useFeatureAccess()
     const { searchOpen, setSearchOpen, openSearch } = useJkOpenSearch(setUpgradeModal)
-
-    // Only show input in chat mode
-    const shouldShowInput = currentMode.id === '/chat'
 
     // Phone back arrow returns to the last of Jobs / Docs / Chat the person was on.
     const lastTop = useRef<string>('/chat')
@@ -97,11 +93,7 @@ export default function JkConsole() {
                     extra={<JkChatThreadMenu />}
                 />
 
-                {/* Desktop: thread options float top-right (the frames have no top bar) */}
-                <div className="absolute right-5 top-4 z-20 hidden lg:block">
-                    <JkChatThreadMenu />
-                </div>
-
+                {/* Desktop: Chat renders its own composer and thread header (with the thread menu). */}
                 <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[var(--jk-tabbar-h)]">
                     <JkFileUploadModal
                         isOpen={isFileModalOpen}
@@ -115,13 +107,6 @@ export default function JkConsole() {
                         </div>
                     </div>
 
-                    {shouldShowInput && (
-                        <div className="fixed bottom-[calc(var(--jk-tabbar-h)+20px)] w-full max-w-3xl place-self-center bg-transparent px-6 pt-2">
-                            <div className="mx-auto w-full max-w-3xl">
-                                <JkInputSection />
-                            </div>
-                        </div>
-                    )}
                 </div>
             </main>
 

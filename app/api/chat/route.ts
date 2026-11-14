@@ -12,26 +12,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { jobKompassDescription, resumeBestPractices, jobKompassInstructions, jobKompassInstructionsMinimal } from '@/app/ai/constants/file';
-import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool, createGetUserResumePreferencesTool, createGetUserUsageTool } from '@/app/ai/tools/file';
+import { createAddToResourcesTool, createAddToJobsTool, createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool, createGetUserResumesTool, createGetUserJobsTool, createGetResumeByIdTool, createGetJobByIdTool, createGetUserResumePreferencesTool, createGetUserUsageTool, type ChatTurnContext } from '@/app/ai/tools/file';
+import OpenAI from 'openai';
+import { unwrapToolResult } from '@/lib/chat/toolTrace';
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { setDefaultOpenAIKey, setTracingExportApiKey } from '@openai/agents';
+import { setDefaultOpenAIKey, setTracingExportApiKey, setDefaultOpenAIClient, setOpenAIAPI, setTracingDisabled } from '@openai/agents';
 import { mcpTools } from '@/app/lib/mcp-tools';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 import { chatTurnNamesInventedFact, guardChatTurn, resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 
-/** Saved resume for this signed-in user. Earlier chat turns are not a source. */
+/** Id and name of the resume loadSignedInResume picks, for the chat's step trace. */
+async function baseResumeLabel(client: ConvexHttpClient, contextResumeIds: string[] | undefined): Promise<ChatTurnContext["baseResume"]> {
+  const turn: ChatTurnContext = {};
+  await loadSignedInResume(client, contextResumeIds, turn);
+  return turn.baseResume ?? null;
+}
+
+/** Saved resume for this signed-in user. Earlier chat turns are not a source. Records which one in `turn`. */
 async function loadSignedInResume(
   client: ConvexHttpClient,
   contextResumeIds: string[] | undefined,
+  turn?: ChatTurnContext,
 ): Promise<unknown | null> {
   try {
     for (const resumeId of contextResumeIds ?? []) {
       if (!resumeId) continue;
       try {
         const resume = await client.query(api.documents.getResume, { resumeId: resumeId as never });
-        if (resume?.content) return resume.content;
+        if (resume?.content) {
+          if (turn) turn.baseResume = { id: String(resume._id), name: resume.name };
+          return resume.content;
+        }
       } catch {
         // A bad id is not resume evidence.
       }
@@ -39,14 +52,25 @@ async function loadSignedInResume(
     const resumes = await client.query(api.documents.listResumes);
     if (!Array.isArray(resumes) || resumes.length === 0) return null;
     const latest = [...resumes].sort((a, b) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0))[0];
+    if (latest?.content && turn) turn.baseResume = { id: String(latest._id), name: latest.name };
     return latest?.content ?? null;
   } catch {
     return null;
   }
 }
 
-setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
-setTracingExportApiKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
+const OPENAI_KEY = process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY : process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+// Local dev without an OpenAI key runs the same agent through OpenRouter's
+// OpenAI-compatible Chat Completions API. Production keeps the OpenAI key path.
+const VIA_OPENROUTER = !OPENAI_KEY && process.env.NODE_ENV !== 'production' && !!process.env.OPENROUTER_API_KEY;
+if (VIA_OPENROUTER) {
+  setDefaultOpenAIClient(new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' }) as never);
+  setOpenAIAPI('chat_completions');
+  setTracingDisabled(true);
+} else {
+  setDefaultOpenAIKey(OPENAI_KEY!);
+  setTracingExportApiKey(OPENAI_KEY!);
+}
 
 // Request/Response schemas
 const ChatRequestSchema = z.object({
@@ -105,24 +129,27 @@ export async function POST(request: NextRequest) {
     // Pasted resume JSON, a resume attached to this turn, or the signed-in user's
     // saved resume. Earlier conversation turns are not a source of facts.
     const factGuard: FactGuard = { source: resumeJsonFromText(message) };
+    const turn: ChatTurnContext = { jobIds: contextJobIds };
     if (!factGuard.source) {
       factGuard.source = await loadSignedInResume(convexClient, contextResumeIds);
+      if (factGuard.source) turn.baseResume = await baseResumeLabel(convexClient, contextResumeIds);
     }
     const toolInstancesWithConvexClient = [
       createGetUserUsageTool(convexClient), // Always available - check usage first
-      createResumeJakeTemplateTool(convexClient, factGuard),
-      createCoverLetterJakeTemplateTool(convexClient, factGuard),
+      createResumeJakeTemplateTool(convexClient, factGuard, turn),
+      createCoverLetterJakeTemplateTool(convexClient, factGuard, turn),
       createAddToResourcesTool(convexClient),
       createAddToJobsTool(convexClient),
       createGetUserResumesTool(convexClient),
       createGetUserJobsTool(convexClient),
-      createGetResumeByIdTool(convexClient, factGuard),
-      createGetJobByIdTool(convexClient),
+      createGetResumeByIdTool(convexClient, factGuard, turn),
+      createGetJobByIdTool(convexClient, turn),
       createGetUserResumePreferencesTool(convexClient),
     ];
 
+    // Hosted web search only exists on OpenAI's Responses API.
     const normalTools = [
-      webSearchTool(),
+      ...(VIA_OPENROUTER ? [] : [webSearchTool()]),
       mcpTools.get_introduction,
     ];
 
@@ -155,6 +182,7 @@ export async function POST(request: NextRequest) {
       if (contextJobIds?.length) {
         contextInstructions += `\nThe user has attached the following job(s) to this message: ${contextJobIds.join(', ')}`;
         contextInstructions += "\nIf relevant to the user's request, use the 'getJobById' tool to fetch detailed information about these jobs. If you already searched for this, do not search again unless the user asks you to do so.";
+        contextInstructions += `\nWhen you write a resume for an attached job, pass jobId: "${contextJobIds[0]}" to createResumeJakeTemplate so the resume is linked to it in My Jobs.`;
       }
       
       contextInstructions += "\n\nImportant: Only fetch context details if they're relevant to the user's current request. Don't fetch context unnecessarily if it was already discussed in the conversation history.";
@@ -170,6 +198,8 @@ export async function POST(request: NextRequest) {
       // model: "gpt-4.1",
       // model: "gpt-4.1-mini",
     });
+
+    if (VIA_OPENROUTER) jobKompassAgent.model = "openai/gpt-5-mini";
 
     // TODO Make a new agent that can handle bigger context windows
 
@@ -288,6 +318,9 @@ export async function POST(request: NextRequest) {
     }
 
     let fullMessage = result.finalOutput || 'No response generated';
+    // The job being applied to is the target, not a claimed employer: naming it is allowed.
+    // Its posting text is still never evidence about the candidate.
+    const target = turn.job ? { applicationTarget: { company: turn.job.company, role: turn.job.title } } : {};
     if (factGuard.source) {
       const trimmed = fullMessage.trim();
       let parsed: unknown = null;
@@ -301,13 +334,13 @@ export async function POST(request: NextRequest) {
         }
       }
       if (parsed && typeof parsed === "object") {
-        fullMessage = JSON.stringify(scrubInventedExperience(factGuard.source, parsed), null, 2);
+        fullMessage = JSON.stringify(scrubInventedExperience(factGuard.source, parsed, target), null, 2);
       } else {
         const original = fullMessage;
-        const scrubbed = scrubInventedExperience(factGuard.source, fullMessage);
+        const scrubbed = scrubInventedExperience(factGuard.source, fullMessage, target);
         if (typeof scrubbed === "string" && scrubbed.trim()) fullMessage = scrubbed;
         else fullMessage = "I can only rephrase facts already on the resume.";
-        if (chatTurnNamesInventedFact(factGuard.source, original)) {
+        if (chatTurnNamesInventedFact(factGuard.source, original, target)) {
           fullMessage = "I can only rephrase facts already on the resume.";
         }
       }
@@ -324,6 +357,18 @@ export async function POST(request: NextRequest) {
           const rawArgs = typeof call.arguments === "string" ? call.arguments : JSON.stringify(call.arguments ?? "");
           call.arguments = guardChatTurn({ message, rawText: rawArgs }).toolArguments;
         }
+      }
+    }
+
+    // When the guard had to drop the model's reply after a resume was written, say what
+    // happened from the tool's own record: the target role and the diff notes, nothing else.
+    if (fullMessage === "I can only rephrase facts already on the resume.") {
+      const wrote = toolCalls.map((c) => (c.name === "createResumeJakeTemplate" ? unwrapToolResult(c.result) : null)).find((r) => r?.success);
+      const t = wrote?.tailoring;
+      if (t) {
+        const role = t.jobTitle && t.jobCompany ? ` for the ${t.jobTitle} role at ${t.jobCompany}` : "";
+        const notes = (t.changes ?? []).map((c: { title: string; note: string }) => `${c.title}: ${c.note.charAt(0).toLowerCase()}${c.note.slice(1)}`);
+        fullMessage = `Done. I tailored your resume${role}${notes.length ? `. ${notes.join(". ")}.` : "."}`;
       }
     }
 
