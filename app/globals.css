@@ -981,3 +981,8 @@ input:-webkit-autofill:focus {
   caret-color: var(--foreground);
   transition: background-color 9999s ease-out 0s;
 }
+
+/* ─── App shell (jkConsole.tsx): height of the phone tab bar, 0 where the rail takes over.
+   Fixed bottom UI in any screen sits above it with calc(var(--jk-tabbar-h) + …). */
+.jk-app-shell { --jk-tabbar-h: calc(60px + env(safe-area-inset-bottom)); }
+@media (min-width: 1024px) { .jk-app-shell { --jk-tabbar-h: 0px; } }
