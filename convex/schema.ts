@@ -64,6 +64,9 @@ const documentsTables = {
     content: v.optional(v.any()),
     // Track when user has seen/viewed this document
     seenAt: v.optional(v.number()),
+    // Every status the job has been in, oldest first. Recorded from v4 onward;
+    // older jobs have none (Performance treats that as "unknown", never guesses).
+    statusHistory: v.optional(v.array(v.object({ status: v.string(), at: v.number() }))),
   }).index("by_user", ["userId"]),
 
   documentFolders: defineTable({
@@ -340,6 +343,8 @@ const schema = defineSchema({
     interviewerRole: v.optional(v.string()),
     interviewerEmail: v.optional(v.string()),
     interviewDate: v.optional(v.string()),
+    // When the call starts (ms since epoch). Shown in the D10 header; interviewDate stays as free text.
+    callAt: v.optional(v.number()),
     meetingLink: v.optional(v.string()),
     phoneBackup: v.optional(v.string()),
     compensationTarget: v.optional(v.string()),
@@ -347,6 +352,8 @@ const schema = defineSchema({
     status: v.string(), // "upcoming" | "ready" | "completed" | "archived"
     elevatorPitch: v.optional(v.string()),
     roleSummary: v.optional(v.string()),
+    // "The big four": the proof points to lead with (D10 side panel).
+    proofPoints: v.optional(v.array(v.object({ id: v.string(), title: v.string(), detail: v.string() }))),
     flashcards: v.array(
       v.object({
         id: v.string(),

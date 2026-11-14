@@ -1,190 +1,113 @@
 /**
- * API route for generating AI-powered performance summaries
- * Uses free OpenRouter models to analyze job hunt stats
+ * "What JobKompass sees" (D11 / M09, Pro only).
+ *
+ * Reads the caller's own jobs on the server, turns them into plain counts
+ * (lib/performance/stats.ts → insightFacts) and asks the model for three
+ * observations, each a short headline plus the evidence behind it. The model may
+ * only use the numbers it is given. Returns:
+ *   200 { items: { headline, evidence }[] }            three items
+ *   200 { items: [], reason: "not-enough-data" }       fewer than 5 applications
+ *   401 not signed in · 402 not on Pro
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
-import { FREE_RESUME_MODEL_IDS } from '@/lib/aiModels';
+import { NextRequest, NextResponse } from "next/server";
+import { api } from "@/convex/_generated/api";
+import { RANK_PRO } from "@/convex/plans";
+import { enforceAiRateLimit } from "@/lib/rateLimit/guard";
+import { FREE_RESUME_MODEL_IDS } from "@/lib/aiModels";
+import { convexForCaller } from "@/lib/onboarding/server";
+import { insightFacts } from "@/lib/performance/stats";
 
-const OPENROUTER_MODEL_PRIMARY = FREE_RESUME_MODEL_IDS[0];
-const OPENROUTER_MODEL_FALLBACK = FREE_RESUME_MODEL_IDS[1];
+export const maxDuration = 60;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const MIN_APPLICATIONS = 5;
 
-interface PerformanceStats {
-  totalJobs: number;
-  statusCounts: {
-    Applied?: number;
-    Callback?: number;
-    Interviewing?: number;
-    Offered?: number;
-    Rejected?: number;
-    Ghosted?: number;
-    Interested?: number;
-  };
-  resumeStats?: Record<string, {
-    totalJobs: number;
-    offered: number;
-    rejected: number;
-    ghosted: number;
-    applied: number;
-    interviewing: number;
-  }>;
-  coverLetterStats?: Record<string, {
-    totalJobs: number;
-    offered: number;
-    rejected: number;
-    ghosted: number;
-    applied: number;
-    interviewing: number;
-  }>;
-  documentsGeneratedThisMonth?: number;
-  jobsCount?: number;
+const SYSTEM_PROMPT = `You look at one person's job search numbers and point out the three things most worth knowing.
+
+Return JSON only: {"items":[{"headline":"...","evidence":"..."}]} with exactly 3 items.
+- headline: one short sentence, under 60 characters, stating the finding. Example: "67 of 236 went quiet."
+- evidence: one sentence, under 110 characters, with the numbers that back it up, or what to do about it.
+- Use ONLY numbers present in the data. Never estimate, never round into new claims, never invent a cause.
+- If a comparison group is too small (under 3 applications), don't build an item on it.
+- Plain words. No exclamation marks, no "great job", no "consider", no em dashes.`;
+
+export interface InsightItem {
+  headline: string;
+  evidence: string;
 }
 
-const SYSTEM_PROMPT = `You are a career coach analyzing a job seeker's performance. Given job hunt statistics, write a personalized, actionable 2-4 sentence summary.
-
-Guidelines:
-- Be encouraging but honest
-- Focus on actionable insights (e.g., "Try tailoring your Software Engineer resume more" or "Your 15% response rate suggests stronger cover letters could help")
-- Mention specific numbers when relevant
-- Suggest 1-2 concrete next steps
-- Keep it conversational and supportive
-- If they have interviews or offers, acknowledge those wins
-- If stats are low, focus on improvement opportunities
-
-Return ONLY the summary text, no additional formatting or explanations.`;
+function parseItems(raw: string): InsightItem[] {
+  const text = raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end < 0) return [];
+  try {
+    const data = JSON.parse(text.slice(start, end + 1));
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items
+      .filter((i: any) => typeof i?.headline === "string" && typeof i?.evidence === "string")
+      .map((i: any) => ({ headline: i.headline.trim().slice(0, 120), evidence: i.evidence.trim().slice(0, 220) }))
+      .filter((i: InsightItem) => i.headline && i.evidence)
+      .slice(0, 3);
+  } catch {
+    return [];
+  }
+}
 
 export async function POST(req: NextRequest) {
+  const convex = await convexForCaller();
+  if (!convex) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const rank = await convex.query(api.usage.currentPlanRank, {});
+  if (rank < RANK_PRO) return NextResponse.json({ error: "What JobKompass sees is part of Pro." }, { status: 402 });
+
   const limited = await enforceAiRateLimit(req, "ai");
   if (limited) return limited;
 
-  try {
-    const stats: PerformanceStats = await req.json();
+  const jobs = (await convex.query(api.jobs.list, {})) ?? [];
+  const facts = insightFacts(jobs);
+  if (facts.all.applications < MIN_APPLICATIONS) {
+    return NextResponse.json({ items: [], reason: "not-enough-data", applications: facts.all.applications });
+  }
 
-    if (!stats || typeof stats.totalJobs !== 'number') {
-      return NextResponse.json(
-        { error: 'Invalid stats provided' },
-        { status: 400 }
-      );
-    }
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) return NextResponse.json({ error: "OpenRouter not configured" }, { status: 500 });
 
-    const openRouterKey = process.env.OPENROUTER_API_KEY;
-    if (!openRouterKey) {
-      return NextResponse.json(
-        { error: 'OpenRouter not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Build user prompt with stats
-    const userPrompt = `Analyze these job hunt stats and provide a personalized, actionable summary:
-
-Total Jobs: ${stats.totalJobs}
-Status Breakdown:
-- Interested: ${stats.statusCounts.Interested || 0}
-- Applied: ${stats.statusCounts.Applied || 0}
-- Callback: ${stats.statusCounts.Callback || 0}
-- Interviewing: ${stats.statusCounts.Interviewing || 0}
-- Offered: ${stats.statusCounts.Offered || 0}
-- Rejected: ${stats.statusCounts.Rejected || 0}
-- Ghosted: ${stats.statusCounts.Ghosted || 0}
-
-${stats.resumeStats && Object.keys(stats.resumeStats).length > 0 ? `Resume Performance:
-${Object.entries(stats.resumeStats).map(([name, data]: [string, any]) =>
-  `- ${name}: ${data.totalJobs} jobs (${data.offered} offers, ${data.callback ?? 0} callback, ${data.interviewing} interviewing, ${data.rejected} rejected)`
-).join('\n')}` : ''}
-
-${stats.coverLetterStats && Object.keys(stats.coverLetterStats).length > 0 ? `Cover Letter Performance:
-${Object.entries(stats.coverLetterStats).map(([name, data]: [string, any]) =>
-  `- ${name}: ${data.totalJobs} jobs (${data.offered} offers, ${data.callback ?? 0} callback, ${data.interviewing} interviewing, ${data.rejected} rejected)`
-).join('\n')}` : ''}
-
-${stats.documentsGeneratedThisMonth ? `Documents Generated This Month: ${stats.documentsGeneratedThisMonth}` : ''}`;
-
-    const callOpenRouter = async (model: string) => {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openRouterKey}`,
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://jobkompass.com',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 500,
-        }),
-      });
-      return res;
-    };
-
-    let modelUsed: string = OPENROUTER_MODEL_PRIMARY;
-    let res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
-    if (!res.ok && [502, 429, 503].includes(res.status)) {
-      await sleep(2000);
-      res = await callOpenRouter(OPENROUTER_MODEL_PRIMARY);
-    }
-    if (!res.ok) {
-      await sleep(1000);
-      modelUsed = OPENROUTER_MODEL_FALLBACK;
-      res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
-    }
-    if (!res.ok && [502, 429, 503].includes(res.status)) {
-      await sleep(1000);
-      res = await callOpenRouter(OPENROUTER_MODEL_FALLBACK);
-    }
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('OpenRouter error:', res.status, errText);
-      return NextResponse.json(
-        { error: `AI generation failed: ${res.status}` },
-        { status: 500 }
-      );
-    }
-
-    const data = await res.json();
-    const rawContent = data.choices?.[0]?.message?.content;
-
-    // Handle both string and array content (some models return content as array of parts)
-    let summary: string;
-    if (typeof rawContent === 'string') {
-      summary = rawContent.trim();
-    } else if (Array.isArray(rawContent)) {
-      summary = rawContent
-        .map((part: { type?: string; text?: string }) =>
-          part?.type === 'text' && typeof part?.text === 'string' ? part.text : ''
-        )
-        .join(' ')
-        .trim();
-    } else {
-      summary = '';
-    }
-
-    if (!summary) {
-      return NextResponse.json(
-        { error: 'AI did not return a valid summary' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      summary,
-      modelUsed,
+  const call = (model: string) =>
+    fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://jobkompass.com",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `Data:\n${JSON.stringify(facts, null, 2)}` },
+        ],
+        temperature: 0.3,
+        max_tokens: 600,
+        response_format: { type: "json_object" },
+      }),
+      signal: AbortSignal.timeout(40000),
     });
 
-  } catch (error) {
-    console.error('Performance summary error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate summary' },
-      { status: 500 }
-    );
+  for (const model of FREE_RESUME_MODEL_IDS.slice(0, 2)) {
+    try {
+      const res = await call(model);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      const raw = typeof content === "string"
+        ? content
+        : Array.isArray(content) ? content.map((p: any) => (typeof p?.text === "string" ? p.text : "")).join("") : "";
+      const items = parseItems(raw);
+      if (items.length > 0) return NextResponse.json({ items, modelUsed: model });
+    } catch (err) {
+      console.error("performance summary", model, err);
+    }
   }
+  return NextResponse.json({ error: "Couldn't read your numbers right now. Try again in a minute." }, { status: 502 });
 }

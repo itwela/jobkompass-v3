@@ -46,6 +46,12 @@ export const trapValidator = v.object({
   howToHandle: v.string(),
 });
 
+export const proofPointValidator = v.object({
+  id: v.string(),
+  title: v.string(),
+  detail: v.string(),
+});
+
 export const checklistItemValidator = v.object({
   id: v.string(),
   label: v.string(),
@@ -111,6 +117,7 @@ export const create = mutation({
     interviewerRole: v.optional(v.string()),
     interviewerEmail: v.optional(v.string()),
     interviewDate: v.optional(v.string()),
+    callAt: v.optional(v.number()),
     meetingLink: v.optional(v.string()),
     phoneBackup: v.optional(v.string()),
     compensationTarget: v.optional(v.string()),
@@ -118,6 +125,7 @@ export const create = mutation({
     status: v.optional(v.string()),
     elevatorPitch: v.optional(v.string()),
     roleSummary: v.optional(v.string()),
+    proofPoints: v.optional(v.array(proofPointValidator)),
     flashcards: v.optional(v.array(flashcardValidator)),
     stories: v.optional(v.array(storyValidator)),
     requirementMatches: v.optional(v.array(requirementMatchValidator)),
@@ -140,6 +148,7 @@ export const create = mutation({
       interviewerRole: args.interviewerRole,
       interviewerEmail: args.interviewerEmail,
       interviewDate: args.interviewDate,
+      callAt: args.callAt,
       meetingLink: args.meetingLink,
       phoneBackup: args.phoneBackup,
       compensationTarget: args.compensationTarget,
@@ -147,6 +156,7 @@ export const create = mutation({
       status: args.status || "upcoming",
       elevatorPitch: args.elevatorPitch,
       roleSummary: args.roleSummary,
+      proofPoints: args.proofPoints,
       flashcards: args.flashcards || [],
       stories: args.stories || [],
       requirementMatches: args.requirementMatches || [],
@@ -170,6 +180,7 @@ export const update = mutation({
     interviewerRole: v.optional(v.string()),
     interviewerEmail: v.optional(v.string()),
     interviewDate: v.optional(v.string()),
+    callAt: v.optional(v.number()),
     meetingLink: v.optional(v.string()),
     phoneBackup: v.optional(v.string()),
     compensationTarget: v.optional(v.string()),
@@ -177,6 +188,7 @@ export const update = mutation({
     status: v.optional(v.string()),
     elevatorPitch: v.optional(v.string()),
     roleSummary: v.optional(v.string()),
+    proofPoints: v.optional(v.array(proofPointValidator)),
     flashcards: v.optional(v.array(flashcardValidator)),
     stories: v.optional(v.array(storyValidator)),
     requirementMatches: v.optional(v.array(requirementMatchValidator)),
@@ -333,6 +345,7 @@ export const upsertInternal = internalMutation({
     interviewerRole: v.optional(v.string()),
     interviewerEmail: v.optional(v.string()),
     interviewDate: v.optional(v.string()),
+    callAt: v.optional(v.number()),
     meetingLink: v.optional(v.string()),
     phoneBackup: v.optional(v.string()),
     compensationTarget: v.optional(v.string()),
@@ -340,6 +353,7 @@ export const upsertInternal = internalMutation({
     status: v.optional(v.string()),
     elevatorPitch: v.optional(v.string()),
     roleSummary: v.optional(v.string()),
+    proofPoints: v.optional(v.array(proofPointValidator)),
     flashcards: v.array(flashcardValidator),
     stories: v.array(storyValidator),
     requirementMatches: v.optional(v.array(requirementMatchValidator)),

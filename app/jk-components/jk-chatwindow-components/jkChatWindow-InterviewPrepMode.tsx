@@ -1,1523 +1,736 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+/**
+ * Interview Prep (D10 desktop, M08 phone).
+ *
+ * Desktop: header (job · company · call with X, day time) + tabs, then the tab body on the
+ * left and the call panel on the right (60 second pitch, the big four, guardrails).
+ * Phone: tabs Pitch / Flashcards / Stories / Questions; the call panel lives in Pitch.
+ *
+ * Data: convex/interviewPreps.ts. New optional fields (not deployed until the lead runs
+ * convex deploy): `callAt` (ms, the call start) and `proofPoints` (the big four). Until a
+ * deck has proofPoints, the big four falls back to its own stories (title + outcome).
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import type { Id } from '@/convex/_generated/dataModel'
+import type { Doc, Id } from '@/convex/_generated/dataModel'
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useJobs } from '@/providers/jkJobsProvider'
 import { useJobKompassResume } from '@/providers/jkResumeProvider'
 import { useJobKompassChatWindow } from '@/providers/jkChatWindowProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { BlurFade } from '@/components/ui/blur-fade'
 import { toast } from '@/lib/toast'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Sparkles,
-  BookOpen,
-  Layers,
-  Target,
-  CheckCircle2,
-  Circle,
-  HelpCircle,
-  AlertTriangle,
-  ExternalLink,
-  Copy,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-  Star,
-  Plus,
-  Loader2,
-  Calendar,
-  User,
-  Phone,
-  Video,
-  DollarSign,
-  FileText,
-  Shuffle,
-  MessageSquare,
-  Award,
-  ShieldAlert,
-  Trash2,
-  LogIn,
-} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Check, ChevronLeft, ChevronRight, Copy, Loader2, LogIn, Star, X } from 'lucide-react'
+import JkAppPageHeader from '../jk-app/jkAppPageHeader'
+import JkSectionLabel from '../jk-app/jkSectionLabel'
+import JkArt from '../jkArt'
+import { JkField, jkFieldCls } from '../jkField'
 
-const FLASHCARD_CATEGORIES: Record<
-  string,
-  { label: string; bg: string; text: string; border: string }
-> = {
-  role: {
-    label: 'Role & Fit',
-    bg: 'bg-brand/10',
-    text: 'text-brand ',
-    border: 'border-brand/20',
-  },
-  technical: {
-    label: 'Technical & Stack',
-    bg: 'bg-bar-1/10',
-    text: 'text-bar-1 ',
-    border: 'border-bar-1/20',
-  },
-  experience: {
-    label: 'Proof & Experience',
-    bg: 'bg-ok/10',
-    text: 'text-ok ',
-    border: 'border-ok/20',
-  },
-  objection: {
-    label: 'Pivot / Guardrail',
-    bg: 'bg-warn/10',
-    text: 'text-warn ',
-    border: 'border-warn/20',
-  },
-  behavioral: {
-    label: 'Behavioral',
-    bg: 'bg-brand/10',
-    text: 'text-brand ',
-    border: 'border-brand/20',
-  },
-  logistics: {
-    label: 'Rate & Logistics',
-    bg: 'bg-destructive/10',
-    text: 'text-destructive ',
-    border: 'border-destructive/20',
-  },
-}
-
+type Prep = Doc<'interviewPreps'>
+type Card = Prep['flashcards'][number]
 type PrepTab = 'brief' | 'flashcards' | 'stories' | 'alignment' | 'questions'
+
+const TABS: { id: PrepTab; label: string; short?: string; phone: boolean }[] = [
+  { id: 'brief', label: 'Cheat sheet & pitch', short: 'Pitch', phone: true },
+  { id: 'flashcards', label: 'Flashcards', phone: true },
+  { id: 'stories', label: 'Story bank', short: 'Stories', phone: true },
+  { id: 'alignment', label: 'Role alignment', phone: false },
+  { id: 'questions', label: 'Questions & notes', short: 'Questions', phone: true },
+]
+
+/** Chip label (filter row) and card label ("CARD 7 OF 24 · PROOF & EXPERIENCE"). */
+const CATEGORY: Record<string, { chip: string; card: string; short: string }> = {
+  role: { chip: 'Role & fit', card: 'Role & fit', short: 'Role' },
+  experience: { chip: 'Proof', card: 'Proof & experience', short: 'Proof' },
+  technical: { chip: 'Technical', card: 'Technical', short: 'Technical' },
+  behavioral: { chip: 'Behavioral', card: 'Behavioral', short: 'Behavioral' },
+  logistics: { chip: 'Rate', card: 'Rate & logistics', short: 'Rate' },
+  objection: { chip: 'Pivots', card: 'Pivot', short: 'Pivot' },
+}
+const CHIP_ORDER = ['role', 'experience', 'technical', 'behavioral', 'logistics', 'objection']
+
+/** Confidence values stored on each card. */
+const RATINGS = [
+  { value: 'needs-reps', label: 'Needs reps', dot: 'bg-destructive' },
+  { value: 'learning', label: 'Getting there', dot: 'bg-warn' },
+  { value: 'mastered', label: 'Locked in', dot: 'bg-ok' },
+] as const
+
+const BIG_FOUR_TICKS = ['var(--bar-1)', 'var(--bar-2)', 'var(--bar-3)', 'var(--bar-4)']
+const enter = (i: number) => ({ '--i': i }) as React.CSSProperties
+
+/** "Fri 9:00 AM EST" from callAt, else the deck's free-text date. */
+export function callWhen(prep: Pick<Prep, 'interviewDate'> & { callAt?: number }): string | null {
+  if (prep.callAt) {
+    return new Date(prep.callAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).replace(',', '')
+  }
+  return prep.interviewDate?.trim() || null
+}
 
 export default function JkCW_InterviewPrepMode() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const { allJobs } = useJobs()
   const { resumes } = useJobKompassResume()
-  const { selectedInterviewPrepJobId, setSelectedInterviewPrepJobId } =
-    useJobKompassChatWindow()
+  const { selectedInterviewPrepJobId, setSelectedInterviewPrepJobId } = useJobKompassChatWindow()
 
   const preps = useQuery(api.interviewPreps.list, isAuthenticated ? {} : 'skip')
   const createPrep = useMutation(api.interviewPreps.create)
   const updatePrep = useMutation(api.interviewPreps.update)
-  const removePrep = useMutation(api.interviewPreps.remove)
-  const updateCardConfidence = useMutation(
-    api.interviewPreps.updateFlashcardConfidence
-  )
+  const rateCard = useMutation(api.interviewPreps.updateFlashcardConfidence)
   const toggleChecklist = useMutation(api.interviewPreps.toggleChecklistItem)
   const toggleQuestion = useMutation(api.interviewPreps.toggleQuestionAsked)
 
-  const [selectedPrepId, setSelectedPrepId] =
-    useState<Id<'interviewPreps'> | null>(null)
-  const [activeTab, setActiveTab] = useState<PrepTab>('brief')
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [selectedPrepId, setSelectedPrepId] = useState<Id<'interviewPreps'> | null>(null)
+  const [tab, setTab] = useState<PrepTab>('flashcards')
+  const [showCreate, setShowCreate] = useState(false)
+  const [presetJob, setPresetJob] = useState('')
 
-  // Flashcard state
-  const [cardCategoryFilter, setCardCategoryFilter] = useState<string>('all')
-  const [starredOnly, setStarredOnly] = useState(false)
-  const [currentCardIndex, setCurrentCardIndex] = useState(0)
-  const [isFlipped, setIsFlipped] = useState(false)
-  const [showHint, setShowHint] = useState(false)
-  const [shuffledOrder, setShuffledOrder] = useState<string[] | null>(null)
-
-  // New / AI generate modal state
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [selectedJobForNew, setSelectedJobForNew] = useState<string>('')
-  const [customCompany, setCustomCompany] = useState('')
-  const [customRole, setCustomRole] = useState('')
-  const [customDescription, setCustomDescription] = useState('')
-  const [customNotes, setCustomNotes] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-
-  // Live notes state
-  const [localCallNotes, setLocalCallNotes] = useState('')
-  const [isSavingNotes, setIsSavingNotes] = useState(false)
-
-  // Select first prep or match selectedInterviewPrepJobId
   useEffect(() => {
-    if (!preps || preps.length === 0) return
-
+    if (!preps) return
     if (selectedInterviewPrepJobId) {
-      const matched = preps.find((p) => p.jobId === selectedInterviewPrepJobId)
-      if (matched) {
-        setSelectedPrepId(matched._id)
-        setSelectedInterviewPrepJobId(null)
-        return
-      } else {
-        setSelectedJobForNew(selectedInterviewPrepJobId)
-        setShowCreateForm(true)
-        setSelectedInterviewPrepJobId(null)
-      }
-    }
-
-    if (!selectedPrepId || !preps.some((p) => p._id === selectedPrepId)) {
-      setSelectedPrepId(preps[0]._id)
-    }
-  }, [preps, selectedPrepId, selectedInterviewPrepJobId, setSelectedInterviewPrepJobId])
-
-  const activePrep = useMemo(() => {
-    if (!preps || !selectedPrepId) return null
-    return preps.find((p) => p._id === selectedPrepId) ?? preps[0] ?? null
-  }, [preps, selectedPrepId])
-
-  useEffect(() => {
-    if (activePrep) {
-      setLocalCallNotes(activePrep.callNotes ?? '')
-      setCurrentCardIndex(0)
-      setIsFlipped(false)
-      setShowHint(false)
-      setShuffledOrder(null)
-    }
-  }, [activePrep?._id])
-
-  const filteredCards = useMemo(() => {
-    if (!activePrep) return []
-    let list = activePrep.flashcards || []
-    if (cardCategoryFilter !== 'all') {
-      list = list.filter((c) => c.category === cardCategoryFilter)
-    }
-    if (starredOnly) {
-      list = list.filter((c) => c.starred)
-    }
-    if (shuffledOrder) {
-      const orderMap = new Map(shuffledOrder.map((id, idx) => [id, idx]))
-      list = [...list].sort(
-        (a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999)
-      )
-    }
-    return list
-  }, [activePrep, cardCategoryFilter, starredOnly, shuffledOrder])
-
-  const currentCard = filteredCards[currentCardIndex] ?? filteredCards[0] ?? null
-
-  // Keyboard navigation for flashcards
-  useEffect(() => {
-    if (activeTab !== 'flashcards') return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        document.activeElement?.tagName === 'INPUT' ||
-        document.activeElement?.tagName === 'TEXTAREA'
-      ) {
-        return
-      }
-      if (e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault()
-        setIsFlipped((prev) => !prev)
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        setIsFlipped(false)
-        setShowHint(false)
-        setCurrentCardIndex((prev) =>
-          filteredCards.length > 0 ? (prev + 1) % filteredCards.length : 0
-        )
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        setIsFlipped(false)
-        setShowHint(false)
-        setCurrentCardIndex((prev) =>
-          filteredCards.length > 0
-            ? (prev - 1 + filteredCards.length) % filteredCards.length
-            : 0
-        )
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTab, filteredCards.length])
-
-  const handleCopy = (text: string, id: string) => {
-    navigator.clipboard.writeText(text)
-    setCopiedId(id)
-    toast.success('Copied to clipboard')
-    setTimeout(() => setCopiedId(null), 2000)
-  }
-
-  const handleShuffleCards = () => {
-    if (!activePrep) return
-    const ids = activePrep.flashcards.map((c) => c.id)
-    for (let i = ids.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[ids[i], ids[j]] = [ids[j], ids[i]]
-    }
-    setShuffledOrder(ids)
-    setCurrentCardIndex(0)
-    setIsFlipped(false)
-  }
-
-  const handleSaveCallNotes = async () => {
-    if (!activePrep) return
-    setIsSavingNotes(true)
-    try {
-      await updatePrep({
-        id: activePrep._id,
-        callNotes: localCallNotes,
-      })
-      toast.success('Call notes saved')
-    } catch (err) {
-      console.error(err)
-      toast.error('Failed to save notes')
-    } finally {
-      setIsSavingNotes(false)
-    }
-  }
-
-  const handleGeneratePrep = async () => {
-    const selectedJob = allJobs?.find((j) => j._id === selectedJobForNew)
-    const company = selectedJob ? selectedJob.company : customCompany.trim()
-    const role = selectedJob ? selectedJob.title : customRole.trim()
-    const description = selectedJob
-      ? selectedJob.description || ''
-      : customDescription.trim()
-    const notes = selectedJob ? selectedJob.notes || '' : customNotes.trim()
-
-    if (!company || !role) {
-      toast.error('Missing info', 'Select a job or enter company and role.')
+      const match = preps.find((p) => p.jobId === selectedInterviewPrepJobId)
+      if (match) setSelectedPrepId(match._id)
+      else { setPresetJob(selectedInterviewPrepJobId); setShowCreate(true) }
+      setSelectedInterviewPrepJobId(null)
       return
     }
+    if (preps.length === 0) return
+    if (!selectedPrepId || !preps.some((p) => p._id === selectedPrepId)) setSelectedPrepId(preps[0]._id)
+  }, [preps, selectedPrepId, selectedInterviewPrepJobId, setSelectedInterviewPrepJobId])
 
-    setIsGenerating(true)
-    try {
-      const baseResume =
-        resumes?.find((r: any) => r.isActive) || resumes?.[0] || null
+  const prep = useMemo(() => preps?.find((p) => p._id === selectedPrepId) ?? preps?.[0] ?? null, [preps, selectedPrepId])
 
-      const res = await fetch('/api/interview-prep/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company,
-          role,
-          description,
-          notes,
-          resumeContent: baseResume?.content ?? null,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok || !data.prep) {
-        throw new Error(data.error || 'Failed to generate prep')
-      }
-
-      const p = data.prep
-      const newId = await createPrep({
-        jobId: selectedJob ? (selectedJob._id as Id<'jobs'>) : undefined,
-        company,
-        role,
-        compensationTarget: selectedJob?.compensation,
-        resumeUsed: selectedJob?.resumeUsed || baseResume?.name,
-        status: 'upcoming',
-        elevatorPitch: p.elevatorPitch,
-        roleSummary: p.roleSummary,
-        flashcards: Array.isArray(p.flashcards) ? p.flashcards : [],
-        stories: Array.isArray(p.stories) ? p.stories : [],
-        requirementMatches: Array.isArray(p.requirementMatches)
-          ? p.requirementMatches
-          : [],
-        questionsToAsk: Array.isArray(p.questionsToAsk) ? p.questionsToAsk : [],
-        trapsAndGuardrails: Array.isArray(p.trapsAndGuardrails)
-          ? p.trapsAndGuardrails
-          : [],
-        checklist: Array.isArray(p.checklist) ? p.checklist : [],
-      })
-
-      setSelectedPrepId(newId)
-      setShowCreateForm(false)
-      setSelectedJobForNew('')
-      setCustomCompany('')
-      setCustomRole('')
-      setCustomDescription('')
-      setCustomNotes('')
-      toast.success('Interview Prep ready!', `Built deck for ${company}.`)
-    } catch (err: any) {
-      console.error(err)
-      toast.error('Generation failed', err?.message || 'Please try again.')
-    } finally {
-      setIsGenerating(false)
-    }
+  if (authLoading || (isAuthenticated && preps === undefined)) {
+    return <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
   }
-
-  if (authLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full px-6 py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-6 py-12 text-center">
-        <Target className="h-12 w-12 text-muted-foreground mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Sign in to use Interview Prep</h2>
-        <p className="text-muted-foreground mb-6 max-w-md">
-          Drill flashcards, rehearse STAR stories, and keep your live call
-          briefing in one command center.
-        </p>
-        <Button
-          onClick={() =>
-            window.dispatchEvent(new CustomEvent('jk:openSignIn'))
-          }
-          className="gap-2"
-        >
-          <LogIn className="h-4 w-4" />
-          Sign In
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+        <h2 className="text-[22px] font-medium text-foreground">Sign in to prep for your next call</h2>
+        <Button className="mt-5 gap-2" onClick={() => window.dispatchEvent(new CustomEvent('jk:openSignIn'))}>
+          <LogIn className="h-4 w-4" /> Sign in
         </Button>
       </div>
     )
   }
 
-  const masteredCount =
-    activePrep?.flashcards.filter((c) => c.confidence === 'mastered').length ??
-    0
-  const totalCards = activePrep?.flashcards.length ?? 0
-  const checklistDoneCount =
-    activePrep?.checklist.filter((c) => c.done).length ?? 0
-  const totalChecklist = activePrep?.checklist.length ?? 0
+  const p = prep as (Prep & { callAt?: number; proofPoints?: { id: string; title: string; detail: string }[] }) | null
+  const when = p ? callWhen(p) : null
+  const sub = p
+    ? [p.role, p.company, p.interviewerName ? `call with ${p.interviewerName}${when ? `, ${when}` : ''}` : when].filter(Boolean).join(' · ')
+    : 'Flashcards, stories and a call sheet for any job you track'
+
+  const newDeckButton = (
+    <Button variant="outline" onClick={() => setShowCreate((s) => !s)} className="h-10 rounded-full border-input bg-popover px-6 text-[13.5px] font-medium">
+      {showCreate ? 'Close' : 'New deck'}
+    </Button>
+  )
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto chat-scroll bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="max-w-7xl mx-auto w-full px-6 py-8 space-y-6 pb-24">
-        {/* Top Header + Prep Switcher */}
-        <BlurFade delay={0.05}>
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Interview Prep
-                </h1>
-                <span className="text-xs font-semibold text-brand bg-brand/10 px-2.5 py-0.5 rounded-full">
-                  Command Center
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                Interactive flashcards, outcome-first story bank, requirement
-                mapping, and live call briefing.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              {preps && preps.length > 0 && (
-                <div className="flex items-center gap-1.5 bg-card border border-border rounded-xl p-1">
-                  {preps.map((p) => {
-                    const isSelected = activePrep?._id === p._id
-                    return (
-                      <button
-                        key={p._id}
-                        onClick={() => setSelectedPrepId(p._id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          isSelected
-                            ? 'bg-primary text-primary-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                        }`}
-                      >
-                        {p.company}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              <Button
-                onClick={() => setShowCreateForm((prev) => !prev)}
-                size="sm"
-                variant={showCreateForm ? 'secondary' : 'default'}
-                className="gap-1.5 rounded-xl"
+    <div className="chat-scroll flex h-full flex-col overflow-y-auto pb-[calc(var(--jk-tabbar-h)+24px)] lg:pb-0">
+      <JkAppPageHeader
+        title="Interview Prep"
+        sub={sub}
+        art={null}
+        divider={false}
+        className="hidden lg:block"
+        actions={
+          <div className="hidden items-center gap-2.5 lg:flex">
+            {preps && preps.length > 1 && (
+              <select
+                aria-label="Deck"
+                value={p?._id ?? ''}
+                onChange={(e) => setSelectedPrepId(e.target.value as Id<'interviewPreps'>)}
+                className="h-10 max-w-[220px] truncate rounded-full border border-input bg-card px-4 text-[13.5px] text-foreground"
               >
-                <Plus className="h-4 w-4" />
-                New Prep Deck
-              </Button>
+                {preps.map((d) => <option key={d._id} value={d._id}>{d.company} · {d.role}</option>)}
+              </select>
+            )}
+            {newDeckButton}
+          </div>
+        }
+      />
+
+      {showCreate && (
+        <CreateDeck
+          jobs={allJobs ?? []}
+          presetJob={presetJob}
+          resume={(resumes as any[] | undefined)?.find((r) => r.isActive) ?? (resumes as any[] | undefined)?.[0] ?? null}
+          onCancel={() => setShowCreate(false)}
+          onCreate={async (args) => {
+            const id = await createDeck(createPrep, args)
+            setSelectedPrepId(id)
+            setShowCreate(false)
+            setPresetJob('')
+            setTab('flashcards')
+          }}
+        />
+      )}
+
+      {!p ? (
+        !showCreate && (
+          <div data-enter className="mx-5 mt-6 rounded-[28px] border border-input bg-card px-6 py-12 text-center lg:mx-8">
+            <h2 className="jk-enter text-[22px] font-medium text-foreground" style={enter(0)}>No prep decks yet</h2>
+            <p className="jk-enter mx-auto mt-2 max-w-md text-[14px] text-muted-foreground" style={enter(1)}>
+              Pick a job you track and JobKompass writes flashcards, stories and a call sheet from your resume.
+            </p>
+            <div className="jk-enter mt-6" style={enter(2)}>{newDeckButton}</div>
+          </div>
+        )
+      ) : (
+        <>
+          {/* Tabs */}
+          <nav aria-label="Prep sections" className="sticky top-0 z-10 shrink-0 border-b border-border bg-background">
+            <div className="flex gap-7 overflow-x-auto px-5 [scrollbar-width:none] lg:gap-[31px] lg:px-8">
+              {TABS.map((t) => {
+                const on = tab === t.id
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTab(t.id)}
+                    aria-current={on ? 'page' : undefined}
+                    className={cn(
+                      'relative whitespace-nowrap pb-[11px] pt-[14px] text-[14.5px] transition-colors lg:pb-[9px] lg:pt-0 lg:text-[14px]',
+                      on ? 'font-semibold text-foreground lg:font-medium' : 'text-subtle-foreground hover:text-foreground',
+                      !t.phone && 'hidden lg:block',
+                    )}
+                  >
+                    <span className="lg:hidden">{t.short ?? t.label}</span>
+                    <span className="hidden lg:inline">{t.label}</span>
+                    {on && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-plan" />}
+                  </button>
+                )
+              })}
+            </div>
+          </nav>
+
+          <div key={`${p._id}-${tab}`} className="grid min-h-0 flex-1 xl:grid-cols-[minmax(0,748fr)_minmax(0,428fr)]">
+            <div data-enter className="jk-stagger min-w-0 px-5 pb-10 pt-5 lg:px-8 lg:pt-[22px] xl:pr-4">
+              {tab === 'flashcards' && (
+                <Flashcards prep={p} onRate={(cardId, confidence) => rateCard({ id: p._id, cardId, confidence })} onStar={(cardId, starred) => rateCard({ id: p._id, cardId, starred })} />
+              )}
+              {tab === 'brief' && (
+                <Brief prep={p} when={when} sub={sub} newDeck={newDeckButton} onCallAt={async (callAt) => {
+                  try { await updatePrep({ id: p._id, callAt } as any); toast.success('Call time saved') }
+                  catch { toast.error('Could not save the call time', 'This needs the latest backend. Try again after the next release.') }
+                }} />
+              )}
+              {tab === 'stories' && <Stories prep={p} />}
+              {tab === 'alignment' && <Alignment prep={p} />}
+              {tab === 'questions' && (
+                <Questions
+                  prep={p}
+                  onToggle={(questionId) => toggleQuestion({ id: p._id, questionId })}
+                  onToggleChecklist={(itemId) => toggleChecklist({ id: p._id, itemId })}
+                  onSaveNotes={async (callNotes) => { await updatePrep({ id: p._id, callNotes }); toast.success('Notes saved') }}
+                />
+              )}
+            </div>
+            <aside data-enter className="jk-stagger hidden border-l border-border px-4 pb-10 pt-[30px] xl:block xl:pr-8">
+              <CallPanel prep={p} />
+            </aside>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ─── Flashcards ──────────────────────────────────────────────────────────── */
+
+function Flashcards({ prep, onRate, onStar }: { prep: Prep; onRate: (id: string, c: string) => void; onStar: (id: string, s: boolean) => void }) {
+  const cards = prep.flashcards
+  const [filter, setFilter] = useState<string>('all')
+  const [index, setIndex] = useState(0)
+  const [flipped, setFlipped] = useState(false)
+
+  const list = useMemo(() => {
+    if (filter === 'all') return cards
+    if (filter === 'starred') return cards.filter((c) => c.starred)
+    return cards.filter((c) => c.category === filter)
+  }, [cards, filter])
+  const card: Card | undefined = list[Math.min(index, list.length - 1)]
+  const pos = card ? cards.findIndex((c) => c.id === card.id) + 1 : 0
+  const mastered = cards.filter((c) => c.confidence === 'mastered').length
+  const starred = cards.filter((c) => c.starred).length
+
+  const go = useCallback((d: number) => {
+    setFlipped(false)
+    setIndex((i) => (list.length ? (i + d + list.length) % list.length : 0))
+  }, [list.length])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = document.activeElement?.tagName
+      if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return
+      if (e.key === ' ') { e.preventDefault(); setFlipped((f) => !f) }
+      else if (e.key === 'ArrowRight') go(1)
+      else if (e.key === 'ArrowLeft') go(-1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [go])
+
+  const chips = [
+    { id: 'all', label: `All ${cards.length}` },
+    ...CHIP_ORDER.filter((k) => cards.some((c) => c.category === k)).map((k) => ({ id: k, label: CATEGORY[k].chip })),
+    { id: 'starred', label: `Starred ${starred}` },
+  ]
+
+  return (
+    <>
+      <div className="hidden flex-wrap gap-1.5 lg:flex">
+        {chips.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => { setFilter(c.id); setIndex(0); setFlipped(false) }}
+            aria-pressed={filter === c.id}
+            className={cn(
+              'h-7 rounded-full border px-[15px] text-[12.5px] font-medium transition-colors',
+              filter === c.id ? 'border-plan bg-accent text-foreground' : 'border-input text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {!card ? (
+        <p className="mt-5 rounded-[28px] border border-input bg-card p-8 text-[14px] text-muted-foreground">
+          {filter === 'starred' ? 'No starred cards yet. Star the ones you want to drill.' : 'No cards here.'}
+        </p>
+      ) : (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={flipped ? 'Hide the answer' : 'Show the answer'}
+          onClick={(e) => { if (!(e.target as HTMLElement).closest('[data-star]')) setFlipped((f) => !f) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') setFlipped((f) => !f) }}
+          className="relative isolate mt-0 cursor-pointer overflow-hidden rounded-[28px] border border-input bg-card px-6 pb-12 pt-[29px] lg:mt-5 lg:min-h-[400px] lg:px-8 lg:pb-8 lg:pt-[33px]"
+        >
+          <div aria-hidden className="pointer-events-none absolute right-3 top-2 -z-10 hidden size-[236px] md:block">
+            <JkArt name="step4" variant="spot" fade="all" />
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <p className="font-mono text-[10px] font-medium uppercase tracking-[1.2px] text-plan-text">
+              Card {pos} of {cards.length} · <span className="lg:hidden">{CATEGORY[card.category]?.short ?? card.category}</span><span className="hidden lg:inline">{CATEGORY[card.category]?.card ?? card.category}</span>
+            </p>
+            <button
+              type="button"
+              data-star
+              onClick={() => onStar(card.id, !card.starred)}
+              aria-label={card.starred ? 'Unstar card' : 'Star card'}
+              aria-pressed={!!card.starred}
+              className="-m-1 p-1 text-subtle-foreground hover:text-foreground md:mr-[236px] lg:mr-[220px]"
+            >
+              <Star className={cn('h-[17px] w-[17px] lg:h-[15px] lg:w-[15px]', card.starred && 'fill-plan text-plan')} strokeWidth={1.6} />
+            </button>
+          </div>
+          <p className="mt-[29px] max-w-[400px] text-[27px] font-medium leading-[33px] text-foreground lg:mt-[37px] lg:max-w-[390px] lg:text-[30px] lg:leading-[36px]">
+            {card.front}
+          </p>
+          <div className="mt-[66px] border-t border-dashed border-border pt-[25px] lg:mt-[73px] lg:border-solid lg:pt-[19px]">
+            <p className="font-mono text-[9.5px] uppercase tracking-[1.2px] text-subtle-foreground lg:text-[10px] lg:font-medium">Answer, outcome first</p>
+            {flipped ? (
+              <p className="mt-2.5 text-[13.5px] leading-5 text-muted-foreground lg:text-[14.5px] lg:leading-[22px]">{card.back}</p>
+            ) : (
+              <p className="mt-2.5 text-[13.5px] leading-5 text-subtle-foreground lg:text-[14.5px] lg:leading-[22px]">
+                Say it out loud first, then <span className="hidden lg:inline">press space or </span>tap the card to check.
+                {card.hint && <span className="mt-1 block">Cue: {card.hint}</span>}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {card && (
+        <div className="mt-5 lg:mt-6">
+          <JkSectionLabel className="hidden tracking-[1.2px] lg:flex">How did that go?</JkSectionLabel>
+          <div className="flex items-center justify-between gap-4 lg:mt-[11px]">
+            <div className="grid flex-1 grid-cols-3 gap-[7px] lg:flex lg:flex-none lg:gap-2">
+              {RATINGS.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => { onRate(card.id, r.value); go(1) }}
+                  aria-pressed={card.confidence === r.value}
+                  className={cn(
+                    'flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-full border bg-card px-3 text-[12.5px] font-medium text-foreground transition-colors lg:h-[42px] lg:justify-start lg:gap-2.5 lg:px-4 lg:text-[14px]',
+                    card.confidence === r.value ? 'border-border-strong bg-accent' : 'border-input hover:border-border-strong',
+                  )}
+                >
+                  <span className={cn('size-2 shrink-0 rounded-full', r.dot)} />
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <div className="hidden items-center gap-[30px] lg:flex">
+              <button type="button" onClick={() => go(-1)} aria-label="Previous card" className="-m-2 p-2 text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="font-mono text-[9.5px] uppercase tracking-[1.2px] text-subtle-foreground">Space to flip</span>
+              <button type="button" onClick={() => go(1)} aria-label="Next card" className="-m-2 p-2 text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>
-        </BlurFade>
+        </div>
+      )}
 
-        {/* Create / AI Generate Form */}
-        <AnimatePresence>
-          {showCreateForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="rounded-xl border border-brand/30 bg-card p-6 space-y-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-brand" />
-                    <h3 className="font-semibold text-base">
-                      Generate AI Interview Prep Deck
-                    </h3>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCreateForm(false)}
-                  >
-                    Cancel
-                  </Button>
+      <div className="mt-[34px] lg:mt-[38px]">
+        <div className="flex items-center justify-between">
+          <JkSectionLabel className="font-normal tracking-[1.2px]">Cards mastered</JkSectionLabel>
+          <p className="font-mono text-[12px] font-medium text-foreground">{mastered} / {cards.length}</p>
+        </div>
+        <div className="mt-2.5 flex gap-1" role="img" aria-label={`${mastered} of ${cards.length} cards locked in`}>
+          {cards.map((c) => (
+            <span
+              key={c.id}
+              className={cn(
+                'h-[5px] min-w-0 flex-1 rounded-full',
+                c.confidence === 'mastered' ? 'bg-ok' : c.confidence === 'learning' ? 'bg-warn' : c.confidence === 'needs-reps' ? 'bg-destructive' : 'bg-input',
+              )}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ─── Call panel (side panel on desktop, top of Pitch on phones) ────────── */
+
+function CallPanel({ prep }: { prep: Prep & { proofPoints?: { id: string; title: string; detail: string }[] } }) {
+  const bigFour = (prep.proofPoints?.length
+    ? prep.proofPoints
+    : prep.stories.map((s) => ({ id: s.id, title: s.title.split(/\s[—–-]\s/)[0], detail: s.outcome }))
+  ).slice(0, 4)
+  const guardrails = prep.trapsAndGuardrails ?? []
+  return (
+    <>
+      {prep.elevatorPitch && (
+        <section className="border-b border-border pb-[30px]">
+          <JkSectionLabel as="h2">60 second pitch</JkSectionLabel>
+          <p className="mt-3 whitespace-pre-line text-[14px] leading-[21.5px] text-foreground">{prep.elevatorPitch}</p>
+        </section>
+      )}
+      {bigFour.length > 0 && (
+        <section className="border-b border-border py-5">
+          <JkSectionLabel as="h2">The big four</JkSectionLabel>
+          <ul className="mt-[17px] space-y-[22px]">
+            {bigFour.map((b, i) => (
+              <li key={b.id} className="flex gap-[13px]">
+                <span aria-hidden className="mt-0.5 h-[30px] w-[3px] shrink-0 rounded-full" style={{ background: BIG_FOUR_TICKS[i] }} />
+                <div className="min-w-0">
+                  <p className="text-[14.5px] font-medium leading-[17px] text-foreground">{b.title}</p>
+                  <p className="mt-1 line-clamp-2 text-[12.5px] leading-[15px] text-muted-foreground">{b.detail}</p>
                 </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {guardrails.length > 0 && (
+        <section className="pt-5">
+          <JkSectionLabel as="h2">Guardrails</JkSectionLabel>
+          <ul className="mt-[13px] space-y-3">
+            {guardrails.map((g) => (
+              <li key={g.id} className="space-y-1.5 text-[13px] leading-[17px] text-muted-foreground">
+                <p className="flex gap-3"><X className="mt-px h-3.5 w-3.5 shrink-0 text-destructive" strokeWidth={2} />{g.trap}</p>
+                <p className="flex gap-3"><Check className="mt-px h-3.5 w-3.5 shrink-0 text-ok" strokeWidth={2} />{g.howToHandle}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
+  )
+}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Pick from My Jobs (or leave blank to enter manually)
-                    </label>
-                    <select
-                      value={selectedJobForNew}
-                      onChange={(e) => setSelectedJobForNew(e.target.value)}
-                      className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">-- Custom Role / Manual Entry --</option>
-                      {(allJobs ?? []).map((j) => (
-                        <option key={j._id} value={j._id}>
-                          {j.company} — {j.title} ({j.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+/* ─── Cheat sheet & pitch ─────────────────────────────────────────────────── */
 
-                  {!selectedJobForNew && (
-                    <>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Company
-                        </label>
-                        <Input
-                          value={customCompany}
-                          onChange={(e) => setCustomCompany(e.target.value)}
-                          placeholder="e.g. PTC (via Mondo)"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Role Title
-                        </label>
-                        <Input
-                          value={customRole}
-                          onChange={(e) => setCustomRole(e.target.value)}
-                          placeholder="e.g. GTM AI Solutions Engineer"
-                        />
-                      </div>
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Job Description
-                        </label>
-                        <textarea
-                          value={customDescription}
-                          onChange={(e) => setCustomDescription(e.target.value)}
-                          placeholder="Paste the job description..."
-                          className="w-full min-h-[90px] rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Recruiter / Interview Notes (optional)
-                        </label>
-                        <Input
-                          value={customNotes}
-                          onChange={(e) => setCustomNotes(e.target.value)}
-                          placeholder="Interviewer name, call format, rate target..."
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleGeneratePrep}
-                    disabled={isGenerating}
-                    className="gap-2"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Generating Deck from Your Resume & Job...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Generate Tailored Prep Deck
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
+function Brief({ prep, when, sub, newDeck, onCallAt }: { prep: Prep & { callAt?: number }; when: string | null; sub: string; newDeck: React.ReactNode; onCallAt: (ms: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+  const [copied, setCopied] = useState(false)
+  return (
+    <>
+      <div className="lg:hidden">
+        <p className="text-[13.5px] leading-5 text-muted-foreground">{sub}</p>
+      </div>
+      <section className="mt-5 rounded-3xl border border-input bg-card p-5 lg:mt-0 lg:p-6">
+        <JkSectionLabel as="h2">The call</JkSectionLabel>
+        <p className="mt-2.5 text-[18px] font-medium text-foreground">{prep.role} at {prep.company}</p>
+        <p className="mt-1 text-[13.5px] text-muted-foreground">{when ?? 'No call time yet.'}{prep.interviewerName && ` · ${prep.interviewerName}`}{prep.interviewerRole && `, ${prep.interviewerRole}`}</p>
+        {prep.roleSummary && <p className="mt-3 text-[13.5px] leading-5 text-muted-foreground">{prep.roleSummary}</p>}
+        <div className="mt-4 flex flex-wrap items-end gap-2.5">
+          {editing ? (
+            <>
+              <JkField label="Call starts" id="callAt" className="w-[240px]">
+                <Input id="callAt" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} className={cn(jkFieldCls, 'h-10')} />
+              </JkField>
+              <Button size="sm" disabled={!value} onClick={() => { onCallAt(new Date(value).getTime()); setEditing(false) }}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </>
+          ) : (
+            <Button size="sm" variant="outline" className="rounded-full border-input" onClick={() => setEditing(true)}>{prep.callAt ? 'Change call time' : 'Set call time'}</Button>
           )}
-        </AnimatePresence>
+          {prep.meetingLink && (
+            <a href={prep.meetingLink} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground">Join the call</a>
+          )}
+        </div>
+      </section>
 
-        {!activePrep ? (
-          <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4">
-            <Target className="h-10 w-10 text-muted-foreground mx-auto" />
-            <h3 className="text-lg font-semibold">No Interview Prep Decks Yet</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Click &ldquo;New Prep Deck&rdquo; above to generate flashcards,
-              STAR stories, and a live call sheet for any job in your tracker.
-            </p>
+      {prep.elevatorPitch && (
+        <section className="mt-5 hidden xl:block">
+          <div className="flex items-center justify-between">
+            <JkSectionLabel as="h2">Copy your pitch</JkSectionLabel>
+            <button type="button" onClick={() => { navigator.clipboard.writeText(prep.elevatorPitch!); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+              className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground">
+              {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}{copied ? 'Copied' : 'Copy'}
+            </button>
           </div>
-        ) : (
+        </section>
+      )}
+
+      <div className="mt-7 xl:hidden"><CallPanel prep={prep} /></div>
+
+      <section className="mt-7 lg:hidden">
+        <JkSectionLabel as="h2">Role alignment</JkSectionLabel>
+        <div className="mt-3"><Alignment prep={prep} bare /></div>
+      </section>
+
+      <div className="mt-8 lg:hidden">{newDeck}</div>
+    </>
+  )
+}
+
+/* ─── Story bank ──────────────────────────────────────────────────────────── */
+
+function Stories({ prep }: { prep: Prep }) {
+  if (prep.stories.length === 0) return <p className="text-[14px] text-muted-foreground">No stories in this deck.</p>
+  return (
+    <>
+      {prep.stories.map((s, i) => (
+        <article key={s.id} className="mb-4 rounded-3xl border border-input bg-card p-5 lg:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-[17px] font-medium text-foreground">{s.title}</h2>
+            <span className="font-mono text-[10px] uppercase tracking-[1.2px]" style={{ color: BIG_FOUR_TICKS[i % 4] === 'var(--bar-4)' ? 'var(--bar-4-ink)' : BIG_FOUR_TICKS[i % 4] }}>{s.tag}</span>
+          </div>
+          {s.hook && <p className="mt-2 text-[14px] leading-5 text-foreground">{s.hook}</p>}
+          <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+            {([['Outcome', s.outcome], ['Situation', s.situation], ['What I did', s.action], ['Why it matters here', s.takeaway]] as const).map(([k, v]) => (
+              <div key={k}>
+                <dt className="font-mono text-[10px] font-medium uppercase tracking-[1.2px] text-subtle-foreground">{k}</dt>
+                <dd className="mt-1 text-[13.5px] leading-5 text-muted-foreground">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+      ))}
+    </>
+  )
+}
+
+/* ─── Role alignment ──────────────────────────────────────────────────────── */
+
+const STRENGTH: Record<string, { label: string; dot: string }> = {
+  strong: { label: 'Strong', dot: 'bg-ok' },
+  moderate: { label: 'Partial', dot: 'bg-warn' },
+  pivot: { label: 'Pivot', dot: 'bg-destructive' },
+}
+
+function Alignment({ prep, bare }: { prep: Prep; bare?: boolean }) {
+  const rows = prep.requirementMatches ?? []
+  if (rows.length === 0) return <p className="text-[14px] text-muted-foreground">No requirements mapped in this deck.</p>
+  return (
+    <ul className={cn('divide-y divide-border', !bare && 'rounded-3xl border border-input bg-card px-5 lg:px-6')}>
+      {rows.map((r) => (
+        <li key={r.id} className="py-4">
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-[14px] font-medium leading-5 text-foreground">{r.requirement}</p>
+            <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-muted-foreground">
+              <span className={cn('size-2 rounded-full', STRENGTH[r.strength]?.dot ?? 'bg-input')} />{STRENGTH[r.strength]?.label ?? r.strength}
+            </span>
+          </div>
+          <p className="mt-1 text-[13px] leading-5 text-muted-foreground">{r.yourProof}</p>
+          {r.priority === 'must-have' && <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[1.2px] text-subtle-foreground">Must have</p>}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/* ─── Questions & notes ───────────────────────────────────────────────────── */
+
+function Questions({ prep, onToggle, onToggleChecklist, onSaveNotes }: {
+  prep: Prep; onToggle: (id: string) => void; onToggleChecklist: (id: string) => void; onSaveNotes: (n: string) => Promise<void>
+}) {
+  const [notes, setNotes] = useState(prep.callNotes ?? '')
+  const [saving, setSaving] = useState(false)
+  const asked = prep.questionsToAsk.filter((q) => q.asked).length
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <JkSectionLabel as="h2">Questions to ask</JkSectionLabel>
+        <p className="font-mono text-[12px] text-foreground">{asked} / {prep.questionsToAsk.length}</p>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {prep.questionsToAsk.map((q) => (
+          <li key={q.id}>
+            <button type="button" onClick={() => onToggle(q.id)} aria-pressed={!!q.asked}
+              className="flex w-full items-start gap-3 rounded-2xl border border-input bg-card px-4 py-3 text-left hover:border-border-strong">
+              <span className={cn('mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border', q.asked ? 'border-ok bg-ok text-background' : 'border-border-strong')}>
+                {q.asked && <Check className="h-3 w-3" strokeWidth={3} />}
+              </span>
+              <span className="min-w-0">
+                <span className={cn('block text-[14px] leading-5', q.asked ? 'text-muted-foreground line-through' : 'text-foreground')}>{q.question}</span>
+                {q.whyItMatters && <span className="mt-0.5 block text-[12.5px] leading-[17px] text-muted-foreground">{q.whyItMatters}</span>}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {prep.checklist.length > 0 && (
+        <>
+          <JkSectionLabel as="h2" className="mt-8">Before the call</JkSectionLabel>
+          <ul className="mt-3 space-y-1">
+            {prep.checklist.map((c) => (
+              <li key={c.id}>
+                <button type="button" onClick={() => onToggleChecklist(c.id)} aria-pressed={c.done}
+                  className="flex w-full items-start gap-3 rounded-xl px-1 py-2 text-left text-[14px] leading-5">
+                  <span className={cn('mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border', c.done ? 'border-ok bg-ok text-background' : 'border-border-strong')}>
+                    {c.done && <Check className="h-3 w-3" strokeWidth={3} />}
+                  </span>
+                  <span className={c.done ? 'text-muted-foreground line-through' : 'text-foreground'}>{c.label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <JkSectionLabel as="h2" className="mt-8">Call notes</JkSectionLabel>
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="What they asked, names, next steps…"
+        className={cn(jkFieldCls, 'mt-3 min-h-[160px] w-full rounded-2xl px-4 py-3 text-[14px] leading-5')}
+      />
+      <div className="mt-3 flex justify-end">
+        <Button size="sm" disabled={saving || notes === (prep.callNotes ?? '')} onClick={async () => { setSaving(true); try { await onSaveNotes(notes) } finally { setSaving(false) } }}>
+          {saving ? 'Saving…' : 'Save notes'}
+        </Button>
+      </div>
+    </>
+  )
+}
+
+/* ─── New deck ────────────────────────────────────────────────────────────── */
+
+type NewDeckArgs = {
+  job: { _id: string; company: string; title: string; compensation?: string; resumeUsed?: string } | null
+  company: string; role: string; description: string; notes: string; resume: any | null
+}
+
+async function createDeck(createPrep: ReturnType<typeof useMutation<typeof api.interviewPreps.create>>, a: NewDeckArgs): Promise<Id<'interviewPreps'>> {
+  const res = await fetch('/api/interview-prep/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company: a.company, role: a.role, description: a.description, notes: a.notes, resumeContent: a.resume?.content ?? null }),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.prep) throw new Error(data.error || 'Could not write the deck')
+  const g = data.prep
+  const arr = (x: unknown) => (Array.isArray(x) ? x : [])
+  const base = {
+    jobId: a.job ? (a.job._id as Id<'jobs'>) : undefined,
+    company: a.company,
+    role: a.role,
+    compensationTarget: a.job?.compensation,
+    resumeUsed: a.job?.resumeUsed || a.resume?.name,
+    status: 'upcoming',
+    elevatorPitch: g.elevatorPitch,
+    roleSummary: g.roleSummary,
+    flashcards: arr(g.flashcards).map((c: any) => ({ ...c, confidence: undefined, starred: false })),
+    stories: arr(g.stories),
+    requirementMatches: arr(g.requirementMatches),
+    questionsToAsk: arr(g.questionsToAsk),
+    trapsAndGuardrails: arr(g.trapsAndGuardrails),
+    checklist: arr(g.checklist),
+  }
+  const proofPoints = arr(g.proofPoints)
+    .filter((p: any) => typeof p?.title === 'string' && typeof p?.detail === 'string')
+    .slice(0, 4)
+    .map((p: any, i: number) => ({ id: String(p.id ?? `pp-${i + 1}`), title: p.title, detail: p.detail }))
+  try {
+    return await createPrep({ ...base, proofPoints })
+  } catch (err) {
+    // The deployed backend may not know proofPoints yet (schema change waits for a deploy).
+    if (proofPoints.length && /proofPoints|extra field|Validator/i.test(String(err))) return await createPrep(base)
+    throw err
+  }
+}
+
+function CreateDeck({ jobs, presetJob, resume, onCancel, onCreate }: {
+  jobs: any[]; presetJob: string; resume: any | null; onCancel: () => void; onCreate: (a: NewDeckArgs) => Promise<void>
+}) {
+  const [jobId, setJobId] = useState(presetJob)
+  const [company, setCompany] = useState('')
+  const [role, setRole] = useState('')
+  const [description, setDescription] = useState('')
+  const [notes, setNotes] = useState('')
+  const [busy, setBusy] = useState(false)
+  const job = jobs.find((j) => j._id === jobId) ?? null
+
+  const submit = async () => {
+    const c = job ? job.company : company.trim()
+    const r = job ? job.title : role.trim()
+    if (!c || !r) { toast.error('Pick a job, or type the company and role.'); return }
+    setBusy(true)
+    try {
+      await onCreate({ job, company: c, role: r, description: job ? job.description || '' : description.trim(), notes: job ? job.notes || '' : notes.trim(), resume })
+      toast.success('Deck ready', `${c}, ${r}`)
+    } catch (e) {
+      toast.error('Could not write the deck', e instanceof Error ? e.message : undefined)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section data-enter className="mx-5 mb-5 rounded-[28px] border border-input bg-card p-5 lg:mx-8 lg:p-7">
+      <h2 className="jk-enter text-[18px] font-medium text-foreground" style={enter(0)}>New prep deck</h2>
+      <p className="jk-enter mt-1 text-[13.5px] text-muted-foreground" style={enter(1)}>
+        Written from {resume ? `your resume "${resume.name}"` : 'the job alone (add a base resume for answers in your own words)'} and the posting.
+      </p>
+      <div className="jk-enter mt-5 grid gap-4 md:grid-cols-2" style={enter(2)}>
+        <JkField label="Job" id="prep-job" className="md:col-span-2">
+          <select id="prep-job" value={jobId} onChange={(e) => setJobId(e.target.value)} className={cn(jkFieldCls, 'h-11 w-full px-3')}>
+            <option value="">Type it in instead</option>
+            {jobs.map((j) => <option key={j._id} value={j._id}>{j.company} · {j.title}</option>)}
+          </select>
+        </JkField>
+        {!job && (
           <>
-            {/* Hero Call Briefing Banner */}
-            <BlurFade delay={0.1}>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  <div className="space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ok/15 text-ok  border border-ok/30">
-                        {activePrep.status === 'upcoming'
-                          ? '● Upcoming Interview'
-                          : activePrep.status}
-                      </span>
-                      {activePrep.interviewDate && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-warn/15 text-warn  border border-warn/30">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {activePrep.interviewDate}
-                        </span>
-                      )}
-                      {activePrep.compensationTarget && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand">
-                          <DollarSign className="h-3.5 w-3.5" />
-                          {activePrep.compensationTarget}
-                        </span>
-                      )}
-                    </div>
-                    <h2 className="text-2xl font-bold tracking-tight">
-                      {activePrep.role}{' '}
-                      <span className="text-muted-foreground font-normal">
-                        @ {activePrep.company}
-                      </span>
-                    </h2>
-                    {activePrep.roleSummary && (
-                      <p className="text-sm text-muted-foreground max-w-3xl leading-relaxed">
-                        {activePrep.roleSummary}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Quick Call Links & Readiness */}
-                  <div className="flex flex-wrap items-center gap-2.5 flex-shrink-0">
-                    {activePrep.meetingLink && (
-                      <a
-                        href={activePrep.meetingLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:opacity-90 transition"
-                      >
-                        <Video className="h-4 w-4" />
-                        Join Google Meet
-                        <ExternalLink className="h-3.5 w-3.5 opacity-80" />
-                      </a>
-                    )}
-                    <div className="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-muted/60 border border-border text-xs">
-                      <div>
-                        <span className="text-muted-foreground">Cards Mastered: </span>
-                        <span className="font-bold text-foreground">
-                          {masteredCount}/{totalCards}
-                        </span>
-                      </div>
-                      <span className="text-border">|</span>
-                      <div>
-                        <span className="text-muted-foreground">Checklist: </span>
-                        <span className="font-bold text-foreground">
-                          {checklistDoneCount}/{totalChecklist}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Interviewer / Logistics Strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t border-border/60 text-xs">
-                  {activePrep.interviewerName && (
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30">
-                      <User className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold text-foreground truncate">
-                          {activePrep.interviewerName}
-                        </div>
-                        <div className="text-muted-foreground truncate">
-                          {activePrep.interviewerRole}
-                        </div>
-                        {activePrep.interviewerEmail && (
-                          <div className="text-muted-foreground truncate">
-                            {activePrep.interviewerEmail}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {activePrep.phoneBackup && (
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30">
-                      <Phone className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
-                      <div>
-                        <div className="font-semibold text-foreground">
-                          Phone Backup
-                        </div>
-                        <div className="text-muted-foreground">
-                          {activePrep.phoneBackup}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {activePrep.resumeUsed && (
-                    <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-muted/30 sm:col-span-2">
-                      <FileText className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-semibold text-foreground">
-                          Resume Sent to Interviewer
-                        </div>
-                        <div className="text-muted-foreground truncate">
-                          {activePrep.resumeUsed}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </BlurFade>
-
-            {/* Sub-navigation Tabs */}
-            <BlurFade delay={0.15}>
-              <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
-                {[
-                  {
-                    id: 'brief' as PrepTab,
-                    label: 'Call Cheat Sheet & Pitch',
-                    icon: BookOpen,
-                  },
-                  {
-                    id: 'flashcards' as PrepTab,
-                    label: `Flashcards (${totalCards})`,
-                    icon: Layers,
-                  },
-                  {
-                    id: 'stories' as PrepTab,
-                    label: `Story Bank (${activePrep.stories.length})`,
-                    icon: Award,
-                  },
-                  {
-                    id: 'alignment' as PrepTab,
-                    label: `Role Alignment & Guardrails (${
-                      activePrep.requirementMatches?.length ?? 0
-                    })`,
-                    icon: Target,
-                  },
-                  {
-                    id: 'questions' as PrepTab,
-                    label: `Questions & Live Notes (${activePrep.questionsToAsk.length})`,
-                    icon: HelpCircle,
-                  },
-                ].map((tab) => {
-                  const Icon = tab.icon
-                  const isActive = activeTab === tab.id
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                        isActive
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {tab.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </BlurFade>
-
-            {/* TAB 1: CALL CHEAT SHEET & PITCH */}
-            {activeTab === 'brief' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  {/* 90-Second Opener */}
-                  {activePrep.elevatorPitch && (
-                    <div className="rounded-xl border border-brand/30 bg-gradient-to-br from-brand/5 via-card to-card p-6 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-5 w-5 text-brand" />
-                          <h3 className="font-semibold text-base">
-                            Your 60-Second Spoken Opener (&ldquo;Tell me about
-                            yourself&rdquo;)
-                          </h3>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            handleCopy(activePrep.elevatorPitch!, 'pitch')
-                          }
-                          className="gap-1.5 h-8 text-xs"
-                        >
-                          {copiedId === 'pitch' ? (
-                            <Check className="h-3.5 w-3.5 text-ok" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                          Copy
-                        </Button>
-                      </div>
-                      <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line font-medium bg-background/60 p-4 rounded-lg border border-border/60">
-                        &ldquo;{activePrep.elevatorPitch}&rdquo;
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Read this once out loud before 9:00 AM. Land the final
-                        sentence and stop talking so Jared can steer.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Top 3 Stories Quick Glance */}
-                  <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-base flex items-center gap-2">
-                        <Award className="h-5 w-5 text-brand" />
-                        Core Proof Stories to Lead With
-                      </h3>
-                      <button
-                        onClick={() => setActiveTab('stories')}
-                        className="text-xs text-brand font-medium hover:underline"
-                      >
-                        Open full STAR breakdowns →
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {activePrep.stories.map((story, idx) => (
-                        <div
-                          key={story.id}
-                          className="p-4 rounded-xl border border-border bg-muted/20 space-y-1.5"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-semibold text-sm">
-                              {idx + 1}. {story.title}
-                            </span>
-                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-brand/10 text-brand font-medium">
-                              {story.tag}
-                            </span>
-                          </div>
-                          {story.hook && (
-                            <p className="text-xs font-medium text-foreground/90 italic">
-                              &ldquo;{story.hook}&rdquo;
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            <strong className="text-foreground">Outcome:</strong>{' '}
-                            {story.outcome}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Critical Traps & Guardrails */}
-                  {activePrep.trapsAndGuardrails &&
-                    activePrep.trapsAndGuardrails.length > 0 && (
-                      <div className="rounded-xl border border-warn/30 bg-warn/5 p-6 space-y-4">
-                        <h3 className="font-semibold text-base flex items-center gap-2 text-warn ">
-                          <ShieldAlert className="h-5 w-5" />
-                          Call Guardrails & Pivot Rules (Do Not Trip Here)
-                        </h3>
-                        <div className="space-y-3">
-                          {activePrep.trapsAndGuardrails.map((t) => (
-                            <div
-                              key={t.id}
-                              className="p-3.5 rounded-lg bg-background/80 border border-warn/20 space-y-1"
-                            >
-                              <div className="text-xs font-bold text-warn ">
-                                ⚠️ {t.trap}
-                              </div>
-                              <div className="text-xs text-foreground/90 leading-relaxed">
-                                <span className="font-semibold text-ok ">
-                                  Play:{' '}
-                                </span>
-                                {t.howToHandle}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
-
-                {/* Right Column: Pre-Call Checklist + Top Questions */}
-                <div className="space-y-6">
-                  <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-base flex items-center gap-2">
-                        <CheckCircle2 className="h-5 w-5 text-ok" />
-                        Pre-Call Readiness Checklist
-                      </h3>
-                      <span className="text-xs text-muted-foreground">
-                        {checklistDoneCount}/{totalChecklist}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {activePrep.checklist.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() =>
-                            toggleChecklist({
-                              id: activePrep._id,
-                              itemId: item.id,
-                            })
-                          }
-                          className={`w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left text-xs transition ${
-                            item.done
-                              ? 'bg-ok/10 text-muted-foreground line-through'
-                              : 'bg-muted/40 hover:bg-muted text-foreground'
-                          }`}
-                        >
-                          {item.done ? (
-                            <CheckCircle2 className="h-4 w-4 text-ok flex-shrink-0 mt-0.5" />
-                          ) : (
-                            <Circle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                          )}
-                          <span className="leading-snug">{item.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Must-Ask Questions Quick Box */}
-                  <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-base flex items-center gap-2">
-                        <HelpCircle className="h-5 w-5 text-brand" />
-                        Questions for Jared
-                      </h3>
-                      <button
-                        onClick={() => setActiveTab('questions')}
-                        className="text-xs text-brand font-medium hover:underline"
-                      >
-                        Take live notes →
-                      </button>
-                    </div>
-                    <div className="space-y-2.5">
-                      {activePrep.questionsToAsk.map((q) => (
-                        <button
-                          key={q.id}
-                          onClick={() =>
-                            toggleQuestion({
-                              id: activePrep._id,
-                              questionId: q.id,
-                            })
-                          }
-                          className={`w-full flex items-start gap-2.5 p-2.5 rounded-lg text-left text-xs border transition ${
-                            q.asked
-                              ? 'bg-ok/10 border-ok/20 text-muted-foreground line-through'
-                              : 'bg-background border-border hover:border-brand/40 text-foreground'
-                          }`}
-                        >
-                          {q.asked ? (
-                            <CheckCircle2 className="h-4 w-4 text-ok flex-shrink-0 mt-0.5" />
-                          ) : (
-                            <Circle className="h-4 w-4 text-brand flex-shrink-0 mt-0.5" />
-                          )}
-                          <div className="space-y-0.5">
-                            <div className="font-medium leading-snug">
-                              {q.question}
-                            </div>
-                            {q.whyItMatters && (
-                              <div className="text-[11px] text-muted-foreground">
-                                {q.whyItMatters}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: INTERACTIVE FLASHCARDS */}
-            {activeTab === 'flashcards' && (
-              <div className="space-y-6">
-                {/* Category Filter Pills & Controls */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      onClick={() => {
-                        setCardCategoryFilter('all')
-                        setCurrentCardIndex(0)
-                        setIsFlipped(false)
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        cardCategoryFilter === 'all'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      All ({activePrep.flashcards.length})
-                    </button>
-                    {Object.entries(FLASHCARD_CATEGORIES).map(([key, cfg]) => {
-                      const count = activePrep.flashcards.filter(
-                        (c) => c.category === key
-                      ).length
-                      if (count === 0) return null
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => {
-                            setCardCategoryFilter(key)
-                            setCurrentCardIndex(0)
-                            setIsFlipped(false)
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                            cardCategoryFilter === key
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-card border border-border text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          {cfg.label} ({count})
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={starredOnly ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setStarredOnly((prev) => !prev)
-                        setCurrentCardIndex(0)
-                        setIsFlipped(false)
-                      }}
-                      className="gap-1.5 text-xs h-8"
-                    >
-                      <Star className="h-3.5 w-3.5" />
-                      Starred Only
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleShuffleCards}
-                      className="gap-1.5 text-xs h-8"
-                    >
-                      <Shuffle className="h-3.5 w-3.5" />
-                      Shuffle
-                    </Button>
-                    {shuffledOrder && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setShuffledOrder(null)
-                          setCurrentCardIndex(0)
-                        }}
-                        className="gap-1 text-xs h-8"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Reset Order
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Active Flashcard Deck */}
-                {currentCard ? (
-                  <div className="max-w-3xl mx-auto space-y-4">
-                    <div
-                      onClick={() => setIsFlipped((prev) => !prev)}
-                      className="cursor-pointer select-none rounded-2xl border-2 border-border hover:border-brand/50 bg-card p-8 min-h-[300px] flex flex-col justify-between shadow-md transition-all"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                              FLASHCARD_CATEGORIES[currentCard.category]?.bg ??
-                              'bg-muted'
-                            } ${
-                              FLASHCARD_CATEGORIES[currentCard.category]?.text ??
-                              'text-foreground'
-                            } ${
-                              FLASHCARD_CATEGORIES[currentCard.category]
-                                ?.border ?? 'border-border'
-                            }`}
-                          >
-                            {FLASHCARD_CATEGORIES[currentCard.category]?.label ??
-                              currentCard.category}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Card {currentCardIndex + 1} of {filteredCards.length}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-                            {isFlipped ? 'Answer / Talking Points' : 'Prompt'}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              updateCardConfidence({
-                                id: activePrep._id,
-                                cardId: currentCard.id,
-                                starred: !currentCard.starred,
-                              })
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-accent transition"
-                            title="Star card"
-                          >
-                            <Star
-                              className={`h-4 w-4 ${
-                                currentCard.starred
-                                  ? 'fill-warn text-warn'
-                                  : 'text-muted-foreground'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="my-auto py-6">
-                        {!isFlipped ? (
-                          <div className="space-y-4 text-center">
-                            <h3 className="text-xl md:text-2xl font-bold leading-snug text-foreground">
-                              {currentCard.front}
-                            </h3>
-                            {currentCard.hint && (
-                              <div>
-                                {showHint ? (
-                                  <p className="text-xs text-warn  font-medium bg-warn/10 inline-block px-3 py-1 rounded-full">
-                                    💡 Cue: {currentCard.hint}
-                                  </p>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setShowHint(true)
-                                    }}
-                                    className="text-xs text-muted-foreground hover:text-foreground underline"
-                                  >
-                                    Show memory cue
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="text-xs font-medium text-muted-foreground">
-                              Q: {currentCard.front}
-                            </div>
-                            <div className="text-base md:text-lg leading-relaxed text-foreground whitespace-pre-line font-medium bg-muted/30 p-5 rounded-xl border border-border/60">
-                              {currentCard.back}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between pt-3 border-t border-border/50 text-xs text-muted-foreground">
-                        <span>
-                          Click card or press <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border">Space</kbd> to flip · <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border">←</kbd> <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border">→</kbd> to navigate
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleCopy(currentCard.back, currentCard.id)
-                          }}
-                          className="inline-flex items-center gap-1 text-brand hover:underline"
-                        >
-                          {copiedId === currentCard.id ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                          Copy answer
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Navigation & Confidence Rating */}
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsFlipped(false)
-                            setShowHint(false)
-                            setCurrentCardIndex((prev) =>
-                              (prev - 1 + filteredCards.length) %
-                              filteredCards.length
-                            )
-                          }}
-                          className="gap-1"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                          Previous
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsFlipped(false)
-                            setShowHint(false)
-                            setCurrentCardIndex(
-                              (prev) => (prev + 1) % filteredCards.length
-                            )
-                          }}
-                          className="gap-1"
-                        >
-                          Next
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          Confidence:
-                        </span>
-                        {[
-                          {
-                            id: 'new',
-                            label: 'Needs Reps',
-                            activeClass:
-                              'bg-destructive/20 text-destructive  border-destructive/40',
-                          },
-                          {
-                            id: 'learning',
-                            label: 'Getting There',
-                            activeClass:
-                              'bg-warn/20 text-warn  border-warn/40',
-                          },
-                          {
-                            id: 'mastered',
-                            label: 'Locked In ✓',
-                            activeClass:
-                              'bg-ok/20 text-ok  border-ok/40',
-                          },
-                        ].map((lvl) => {
-                          const isCurrent =
-                            (currentCard.confidence || 'new') === lvl.id
-                          return (
-                            <button
-                              key={lvl.id}
-                              onClick={() =>
-                                updateCardConfidence({
-                                  id: activePrep._id,
-                                  cardId: currentCard.id,
-                                  confidence: lvl.id,
-                                })
-                              }
-                              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                                isCurrent
-                                  ? lvl.activeClass
-                                  : 'bg-card border-border text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              {lvl.label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                    No flashcards match the current filter.
-                  </div>
-                )}
-
-                {/* All Cards Grid Below for Quick Scanning */}
-                <div className="pt-6 border-t border-border space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    All Cards in View ({filteredCards.length})
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredCards.map((card, idx) => {
-                      const cat = FLASHCARD_CATEGORIES[card.category]
-                      return (
-                        <div
-                          key={card.id}
-                          onClick={() => {
-                            setCurrentCardIndex(idx)
-                            setIsFlipped(true)
-                            window.scrollTo({ top: 0, behavior: 'smooth' })
-                          }}
-                          className={`p-4 rounded-xl border bg-card hover:border-brand/40 cursor-pointer transition space-y-2 ${
-                            currentCard?.id === card.id
-                              ? 'border-brand ring-1 ring-brand/30'
-                              : 'border-border'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${
-                                cat?.bg ?? 'bg-muted'
-                              } ${cat?.text ?? 'text-foreground'} ${
-                                cat?.border ?? 'border-border'
-                              }`}
-                            >
-                              {cat?.label ?? card.category}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              {card.confidence === 'mastered' && (
-                                <span className="text-[11px] font-medium text-ok">
-                                  ✓ Locked In
-                                </span>
-                              )}
-                              {card.starred && (
-                                <Star className="h-3.5 w-3.5 fill-warn text-warn" />
-                              )}
-                            </div>
-                          </div>
-                          <div className="font-semibold text-sm text-foreground">
-                            {card.front}
-                          </div>
-                          <div className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
-                            {card.back}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: STORY BANK (STAR + OUTCOME FIRST) */}
-            {activeTab === 'stories' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {activePrep.stories.map((story, idx) => (
-                  <div
-                    key={story.id}
-                    className="rounded-xl border border-border bg-card p-6 space-y-4 shadow-sm flex flex-col justify-between"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand">
-                            Story #{idx + 1} · {story.tag}
-                          </span>
-                          <h3 className="text-lg font-bold mt-2">
-                            {story.title}
-                          </h3>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            handleCopy(
-                              `${story.title}\nHook: ${story.hook ?? ''}\nSituation: ${story.situation}\nAction: ${story.action}\nOutcome: ${story.outcome}\nTakeaway: ${story.takeaway}`,
-                              story.id
-                            )
-                          }
-                          className="h-8 gap-1 text-xs"
-                        >
-                          {copiedId === story.id ? (
-                            <Check className="h-3.5 w-3.5 text-ok" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                          Copy
-                        </Button>
-                      </div>
-
-                      {story.hook && (
-                        <div className="p-3 rounded-lg bg-brand/5 border border-brand/20 text-xs font-medium text-foreground">
-                          <span className="text-brand font-bold uppercase tracking-wider block mb-1">
-                            Spoken Lead-In (Outcome-First Hook)
-                          </span>
-                          &ldquo;{story.hook}&rdquo;
-                        </div>
-                      )}
-
-                      <div className="space-y-3 text-xs leading-relaxed">
-                        <div>
-                          <span className="font-bold text-muted-foreground uppercase tracking-wider block mb-0.5">
-                            Situation / Bottleneck
-                          </span>
-                          <p className="text-foreground/90">{story.situation}</p>
-                        </div>
-                        <div>
-                          <span className="font-bold text-muted-foreground uppercase tracking-wider block mb-0.5">
-                            What You Built (Action)
-                          </span>
-                          <p className="text-foreground/90">{story.action}</p>
-                        </div>
-                        <div className="p-3 rounded-lg bg-ok/10 border border-ok/20">
-                          <span className="font-bold text-ok  uppercase tracking-wider block mb-0.5">
-                            Measurable Outcome
-                          </span>
-                          <p className="text-foreground font-medium">
-                            {story.outcome}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-bold text-muted-foreground uppercase tracking-wider block mb-0.5">
-                            Why It Matters for {activePrep.company}
-                          </span>
-                          <p className="text-foreground/90">{story.takeaway}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* TAB 4: ROLE ALIGNMENT & GUARDRAILS */}
-            {activeTab === 'alignment' && (
-              <div className="space-y-6">
-                <div className="rounded-xl border border-border bg-card overflow-hidden">
-                  <div className="p-5 border-b border-border flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-base">
-                        Requirement-by-Requirement Proof Matrix
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Every requirement from the job description mapped to
-                        your real shipped work or an honest pivot.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="divide-y divide-border">
-                    {(activePrep.requirementMatches ?? []).map((rm) => (
-                      <div
-                        key={rm.id}
-                        className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-muted/20 transition"
-                      >
-                        <div className="space-y-1 md:w-2/5">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                                rm.priority === 'must-have'
-                                  ? 'bg-brand/15 text-brand'
-                                  : 'bg-muted text-muted-foreground'
-                              }`}
-                            >
-                              {rm.priority}
-                            </span>
-                            <span
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                                rm.strength === 'strong'
-                                  ? 'bg-ok/15 text-ok '
-                                  : rm.strength === 'pivot'
-                                  ? 'bg-warn/15 text-warn '
-                                  : 'bg-brand/15 text-brand '
-                              }`}
-                            >
-                              {rm.strength === 'strong'
-                                ? '✓ Direct Proof'
-                                : rm.strength === 'pivot'
-                                ? '⚡ Honest Pivot'
-                                : 'Solid Fit'}
-                            </span>
-                          </div>
-                          <div className="text-sm font-semibold text-foreground">
-                            {rm.requirement}
-                          </div>
-                        </div>
-                        <div className="md:w-3/5 text-xs text-foreground/90 leading-relaxed bg-muted/30 p-3 rounded-lg border border-border/50">
-                          {rm.yourProof}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 5: QUESTIONS TO ASK & LIVE CALL NOTES */}
-            {activeTab === 'questions' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-base">
-                      Questions to Ask on the Call
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Click any question to check it off as you ask it during
-                      the call.
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    {activePrep.questionsToAsk.map((q) => (
-                      <div
-                        key={q.id}
-                        onClick={() =>
-                          toggleQuestion({
-                            id: activePrep._id,
-                            questionId: q.id,
-                          })
-                        }
-                        className={`p-4 rounded-xl border cursor-pointer transition space-y-1.5 ${
-                          q.asked
-                            ? 'bg-ok/10 border-ok/30 opacity-75'
-                            : 'bg-background border-border hover:border-brand/40'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2.5">
-                            {q.asked ? (
-                              <CheckCircle2 className="h-4 w-4 text-ok mt-0.5 flex-shrink-0" />
-                            ) : (
-                              <Circle className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
-                            )}
-                            <span
-                              className={`text-sm font-semibold ${
-                                q.asked ? 'line-through text-muted-foreground' : ''
-                              }`}
-                            >
-                              {q.question}
-                            </span>
-                          </div>
-                          {q.category && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
-                              {q.category}
-                            </span>
-                          )}
-                        </div>
-                        {q.whyItMatters && (
-                          <p className="text-xs text-muted-foreground pl-6">
-                            {q.whyItMatters}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Live Call Scratchpad */}
-                <div className="rounded-xl border border-border bg-card p-6 space-y-4 flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-base flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4 text-brand" />
-                        Live Call Scratchpad
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Jot down rate confirmation, next steps, team structure,
-                        and what the first GTM workflow is.
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={handleSaveCallNotes}
-                      disabled={isSavingNotes}
-                      className="h-8 text-xs"
-                    >
-                      {isSavingNotes ? 'Saving...' : 'Save Notes'}
-                    </Button>
-                  </div>
-                  <textarea
-                    value={localCallNotes}
-                    onChange={(e) => setLocalCallNotes(e.target.value)}
-                    placeholder="Type live notes during your call with Jared here... (e.g. confirmed $55/hr W2, 40 hrs/wk, next round with PTC hiring manager...)"
-                    className="flex-1 min-h-[280px] w-full rounded-xl border border-input bg-background p-4 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-              </div>
-            )}
+            <JkField label="Company" id="prep-company"><Input id="prep-company" value={company} onChange={(e) => setCompany(e.target.value)} className={cn(jkFieldCls, 'h-11')} /></JkField>
+            <JkField label="Role" id="prep-role"><Input id="prep-role" value={role} onChange={(e) => setRole(e.target.value)} className={cn(jkFieldCls, 'h-11')} /></JkField>
+            <JkField label="Job description" id="prep-desc" className="md:col-span-2">
+              <textarea id="prep-desc" value={description} onChange={(e) => setDescription(e.target.value)} className={cn(jkFieldCls, 'min-h-[110px] w-full px-3 py-2')} />
+            </JkField>
+            <JkField label="Notes for the call (optional)" id="prep-notes" className="md:col-span-2">
+              <Input id="prep-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Who you're meeting, format, pay range" className={cn(jkFieldCls, 'h-11')} />
+            </JkField>
           </>
         )}
       </div>
-    </div>
+      <div className="jk-enter mt-5 flex justify-end gap-2" style={enter(3)}>
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button onClick={submit} disabled={busy} className="gap-2">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{busy ? 'Writing your deck…' : 'Write the deck'}</Button>
+      </div>
+    </section>
   )
 }

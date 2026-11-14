@@ -17,6 +17,13 @@ CRITICAL RULES:
 {
   "elevatorPitch": "A 60-90 second spoken opener tailored to this role and the candidate's real background.",
   "roleSummary": "2-3 sentence summary of what this role really cares about and the core problem they are hiring to solve.",
+  "proofPoints": [
+    {
+      "id": "pp-1",
+      "title": "Company or project name from the resume",
+      "detail": "The one result to lead with, under 50 characters, with its real number if the resume has one"
+    }
+  ],
   "flashcards": [
     {
       "id": "fc-1",
@@ -74,15 +81,17 @@ CRITICAL RULES:
   ]
 }
 
-Generate 8-12 flashcards across categories, 3-4 STAR stories, 6-8 requirement matches, 5-6 questions to ask, 3-4 traps/guardrails, and 5-6 checklist items.`;
+Generate exactly 4 proofPoints (the four strongest, most relevant items in the resume; fewer if the resume has fewer), 8-12 flashcards across categories, 3-4 STAR stories, 6-8 requirement matches, 5-6 questions to ask, 3-4 traps/guardrails, and 5-6 checklist items.`;
 
 export async function POST(req: NextRequest) {
   const limited = await enforceAiRateLimit(req, "ai");
   if (limited) return limited;
 
-  if (!OPENAI_KEY) {
+  // OpenAI when configured; otherwise the same model through OpenRouter (local dev has only OpenRouter).
+  const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+  if (!OPENAI_KEY && !OPENROUTER_KEY) {
     return NextResponse.json(
-      { error: "OpenAI API key not configured" },
+      { error: "No AI provider configured" },
       { status: 500 }
     );
   }
@@ -111,23 +120,26 @@ ${notes || "Not provided"}
 Candidate Resume Content (ONLY use facts from here; do not invent):
 ${resumeContent ? JSON.stringify(resumeContent, null, 2) : "Not provided"}`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch(
+      OPENAI_KEY ? "https://api.openai.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions",
+      {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
+        Authorization: `Bearer ${OPENAI_KEY || OPENROUTER_KEY}`,
       },
       body: JSON.stringify({
-        model: TEMPLATE_GENERATION_MODEL_ID,
+        model: OPENAI_KEY ? TEMPLATE_GENERATION_MODEL_ID : `openai/${TEMPLATE_GENERATION_MODEL_ID}`,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.5,
-        max_tokens: 3500,
+        max_tokens: 4000,
       }),
-    });
+      },
+    );
 
     const data = await response.json();
     if (!response.ok) {
