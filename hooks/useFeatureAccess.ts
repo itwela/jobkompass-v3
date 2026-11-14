@@ -12,7 +12,7 @@ interface FeatureLimits {
   jobsLimit: number | null // null means unlimited
 }
 
-const PLAN_LIMITS: Record<string, FeatureLimits> = {
+export const PLAN_LIMITS: Record<string, FeatureLimits> = {
   free: {
     documentsPerMonth: 3,
     jobsLimit: 10,
