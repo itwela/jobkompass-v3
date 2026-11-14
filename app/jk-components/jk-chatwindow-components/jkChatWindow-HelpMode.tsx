@@ -42,7 +42,7 @@ function Callout({ children }: { children: React.ReactNode }) {
 /** "What you get": a picture of the result each guide leads to. */
 function JkHelpVisual({ kind }: { kind: HelpVisual }) {
   const page = (
-    <div className="relative aspect-[186/294] w-[186px] shrink-0 overflow-hidden rounded-[4px] bg-white shadow-lg">
+    <div className="relative aspect-[186/294] w-[186px] shrink-0 overflow-hidden rounded-[4px] shadow-lg">
       <Image src="/images/jobkompass_preview_resume_jake.png" alt="A resume in the Jake template" fill sizes="186px" className="object-cover object-top" />
       {kind === "tailored" && [ [10, 13], [22, 11], [32, 14] ].map(([top, h]) => (
         <span key={top} aria-hidden className="absolute inset-x-[6%] bg-bar-3/15" style={{ top: `${top}%`, height: `${h}%` }}>
