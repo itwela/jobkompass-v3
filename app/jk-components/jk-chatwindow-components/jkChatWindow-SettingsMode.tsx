@@ -298,7 +298,7 @@ export default function JkCW_SettingsMode() {
       <JkAppPageHeader title="Settings" sub="Account, plan, and keys" art="cabin" artHeight={170} artPosition="right 30%" live={false} divider={false}
         className="lg:pl-[max(32px,calc((100%-880px)/2))]" />
 
-      <div className="mx-auto w-full max-w-[880px] px-5 pb-24 pt-6 lg:px-0 lg:pt-[42px]">
+      <div className="mx-auto w-full max-w-[944px] px-5 pb-24 pt-6 lg:px-8 lg:pt-[42px]">
         {/* Account */}
         <JkSettingsSection id="account" index={0} title="Account" sub="How you show up on resumes and in the app"
           action={dirty ? <Button className="h-9 px-5" disabled={savingProfile} onClick={saveProfile}>{savingProfile ? "Saving…" : "Save"}</Button> : null}>
@@ -335,7 +335,7 @@ export default function JkCW_SettingsMode() {
                 </div>
               </div>
             </div>
-            <div aria-hidden className="absolute right-6 top-1/2 hidden size-[164px] -translate-y-1/2 lg:block">
+            <div aria-hidden className="absolute right-6 top-1/2 hidden size-[164px] -translate-y-1/2 xl:block">
               <JkArt name="ship4" variant="spot" />
             </div>
           </div>
