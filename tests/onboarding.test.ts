@@ -55,3 +55,13 @@ describe("job link guard", () => {
     expect(t).not.toContain("evil");
   });
 });
+
+import { parseTailoredResumeResponse } from "@/lib/emailAgent/draftMessage";
+describe("parseTailoredResumeResponse", () => {
+  it("reads the object when the model adds a stray closing brace", () => {
+    expect(parseTailoredResumeResponse('{"a":{"b":"x}"}}}')).toEqual({ a: { b: "x}" } });
+  });
+  it("reads the object after prose and fences", () => {
+    expect(parseTailoredResumeResponse('Here you go:\n{"a":1} hope it helps')).toEqual({ a: 1 });
+  });
+});
