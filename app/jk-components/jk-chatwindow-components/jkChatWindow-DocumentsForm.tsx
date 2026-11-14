@@ -16,6 +16,7 @@ import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { JkDefaultTemplateProbe } from "../jkDefaultTemplate";
 import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES, getDefaultResumeTemplateId, getDefaultCoverLetterTemplateId } from "@/lib/templates";
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
 import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEditor";
@@ -92,6 +93,9 @@ interface JkCW_DocumentsFormProps {
 }
 
 export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_DocumentsFormProps) {
+    // Default template from Settings (users.defaultTemplate); falls back to the app default.
+    const [userDefaultTemplate, setUserDefaultTemplate] = useState<string | null>(null);
+    const defaultResumeTemplateId = () => userDefaultTemplate || getDefaultResumeTemplateId();
 
     const {
         resumes,
@@ -420,7 +424,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                     fileName: storedFileName,
                     fileSize: storedFileSize,
                     content,
-                    template: editingTemplate || getDefaultResumeTemplateId(),
+                    template: editingTemplate || defaultResumeTemplateId(),
                     label: label || undefined,
                     tags: tags && tags.length > 0 ? tags : undefined,
                 });
@@ -488,7 +492,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
             const exportTid = setTimeout(() => exportCtrl.abort(), CLIENT_EXPORT_TIMEOUT_MS);
             let exportRes: Response;
             try {
-                exportRes = await fetch(`/api/resume/export/${editingTemplate || getDefaultResumeTemplateId()}`, {
+                exportRes = await fetch(`/api/resume/export/${editingTemplate || defaultResumeTemplateId()}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ content }),
@@ -532,7 +536,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 fileName: pdfFileName,
                 fileSize: pdfBlob.size,
                 content,
-                template: editingTemplate || getDefaultResumeTemplateId(),
+                template: editingTemplate || defaultResumeTemplateId(),
                 label: label || undefined,
                 tags: tags && tags.length > 0 ? tags : undefined,
             });
@@ -1075,6 +1079,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
 
     return (
         <div className="space-y-6 py-2">
+            <JkDefaultTemplateProbe onChange={setUserDefaultTemplate} />
             {/* Header with stats and upload */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
