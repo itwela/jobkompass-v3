@@ -272,6 +272,21 @@ function asksForRoleOnNextLine(line: string): boolean {
  * the model a fact is already true is not evidence. A job header written
  * inside an instruction, and the dates and bullets under it, are not evidence.
  */
+/**
+ * A resume section heading, as resumes actually write them: "Experience",
+ * "Professional Experience" (our own templates), "Technical Skills",
+ * "Education & Certifications", "Personal Projects" and so on. Trailing colons ok.
+ */
+export function resumeSectionName(line: string): "experience" | "education" | "skills" | "certs" | "projects" | null {
+  const t = line.trim().replace(/:$/, "").trim();
+  if (/^(?:(?:professional|work|relevant|employment|industry)\s+)?experience$|^(?:work|employment|career)\s+history$/i.test(t)) return "experience";
+  if (/^education(?:\s*(?:and|&)\s*(?:certifications?|training))?$/i.test(t)) return "education";
+  if (/^(?:(?:technical|core|key|relevant)\s+)?skills(?:\s*(?:and|&)\s*(?:tools|technologies|interests))?$/i.test(t)) return "skills";
+  if (/^(?:licenses?\s*(?:and|&)\s*)?certifications?$/i.test(t)) return "certs";
+  if (/^(?:(?:personal|selected|key|side|technical)\s+)?projects$/i.test(t)) return "projects";
+  return null;
+}
+
 export function resumeEvidenceLines(text: string): string[] {
   const kept: string[] = [];
   let section = "header";
@@ -283,17 +298,7 @@ export function resumeEvidenceLines(text: string): string[] {
       continue;
     }
     if (POSTING_HEADER.test(trimmed)) break;
-    const sectionName = /^(experience|work experience)$/i.test(trimmed)
-      ? "experience"
-      : /^education$/i.test(trimmed)
-        ? "education"
-        : /^skills$/i.test(trimmed)
-          ? "skills"
-          : /^certifications?$/i.test(trimmed)
-            ? "certs"
-            : /^projects$/i.test(trimmed)
-              ? "projects"
-              : null;
+    const sectionName = resumeSectionName(trimmed);
     if (sectionName) {
       skippingFakeJob = false;
       section = sectionName;
@@ -738,6 +743,10 @@ type PlainEvidence = {
   otherDateText: string;
 };
 
+const MONTH = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?";
+const DATED_LINE = /\b(?:19|20)\d{2}\b|\bpresent\b/i;
+const DATE_TAIL = new RegExp(`\\s*(?:(?:${MONTH}\\s+)?(?:19|20)\\d{2}\\s*(?:[-–—]|to)\\s*(?:(?:${MONTH}\\s+)?(?:(?:19|20)\\d{2})|present|current)|(?:${MONTH}\\s+)?(?:19|20)\\d{2})\\s*$`, "i");
+
 /** Employers, schools, degrees, and certs come from section lines, not from prose. */
 function plainEvidence(text: string): PlainEvidence {
   const orgs: string[] = [];
@@ -753,24 +762,9 @@ function plainEvidence(text: string): PlainEvidence {
   for (const raw of resumeEvidenceLines(text)) {
     const line = raw.trim();
     if (!line) continue;
-    if (/^experience$/i.test(line)) {
-      section = "experience";
-      continue;
-    }
-    if (/^education$/i.test(line)) {
-      section = "education";
-      continue;
-    }
-    if (/^skills$/i.test(line)) {
-      section = "skills";
-      continue;
-    }
-    if (/^certifications?$/i.test(line)) {
-      section = "certs";
-      continue;
-    }
-    if (/^projects$/i.test(line)) {
-      section = "projects";
+    const named = resumeSectionName(line);
+    if (named) {
+      section = named;
       continue;
     }
     const header = line.match(/^(.+?)\s+[—–]\s+(.+)$/);
@@ -789,6 +783,31 @@ function plainEvidence(text: string): PlainEvidence {
       orgs.push(header[2].trim());
       section = section === "header" || section === "projects" ? "experience" : section;
       continue;
+    }
+    // "Software Engineer, Brightline Labs  2022 - Present" / "Engineer | Acme | Jan 2021 - Present":
+    // a dated line inside the experience section names a title and an employer.
+    if (section === "experience" && DATED_LINE.test(line)) {
+      const parts = line
+        .replace(DATE_TAIL, "")
+        .split(/\s*(?:,|\||·|•|\s+at\s+|\s+@\s+)\s*/i)
+        .map((part) => part.trim())
+        .filter((part) => part && !/^\d/.test(part));
+      if (parts.length >= 2) {
+        titles.push(parts[0]);
+        orgs.push(...parts.slice(1));
+      }
+    }
+    // "B.S. Computer Science, University of Texas at Austin, 2020": degree and school on one dated line.
+    if (section === "education" && DATED_LINE.test(line)) {
+      const parts = line
+        .replace(DATE_TAIL, "")
+        .split(/\s*(?:,|\||·|•)\s*/)
+        .map((part) => part.trim())
+        .filter((part) => part && !/^\d/.test(part));
+      if (parts.length >= 2) {
+        degreeLines.push(parts[0]);
+        schools.push(...parts.slice(1));
+      }
     }
     if (section === "skills") skillLines.push(line);
     if (section === "certs") certs.push(line);

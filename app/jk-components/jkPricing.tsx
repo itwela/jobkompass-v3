@@ -3,12 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
-import { Check, Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
-import JkPublicHeader from './jkPublicHeader'
+import JkPricingView from './jk-pricing/jkPricingView'
 import { trackCheckoutStarted, trackPlanUpgrade } from '@/lib/analytics/client'
 
 
@@ -219,211 +216,27 @@ export default function JkPricing() {
     return savings > 0 ? savings : null
   }
 
+  // Sentence-case labels to match the design ("Start 3-day free trial", "Current plan").
+  const actionLabel = (plan: Plan) => {
+    if (plan.id === 'free') return isAuthenticated ? 'Go to the app' : 'Get started'
+    const t = getButtonText(plan)
+    return t === 'Current Plan' ? 'Current plan' : t.replace(/^Start (\d+)-Day Free Trial$/, 'Start $1-day free trial')
+  }
+  const actionDisabled = (plan: Plan) =>
+    plan.id !== 'free' && (loadingPlan === plan.id || (isCurrentPlan(plan) && subscription?.status !== 'canceled'))
+  const onSelect = (plan: Plan) => {
+    if (plan.id === 'free') { router.push(isAuthenticated ? '/app' : '/auth?mode=signup'); return }
+    void handleSubscribe(plan)
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <JkPublicHeader />
-
-      <div className="flex-1 bg-gradient-to-br from-background via-background to-muted/20 py-12 px-4">
-        <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
-          <p className="text-muted-foreground text-lg mb-6">
-            Start with a 7-day trial for just $2.99, or choose a subscription
-          </p>
-          
-          {/* Free Plan Mention */}
-          <p className="text-sm text-muted-foreground mb-8">
-            Or{' '}
-            <Link
-              href="/app"
-              className="text-brand hover:underline font-medium"
-            >
-              stay on the free plan
-            </Link>
-            {' '}with 3 documents/month and 10 job tracking
-          </p>
-          
-          {/* Billing Toggle - Button Style */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <button
-              onClick={() => setIsAnnual(false)}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                !isAnnual
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setIsAnnual(true)}
-              className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                isAnnual
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
-            >
-              Annual
-            </button>
-            {!isAnnual ? (
-              <span className="text-xs text-muted-foreground">
-                Switch to annual to save 25%
-              </span>
-            ) : (
-              <span className="text-xs text-ok font-medium">
-                You're saving 25% with annual billing
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {plans.map((plan, index) => {
-            const isStarter = plan.id === 'starter'
-            const currentPricing = plan.pricing 
-              ? (isAnnual ? plan.pricing.annual : plan.pricing.monthly)
-              : null
-            const savings = getSavings(plan)
-
-            const isSelected = selectedPlanId === plan.id
-            
-            return (
-              <motion.div
-                key={plan.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                onClick={() => !isCurrentPlan(plan) && setSelectedPlanId(plan.id)}
-                className={`group/card relative border rounded-2xl p-8 bg-card cursor-pointer transition-all duration-200 flex flex-col ${
-                  isSelected
-                    ? 'border-brand shadow-lg scale-105'
-                    : plan.popular
-                    ? 'border-brand/50 shadow-md hover:border-brand hover:shadow-lg hover:scale-105'
-                    : 'border-border hover:border-brand/50 hover:shadow-md hover:scale-[1.02]'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                {isAnnual && currentPricing && savings && (
-                  <div className="absolute -top-4 right-4">
-                    <span className="bg-ok text-on-fill px-3 py-1 rounded-full text-xs font-medium">
-                      Save ${savings.toFixed(0)}/yr
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-6">
-                  <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                  {isStarter && plan.oneTimePrice ? (
-                    <>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-4xl font-bold">{plan.oneTimePrice}</span>
-                        <span className="text-muted-foreground">one-time</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        7-day full access
-                      </p>
-                    </>
-                  ) : currentPricing ? (
-                    <>
-                      <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-4xl font-bold">{currentPricing.price}</span>
-                        <span className="text-muted-foreground">
-                          /{isAnnual ? 'year' : 'month'}
-                        </span>
-                      </div>
-                      {currentPricing.trialDays > 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          {currentPricing.trialDays}-day free trial
-                        </p>
-                      )}
-                    </>
-                  ) : null}
-                  <p className="text-sm text-muted-foreground mt-2">{plan.description}</p>
-                </div>
-
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-brand mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {!isAuthenticated ? (
-                  <Link
-                    href="/auth?mode=signup"
-                    className="block w-full"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      trackPlanUpgrade({
-                        surface: 'pricing',
-                        planId: plan.id,
-                        isAnnual,
-                        isOneTime: Boolean(plan.isOneTime),
-                        authenticated: false,
-                      })
-                    }}
-                  >
-                    <Button
-                      className="w-full cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                      variant="default"
-                    >
-                      {getButtonText(plan)}
-                    </Button>
-                  </Link>
-                ) : (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (!isSelected && !isCurrentPlan(plan)) {
-                        setSelectedPlanId(plan.id)
-                      }
-                      handleSubscribe(plan)
-                    }}
-                    disabled={
-                      isLoading ||
-                      loadingPlan === plan.id ||
-                      (isCurrentPlan(plan) && subscription?.status !== 'canceled')
-                    }
-                    className={`w-full opacity-100 hover:opacity-100 active:opacity-100 cursor-pointer ${
-                      isSelected
-                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                        : 'bg-primary hover:bg-primary text-primary-foreground'
-                    }`}
-                    variant="default"
-                  >
-                    {loadingPlan === plan.id ? (
-                      'Loading...'
-                    ) : (
-                      getButtonText(plan)
-                    )}
-                  </Button>
-                )}
-              </motion.div>
-            )
-          })}
-        </div>
-
-        <div className="mt-12 text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            All plans include our core features. Cancel anytime.
-          </p>
-          <div id="free-plan-info" className="text-xs text-muted-foreground">
-            <p>
-              <strong>Free Plan:</strong> 3 AI-generated documents/month, unlimited edits, track up to 10 jobs, basic templates
-            </p>
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
+    <JkPricingView
+      isAnnual={isAnnual}
+      onAnnualChange={setIsAnnual}
+      actionLabel={actionLabel}
+      actionDisabled={actionDisabled}
+      loadingPlanId={loadingPlan}
+      onSelect={onSelect}
+    />
   )
 }

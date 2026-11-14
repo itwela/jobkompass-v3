@@ -55,6 +55,9 @@
   --color-sky-top: var(--sky-top);
   --color-sky: var(--sky);
   --color-on-fill: var(--on-fill);
+  --color-hero-ink: var(--hero-ink);
+  --color-bar-4-ink: var(--bar-4-ink);
+  --color-terminal: var(--terminal);
   --color-paper: var(--paper);
   --color-paper-warm: var(--paper-warm);
   --color-paper-foreground: var(--paper-foreground);
@@ -135,7 +138,9 @@ textarea[aria-label="Message input"]:focus-visible {
   --border-strong: #A9B0BF;
   --primary: #0A1228;
   --primary-foreground: #F6F0DF;
-  --plan: #E8A33D;
+  --plan: #F2B45A;
+  --agent-claude: #D97757;
+  --agent-gemini: #8E75B2;
   --plan-text: #A46A08;
   --plan-foreground: #0A1228;
   --ok: #0F8A55;
@@ -143,8 +148,8 @@ textarea[aria-label="Message input"]:focus-visible {
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(10 18 40 / 0.45);
-  --sky-top: #0B1430;
-  --sky: #11204A;
+  --sky-top: #FFFFFF;
+  --sky: #FFFFFF;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #0A1228;
   --sidebar-primary: #0A1228;
@@ -172,6 +177,11 @@ textarea[aria-label="Message input"]:focus-visible {
   --chart-4: var(--bar-4);
   --chart-5: var(--plan);
   --on-fill: #FFFFFF;
+  /* Type laid over the paintings (hero, closing): navy by day. */
+  --hero-ink: #0A1228;
+  /* Logo cyan is too pale for text on white; this is the frame's cyan for text. */
+  --bar-4-ink: #0B7A99;
+  --terminal: #EEF2F9;
   --paper: #FFFFFF;
   --paper-warm: #FAF7EE;
   --paper-foreground: #111111;
@@ -198,6 +208,8 @@ textarea[aria-label="Message input"]:focus-visible {
   --primary: #F6F0DF;
   --primary-foreground: #0A1228;
   --plan: #F2B45A;
+  --agent-claude: #D97757;
+  --agent-gemini: #8E75B2;
   --plan-text: #F2B45A;
   --plan-foreground: #0A1228;
   --ok: #3DDC97;
@@ -234,6 +246,9 @@ textarea[aria-label="Message input"]:focus-visible {
   --chart-4: var(--bar-4);
   --chart-5: var(--plan);
   --on-fill: #FFFFFF;
+  --hero-ink: var(--on-fill);
+  --bar-4-ink: var(--bar-4);
+  --terminal: #060A18;
   --paper: #FFFFFF;
   --paper-warm: #FAF7EE;
   --paper-foreground: #111111;
@@ -241,6 +256,17 @@ textarea[aria-label="Message input"]:focus-visible {
 }
 
 @layer base {
+  /* Tailwind v4 dropped the pointer on buttons; every clickable control shows it again (Nov 12). */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select,
+  label[for],
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -836,3 +862,122 @@ textarea[aria-label="Message input"]:focus-visible {
 }
 
 /* v4 landing styles end */
+
+/* ─── Step preview stories, from figcraft-work/jobkompass/motion/build2.py ─────
+   Each preview plays an 8 s loop while on screen ([data-playing]). The resting
+   styles are the finished frame, so reduced motion simply shows that. */
+@media (prefers-reduced-motion: no-preference) {
+  .jk-step:not([data-playing]) * { animation-play-state: paused !important; }
+  /* 01 save: the URL types in, the arrow wakes, the saved card drops in */
+  .jk-type { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; animation: jk-type 8s steps(31) infinite; }
+  @keyframes jk-type { 0%, 6% { max-width: 0; } 36%, 92% { max-width: 31ch; } 100% { max-width: 0; } }
+  .jk-caret { animation: jk-blink 1s steps(2) infinite; }
+  @keyframes jk-blink { 50% { opacity: 0; } }
+  .jk-arrow { animation: jk-arrow 8s infinite; }
+  @keyframes jk-arrow { 0%, 38% { opacity: .25; transform: translateY(-3px); } 46%, 90% { opacity: 1; transform: none; } 100% { opacity: .25; } }
+  .jk-drop { animation: jk-drop 8s infinite; }
+  @keyframes jk-drop { 0%, 42% { opacity: 0; transform: translateY(-14px) scale(.97); } 52%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(6px); } }
+  /* 02 resume: changed passages wipe in, then their notes pop out */
+  .jk-wipe [data-mark] { background-color: transparent; background-image: linear-gradient(color-mix(in srgb, var(--bar-3) 15%, transparent), color-mix(in srgb, var(--bar-3) 15%, transparent)); background-repeat: no-repeat; animation: jk-wipe 8s infinite; }
+
+  @keyframes jk-wipe { 0%, 8% { background-size: 0% 100%; } 18%, 88% { background-size: 100% 100%; } 96%, 100% { background-size: 100% 100%; opacity: .6; } }
+  .jk-pop { animation: jk-pop 8s var(--d, 0s) infinite both; }
+  @keyframes jk-pop { 0%, 14% { opacity: 0; transform: translateX(-8px); } 22%, 88% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; } }
+  /* 03 track: the bar grows in, the top job moves Interested > Applied > Interviewing */
+  .jk-grow > div:last-child > * { transform-origin: left; animation: jk-grow 8s infinite; }
+  .jk-grow > div:last-child > *:nth-child(2) { animation: jk-grow 8s .12s infinite both; } .jk-grow > div:last-child > *:nth-child(3) { animation: jk-grow 8s .24s infinite both; }
+  .jk-grow > div:last-child > *:nth-child(4) { animation: jk-grow 8s .3s infinite both; } .jk-grow > div:last-child > *:nth-child(5) { animation: jk-grow 8s .36s infinite both; } .jk-grow > div:last-child > *:nth-child(6) { animation: jk-grow 8s .48s infinite both; }
+  @keyframes jk-grow { 0%, 4% { transform: scaleX(0); } 16%, 92% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+  .jk-lift { animation: jk-lift 8s infinite; }
+  @keyframes jk-lift { 0%, 20% { background-color: transparent; } 28%, 90% { background-color: color-mix(in srgb, var(--accent) 70%, transparent); } 100% { background-color: transparent; } }
+  .jk-sw > *:nth-child(1) { animation: jk-sw1 8s infinite; } .jk-sw > *:nth-child(2) { animation: jk-sw2 8s infinite; } .jk-sw > *:nth-child(3) { animation: jk-sw3 8s infinite; }
+  @keyframes jk-sw1 { 0%, 30% { opacity: 1; } 34%, 100% { opacity: 0; } }
+  @keyframes jk-sw2 { 0%, 34% { opacity: 0; } 38%, 56% { opacity: 1; } 60%, 100% { opacity: 0; } }
+  @keyframes jk-sw3 { 0%, 60% { opacity: 0; } 64%, 96% { opacity: 1; } 100% { opacity: 0; } }
+  /* 04 prep: the card flips to its answer, the rating lands on Locked, the next pip turns green */
+  .jk-flip { animation: jk-flip 8s infinite cubic-bezier(.6, 0, .3, 1); }
+  @keyframes jk-flip { 0%, 26% { transform: rotateX(0); } 36%, 88% { transform: rotateX(180deg); } 98%, 100% { transform: rotateX(360deg); } }
+  .jk-pick { animation: jk-pick 8s infinite; }
+  @keyframes jk-pick { 0%, 52% { border-color: var(--input); background-color: transparent; } 58%, 92% { border-color: var(--ok); background-color: color-mix(in srgb, var(--ok) 13%, transparent); } 100% { border-color: var(--input); } }
+  .jk-pip { animation: jk-pip 8s infinite; }
+  /* App section: live list */
+  .jk-play:not([data-playing]) * { animation-play-state: paused !important; }
+  .jk-sw2 > *:nth-child(1) { animation: jk-swa 8s infinite; } .jk-sw2 > *:nth-child(2) { animation: jk-swb 8s infinite; }
+  @keyframes jk-swa { 0%, 40% { opacity: 1; } 45%, 95% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes jk-swb { 0%, 40% { opacity: 0; } 45%, 95% { opacity: 1; } 100% { opacity: 0; } }
+  /* Free generator: the board pulses column by column, a lantern sheen crosses the unlit dots, the page floats */
+  .jk-dot { animation: jk-dot 4s calc(var(--i, 0) * 70ms) infinite; }
+  @keyframes jk-dot { 0%, 30%, 100% { filter: none; transform: none; } 12% { filter: brightness(1.35); transform: scale(1.14); } }
+  .jk-sheen { animation: jk-sheen 6s linear infinite; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--plan) 55%, transparent), transparent) no-repeat; background-size: 22% 100%; }
+  @keyframes jk-sheen { 0% { background-position: -30% 0; } 70%, 100% { background-position: 130% 0; } }
+  .jk-float { animation: jk-float 6s ease-in-out infinite; }
+  @keyframes jk-float { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(-0.6deg); } }
+  .jk-seq > li { animation: jk-seq 6s var(--d, 0s) infinite both; }
+  .jk-seq > li > span:first-child { animation: jk-seqt 6s var(--d, 0s) infinite both; transform-origin: center; }
+  @keyframes jk-seq { 0%, 30%, 100% { background-color: transparent; } 6%, 24% { background-color: color-mix(in srgb, var(--accent) 45%, transparent); } }
+  @keyframes jk-seqt { 0%, 30%, 100% { transform: none; filter: none; } 6%, 24% { transform: scaleY(1.25); filter: brightness(1.4); } }
+  @keyframes jk-pip { 0%, 56% { background-color: var(--warn); } 62%, 94% { background-color: var(--ok); } 100% { background-color: var(--warn); } }
+}
+/* Static pieces of the stories (also used when motion is reduced). */
+.jk-sw { display: grid; } .jk-sw > * { grid-area: 1 / 1; }
+@media (prefers-reduced-motion: reduce) { .jk-sw > *:not(:last-child) { opacity: 0; } }
+.jk-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+/* Long dissolve from the left, for a painting that sits at the edge of a section. */
+.jk-art-fade-l {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 60%), linear-gradient(to bottom, transparent, #000 20%, #000 78%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 60%), linear-gradient(to bottom, transparent, #000 20%, #000 78%, transparent);
+  mask-composite: intersect;
+}
+
+/* ─── Entrance: anything marked .jk-enter rises in, staggered by --i, when its
+   [data-enter] section first scrolls into view (JkEnter sets data-entered; a data attribute, because React rewrites `class` on re-render). Content is
+   only hidden once JS has marked the page ready, so it never stays invisible. */
+@media (prefers-reduced-motion: no-preference) {
+  .jk-enter-ready [data-enter]:not([data-entered]) .jk-enter { opacity: 0; }
+  [data-enter][data-entered] .jk-enter { animation: jk-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 70ms) both; }
+  @keyframes jk-enter { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+  /* Auth + onboarding: each top-level block of a step rises in turn. */
+  .jk-enter-ready [data-enter]:not([data-entered]).jk-stagger > *,
+  .jk-enter-ready [data-enter]:not([data-entered]).jk-stagger-aside > * { opacity: 0; }
+  [data-enter][data-entered].jk-stagger > *,
+  [data-enter][data-entered].jk-stagger-aside > * { animation: jk-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 70ms) both; }
+  .jk-stagger > :nth-child(2), .jk-stagger-aside > :nth-child(1) { --i: 1; }
+  .jk-stagger > :nth-child(3), .jk-stagger-aside > :nth-child(2) { --i: 2; }
+  .jk-stagger > :nth-child(4), .jk-stagger-aside > :nth-child(3) { --i: 3; }
+  .jk-stagger > :nth-child(5) { --i: 4; }
+  .jk-stagger > :nth-child(6) { --i: 5; }
+  .jk-stagger > :nth-child(n+7) { --i: 6; }
+  /* The pinned phone bar must not slide. */
+  [data-enter][data-entered].jk-stagger > .fixed { animation: none; }
+}
+
+/* Glow card: one colour (--tone) as a top edge, corner wash and glow. Step cards pass a logo colour; paid-plan cards default to gold. */
+.jk-glow { --tone: var(--plan); }
+.jk-step-glow, .jk-glow {
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  background: radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 60%), var(--card);
+  box-shadow: inset 0 2px 0 var(--tone), 0 20px 60px -30px var(--tone);
+}
+:root:not(.dark) .jk-step-glow, :root:not(.dark) .jk-glow {
+  background: radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--tone) 12%, transparent), transparent 60%), var(--card);
+  box-shadow: inset 0 2px 0 var(--tone), 0 20px 50px -34px var(--tone);
+}
+
+
+/* Agent logos in the CLI section: muted at rest, their real colour on hover (black/white marks go full ink). */
+.jk-agent { color: var(--muted-foreground); }
+.jk-agent:hover, .jk-agent:focus-visible { color: var(--foreground); }
+.jk-agent:hover span, .jk-agent:focus-visible span { color: var(--foreground); }
+.jk-agent[data-tone="claude"]:hover svg, .jk-agent[data-tone="claude"]:focus-visible svg { color: var(--agent-claude); }
+.jk-agent[data-tone="gemini"]:hover svg, .jk-agent[data-tone="gemini"]:focus-visible svg { color: var(--agent-gemini); }
+
+/* Browser autofill paints its own grey/blue; keep the field colour. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px var(--card) inset;
+  caret-color: var(--foreground);
+  transition: background-color 9999s ease-out 0s;
+}

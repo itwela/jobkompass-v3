@@ -1,9 +1,23 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
-import { query, mutation } from "./_generated/server";
+import Google from "@auth/core/providers/google";
+import { query, mutation, type MutationCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { ResendOTPPasswordReset } from "./authPasswordReset";
+import { decideLink, EMAIL_TAKEN_MESSAGE } from "./authLinking";
+
+/** Where OAuth may send people back to: the live site, or a local dev server. */
+function allowedRedirect(redirectTo: string): string {
+  const site = (process.env.SITE_URL || "").replace(/\/$/, "");
+  if (redirectTo.startsWith("/") || redirectTo.startsWith("?")) return `${site}${redirectTo}`;
+  const allowed = [site, "http://localhost:3000"].filter(Boolean);
+  if (allowed.some((origin) => redirectTo === origin || redirectTo.startsWith(`${origin}/`) || redirectTo.startsWith(`${origin}?`))) {
+    return redirectTo;
+  }
+  throw new Error(`Invalid redirectTo ${redirectTo}`);
+}
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
@@ -12,15 +26,66 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         const email = params.email as string;
         const name = (params.name as string) || email.split('@')[0];
         const username = (params.username as string) || email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
-        
+
         return {
           email,
           name,
           username,
         };
       },
+      reset: ResendOTPPasswordReset,
+    }),
+    // Needs AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET on the deployment, and
+    // <CONVEX_SITE_URL>/api/auth/callback/google as an authorised redirect URI.
+    Google({
+      profile(p) {
+        return { id: p.sub, name: p.name, email: p.email, image: p.picture, emailVerified: p.email_verified === true };
+      },
     }),
   ],
+  callbacks: {
+    redirect: async ({ redirectTo }) => allowedRedirect(redirectTo),
+    // See convex/authLinking.ts for why this exists.
+    async createOrUpdateUser(ctx, args) {
+      const db = ctx.db as unknown as MutationCtx["db"];
+      const profile = args.profile as Record<string, unknown>;
+      const rawEmail = typeof profile.email === "string" ? profile.email.trim() : "";
+      let sameEmail: any = null;
+      if (rawEmail) {
+        for (const candidate of new Set([rawEmail, rawEmail.toLowerCase()])) {
+          sameEmail = await db.query("users").withIndex("email", (q) => q.eq("email", candidate)).first();
+          if (sameEmail) break;
+        }
+      }
+      const decision = decideLink({
+        existingUserId: args.existingUserId,
+        type: args.type,
+        emailVerified: profile.emailVerified === true,
+        userWithSameEmail: sameEmail?._id ?? null,
+      });
+      if (decision.kind === "existing") return decision.userId as Id<"users">;
+      if (decision.kind === "refuse") throw new ConvexError(EMAIL_TAKEN_MESSAGE);
+      const name = typeof profile.name === "string" ? profile.name : undefined;
+      const image = typeof profile.image === "string" ? profile.image : undefined;
+      if (decision.kind === "link") {
+        const patch: Record<string, unknown> = {};
+        if (!sameEmail.name && name) patch.name = name;
+        if (!sameEmail.image && image) patch.image = image;
+        if (Object.keys(patch).length) await db.patch(sameEmail._id, patch);
+        return decision.userId as Id<"users">;
+      }
+      const username = typeof profile.username === "string"
+        ? profile.username
+        : rawEmail ? rawEmail.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "_") : undefined;
+      return await db.insert("users", {
+        email: rawEmail || undefined,
+        name: name ?? (rawEmail ? rawEmail.split("@")[0] : undefined),
+        username,
+        image,
+        ...(args.type === "oauth" && profile.emailVerified === true ? { emailVerificationTime: Date.now() } : {}),
+      });
+    },
+  },
 });
 
 export const currentUser = query({

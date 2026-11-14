@@ -367,3 +367,33 @@ describe("checker flags invented experience", () => {
     expect(found).toContain("skill");
   });
 });
+
+describe("real-world resume layouts in text sources", () => {
+  const text = [
+    "Jordan Rivera",
+    "PROFESSIONAL EXPERIENCE",
+    "Software Engineer, Brightline Labs 2022 - Present",
+    "Built a React dashboard used by 40 internal analysts.",
+    "Junior Developer | Tandem Co | Jan 2020 - Mar 2022",
+    "Maintained Django admin tools.",
+    "EDUCATION",
+    "B.S. Computer Science, University of Texas at Austin, 2020",
+  ].join("\n");
+  const resume = {
+    personalInfo: { firstName: "Jordan", lastName: "Rivera", email: "j@example.com" },
+    experience: [
+      { company: "Brightline Labs", title: "Software Engineer", date: "2022 - Present", details: ["Built a React dashboard used by 40 internal analysts."] },
+      { company: "Tandem Co", title: "Junior Developer", date: "Jan 2020 - Mar 2022", details: ["Maintained Django admin tools."] },
+    ],
+    education: [{ name: "University of Texas at Austin", degree: "B.S. Computer Science", endDate: "2020" }],
+  };
+
+  it("accepts employers, titles, dates and schools written in comma and pipe headers", () => {
+    expect(checkNoInventedExperience(text, resume)).toEqual([]);
+  });
+
+  it("still flags an employer that is not in the source", () => {
+    const invented = { ...resume, experience: [...resume.experience, { company: "Google", title: "Staff Engineer", date: "2019 - 2020", details: [] }] };
+    expect(checkNoInventedExperience(text, invented).map((v) => v.kind)).toEqual(expect.arrayContaining(["employer", "date"]));
+  });
+});

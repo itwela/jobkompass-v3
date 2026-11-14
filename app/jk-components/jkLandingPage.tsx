@@ -11,6 +11,7 @@ import JkLandingCli from "./jk-landing/jkLandingCli";
 import JkLandingPricing from "./jk-landing/jkLandingPricing";
 import JkLandingFaq from "./jk-landing/jkLandingFaq";
 import JkLandingStart from "./jk-landing/jkLandingStart";
+import JkEnter from "./jkEnter";
 
 /** Pointer-follow and click ripple for .jk-fx buttons, delegated from the page wrapper. */
 function fxTarget(e: React.SyntheticEvent): HTMLElement | null {
@@ -51,6 +52,7 @@ function onFxClick(e: React.MouseEvent) {
 export default function JkLandingPage() {
   return (
     <div className="jk-landing relative" onPointerMove={onFxMove} onPointerOut={onFxOut} onClick={onFxClick}>
+      <JkEnter />
       <JkPublicHeader showPricing showNav overlay />
       <main className="flex min-h-screen flex-col bg-background" role="main">
         <JkLandingHero />

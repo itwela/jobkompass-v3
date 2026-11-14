@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const BAR = ["bg-bar-1", "bg-bar-2", "bg-bar-3", "bg-bar-4"] as const;
-const TICK_TEXT = ["text-bar-1", "text-bar-2", "text-bar-3", "text-bar-4"] as const;
+const TICK_TEXT = ["text-bar-1", "text-bar-2", "text-bar-3", "text-bar-4-ink"] as const;
 export type JkTone = 1 | 2 | 3 | 4 | "plan";
 
 /** The four logo-colour bars. */

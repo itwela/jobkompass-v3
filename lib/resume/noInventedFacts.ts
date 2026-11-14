@@ -9,6 +9,7 @@ import path from "node:path";
 import {
   checkNoInventedExperience,
   resumeEvidenceLines,
+  resumeSectionName,
   type CheckOptions,
 } from "../../tests/no-invented-experience/checker";
 
@@ -323,12 +324,7 @@ type GroundedSchool = { name: string; degree: string; startDate: string; endDate
 type GroundedCert = { name: string; issuer: string; date: string };
 
 function sectionName(line: string): "experience" | "education" | "skills" | "certs" | "projects" | null {
-  if (/^(experience|work experience)$/i.test(line)) return "experience";
-  if (/^education$/i.test(line)) return "education";
-  if (/^skills$/i.test(line)) return "skills";
-  if (/^certifications?$/i.test(line)) return "certs";
-  if (/^projects$/i.test(line)) return "projects";
-  return null;
+  return resumeSectionName(line);
 }
 
 function headerParts(line: string): { left: string; right: string } | null {

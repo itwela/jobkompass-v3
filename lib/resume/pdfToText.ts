@@ -1,4 +1,11 @@
-import { extractText } from 'unpdf';
+import { extractText, getDocumentProxy } from 'unpdf';
+
+// unpdf's bundled pdf.js calls Promise.try, which Node 22 does not have; without
+// this every text extraction throws and falls back to the weaker paths.
+const P = Promise as unknown as { try?: <T>(fn: (...a: unknown[]) => T | PromiseLike<T>, ...a: unknown[]) => Promise<T> };
+if (typeof P.try !== 'function') {
+  P.try = (fn, ...a) => new Promise((resolve) => resolve(fn(...a)));
+}
 
 /** Treat extracted text as usable for LLM if at least this many characters (avoids noise / empty layers). */
 export const PDF_TEXT_MIN_CHARS = 20;
@@ -43,8 +50,12 @@ export async function extractTextFromPdfBase64(resumePdf: string): Promise<strin
   const bytes = decodePdfToUint8Array(resumePdf);
   if (!bytes) return '';
   try {
-    const { text } = await withTimeout(extractText(bytes, { mergePages: true }), PDF_PARSE_TIMEOUT_MS);
-    if (typeof text !== 'string') return '';
+    // Keep the PDF's own line breaks: section headings and job headers must stay
+    // on their own lines, or the fact guard can't find the employers in them.
+    const text = await withTimeout(linedText(bytes), PDF_PARSE_TIMEOUT_MS).catch(async () => {
+      const merged = await withTimeout(extractText(new Uint8Array(bytes), { mergePages: true }), PDF_PARSE_TIMEOUT_MS);
+      return typeof merged.text === 'string' ? merged.text : '';
+    });
     return text
       .replace(/\u00a0/g, ' ')
       .replace(/[ \t]+\n/g, '\n')
@@ -53,6 +64,24 @@ export async function extractTextFromPdfBase64(resumePdf: string): Promise<strin
   } catch {
     return '';
   }
+}
+
+/** Page text with a newline wherever pdf.js marks the end of a line. */
+async function linedText(bytes: Uint8Array): Promise<string> {
+  const pdf = await getDocumentProxy(new Uint8Array(bytes));
+  const pages: string[] = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const content = await page.getTextContent();
+    let out = '';
+    for (const item of content.items as Array<{ str?: string; hasEOL?: boolean }>) {
+      if (typeof item.str !== 'string') continue;
+      out += item.str;
+      if (item.hasEOL) out += '\n';
+    }
+    pages.push(out);
+  }
+  return pages.join('\n');
 }
 
 export function isLikelyReadableResumeText(text: string): boolean {

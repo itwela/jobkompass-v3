@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -9,10 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { Settings, LogOut, User, DollarSign, Moon, Sun } from 'lucide-react'
+import { LogOut, User, DollarSign, Moon, Sun } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { mainAssets } from '@/app/lib/constants'
 import JkGetStartedButton from './jkGetStartedButton'
+import JkMobileMenu from './jkMobileMenu'
 import { useJobKompassTheme } from '@/providers/jkThemeProvider'
 
 interface JkPublicHeaderProps {
@@ -35,6 +36,8 @@ export default function JkPublicHeader({
   const { signOut } = useAuthActions()
   const router = useRouter()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const closeMobile = useCallback(() => setMobileOpen(false), [])
   const { theme, toggleTheme } = useJobKompassTheme()
 
   const handleSignOut = async () => {
@@ -50,9 +53,10 @@ export default function JkPublicHeader({
 
   return (
     <nav className={overlay ? "absolute inset-x-0 top-0 z-50 w-full" : "sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70"}>
-      <div className={overlay ? "relative mx-auto flex h-[76px] max-w-[1248px] items-center justify-between gap-3 px-5 sm:px-6 lg:h-[92px]" : "mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8"}>
-        <Link href="/" className="flex items-end gap-3">
+      <div className={overlay ? "relative mx-auto flex h-[136px] max-w-[1248px] items-center justify-between gap-3 px-5 sm:px-6 lg:h-[92px]" : "mx-auto flex max-w-[1232px] items-center justify-between px-5 py-4 sm:px-8"}>
+        <Link href="/" className={overlay ? "flex shrink-0 items-center gap-1.5 lg:items-end lg:gap-3" : "flex items-end gap-3"}>
           <motion.div
+            className="shrink-0"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -70,13 +74,13 @@ export default function JkPublicHeader({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className={overlay ? "text-xl font-bold tracking-[-0.2px] text-on-fill" : "text-xl font-medium tracking-tight"}
+            className={overlay ? "text-[19px] font-bold tracking-[-0.2px] text-hero-ink max-[359px]:text-[17px] lg:text-xl" : "text-xl font-medium tracking-tight"}
           >
             JobKompass
           </motion.span>
         </Link>
         {showNav && (
-          <div className={overlay ? "absolute left-1/2 hidden -translate-x-1/2 items-center gap-[33px] text-[15px] font-medium text-on-fill/90 lg:flex [&>a:hover]:text-on-fill" : "hidden items-center gap-8 text-sm text-muted-foreground md:flex"}>
+          <div className={overlay ? "absolute left-1/2 hidden -translate-x-1/2 items-center gap-[33px] text-[15px] font-medium text-hero-ink/90 lg:flex [&>a:hover]:text-hero-ink" : "hidden items-center gap-8 text-sm text-muted-foreground md:flex"}>
             <Link href="/#product" className="transition-colors hover:text-foreground">Product</Link>
             <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
             <Link href="/#cli" className="transition-colors hover:text-foreground">CLI</Link>
@@ -203,19 +207,35 @@ export default function JkPublicHeader({
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className={overlay && showNav ? "hidden lg:block" : undefined}
                 >
                   <Link href="/auth">
-                    <Button variant="ghost" size="sm" className={overlay ? "px-3 text-[15px] text-on-fill hover:bg-on-fill/10 hover:text-on-fill" : undefined}>
+                    <Button variant="ghost" size="sm" className={overlay ? "px-3 text-[15px] text-hero-ink hover:bg-hero-ink/10 hover:text-hero-ink" : undefined}>
                       Log in
                     </Button>
                   </Link>
                 </motion.div>
               )}
-              {showNav && <JkGetStartedButton size="default" surface="header" className={overlay ? "jk-fx jk-fx-cream h-10 px-[26px] text-[15.5px]" : ""} />}
+              {showNav && <JkGetStartedButton size="default" surface="header" className={overlay ? "jk-fx jk-fx-cream h-9 px-4 text-[13.5px] max-[359px]:px-3 max-[359px]:text-[13px] lg:h-10 lg:px-[26px] lg:text-[15.5px]" : ""} />}
             </>
+          )}
+          {overlay && showNav && (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-expanded={mobileOpen}
+              aria-controls="jk-mobile-nav"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              className="-mr-2 flex size-10 shrink-0 flex-col items-center justify-center gap-[3.5px] text-hero-ink max-[359px]:mr-0 max-[359px]:size-9 lg:hidden"
+            >
+              <span className={`h-[1.5px] w-4 rounded-full bg-current transition-transform ${mobileOpen ? "translate-y-[5px] rotate-45" : ""}`} />
+              <span className={`h-[1.5px] w-4 rounded-full bg-current transition-opacity ${mobileOpen ? "opacity-0" : ""}`} />
+              <span className={`h-[1.5px] w-4 rounded-full bg-current transition-transform ${mobileOpen ? "-translate-y-[5px] -rotate-45" : ""}`} />
+            </button>
           )}
         </motion.div>
       </div>
+      {overlay && showNav && <JkMobileMenu open={mobileOpen} onClose={closeMobile} isAuthenticated={Boolean(isAuthenticated && user)} />}
     </nav>
   )
 }

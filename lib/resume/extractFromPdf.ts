@@ -32,7 +32,8 @@ Structure (ResumeContentForJake):
     "linkedin": "string or null",
     "github": "string or null",
     "portfolio": "string or null",
-    "citizenship": "string or null"
+    "citizenship": "string or null",
+    "summary": "the resume's own summary or objective paragraph, copied word for word, or null if it has none"
   },
   "experience": [
     {

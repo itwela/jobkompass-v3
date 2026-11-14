@@ -186,6 +186,8 @@ export async function tailorResumeContent(input: {
   baseContent: any;
   company: string;
   role: string;
+  /** Optional posting text: used only to judge relevance, never as a source of facts. */
+  jobDescription?: string;
 }): Promise<any | null> {
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterKey) throw new Error("OpenRouter API key not configured on server");
@@ -199,7 +201,10 @@ export async function tailorResumeContent(input: {
 - The job description is not a source of facts about the candidate. Do not copy employers, titles, tools, metrics, or accomplishments from the target role into the resume.
 Respond with ONLY the JSON object, no explanation or markdown.`;
 
-  const userPrompt = `Target company: ${input.company}\nTarget role: ${input.role}\n\nBase resume JSON:\n${JSON.stringify(input.baseContent)}`;
+  const posting = input.jobDescription?.trim()
+    ? `\n\nJob posting (for deciding what is relevant ONLY; it is not a source of facts about the candidate):\n${input.jobDescription.trim().slice(0, 12000)}`
+    : "";
+  const userPrompt = `Target company: ${input.company}\nTarget role: ${input.role}${posting}\n\nBase resume JSON:\n${JSON.stringify(input.baseContent)}`;
 
   // Model output is nondeterministic; a malformed-JSON response on the first try
   // often parses fine on a retry.

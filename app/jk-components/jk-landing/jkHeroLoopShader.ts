@@ -6,7 +6,7 @@ export const HERO_LOOP_SECONDS = 10;
 export const HERO_LOOP_SPACE: [number, number] = [1672, 941];
 
 export const HERO_LOOP_FRAGMENT = `precision highp float;
-uniform sampler2D u_tex; uniform vec2 u_res; uniform vec2 u_img; uniform float u_t; uniform float u_focus;
+uniform sampler2D u_tex; uniform vec2 u_res; uniform vec2 u_img; uniform float u_t; uniform float u_focus; uniform float u_day;
 #define TAU 6.28318530718
 float ell(vec2 p, vec2 c, vec2 r){ return 1.0 - smoothstep(0.62, 1.0, length((p-c)/r)); }
 float glow(vec2 p, vec2 c, float r){ vec2 d=(p-c)/r; return exp(-dot(d,d)); }
@@ -26,8 +26,9 @@ void main(){
   vec2 q = p;
   // boat: rock about the keel + rise and fall
   float bm = ell(p, vec2(352.0,650.0), vec2(170.0,205.0));
-  float a = 0.020*sin(TAU*(u_t*2.0+0.12));
-  float lift = 4.5*sin(TAU*u_t*2.0);
+  // Gentle bob only: tilting the boat region bent the horizon behind the sail (Nov 12).
+  float a = 0.004*sin(TAU*(u_t*2.0+0.12));
+  float lift = 2.2*sin(TAU*u_t*2.0);
   vec2 c = vec2(356.0,778.0); vec2 d = p-c;
   vec2 bq = c + vec2(d.x*cos(a)-d.y*sin(a), d.x*sin(a)+d.y*cos(a)) + vec2(0.0, lift);
   q = mix(q, bq, bm);
@@ -44,11 +45,12 @@ void main(){
   float w = smoothstep(596.0, 626.0, p.y)*(1.0-solid)*shore;
   float dx = (1.5+7.0*depth)*sin(p.y*0.085 + TAU*u_t*3.0) + (0.8+3.0*depth)*sin(p.y*0.21 - TAU*u_t*5.0 + p.x*0.012);
   float dy = (0.6+2.2*depth)*sin(p.x*0.021 + p.y*0.03 + TAU*u_t*2.0);
-  q += w*vec2(dx, dy);
+  q += w*vec2(dx, dy)*0.65; // calmer than the prototype, per Itwela Nov 12
   vec3 col = texture2D(u_tex, clamp(q/u_img, 0.0, 1.0)).rgb;
   // moving glints on the water
   float gl = pow(max(0.0, sin(p.x*0.045 + p.y*0.16 + TAU*u_t*4.0)*sin(p.y*0.31 - TAU*u_t*3.0)), 8.0);
   col += vec3(0.25,0.55,0.62)*gl*w*0.22*(0.3+depth);
+  vec3 base = col; // by day, the lights below are dimmed to a fifth
   // lighthouse beam
   vec2 L = vec2(1470.0,372.0); vec2 v = p-L;
   float ang = atan(v.y, max(-v.x, 0.0001));
@@ -61,7 +63,7 @@ void main(){
   col += vec3(1.0,0.75,0.4)*glow(p, vec2(1476.0,700.0), 60.0)*w*(0.05+0.06*breath);
   // boat lantern (moves with the boat)
   float flick = 0.72 + 0.16*sin(TAU*u_t*7.0) + 0.12*sin(TAU*u_t*13.0+1.3);
-  vec2 lp = vec2(255.0,715.0) + vec2(-a*60.0, lift);
+  vec2 lp = vec2(255.0,715.0) + vec2(0.0, lift); // the glow rides the lantern up and down, never sideways
   col += vec3(1.0,0.60,0.20)*(glow(p,lp,78.0)*0.30 + glow(p,lp,22.0)*0.35)*flick;
   col += vec3(1.0,0.60,0.20)*glow(p, vec2(275.0,850.0), 70.0)*w*0.16*flick;
   // buoy lights, in order toward the lighthouse
@@ -74,6 +76,7 @@ void main(){
        + star(p, vec2(1443.0,71.0), 4.0, 0.2) + star(p, vec2(1572.0,147.0), 3.0, 0.7)
        + 0.6*(star(p, vec2(520.0,120.0), 3.0, 0.45) + star(p, vec2(760.0,58.0), 2.0, 0.85) + star(p, vec2(1210.0,140.0), 5.0, 0.1)
             + star(p, vec2(380.0,250.0), 4.0, 0.62) + star(p, vec2(1320.0,250.0), 2.0, 0.33) + star(p, vec2(930.0,110.0), 3.0, 0.9));
+  col = base + (col - base)*(1.0 - 0.8*u_day);
   gl_FragColor = vec4(col, 1.0);
 }
 `;

@@ -2,350 +2,177 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useAuthActions } from "@convex-dev/auth/react"
-import { useMutation, useQuery } from "convex/react"
+import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { LogIn, ArrowLeft } from "lucide-react"
-import { motion } from "framer-motion"
-import Image from "next/image"
-import Link from "next/link"
-import { mainAssets } from "@/app/lib/constants"
-import JkPublicHeader from "@/app/jk-components/jkPublicHeader"
-import JkPricingModal from "@/app/jk-components/jkPricingModal"
+import { Button } from "@/components/ui/button"
+import JkAuthShell, { JkAuthHeading } from "@/app/jk-components/jk-auth/jkAuthShell"
+import { JkField, JkFormError, jkFieldCls } from "@/app/jk-components/jkField"
 import { PRICING_REDIRECT_THRESHOLD } from "@/app/lib/timePeriods"
 import { trackSignup } from "@/lib/analytics/client"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
+import { cn } from "@/lib/utils"
+
+type Step = "signIn" | "signUp"
+
+/** A friendly sentence for whatever Convex Auth threw. */
+function authErrorMessage(error: unknown, step: Step): string {
+  const raw = error instanceof Error ? error.message : typeof error === "object" && error && "message" in error ? String((error as { message: unknown }).message) : ""
+  const m = raw.toLowerCase()
+  if (m.includes("already exists") || (m.includes("email") && m.includes("already"))) return "An account with this email already exists. Sign in instead."
+  if (m.includes("network") || m.includes("fetch") || m.includes("connection")) return "Could not reach JobKompass. Check your connection and try again."
+  if (step === "signIn") return "That email and password do not match an account."
+  if (m.includes("password")) return "Use a password of at least 8 characters."
+  return "Could not create the account. If you already have one, sign in instead."
+}
 
 export default function AuthPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const { signIn } = useAuthActions()
   const { isFree, isLoading: subscriptionLoading, subscription } = useSubscription()
   const router = useRouter()
-  
-  // Check if user should see pricing prompts (free plan or cancelled subscription)
-  const shouldShowPricing = isFree || subscription?.status === 'cancelled'
   const searchParams = useSearchParams()
-  const [signInStep, setSignInStep] = useState<"signIn" | "signUp">(
-    searchParams.get('mode') === 'signup' ? 'signUp' : 'signIn'
-  )
-  // Sync signInStep to URL so /auth?mode=signup always shows signup (e.g. from pricing)
+  const shouldShowPricing = isFree || subscription?.status === 'cancelled'
+
+  const [step, setStep] = useState<Step>(searchParams.get('mode') === 'signup' ? 'signUp' : 'signIn')
   useEffect(() => {
-    if (searchParams.get('mode') === 'signup') {
-      setSignInStep('signUp')
-    }
+    if (searchParams.get('mode') === 'signup') setStep('signUp')
   }, [searchParams])
+
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
-  const [showPricingModal, setShowPricingModal] = useState(false)
-  const [wasSignUp, setWasSignUp] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const hasRedirectedRef = useRef(false)
   const updateLastSignIn = useMutation(api.auth.updateLastSignIn)
 
-  // Redirect if already authenticated
+  // Where a signed-in person goes next. A first-ever sign-in (new password
+  // account or new Google account) goes to onboarding instead of the pricing modal.
   useEffect(() => {
-    // Wait for both auth and subscription to load before checking redirect
-    if (!isLoading && !subscriptionLoading && isAuthenticated && user && !hasRedirectedRef.current) {
-      const checkRedirect = async () => {
-        hasRedirectedRef.current = true // Prevent multiple redirects
-        
-        // Get the lastSignInAt before we update it
-        const previousLastSignInAt = (user as any)?.lastSignInAt
-        
-        // Check if first sign-up (no previous lastSignInAt)
-        if (wasSignUp && !previousLastSignInAt) {
-          // First sign-up: show pricing modal if on free plan or cancelled subscription
-          if (shouldShowPricing) {
-            setShowPricingModal(true)
-          }
-          // Update lastSignInAt in background
-          try {
-            await updateLastSignIn()
-          } catch (err) {
-            console.error('Failed to update lastSignInAt:', err)
-          }
-          // If not free plan and not cancelled, go directly to app
-          if (!shouldShowPricing) {
-            router.replace('/app')
-            return
-          }
-          return // Don't redirect yet, let modal show if free plan or cancelled
-        } else if (previousLastSignInAt) {
-          // Check if enough time has passed
-          const timeSinceLastSignIn = Date.now() - previousLastSignInAt
-          if (timeSinceLastSignIn >= PRICING_REDIRECT_THRESHOLD) {
-            // Update lastSignInAt in background
-            try {
-              await updateLastSignIn()
-            } catch (err) {
-              console.error('Failed to update lastSignInAt:', err)
-            }
-            // Haven't signed in for threshold time: redirect to pricing if on free plan or cancelled
-            if (shouldShowPricing) {
-              router.replace('/pricing')
-              return
-            }
-            // If not free plan and not cancelled, go to app
-            router.replace('/app')
-            return
-          }
-        }
-        
-        // Update lastSignInAt
-        try {
-          await updateLastSignIn()
-        } catch (err) {
-          console.error('Failed to update lastSignInAt:', err)
-        }
-        
-        // Otherwise go to app
-        router.replace('/app')
-      }
-      
-      checkRedirect()
-    }
-  }, [isAuthenticated, isLoading, subscriptionLoading, router, user, wasSignUp, updateLastSignIn, shouldShowPricing])
+    if (isLoading || subscriptionLoading || !isAuthenticated || !user || hasRedirectedRef.current) return
+    hasRedirectedRef.current = true
+    const previousLastSignInAt = (user as { lastSignInAt?: number | null }).lastSignInAt
+    const next = searchParams.get('next')
+    void (async () => {
+      try { await updateLastSignIn() } catch (err) { console.error('Failed to update lastSignInAt:', err) }
+      if (!previousLastSignInAt) return router.replace('/onboarding')
+      if (next && next.startsWith('/') && !next.startsWith('//')) return router.replace(next)
+      if (Date.now() - previousLastSignInAt >= PRICING_REDIRECT_THRESHOLD && shouldShowPricing) return router.replace('/pricing')
+      router.replace('/app')
+    })()
+  }, [isAuthenticated, isLoading, subscriptionLoading, router, user, updateLastSignIn, shouldShowPricing, searchParams])
 
-  const getErrorMessage = (error: unknown): string => {
-    // Handle different error types
-    if (error instanceof Error) {
-      const message = error.message.toLowerCase()
-      
-      // Check for common error patterns and provide user-friendly messages
-      if (message.includes('redirect') || message.includes('null is not an object')) {
-        if (signInStep === "signIn") {
-          return "The email or password you entered is incorrect. Please check your credentials and try again."
-        } else {
-          return "An account with this email may already exist. Try signing in instead, or use a different email."
-        }
-      }
-      
-      if (message.includes('user not found') || message.includes('account') || message.includes('does not exist')) {
-        if (signInStep === "signIn") {
-          return "No account found with this email. Please check your email or sign up to create a new account."
-        }
-      }
-      
-      if (message.includes('password') || message.includes('incorrect') || message.includes('invalid')) {
-        return "The email or password you entered is incorrect. Please check your credentials and try again."
-      }
-      
-      if (message.includes('email') && (message.includes('already') || message.includes('exists'))) {
-        return "An account with this email already exists. Please sign in instead."
-      }
-      
-      if (message.includes('network') || message.includes('fetch') || message.includes('connection')) {
-        return "Network error. Please check your internet connection and try again."
-      }
-      
-      // Return the original message if it's user-friendly, otherwise provide a generic one
-      if (message.length < 100 && !message.includes('error') && !message.includes('exception')) {
-        return error.message
-      }
-    }
-    
-    // Handle non-Error objects
-    if (typeof error === 'object' && error !== null) {
-      const errorObj = error as any
-      if (errorObj.message && typeof errorObj.message === 'string') {
-        return getErrorMessage(new Error(errorObj.message))
-      }
-      if (errorObj.error && typeof errorObj.error === 'string') {
-        return getErrorMessage(new Error(errorObj.error))
-      }
-    }
-    
-    // Default messages based on step
-    if (signInStep === "signIn") {
-      return "Sign in failed. Please check your email and password, then try again."
-    } else {
-      return "Sign up failed. Please check your information and try again. If you already have an account, try signing in instead."
-    }
+  const switchTo = (s: Step) => {
+    setStep(s)
+    setAuthError(null)
+    const params = new URLSearchParams(searchParams.toString())
+    if (s === 'signUp') params.set('mode', 'signup'); else params.delete('mode')
+    router.replace(`/auth${params.toString() ? `?${params}` : ''}`, { scroll: false })
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setAuthError(null)
     setAuthLoading(true)
-
     try {
-      const formData = new FormData(e.currentTarget)
-      const isSignUp = signInStep === "signUp"
-      setWasSignUp(isSignUp)
-      
-      await signIn("password", formData)
-      if (isSignUp) trackSignup()
-      // Redirect will happen via useEffect when isAuthenticated changes
+      await signIn("password", new FormData(e.currentTarget))
+      if (step === "signUp") trackSignup()
     } catch (error) {
-      console.error('Authentication failed')
-      const friendlyMessage = getErrorMessage(error)
-      setAuthError(friendlyMessage)
+      setAuthError(authErrorMessage(error, step))
     } finally {
       setAuthLoading(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    )
+  const handleGoogle = async () => {
+    setAuthError(null)
+    setGoogleLoading(true)
+    try {
+      await signIn("google", { redirectTo: `${window.location.origin}/auth` })
+    } catch {
+      setAuthError("Google sign-in is not available right now. Use your email and password.")
+      setGoogleLoading(false)
+    }
   }
 
-  if (isAuthenticated) {
-    return null // Will redirect
+  if (isLoading || isAuthenticated) {
+    return <div className="min-h-dvh bg-background" />
   }
+
+  const isSignUp = step === "signUp"
+  const primaryCls = "h-[54px] w-full text-[16.5px] lg:h-12 lg:text-[15.5px]"
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <JkPublicHeader showPricing={true} />
-
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 px-4 py-12">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="px-8 pt-8 pb-6 border-b border-border">
-            
-            <div className="flex items-center justify-between pt-4">
-
-              <Link href="/app" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
-                <ArrowLeft className="h-4 w-4" />
-                Back to app
-              </Link>
-              <div className="flex items-center gap-3 mb-4">
-                <Image src={mainAssets.logo} alt="JobKompass Logo" width={32} height={32} className="object-contain" />
-              </div>
-            
-            </div>
-
-            <div className="text-center space-y-1">
-              <h1 className="text-2xl font-semibold">
-                {signInStep === "signIn" ? "Sign in to JobKompass" : "Create an account"}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {signInStep === "signIn"
-                  ? "Welcome back!"
-                  : "Get started with your career journey."}
-              </p>
-            </div>
-          </div>
-
-          {/* Form */}
-          <div className="px-8 py-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {signInStep === "signUp" && (
-                <>
-                  <div>
-                    <Input
-                      name="name"
-                      type="text"
-                      placeholder="Full Name"
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <Input
-                      name="username"
-                      type="text"
-                      placeholder="Username"
-                      className="w-full"
-                    />
-                  </div>
-                </>
-              )}
-              <div>
-                <Input
-                  name="email"
-                  type="email"
-                  placeholder="Email"
-                  required
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <Input
-                  name="password"
-                  type="password"
-                  placeholder="Password"
-                  required
-                  className="w-full"
-                />
-              </div>
-              <input name="flow" type="hidden" value={signInStep} />
-
-              {authError && (
-                <div className="p-4 text-sm bg-destructive/10 border border-destructive/30 rounded-lg text-destructive space-y-2">
-                  <div className="font-medium">⚠️ {signInStep === "signIn" ? "Sign in failed" : "Sign up failed"}</div>
-                  <div>{authError}</div>
-                  {signInStep === "signIn" && (
-                    <div className="text-xs text-destructive/80 mt-2">
-                      Don't have an account?{" "}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignInStep("signUp")
-                          setAuthError(null)
-                        }}
-                        className="underline font-medium hover:text-destructive"
-                      >
-                        Sign up here
-                      </button>
-                    </div>
-                  )}
-                  {signInStep === "signUp" && (
-                    <div className="text-xs text-destructive/80 mt-2">
-                      Already have an account?{" "}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignInStep("signIn")
-                          setAuthError(null)
-                        }}
-                        className="underline font-medium hover:text-destructive"
-                      >
-                        Sign in here
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={authLoading}>
-                <LogIn className="mr-2 h-4 w-4" />
-                {authLoading ? "Please wait..." : signInStep === "signIn" ? "Sign in" : "Sign up"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setSignInStep(signInStep === "signIn" ? "signUp" : "signIn")
-                  setAuthError(null)
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {signInStep === "signIn" ? "Don't have an account? " : "Already have an account? "}
-                <span className="text-brand font-medium">
-                  {signInStep === "signIn" ? "Sign up" : "Sign in"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+    <JkAuthShell enterKey={step} band={isSignUp ? "short" : "tall"} className={isSignUp ? "lg:pb-[138px]" : "lg:pt-[142px]"}>
+      <div>
+      {isSignUp ? (
+        <JkAuthHeading eyebrow="Create account" title="Start your search" sub="The free plan covers 3 AI documents a month and 10 jobs." subClassName="max-w-[260px] sm:max-w-none" />
+      ) : (
+        <JkAuthHeading eyebrow="Sign in" title="Welcome aboard" sub="Pick up your search where you left it." subClassName="hidden lg:block" />
+      )}
       </div>
-      
-      <JkPricingModal isOpen={showPricingModal} onClose={() => setShowPricingModal(false)} />
-    </div>
+
+      {!isSignUp && (
+        <>
+          <Button type="button" variant="secondary" onClick={handleGoogle} disabled={googleLoading} style={{ "--i": 3 } as React.CSSProperties} className="jk-enter mt-[17px] h-[52px] w-full border-input bg-card text-[15.5px] hover:bg-accent lg:mt-[33px] lg:h-12 lg:text-[15px]">
+            <svg aria-hidden viewBox="0 0 48 48" className="size-[18px] shrink-0">
+              <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+              <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+              <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+              <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+            </svg>
+            {googleLoading ? "Opening Google…" : "Continue with Google"}
+          </Button>
+          <div aria-hidden style={{ "--i": 4 } as React.CSSProperties} className="jk-enter mt-[26px] hidden items-center gap-[23px] lg:flex">
+            <span className="h-px flex-1 bg-border" />
+            <span className="font-mono text-[10px] leading-[13px] tracking-[0.12em] text-subtle-foreground">OR</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </>
+      )}
+
+      <form onSubmit={handleSubmit} className={cn(isSignUp ? "mt-[21px] lg:mt-[37px]" : "mt-[22px] lg:mt-[21px]")}>
+        <div className={cn("flex flex-col", isSignUp ? "gap-4 lg:gap-[18px]" : "gap-[14px] lg:gap-[18px]")}>
+          {isSignUp && (
+            <div className="grid grid-cols-2 gap-3">
+              <JkField label="Full name" id="name" className="jk-enter" style={{ "--i": 5 } as React.CSSProperties}>
+                <Input id="name" name="name" autoComplete="name" className={cn(jkFieldCls, "h-11")} />
+              </JkField>
+              <JkField label="Username" id="username" className="jk-enter" style={{ "--i": 5.5 } as React.CSSProperties}>
+                <Input id="username" name="username" autoComplete="username" className={cn(jkFieldCls, "h-11")} />
+              </JkField>
+            </div>
+          )}
+          <JkField label="Email" id="email" className="jk-enter" style={{ "--i": 6 } as React.CSSProperties}>
+            <Input id="email" name="email" type="email" required autoComplete="email" className={cn(jkFieldCls, isSignUp ? "h-11" : "h-12 lg:h-11")} />
+          </JkField>
+          <JkField
+            label="Password"
+            id="password"
+            className="jk-enter"
+            style={{ "--i": 7 } as React.CSSProperties}
+            aside={!isSignUp && <Link href="/auth/reset" className="text-[12px] leading-[14px] text-muted-foreground transition-colors hover:text-foreground">Forgot password?</Link>}
+          >
+            <Input id="password" name="password" type="password" required minLength={8} sanitize={false} autoComplete={isSignUp ? "new-password" : "current-password"} className={cn(jkFieldCls, isSignUp ? "h-11" : "h-12 lg:h-11")} />
+          </JkField>
+        </div>
+        <input name="flow" type="hidden" value={step} />
+
+        {authError && <div className="mt-5"><JkFormError>{authError}</JkFormError></div>}
+
+        <Button type="submit" disabled={authLoading} style={{ "--i": 8 } as React.CSSProperties} className={cn("jk-enter", primaryCls, isSignUp ? "mt-9 lg:mt-[38px]" : "mt-8 lg:mt-9")}>
+          {authLoading ? "One moment…" : isSignUp ? "Create account" : "Sign in"}
+        </Button>
+      </form>
+
+      <p style={{ "--i": 9 } as React.CSSProperties} className={cn("jk-enter text-center text-[14px] leading-[17px] text-muted-foreground lg:text-left", isSignUp ? "mt-[19px] lg:mt-[22px]" : "mt-[23px]")}>
+        {isSignUp ? "Already have an account?" : "New here?"}
+        <button type="button" onClick={() => switchTo(isSignUp ? "signIn" : "signUp")} className={cn("ml-1 font-normal transition-colors hover:text-foreground lg:font-medium lg:text-plan-text lg:hover:text-plan", isSignUp ? "lg:ml-[18px]" : "lg:ml-[7px]")}>
+          {isSignUp ? "Sign in" : "Create an account"}
+        </button>
+      </p>
+    </JkAuthShell>
   )
 }
-
