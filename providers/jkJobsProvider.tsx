@@ -8,7 +8,7 @@ import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import JkUpgradeModal from '@/app/jk-components/jkUpgradeModal';
 import { Id } from "@/convex/_generated/dataModel";
 
-interface Job {
+export interface Job {
   _id: Id<"jobs">;
   company: string;
   title: string;
@@ -24,6 +24,7 @@ interface Job {
   resumeUsed?: string;
   coverLetterUsed?: string;
   notes?: string;
+  statusHistory?: { status: string; at: number }[];
   createdAt: number;
   updatedAt: number;
 }
@@ -80,6 +81,8 @@ interface JobsContextType {
   }>) => Promise<void>;
   handleDeleteJob: (id: Id<"jobs">) => Promise<void>;
   handleBulkDeleteJobs: (ids?: Id<"jobs">[]) => Promise<void>;
+  /** Sets one status on every given job (defaults to the current selection). */
+  handleBulkStatusJobs: (status: string, ids?: Id<"jobs">[]) => Promise<void>;
   toggleJobSelection: (id: Id<"jobs">) => void;
   selectAllJobs: (jobIds?: Id<"jobs">[]) => void;
   clearJobSelection: () => void;
@@ -305,6 +308,17 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const handleBulkStatusJobs = async (status: string, ids?: Id<"jobs">[]) => {
+    const targetIds = (ids ?? selectedJobIds).filter((jobId): jobId is Id<"jobs"> => Boolean(jobId));
+    if (targetIds.length === 0) return;
+    try {
+      setError(null);
+      await Promise.all(targetIds.map((jobId) => updateJob({ id: jobId, status })));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update the selected jobs. Please try again.');
+    }
+  };
+
   const value: JobsContextType = {
     // Data
     jobs,
@@ -329,6 +343,7 @@ export function JkJobsProvider({ children }: { children: ReactNode }) {
     handleUpdateJob,
     handleDeleteJob,
     handleBulkDeleteJobs,
+    handleBulkStatusJobs,
     toggleJobSelection,
     selectAllJobs,
     clearJobSelection,

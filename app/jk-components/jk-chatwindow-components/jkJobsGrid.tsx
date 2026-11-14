@@ -1,367 +1,254 @@
 'use client'
 
-import { useState, MouseEvent, useEffect } from "react";
-import { BlurFade } from "@/components/ui/blur-fade";
-import { useJobs } from "@/providers/jkJobsProvider";
-import { Id } from "@/convex/_generated/dataModel";
-import { motion } from "framer-motion";
-import { ExternalLink, Calendar, Briefcase, Trash2, CheckCircle2, Circle, Sparkles, FileText, FileCheck } from "lucide-react";
-import JkConfirmDelete from "../jkConfirmDelete";
-import JkCompensationBadge from "../jkCompensationBadge";
-import { TemplateType } from "../jkTemplateSelector";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+/**
+ * The three ways My Jobs lists jobs:
+ *   JkJobsTable      D03 table: title · company (logo) · status glyph · applied date · comp band
+ *   JkJobsGrouped    D04 columns per status with counts, up to 4 cards each, then "N more"
+ *   JkJobsPhoneList  M01 rows: glyph, title, company · status, comp band
+ * All three take the already-filtered jobs from useJobs() and report clicks up; the page
+ * (jkChatWindow-MyJobsMode.tsx) owns focus (J/K), selection and dialogs.
+ */
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { appliedDate } from "@/lib/jkJobs";
+import { STATUS_BG, STATUS_TEXT, statusKey } from "@/lib/jkStatus";
+import type { Job } from "@/providers/jkJobsProvider";
+import type { Id } from "@/convex/_generated/dataModel";
+import { JkStatusGlyph } from "../jkStatusChip";
+import { JkCompBars, JkJobLogo, JkMonoLabel } from "../jk-jobs/jkJobBits";
 
-interface JobCardProps {
-  job: {
-    _id: Id<"jobs">;
-    company: string;
-    title: string;
-    link: string;
-    status: string;
-    compensation?: string;
-    dateApplied?: string;
-    easyApply?: string;
-    createdAt: number;
-    updatedAt: number;
-    seenAt?: number;
-  };
-  index: number;
-  onClick: () => void;
-  onDelete: () => Promise<void>;
-  isDeleting: boolean;
-  selectionMode: boolean;
-  selected: boolean;
-  onToggleSelect: () => void;
-  onOpenTemplateSelector: (type: TemplateType, job: JobForTemplateSelection) => void;
+type JobId = Id<"jobs">;
+
+const enter = (i: number) => ({ "--i": Math.min(i, 14) } as React.CSSProperties);
+
+function SelectBox({ on, label }: { on: boolean; label: string }) {
+  return (
+    <span
+      role="checkbox"
+      aria-checked={on}
+      aria-label={label}
+      className={cn(
+        "flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
+        on ? "border-primary bg-primary text-primary-foreground" : "border-border-strong",
+      )}
+    >
+      {on && <Check className="size-3" strokeWidth={3} />}
+    </span>
+  );
 }
 
-function JobCard({
-  job,
-  index,
-  onClick,
-  onDelete,
-  isDeleting,
-  selectionMode,
-  selected,
-  onToggleSelect,
-  onOpenTemplateSelector,
-}: JobCardProps) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [localDeleting, setLocalDeleting] = useState(false);
+const TABLE_COLS = "grid grid-cols-[minmax(0,1fr)_minmax(120px,166px)_124px_84px_56px] items-center gap-x-0";
 
-  const handleDeleteClick = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    setShowDeleteConfirm(true);
-  };
-
-  useEffect(() => {
-    if (selectionMode) {
-      setShowDeleteConfirm(false);
-      setLocalDeleting(false);
-    }
-  }, [selectionMode]);
-
-  const handleConfirmDelete = async () => {
-    setLocalDeleting(true);
-    try {
-      await onDelete();
-      setShowDeleteConfirm(false);
-    } finally {
-      setLocalDeleting(false);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setShowDeleteConfirm(false);
-  };
-
-  const handleCardClick = () => {
-    if (selectionMode) {
-      onToggleSelect();
-    } else {
-      onClick();
-    }
-  };
-
-  const statusColors: Record<string, string> = {
-    Interested: 'bg-brand/10 text-brand border-brand/30   ',
-    Applied: 'bg-warn/10 text-warn border-warn/30',
-    Callback: 'bg-brand/10 text-brand border-brand/30',
-    Interviewing: 'bg-bar-1/10 text-bar-1 border-bar-1/30',
-    Rejected: 'bg-destructive/10 text-destructive border-destructive/30',
-    Offered: 'bg-ok/10 text-ok border-ok/30',
-  };
-
-  const statusColor = statusColors[job.status] || 'bg-muted text-foreground border-border';
-
-  // Check if job is new (never seen)
-  const isNew = !job.seenAt;
-
-const handleGenerateResume = (event: MouseEvent) => {
-    event.stopPropagation();
-    onOpenTemplateSelector('resume', job);
-  };
-
-  const handleGenerateCoverLetter = (event: MouseEvent) => {
-    event.stopPropagation();
-    onOpenTemplateSelector('cover-letter', job);
-  };
-
-  const cardDetails = (
-    <div className="mt-auto space-y-2">
-
-      {job.dateApplied && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Calendar className="h-3 w-3" />
-          Applied {job.dateApplied}
-        </div>
-      )}
-
-      {/* Compensation Badge */}
-      <JkCompensationBadge compensation={job.compensation} />
-
-      <div className="flex items-center gap-2 justify-between w-full">
-        <div className="flex items-center gap-2 min-w-0">
-          {job.easyApply && job.easyApply.toLowerCase() !== 'no' && (
-            <span className="text-xs text-muted-foreground shrink-0">
-              {job.easyApply} ·
-            </span>
-          )}
-          <a
-            href={job.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-xs text-brand  hover:text-brand  hover:underline shrink-0"
-          >
-            View Job <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-            >
-              <Sparkles className="h-3 w-3" />
-              Generate
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onClick={handleGenerateResume}>
-              <FileText className="h-4 w-4 mr-2" />
-              Resume
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleGenerateCoverLetter}>
-              <FileCheck className="h-4 w-4 mr-2" />
-              Cover Letter
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+export function JkJobsTable({
+  jobs, total, focusedId, selectionMode, selectedIds, onRowClick, onRowOpen, onToggle,
+}: {
+  jobs: Job[];
+  total: number;
+  focusedId: JobId | null;
+  selectionMode: boolean;
+  selectedIds: JobId[];
+  onRowClick: (id: JobId) => void;
+  onRowOpen: (id: JobId) => void;
+  onToggle: (id: JobId) => void;
+}) {
+  return (
+    <div role="table" aria-label="Jobs" aria-rowcount={jobs.length} className="min-w-0">
+      <div role="row" className={cn(TABLE_COLS, "sticky top-0 z-[1] h-10 border-b border-border bg-background pl-8 pr-5")}>
+        {["Title", "Company", "Status", "Applied", "Comp"].map((h) => (
+          <JkMonoLabel key={h} as="span" className="tracking-[0.12em]">
+            <span role="columnheader">{h}</span>
+          </JkMonoLabel>
+        ))}
       </div>
+      <div data-enter className="relative">
+        {jobs.map((job, i) => {
+          const focused = job._id === focusedId;
+          const selected = selectedIds.includes(job._id);
+          const date = appliedDate(job.dateApplied);
+          return (
+            <div
+              key={job._id}
+              role="row"
+              data-job-row={job._id}
+              aria-selected={selectionMode ? selected : focused}
+              tabIndex={-1}
+              onClick={() => (selectionMode ? onToggle(job._id) : onRowClick(job._id))}
+              onDoubleClick={() => !selectionMode && onRowOpen(job._id)}
+              className={cn(
+                "jk-enter group relative h-11 cursor-pointer border-b border-border pl-8 pr-5 transition-colors duration-150",
+                TABLE_COLS,
+                focused ? "bg-popover" : "hover:bg-popover/60",
+                selected && "bg-accent/60",
+              )}
+              style={enter(i)}
+            >
+              {focused && !selectionMode && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-plan" />}
+              <div role="cell" className="flex min-w-0 items-center gap-3 pr-4">
+                {selectionMode && <SelectBox on={selected} label={`Select ${job.title}`} />}
+                <span className="truncate text-[14.5px] font-medium text-foreground">{job.title}</span>
+              </div>
+              <div role="cell" className="flex min-w-0 items-center gap-2 pr-3">
+                <JkJobLogo company={job.company} link={job.link} size={20} />
+                <span className="truncate text-[13.5px] text-muted-foreground">{job.company}</span>
+              </div>
+              <div role="cell" className="flex min-w-0 items-center gap-[11px]">
+                <JkStatusGlyph status={job.status} className="size-[13px]" />
+                <span className="truncate text-[13.5px] text-foreground">{job.status}</span>
+              </div>
+              <div role="cell" className="truncate font-mono text-[12px] text-muted-foreground">{date ?? "-"}</div>
+              <div role="cell"><JkCompBars compensation={job.compensation} /></div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="px-8 pb-8 pt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-subtle-foreground" aria-live="polite">
+        {jobs.length} of {total} shown
+      </p>
     </div>
   );
+}
+
+/** Column order for D04. Empty statuses get no column. */
+export const GROUP_ORDER = ["Interviewing", "Applied", "Callback", "Offered", "Interested", "Rejected", "Ghosted"] as const;
+const CARDS_PER_COLUMN = 4;
+
+function shortDate(job: Job) {
+  const d = appliedDate(job.dateApplied);
+  return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.slice(5) : d;
+}
+
+export function JkJobCard({ job, focused, selectionMode, selected, onClick, style }: {
+  job: Job; focused: boolean; selectionMode: boolean; selected: boolean; onClick: () => void; style?: React.CSSProperties;
+}) {
+  const d = shortDate(job);
+  const eyebrow = statusKey(job.status) === "interested" ? "Saved" : d ? `Applied ${d}` : job.status;
+  return (
+    <button
+      type="button"
+      data-job-row={job._id}
+      onClick={onClick}
+      aria-pressed={selectionMode ? selected : undefined}
+      style={style}
+      className={cn(
+        "jk-enter group flex h-[110px] w-full flex-col rounded-[18px] border bg-card px-4 pb-3 pt-[14px] text-left transition-[border-color,transform] duration-200 hover:-translate-y-px",
+        focused || selected ? "border-plan" : "border-border hover:border-input",
+      )}
+    >
+      <div className="flex w-full items-center justify-between gap-2">
+        <span className={cn("truncate font-mono text-[10.5px] uppercase tracking-[0.04em]", focused ? "text-plan-text" : "text-subtle-foreground")}>{eyebrow}</span>
+        {selectionMode ? <SelectBox on={selected} label={`Select ${job.title}`} /> : <JkCompBars compensation={job.compensation} className="text-[11px]" />}
+      </div>
+      <span className="mt-2 w-full truncate text-[15px] font-medium leading-[18px] text-foreground">{job.title}</span>
+      <span className="mt-1 flex w-full min-w-0 items-center gap-2">
+        <JkJobLogo company={job.company} link={job.link} size={16} />
+        <span className="truncate text-[13px] text-muted-foreground">{job.company}</span>
+      </span>
+      <span className="mt-auto w-full truncate border-t border-border pt-[5px] font-mono text-[11px] text-subtle-foreground">
+        {job.resumeUsed ? job.resumeUsed.replace(/^.*?resume\s*[-–—:]\s*/i, "Resume - ") : "no resume yet"}
+      </span>
+    </button>
+  );
+}
+
+export function JkJobsGrouped({
+  jobs, focusedId, selectionMode, selectedIds, onCardClick, onMore,
+}: {
+  jobs: Job[];
+  focusedId: JobId | null;
+  selectionMode: boolean;
+  selectedIds: JobId[];
+  onCardClick: (id: JobId) => void;
+  /** "N more": show that whole status (the page switches to the table filtered to it). */
+  onMore: (status: string) => void;
+}) {
+  const known = new Set<string>(GROUP_ORDER);
+  const others = [...new Set(jobs.map((j) => j.status).filter((s) => !known.has(s)))];
+  const columns = [...GROUP_ORDER, ...others]
+    .map((status) => ({ status, items: jobs.filter((j) => j.status === status) }))
+    .filter((c) => c.items.length > 0);
 
   return (
-    <BlurFade delay={0.0618 + index * 0.05} inView>
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        className="cursor-pointer"
-        onClick={handleCardClick}
-      >
-        <div
-          className={`bg-card border rounded-lg p-6 h-full min-h-[230px] flex flex-col hover:shadow-lg transition-shadow ${
-            selectionMode && selected 
-              ? 'border-brand ring-2 ring-brand/30' 
-              : isNew 
-                ? 'border-brand border-2' 
-                : 'border-border'
-          }`}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg mb-1 line-clamp-2">{job.title}</h3>
-            </div>
-            {selectionMode ? (
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggleSelect();
-                }}
-                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-brand hover:bg-brand/40 transition-colors"
-                aria-pressed={selected}
-              >
-                {selected ? (
-                  <CheckCircle2 className="h-4 w-4 text-brand" />
-                ) : (
-                  <Circle className="h-4 w-4" />
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={handleDeleteClick}
-                className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                aria-label="Delete job"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
+    <div data-enter className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] items-start gap-3 px-5 pb-28 pt-[18px] lg:px-8">
+      {columns.map((col, ci) => {
+        const k = statusKey(col.status);
+        const shown = col.items.slice(0, CARDS_PER_COLUMN);
+        const more = col.items.length - shown.length;
+        return (
+          <section key={col.status} aria-label={`${col.status}, ${col.items.length}`} className="flex min-w-0 flex-col gap-3">
+            <header
+              className={cn("jk-enter flex h-[42px] items-center gap-[11px] rounded-[14px] px-3.5", {
+                interested: "bg-status-interested/14", applied: "bg-status-applied/14", callback: "bg-status-callback/14",
+                interviewing: "bg-status-interviewing/14", offered: "bg-status-offered/14", rejected: "bg-status-rejected/14", ghosted: "bg-status-ghosted/14",
+              }[k])}
+              style={enter(ci)}
+            >
+              <span aria-hidden className={cn("h-3.5 w-[3px] rounded-full", STATUS_BG[k])} />
+              <span className="text-[15px] font-medium text-foreground">{col.status}</span>
+              <span className="ml-auto font-mono text-[12.5px] font-medium text-foreground">{col.items.length}</span>
+            </header>
+            {shown.map((job, i) => (
+              <JkJobCard
+                key={job._id}
+                job={job}
+                focused={!selectionMode && job._id === focusedId}
+                selectionMode={selectionMode}
+                selected={selectedIds.includes(job._id)}
+                onClick={() => onCardClick(job._id)}
+                style={enter(ci + i + 1)}
+              />
+            ))}
+            {more > 0 && (
+              <button type="button" onClick={() => onMore(col.status)} className="jk-enter self-start text-[12.5px] text-subtle-foreground transition-colors hover:text-foreground" style={enter(ci + shown.length + 1)}>
+                {more} more
               </button>
             )}
-          </div>
-
-          <div className="flex items-center gap-2  mb-3 justify-between w-full">
-                
-                <p className="text-muted-foreground text-sm mb-2 flex items-center gap-1">
-                  <Briefcase className="h-3 w-3" />
-                  {job.company}
-                </p>
-                <div className={` px-2.5 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
-                  {job.status}
-                </div>
-
-          </div>
-
-          {!selectionMode && showDeleteConfirm ? (
-            <div
-              className="mt-3"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <JkConfirmDelete
-                onConfirm={() => {
-                  void handleConfirmDelete();
-                }}
-                onCancel={handleCancelDelete}
-                isLoading={isDeleting || localDeleting}
-              />
-            </div>
-          ) : (
-            cardDetails
-          )}
-        </div>
-      </motion.div>
-    </BlurFade>
-  );
-}
-
-/** Job shape for template generation: pass full job so toast and API get company. Do not pass (jobId, jobTitle, jobCompany). */
-type JobForTemplateSelection = { _id: Id<"jobs">; title: string; company: string };
-
-interface JkJobsGridProps {
-  onOpenTemplateSelector?: (type: TemplateType, job: JobForTemplateSelection) => void;
-}
-
-export default function JkJobsGrid({ onOpenTemplateSelector }: JkJobsGridProps = {}) {
-  const {
-    allJobs,
-    filteredJobs,
-    setSelectedJobId,
-    isAuthenticated,
-    authLoading,
-    handleDeleteJob,
-    selectionMode,
-    toggleJobSelection,
-    selectedJobIds,
-    selectedStatus,
-  } = useJobs();
-  const [deletingId, setDeletingId] = useState<Id<"jobs"> | null>(null);
-  const markJobAsSeen = useMutation(api.jobs.markJobAsSeen);
-
-  const handleOpenTemplateSelectorInternal = (
-    type: TemplateType,
-    job: any,
-  ) => {
-    if (onOpenTemplateSelector) {
-      onOpenTemplateSelector(type, job);
-    }
-  };
-
-  const handleDelete = async (id: Id<"jobs">) => {
-    setDeletingId(id);
-    try {
-      await handleDeleteJob(id);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  if (authLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-        <div className="text-6xl mb-4">🔒</div>
-        <h2 className="text-2xl font-semibold mb-2">Sign in required</h2>
-        <p className="text-muted-foreground mb-6 max-w-md">
-          Please sign in to view your applied jobs.
-        </p>
-      </div>
-    );
-  }
-
-  if (allJobs.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-        <div className="text-6xl mb-4">💼</div>
-        <h2 className="text-2xl font-semibold mb-2">No jobs yet</h2>
-        <p className="text-muted-foreground mb-6">
-          Jobs you apply to will appear here
-        </p>
-      </div>
-    );
-  }
-
-  if (filteredJobs.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-6">
-        <div className="text-6xl mb-4">🔍</div>
-        <h2 className="text-2xl font-semibold mb-2">No jobs match this filter</h2>
-        <p className="text-muted-foreground mb-4">
-          {selectedStatus
-            ? `Try choosing a different status, clearing search, or reset filters.`
-            : `Try adjusting your filters or clearing the search.`}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-[230px]">
-      {filteredJobs.map((job, index) => (
-        <JobCard
-          key={job._id}
-          job={job}
-          index={index}
-          onClick={async () => {
-            setSelectedJobId(job._id);
-            // Mark job as seen when clicked
-            try {
-              await markJobAsSeen({ jobId: job._id });
-            } catch (error) {
-              // Silently fail - don't interrupt user experience
-              console.error('Failed to mark job as seen:', error);
-            }
-          }}
-          onDelete={() => handleDelete(job._id)}
-          isDeleting={deletingId === job._id}
-          selectionMode={selectionMode}
-          selected={selectedJobIds.includes(job._id)}
-          onToggleSelect={() => toggleJobSelection(job._id)}
-          onOpenTemplateSelector={handleOpenTemplateSelectorInternal}
-        />
-      ))}
+          </section>
+        );
+      })}
     </div>
   );
 }
 
+export function JkJobsPhoneList({
+  jobs, total, selectionMode, selectedIds, onOpen, onToggle,
+}: {
+  jobs: Job[];
+  total: number;
+  selectionMode: boolean;
+  selectedIds: JobId[];
+  onOpen: (id: JobId) => void;
+  onToggle: (id: JobId) => void;
+}) {
+  return (
+    <div className="px-5">
+      <ul data-enter className="border-t border-border">
+        {jobs.map((job, i) => {
+          const k = statusKey(job.status);
+          const selected = selectedIds.includes(job._id);
+          return (
+            <li key={job._id} className="jk-enter border-b border-border" style={enter(i)}>
+              <button
+                type="button"
+                onClick={() => (selectionMode ? onToggle(job._id) : onOpen(job._id))}
+                className={cn("flex min-h-20 w-full items-start gap-[13px] py-[17px] text-left", selected && "bg-accent/40")}
+              >
+                <span className="mt-[3px]">{selectionMode ? <SelectBox on={selected} label={`Select ${job.title}`} /> : <JkStatusGlyph status={job.status} className="size-[13px]" />}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] font-medium leading-[19px] text-foreground">{job.title}</span>
+                  <span className="mt-1.5 flex min-w-0 items-baseline gap-3 text-[13px] leading-[15px]">
+                    <span className="truncate text-muted-foreground">{job.company}</span>
+                    <span className={cn("shrink-0", STATUS_TEXT[k])}>· {job.status}</span>
+                    <JkCompBars compensation={job.compensation} className="ml-auto shrink-0 pl-2 text-[11px]" />
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="pb-28 pt-4 font-mono text-[10px] uppercase tracking-[0.12em] text-subtle-foreground">{jobs.length} of {total} shown</p>
+    </div>
+  );
+}
+
+export default JkJobsTable;

@@ -38,6 +38,7 @@ import type * as http from "../http.js";
 import type * as inputSanitizer from "../inputSanitizer.js";
 import type * as interviewPreps from "../interviewPreps.js";
 import type * as jobLeads from "../jobLeads.js";
+import type * as jobStatusHistory from "../jobStatusHistory.js";
 import type * as jobs from "../jobs.js";
 import type * as plans from "../plans.js";
 import type * as rateLimit from "../rateLimit.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   inputSanitizer: typeof inputSanitizer;
   interviewPreps: typeof interviewPreps;
   jobLeads: typeof jobLeads;
+  jobStatusHistory: typeof jobStatusHistory;
   jobs: typeof jobs;
   plans: typeof plans;
   rateLimit: typeof rateLimit;
