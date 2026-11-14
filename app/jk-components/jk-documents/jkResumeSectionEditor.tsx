@@ -291,7 +291,7 @@ function ListSection({ tab, content, update, item, onItem, resumeName }: { tab: 
               <Field id="e-title" label="Title" value={entry.title} onChange={setField("title")} />
               <Field id="e-company" label="Company" value={entry.company} onChange={setField("company")} />
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-[14px]">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-[14px] min-[360px]:grid-cols-2">
               <Field id="e-date" label="Dates" mono value={entry.date} onChange={setField("date")} placeholder="2024 - Present" />
               <Field id="e-location" label="Location" value={entry.location} onChange={setField("location")} />
             </div>
@@ -314,7 +314,7 @@ function ListSection({ tab, content, update, item, onItem, resumeName }: { tab: 
               <Field id="ed-degree" label="Degree" value={entry.degree} onChange={setField("degree")} />
               <Field id="ed-field" label="Field" value={entry.field} onChange={setField("field")} />
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-[14px]">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-[14px] min-[360px]:grid-cols-2">
               <Field id="ed-start" label="Start" mono value={entry.startDate} onChange={setField("startDate")} />
               <Field id="ed-end" label="End" mono value={entry.endDate} onChange={setField("endDate")} />
             </div>

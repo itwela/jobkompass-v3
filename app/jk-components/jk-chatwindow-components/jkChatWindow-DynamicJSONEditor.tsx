@@ -301,6 +301,9 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                 aside={company}
                 actions={
                     <>
+                        <Button variant="secondary" onClick={() => setShowPreview(true)} className="h-[38px] bg-popover px-4 text-[13.5px] xl:hidden">
+                            Preview
+                        </Button>
                         <Button variant="secondary" onClick={() => void share()} disabled={isSharing} className="h-[38px] bg-popover px-4 text-[13.5px]">
                             {isSharing ? "Copying…" : "Share link"}
                         </Button>
@@ -311,9 +314,9 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                 }
             />
 
-            <div className="flex flex-1 flex-col lg:grid lg:min-h-0 lg:grid-cols-[minmax(440px,560px)_minmax(0,1fr)]">
+            <div className="flex flex-1 flex-col lg:min-h-0 xl:grid xl:grid-cols-[minmax(480px,560px)_minmax(0,1fr)]">
                 {/* Left: section tabs, fields, template row */}
-                <div className="jk-enter flex min-w-0 flex-col lg:min-h-0 lg:border-r lg:border-border" style={{ "--i": 1 } as React.CSSProperties}>
+                <div className="jk-enter flex min-w-0 flex-col lg:min-h-0 lg:flex-1 xl:border-r xl:border-border" style={{ "--i": 1 } as React.CSSProperties}>
                     <div className="flex flex-1 flex-col lg:min-h-0 lg:overflow-y-auto">
                         <JkResumeSectionEditor
                             content={content}
@@ -330,7 +333,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                 </div>
 
                 {/* Right: live page with the section being edited highlighted */}
-                <aside aria-label="Preview" className="jk-enter hidden min-w-0 flex-col bg-card lg:flex lg:min-h-0" style={{ "--i": 2 } as React.CSSProperties}>
+                <aside aria-label="Preview" className="jk-enter hidden min-w-0 flex-col bg-card xl:flex xl:min-h-0" style={{ "--i": 2 } as React.CSSProperties}>
                     <JkLivePreview content={content} focus={focus} pages={pages} />
                 </aside>
             </div>
@@ -343,7 +346,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             </div>
 
             {showPreview && (
-                <div role="dialog" aria-modal="true" aria-label="Preview" className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm lg:hidden">
+                <div role="dialog" aria-modal="true" aria-label="Preview" className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm xl:hidden">
                     <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
                         <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-subtle-foreground">Preview{pages ? ` · ${pages} page${pages === 1 ? "" : "s"}` : ""}</p>
                         <button type="button" aria-label="Close preview" onClick={() => setShowPreview(false)} className="flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><X className="size-5" /></button>
