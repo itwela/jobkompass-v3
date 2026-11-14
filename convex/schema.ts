@@ -124,6 +124,8 @@ const documentsTables = {
     updatedAt: v.number(),
     // Track when user has seen/viewed this job
     seenAt: v.optional(v.number()),
+    // Every status change with its time, oldest first (appended by jobs.add / jobs.update).
+    statusHistory: v.optional(v.array(v.object({ status: v.string(), at: v.number() }))),
   }).index("by_user", ["userId"])
     .index("by_username", ["username"]),
 

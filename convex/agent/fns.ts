@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, internalAction } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { AgentError } from "./auth";
 import { shouldSeedBaseResume } from "../baseResume";
+import { nextStatusHistory } from "../jobStatusHistory";
 import { planRank } from "../plans";
 import { setResumeShared } from "../resumeShares";
 import {
@@ -91,7 +92,7 @@ export const jobsAdd = internalMutation({
   args: { userId: v.string(), ...jobFields },
   handler: async (ctx, args) => {
     const now = Date.now();
-    return await ctx.db.insert("jobs", { ...args, createdAt: now, updatedAt: now });
+    return await ctx.db.insert("jobs", { ...args, statusHistory: nextStatusHistory(undefined, undefined, args.status, now) ?? undefined, createdAt: now, updatedAt: now });
   },
 });
 
@@ -115,8 +116,10 @@ export const jobsUpdate = internalMutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, { userId, id, ...fields }) => {
-    await owned(ctx, id, userId, "Job");
-    await ctx.db.patch(id, { ...definedOnly(fields), updatedAt: Date.now() });
+    const job = await owned<Doc<"jobs">>(ctx, id, userId, "Job");
+    const now = Date.now();
+    const statusHistory = nextStatusHistory(job.statusHistory, job.status, fields.status, now);
+    await ctx.db.patch(id, { ...definedOnly(fields), ...(statusHistory ? { statusHistory } : {}), updatedAt: now });
   },
 });
 

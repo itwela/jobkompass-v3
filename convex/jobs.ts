@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { nextStatusHistory } from "./jobStatusHistory";
 
 const PLAN_LIMITS: Record<string, number | null> = {
   free: 10,
@@ -224,6 +225,7 @@ export const add = mutation({
     return await ctx.db.insert("jobs", {
       userId: convexUserId, // Use convex_user_id as the sole identifier
       ...args,
+      statusHistory: nextStatusHistory(undefined, undefined, args.status, now) ?? undefined,
       createdAt: now,
       updatedAt: now,
     });
@@ -266,9 +268,12 @@ export const update = mutation({
       throw new Error("Not authorized");
     }
 
+    const now = Date.now();
+    const statusHistory = nextStatusHistory(job.statusHistory, job.status, updates.status, now);
     await ctx.db.patch(id, {
       ...updates,
-      updatedAt: Date.now(),
+      ...(statusHistory ? { statusHistory } : {}),
+      updatedAt: now,
     });
   },
 });
@@ -324,6 +329,7 @@ export const addInternal = internalMutation({
     return await ctx.db.insert("jobs", {
       userId, // Use convex_user_id as the sole identifier
       ...jobData,
+      statusHistory: nextStatusHistory(undefined, undefined, jobData.status, now) ?? undefined,
       createdAt: now,
       updatedAt: now,
     });
@@ -359,6 +365,7 @@ export const addForAgent = mutation({
     return await ctx.db.insert("jobs", {
       userId, // Use convex_user_id as the sole identifier
       ...jobData,
+      statusHistory: nextStatusHistory(undefined, undefined, jobData.status, now) ?? undefined,
       createdAt: now,
       updatedAt: now,
     });
