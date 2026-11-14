@@ -77,7 +77,10 @@ export function upgradeOffer(
 
   let target: JkPaidTarget | null;
   let headline: string;
-  if (f.includes("cli") || f.includes("agent")) {
+  if (f === "" || f === "plans") {
+    target = requiredPlan ?? nextTier(current);
+    headline = target ? `Upgrade to ${NAMES[target]}` : "You're on Pro";
+  } else if (f.includes("cli") || f.includes("agent")) {
     target = at(requiredPlan ?? "pro");
     headline = "The jk CLI is part of Pro";
   } else if (f.includes("extension")) {
