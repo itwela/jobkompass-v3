@@ -99,15 +99,15 @@ export default function JkJobRail({
           </button>
         </div>
       </div>
-      <div className="flex shrink-0 flex-wrap gap-2 border-t border-border bg-background px-[27px] py-4">
-        <Button onClick={onWriteResume} className="h-10 gap-2.5 px-[22px] text-[14px]">
+      <div className="flex shrink-0 gap-2 border-t border-border bg-background px-[27px] py-4">
+        <Button onClick={onWriteResume} className="h-10 gap-2 px-[18px] text-[14px]">
           Write resume
           <kbd className="inline-flex h-[18px] min-w-5 items-center justify-center rounded-[5px] bg-primary-foreground/15 px-1 font-mono text-[10.5px] font-semibold">G</kbd>
         </Button>
-        <Button variant="secondary" className="h-10 px-6 text-[14px]" disabled={!job.link} onClick={() => job.link && window.open(job.link, "_blank", "noopener,noreferrer")}>
+        <Button variant="secondary" className="h-10 px-5 text-[14px]" disabled={!job.link} onClick={() => job.link && window.open(job.link, "_blank", "noopener,noreferrer")}>
           View posting
         </Button>
-        <Button variant="secondary" className="h-10 px-[21px] text-[14px]" onClick={onPrep}>Prep</Button>
+        <Button variant="secondary" className="h-10 px-5 text-[14px]" onClick={onPrep}>Prep</Button>
       </div>
     </aside>
   );

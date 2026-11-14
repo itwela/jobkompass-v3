@@ -35,6 +35,8 @@ export default function JkJobInputModal({ isOpen, onClose, onJobAdded, onOpenExt
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState(false);
+  useEffect(() => { const mq = window.matchMedia("(max-width: 767px)"); const on = () => setPhone(mq.matches); on(); mq.addEventListener("change", on); return () => mq.removeEventListener("change", on); }, []);
   const linkRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -129,7 +131,7 @@ export default function JkJobInputModal({ isOpen, onClose, onJobAdded, onOpenExt
           id="jk-add-text"
           value={text}
           onChange={(e) => { setText(e.target.value); setError(null); }}
-          placeholder="Paste the job description..."
+          placeholder={phone ? "Or paste the job description..." : "Paste the job description..."}
           aria-label="Posting text"
           className={cn(jkFieldCls, "mt-[26px] h-[100px] resize-none rounded-[14px] px-4 py-3.5 text-[14px] md:mt-0 md:h-[130px] md:rounded-xl md:px-3.5")}
         />

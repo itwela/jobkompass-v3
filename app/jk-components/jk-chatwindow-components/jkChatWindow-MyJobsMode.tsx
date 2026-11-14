@@ -280,9 +280,9 @@ export default function JkCW_MyJobsMode() {
         title="My Jobs"
         sub={`${total} saved · ${applied} applied · ${interviewing} interviewing`}
         art="waves"
-        actions={
+        actions={desk ? (
           <div className="hidden flex-wrap items-center gap-2.5 md:flex">
-            <label className="relative block w-[clamp(200px,calc(100vw-1020px),420px)]">
+            <label className="relative block w-[clamp(200px,calc(100vw-700px),420px)]">
               <Search aria-hidden className="pointer-events-none absolute left-[19px] top-1/2 size-3.5 -translate-y-1/2 text-subtle-foreground" strokeWidth={1.8} />
               <input
                 ref={searchRef}
@@ -305,7 +305,7 @@ export default function JkCW_MyJobsMode() {
             </Button>
             <Button className="h-10 px-[30px] text-[14px]" onClick={() => setAddOpen(true)}>Add job</Button>
           </div>
-        }
+        ) : undefined}
         bottom={
           <>
             <div className="hidden md:block md:pt-[38px] lg:pt-[41px]">
@@ -317,7 +317,7 @@ export default function JkCW_MyJobsMode() {
             </div>
           </>
         }
-        className="pb-3.5 md:pb-5"
+        className="pb-3.5 pt-1 md:pb-5 md:pt-4 lg:pt-5"
       />
 
       <div className="flex min-h-0 flex-1">

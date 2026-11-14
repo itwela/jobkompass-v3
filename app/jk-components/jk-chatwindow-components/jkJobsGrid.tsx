@@ -229,6 +229,7 @@ export function JkJobsPhoneList({
             <li key={job._id} className="jk-enter border-b border-border" style={enter(i)}>
               <button
                 type="button"
+                data-job-row={job._id}
                 onClick={() => (selectionMode ? onToggle(job._id) : onOpen(job._id))}
                 className={cn("flex min-h-20 w-full items-start gap-[13px] py-[17px] text-left", selected && "bg-accent/40")}
               >
