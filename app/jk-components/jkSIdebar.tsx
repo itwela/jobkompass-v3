@@ -56,7 +56,7 @@ export function JkNavRow({ label, count, active, tick, onClick, size = "md" }: {
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex w-full items-center text-left transition-colors duration-200",
+        "group flex w-full items-center text-left outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring/50",
         size === "md"
           ? cn("h-[38px] gap-[13px] rounded-xl px-3 text-[15px] leading-[18px]", active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground")
           : cn("min-h-14 gap-[17px] py-2 text-[22px] font-medium leading-[26px] tracking-[-0.3px]", active ? "text-foreground" : "text-muted-foreground hover:text-foreground"),

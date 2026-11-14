@@ -1,7 +1,7 @@
 // app/jk-components/jkEmailLeads/ApprovalQueue.tsx
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useState } from "react";
@@ -14,8 +14,9 @@ export function ApprovalQueue() {
   // `reconcileStuckSends` cron reappears with a real, server-driven "Sending..." state in
   // between, instead of vanishing from the list entirely while the local component still
   // thinks it's in flight.
-  const pendingLeads = useQuery(api.jobLeads.list, { status: "pending_approval" });
-  const sendingLeads = useQuery(api.jobLeads.list, { status: "sending" });
+  const { isAuthenticated } = useConvexAuth();
+  const pendingLeads = useQuery(api.jobLeads.list, isAuthenticated ? { status: "pending_approval" } : "skip");
+  const sendingLeads = useQuery(api.jobLeads.list, isAuthenticated ? { status: "sending" } : "skip");
   const accounts = useQuery(api.emailAccounts.list, {});
   const resumes = useQuery(api.documents.listResumes);
   const approve = useMutation(api.jobLeads.approve);

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from "react"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation, useConvexAuth } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,8 @@ export default function JkCW_LeadsMode() {
   // Same subscription the child components use — Convex dedupes it, and having the
   // full list here lets the section headers show live totals so it's obvious whether
   // leads/drafts generated at all.
-  const leads = useQuery(api.jobLeads.list, {})
+  const { isAuthenticated } = useConvexAuth();
+  const leads = useQuery(api.jobLeads.list, isAuthenticated ? {} : "skip")
   const totalCount = leads?.length
   const pendingCount = leads?.filter(
     (l) => l.status === "pending_approval" || l.status === "sending"

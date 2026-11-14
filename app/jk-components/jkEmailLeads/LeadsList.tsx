@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import {
@@ -65,7 +65,8 @@ export function LeadsList({
   selectedLeadIds = [],
   onToggleLeadSelection,
 }: LeadsListProps) {
-  const leads = useQuery(api.jobLeads.list, {});
+  const { isAuthenticated } = useConvexAuth();
+  const leads = useQuery(api.jobLeads.list, isAuthenticated ? {} : "skip");
   const accounts = useQuery(api.emailAccounts.list, {});
   const promote = useMutation(api.jobLeads.promoteToJob);
   const deleteLead = useMutation(api.jobLeads.deleteLead);
