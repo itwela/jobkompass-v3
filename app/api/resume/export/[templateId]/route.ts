@@ -11,8 +11,11 @@ import type { ResumeContent } from '@/lib/resume/types';
 export const maxDuration = 300;
 
 function getLatexServiceUrl() {
+  // An explicit URL wins, so local dev can point at the deployed compile service
+  // (same rule as lib/onboarding/server.ts). Production behaviour is unchanged.
+  if (process.env.LATEX_SERVICE_URL) return process.env.LATEX_SERVICE_URL;
   if (process.env.NODE_ENV === 'development') return 'http://127.0.0.1:8080';
-  return process.env.LATEX_SERVICE_URL ?? null;
+  return null;
 }
 
 export async function POST(

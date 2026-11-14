@@ -108,7 +108,7 @@ export default function JkDocumentFolderCard({
           }
         }}
         className={cn(
-          "group relative flex min-h-[56px] cursor-pointer items-center gap-4 rounded-[16px] border border-border bg-card py-3 pl-4 pr-2 text-foreground transition-colors hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-16 lg:rounded-[18px] lg:pl-5",
+          "group relative flex min-h-[56px] cursor-pointer items-center gap-3 rounded-[16px] border border-border bg-card py-3 pl-4 pr-1 lg:gap-4 lg:pr-2 text-foreground transition-colors hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-16 lg:rounded-[18px] lg:pl-5",
           isDropTarget && "border-ring ring-2 ring-ring/40"
         )}
       >
@@ -134,10 +134,10 @@ export default function JkDocumentFolderCard({
               className="h-8"
             />
           ) : (
-            <p className="truncate text-[15px] font-medium leading-[18px]">{folder.name}</p>
+            <p className="truncate text-[14px] font-medium leading-[17px] lg:text-[15px] lg:leading-[18px]">{folder.name}</p>
           )}
           {showDeleteConfirm ? null : (
-            <p className="mt-[3px] font-mono text-[11.5px] leading-[15px] text-subtle-foreground">
+            <p className="mt-[3px] truncate whitespace-nowrap font-mono text-[10.5px] leading-[14px] text-subtle-foreground lg:text-[11.5px] lg:leading-[15px]">
               {count} document{count === 1 ? "" : "s"}
             </p>
           )}
@@ -149,7 +149,7 @@ export default function JkDocumentFolderCard({
               variant="ghost"
               size="icon-sm"
               aria-label={`${folder.name} options`}
-              className="text-subtle-foreground opacity-100 hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 lg:data-[state=open]:opacity-100"
+              className="size-7 shrink-0 text-subtle-foreground lg:size-8 opacity-100 hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 lg:data-[state=open]:opacity-100"
               onClick={(event) => event.stopPropagation()}
             >
               <MoreVertical className="h-4 w-4" />

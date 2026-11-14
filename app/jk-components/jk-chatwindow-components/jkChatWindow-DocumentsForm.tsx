@@ -819,7 +819,7 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
                 }
             />
 
-            <div data-enter className="flex flex-col gap-5 px-5 pb-28 pt-1 lg:gap-0 lg:px-8 lg:pb-10 lg:pt-[14px]">
+            <div data-enter className="relative flex flex-col gap-5 px-5 pb-28 pt-1 lg:gap-0 lg:px-8 lg:pb-10 lg:pt-[14px]">
             {isUploading && (
                 <div className="jk-enter rounded-[16px] border border-border bg-card p-4 lg:mb-5">
                     <div className="flex items-center gap-3">
@@ -939,8 +939,8 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
 
             {!openFolderId && folders.length > 0 && typeFilter !== "favorites" && (
                 <section aria-label="Folders" className="jk-enter lg:mb-[26px]" style={{ "--i": 1 } as React.CSSProperties}>
-                    <JkSectionLabel as="h2" className="mb-[13px] hidden lg:flex">Folders</JkSectionLabel>
-                    <div className="grid grid-cols-2 gap-2 lg:-mt-1 lg:grid-cols-[repeat(auto-fill,minmax(232px,1fr))] lg:gap-3">
+                    <JkSectionLabel as="h2" className="hidden lg:flex">Folders</JkSectionLabel>
+                    <div className="grid grid-cols-2 gap-2 lg:mt-[22px] lg:grid-cols-[repeat(auto-fill,minmax(232px,1fr))] lg:gap-3">
                         {folders.map((folder: JkFolder, folderIndex: number) => (
                             <JkDocumentFolderCard
                                 key={String(folder._id)}
@@ -1035,6 +1035,7 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
                                 fileId={resume?.fileId}
                                 selectionMode={selectionMode}
                                 selected={isSelectedForBulk}
+                                expanded={confirmingId === resumeId || (editingResumeId === resumeId && editingDocType === documentType)}
                                 onOpen={() => openDocument(resume)}
                                 onToggleFavorite={() => {
                                     void toggleFavorite({ documentId: resumeId, documentType }).catch(() => {

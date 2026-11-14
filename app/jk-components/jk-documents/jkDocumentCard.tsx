@@ -17,7 +17,7 @@ import { DRAG_MIME } from "./jkDocumentFolderCard";
  */
 export default function JkDocumentCard({
   id, type, title, kindLabel, templateShort, company, edited, dateShort, isBase, isFavorite, isNew,
-  content, fileId, selectionMode, selected, onOpen, onToggleFavorite, menu, below, index = 0,
+  content, fileId, selectionMode, selected, onOpen, onToggleFavorite, menu, below, expanded, index = 0,
 }: {
   id: string;
   type: "resume" | "cover-letter";
@@ -38,6 +38,8 @@ export default function JkDocumentCard({
   onToggleFavorite: () => void;
   menu: React.ReactNode;
   below?: React.ReactNode;
+  /** `below` is showing (delete confirm / labels editor): hide the kebab so it doesn't sit on it. */
+  expanded?: boolean;
   index?: number;
 }) {
   const desktopMeta = company ? `${company} · ${dateShort}` : edited;
@@ -69,7 +71,7 @@ export default function JkDocumentCard({
     >
       <div className="relative flex h-[150px] items-center justify-center overflow-hidden rounded-[10px] bg-popover lg:rounded-[12px]">
         {/* One page (104x140, D07); phones show it at 91x130 (M06). */}
-        <JkDocThumb content={type === "resume" ? content : undefined} fileId={fileId} width={104} height={140} className="origin-center max-lg:scale-[0.9] lg:mt-5 lg:self-start" />
+        <JkDocThumb content={type === "resume" ? content : undefined} fileId={fileId} width={104} height={140} className="origin-center max-lg:scale-[0.9] lg:mt-2.5 lg:self-start" />
         {selectionMode ? (
           <span className={cn("absolute right-2.5 top-2.5", selected ? "text-ring" : "text-subtle-foreground")}>
             {selected ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}
@@ -88,9 +90,6 @@ export default function JkDocumentCard({
             <Star className={cn("size-[15px]", isFavorite && "fill-current")} strokeWidth={1.6} />
           </button>
         )}
-        {isNew && !selectionMode && (
-          <span className="absolute left-2.5 top-2.5 rounded-full bg-ring/15 px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.8px] text-ring">New</span>
-        )}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col px-1 pt-3 lg:pt-3.5">
@@ -99,16 +98,18 @@ export default function JkDocumentCard({
           {kindLabel}{templateShort ? ` · ${templateShort} template` : ""}
         </p>
         <div className="mt-auto flex items-center gap-2 pt-2.5 lg:pt-3">
-          <p className="hidden min-w-0 flex-1 truncate font-mono text-[11px] leading-[15px] text-subtle-foreground lg:block">{desktopMeta}</p>
+          <p className="hidden min-w-0 flex-1 truncate pr-8 font-mono text-[11px] leading-[15px] text-subtle-foreground lg:block">{desktopMeta}</p>
           <p className="min-w-0 flex-1 truncate font-mono text-[8.5px] uppercase leading-[11px] tracking-[0.6px] text-subtle-foreground lg:hidden">{phoneMeta}</p>
-          {!selectionMode && (
-            <div className="-my-2 -mr-1.5 shrink-0" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-              {menu}
-            </div>
-          )}
+
         </div>
         {below}
       </div>
+      {/* Kebab: over the page panel on phones (M06 keeps the meta line whole), end of the meta row on desktop. */}
+      {!selectionMode && !expanded && (
+        <div className="absolute right-3 top-3 lg:bottom-[13px] lg:right-[13px] lg:top-auto" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          {menu}
+        </div>
+      )}
     </div>
   );
 }

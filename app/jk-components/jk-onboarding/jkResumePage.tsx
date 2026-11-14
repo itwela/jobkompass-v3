@@ -58,7 +58,7 @@ export default function JkResumePage({ content, marks, focus, width, height, cla
   const additional = clean(content.skills?.additional);
   const scale = width / PAGE;
   return (
-    <div aria-label={`${name || "Resume"} resume`} role="img" className={cn("shrink-0 overflow-hidden rounded-[4px] bg-paper-warm shadow-lg", className)} style={{ width, height: height === "auto" ? Math.max((width * 11) / 8.5, (autoH ?? 0) * (width / PAGE)) : height ?? (width * 580) / 440 }}>
+    <div aria-label={`${name || "Resume"} resume`} role="img" className={cn("shrink-0 overflow-hidden rounded-[4px] bg-paper-warm shadow-lg", className)} style={{ width, height: height === "auto" ? Math.max((width * 660) / 480, (autoH ?? 0) * (width / PAGE)) : height ?? (width * 580) / 440 }}>
       <div
         ref={innerRef}
         className="origin-top-left px-9 pb-9 pt-[38px] text-[10.9px] leading-[1.48] text-paper-foreground"

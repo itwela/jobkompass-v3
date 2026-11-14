@@ -100,7 +100,7 @@ function JkSectionTabs({ tabs, value, onChange }: { tabs: JkResumeTab[]; value: 
               aria-selected={active}
               onClick={() => onChange(t)}
               className={cn(
-                "relative shrink-0 pb-[13px] pt-[19px] text-[15px] leading-[18px] transition-colors lg:pb-3 lg:pt-[19px] lg:text-[13.5px] lg:leading-4",
+                "relative shrink-0 pb-[13px] pt-[19px] text-[15px] leading-[18px] transition-colors lg:pb-[9px] lg:pt-[19px] lg:text-[13.5px] lg:leading-4",
                 active ? "font-medium text-foreground" : "text-subtle-foreground hover:text-muted-foreground",
               )}
             >
@@ -129,7 +129,7 @@ function Field({ id, label, value, onChange, mono, placeholder, type = "text", c
         value={value ?? ""}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={cn(jkFieldCls, "h-11 bg-card lg:h-11", mono && "font-mono text-[14.5px]")}
+        className={cn(jkFieldCls, "h-11 rounded-[12px] bg-card", mono && "font-mono text-[14.5px]")}
       />
     </div>
   );
@@ -165,7 +165,7 @@ function AreaField({ id, label, value, onChange, hint, placeholder }: { id: stri
   return (
     <div className="jk-enter">
       <JkFieldLabel htmlFor={id} aside={hint ? <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-subtle-foreground">{hint}</span> : undefined}>{label}</JkFieldLabel>
-      <div className={cn(jkFieldCls, "px-3.5 py-3 focus-within:border-plan focus-within:shadow-[0_0_0_0.5px_var(--plan)]")}>
+      <div className={cn(jkFieldCls, "rounded-[12px] px-3.5 py-3 focus-within:border-plan focus-within:shadow-[0_0_0_0.5px_var(--plan)]")}>
         <GrowArea id={id} value={value} onChange={onChange} placeholder={placeholder} rows={3} className="min-h-[66px] text-[14.5px] leading-[21px]" />
       </div>
     </div>
@@ -258,7 +258,7 @@ function ListSection({ tab, content, update, item, onItem, resumeName }: { tab: 
 
   return (
     <div className="flex flex-col">
-      <div className="jk-enter mb-[15px] flex items-center gap-2">
+      <div className="jk-enter mb-[15px] flex h-[13px] items-center gap-2">
         <p className="font-mono text-[10px] font-medium uppercase leading-[13px] tracking-[0.12em] text-subtle-foreground">
           {TAB_LABEL[tab]} · {i + 1} of {list.length}
         </p>
@@ -424,7 +424,7 @@ function BulletRow({ row, index, active, onFocus, onText, onDelete }: { row: Row
       dragListener={false}
       dragControls={controls}
       className={cn(
-        "group relative flex items-start gap-1 rounded-xl border bg-card py-[13px] pl-1.5 pr-2 transition-colors",
+        "group relative flex items-start gap-1 rounded-[12px] border bg-card py-[13px] pl-1.5 pr-2 transition-colors",
         active ? "border-[1.5px] border-plan" : "border-input",
       )}
       whileDrag={{ scale: 1.01, boxShadow: "0 12px 32px var(--scrim)" }}

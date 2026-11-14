@@ -35,8 +35,23 @@ interface DynamicJSONEditorProps {
 }
 
 const AUTOSAVE_MS = 2500;
+// Top-center keeps toasts off Share link / Download PDF (top-right on desktop).
+const TOAST_AT = "top-center" as const;
 const PAGE_W = 480; // D08 page width at 100%
 const PAGE_H = 660;
+
+/** Real page count of a PDF: quick scan first, pdf.js when pages sit in compressed object streams. */
+async function pdfPages(bytes: Uint8Array): Promise<number | null> {
+    const quick = countPdfPages(bytes);
+    if (quick) return quick;
+    try {
+        const { getDocumentProxy } = await import("unpdf");
+        const doc = await getDocumentProxy(bytes.slice());
+        return doc.numPages || null;
+    } catch {
+        return null;
+    }
+}
 
 const emptyContent = (): ResumeContent => ({ personalInfo: { email: "" } });
 
@@ -85,7 +100,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
         let cancelled = false;
         fetch(fileUrl)
             .then((r) => (r.ok ? r.arrayBuffer() : null))
-            .then((buf) => { if (!cancelled && buf) setPages(countPdfPages(new Uint8Array(buf))); })
+            .then(async (buf) => { const n = buf ? await pdfPages(new Uint8Array(buf)) : null; if (!cancelled) setPages(n); })
             .catch(() => {});
         return () => { cancelled = true; };
     }, [fileUrl]);
@@ -130,14 +145,14 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                     fileSize: pdfBlob.size,
                     content: contentToSave,
                 });
-                setPages(countPdfPages(new Uint8Array(await pdfBlob.arrayBuffer())));
+                setPages(await pdfPages(new Uint8Array(await pdfBlob.arrayBuffer())));
                 setSaveState(dirtyRef.current ? "unsaved" : "saved");
                 return true;
             } catch (error) {
                 console.error("Failed to save resume:", error);
                 dirtyRef.current = true;
                 setSaveState("error");
-                toast.error("Couldn't save your resume", { description: error instanceof Error ? error.message : undefined });
+                toast.error("Couldn't save your resume", { description: error instanceof Error ? error.message : undefined, position: TOAST_AT });
                 return false;
             }
         })();
@@ -200,7 +215,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             setPages(null);
             setSaveState("saved");
         } catch (error) {
-            toast.error("Couldn't switch the template", { description: error instanceof Error ? error.message : undefined });
+            toast.error("Couldn't switch the template", { description: error instanceof Error ? error.message : undefined, position: TOAST_AT });
         } finally {
             setSwitching(null);
         }
@@ -212,12 +227,12 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             if (!resume?.fileId) await flush();
             const result = await shareResume({ resumeId });
             if (result.shared) {
-                try { await navigator.clipboard.writeText(result.url); toast.success("Share link copied", { description: result.url }); }
-                catch { toast.success("Share link ready", { description: result.url }); }
+                try { await navigator.clipboard.writeText(result.url); toast.success("Share link copied", { description: result.url, position: TOAST_AT }); }
+                catch { toast.success("Share link ready", { description: result.url, position: TOAST_AT }); }
             }
         } catch (error) {
             console.error("Failed to share:", error);
-            toast.error("Couldn't create a share link");
+            toast.error("Couldn't create a share link", { position: TOAST_AT });
         } finally {
             setIsSharing(false);
         }
@@ -249,7 +264,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             trackResumeExported({ method: "export", template_id: template });
         } catch (error) {
             console.error("Download error:", error);
-            toast.error("Couldn't download the PDF", { description: error instanceof Error ? error.message : undefined });
+            toast.error("Couldn't download the PDF", { description: error instanceof Error ? error.message : undefined, position: TOAST_AT });
         } finally {
             setIsDownloading(false);
         }
@@ -321,7 +336,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
             </div>
 
             {/* Phone: bottom actions above the tab bar (M15). */}
-            <div className="sticky z-20 mt-auto flex gap-2 border-t border-border bg-card px-5 pb-3 pt-3.5 lg:hidden" style={{ bottom: "calc(var(--jk-tabbar-h, 0px))" }}>
+            <div className="sticky bottom-0 z-20 mt-auto flex gap-2 border-t border-border bg-card px-5 pb-3 pt-3.5 lg:hidden">
                 <Button onClick={() => void download()} disabled={isDownloading} className="h-11 flex-[1.9] text-[15px]">{isDownloading ? "Preparing…" : "Download PDF"}</Button>
                 <Button variant="secondary" onClick={() => setShowPreview(true)} className="h-11 flex-1 bg-popover text-[15px]">Preview</Button>
                 <Button variant="secondary" onClick={() => void share()} disabled={isSharing} aria-label="Share link" className="hidden h-11 flex-1 bg-popover text-[15px] sm:inline-flex">Share link</Button>
@@ -416,14 +431,14 @@ function JkLivePreview({ content, focus, pages }: { content: ResumeContent; focu
     }, [focus?.section, focus?.index]);
     return (
         <>
-            <div className="flex h-[52px] shrink-0 items-end justify-between px-8 pb-2 font-mono text-[10px] uppercase leading-[13px] tracking-[0.12em] text-subtle-foreground">
-                <span>Preview{pages ? ` · ${pages} page${pages === 1 ? "" : "s"}` : ""}</span>
+            <div className="flex shrink-0 items-center justify-between px-8 pt-[21px] font-mono text-[10px] uppercase leading-[13px] tracking-[0.12em] text-subtle-foreground">
+                <span>Preview{pages ? ` · Page 1 of ${pages}` : ""}</span>
                 <span>{Math.round((w / PAGE_W) * 100)}%</span>
             </div>
             <div ref={boxRef} className="min-h-0 flex-1">
-                <div ref={scroller} className="flex h-full justify-center overflow-y-auto px-8 pb-8 pt-4">
+                <div ref={scroller} className="flex h-full justify-center overflow-y-auto px-8 pb-8 pt-[17px]">
                     {hasRenderableResume(content) ? (
-                        <JkResumePage content={content} focus={focus} width={w} height="auto" className="shadow-[0_24px_60px_var(--scrim)]" />
+                        <JkResumePage content={content} focus={focus} width={w} height="auto" className="shadow-none ring-1 ring-border dark:shadow-[0_24px_60px_var(--scrim)] dark:ring-0" />
                     ) : (
                         <p className="mt-20 text-[14px] text-muted-foreground">Fill in the header to see your page.</p>
                     )}
