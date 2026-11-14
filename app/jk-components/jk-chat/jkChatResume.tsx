@@ -7,6 +7,7 @@
  * - JkChatChangesSheet: "What changed and why", full screen below the panel breakpoint.
  * All three read the same artifact (tool result) merged with the live resume document.
  */
+import { createPortal } from "react-dom";
 import { useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -304,8 +305,9 @@ export function JkChatChangesSheet({ artifact, onClose }: { artifact: ChatArtifa
     return () => ro.disconnect();
   }, []);
   const changes = tailoring?.changes ?? [];
-  return (
-    <div role="dialog" aria-modal aria-label="What changed and why" className="fixed inset-0 z-50 flex flex-col bg-background">
+  return createPortal(
+    
+    <div role="dialog" aria-modal aria-label="What changed and why" className="fixed inset-0 z-[70] flex flex-col bg-background">
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 sm:px-6">
         <button type="button" onClick={onClose} aria-label="Back to the chat" className="-ml-1 flex size-9 items-center justify-center rounded-full text-foreground hover:bg-accent">
           <ChevronLeft className="size-5" strokeWidth={1.75} />
@@ -347,6 +349,7 @@ export function JkChatChangesSheet({ artifact, onClose }: { artifact: ChatArtifa
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

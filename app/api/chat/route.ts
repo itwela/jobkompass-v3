@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
       const t = wrote?.tailoring;
       if (t) {
         const role = t.jobTitle && t.jobCompany ? ` for the ${t.jobTitle} role at ${t.jobCompany}` : "";
-        const notes = (t.changes ?? []).map((c: { title: string; note: string }) => `${c.title}: ${c.note.charAt(0).toLowerCase()}${c.note.slice(1)}`);
+        const notes = (t.changes ?? []).map((c: { title: string; note: string }) => `${c.title}: ${c.note}`);
         fullMessage = `Done. I tailored your resume${role}${notes.length ? `. ${notes.join(". ")}.` : "."}`;
       }
     }

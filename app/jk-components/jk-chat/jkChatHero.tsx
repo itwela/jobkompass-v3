@@ -5,6 +5,7 @@
  * {first name}?", the composer, four action cards that start real flows, and the context
  * counts. Phone shows three cards and no counts, as M03 does.
  */
+import { createPortal } from "react-dom";
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import JkArt from "../jkArt";
@@ -112,8 +113,9 @@ export function JkChatJobPicker({ open, title, onPick, onClose, onSaveJob }: { o
     return allJobs.filter((j) => !needle || `${j.title} ${j.company}`.toLowerCase().includes(needle));
   }, [allJobs, q]);
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim p-0 sm:items-center sm:p-6" onClick={onClose}>
+  return createPortal(
+    
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-scrim p-0 sm:items-center sm:p-6" onClick={onClose}>
       <div role="dialog" aria-modal aria-label={title} onClick={(e) => e.stopPropagation()}
         className="flex max-h-[80dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[24px] border border-input bg-card sm:rounded-[24px]">
         <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-5">
@@ -143,7 +145,8 @@ export function JkChatJobPicker({ open, title, onPick, onClose, onSaveJob }: { o
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
