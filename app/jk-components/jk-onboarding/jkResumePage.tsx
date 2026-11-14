@@ -8,8 +8,9 @@ import type { ResumeMarks } from "@/lib/onboarding/resumeChanges";
 const PAGE = 510; // natural width the page is typeset at, then scaled (same as JkDocPreview)
 
 /** A changed passage: faint blue fill with a thin blue rule on the right edge. */
-function Mark({ on, children }: { on?: boolean; children: React.ReactNode }) {
-  return <div className={cn(on && "-mx-[12px] border-r-[2.5px] border-bar-3 bg-bar-3/13 px-[12px] py-[2px]")}>{children}</div>;
+function Mark({ on, name, children }: { on?: boolean; name?: string; children: React.ReactNode }) {
+  // data-mark lets a caller line margin notes up with a changed passage (chat's Artifacts panel).
+  return <div data-mark={on ? name : undefined} className={cn(on && "-mx-[12px] border-r-[2.5px] border-bar-3 bg-bar-3/13 px-[12px] py-[2px]")}>{children}</div>;
 }
 
 /** The section the editor is on (D08): pale gold fill with a 2px gold rule on the left edge. */
@@ -72,13 +73,13 @@ export default function JkResumePage({ content, marks, focus, width, height, cla
 
         {pi.summary && (
           <Section title="Professional Summary">
-            <Focus on={on("summary")}><Mark on={marks?.summary}><p>{pi.summary}</p></Mark></Focus>
+            <Focus on={on("summary")}><Mark on={marks?.summary} name="summary"><p>{pi.summary}</p></Mark></Focus>
           </Section>
         )}
 
         {(technical.length > 0 || additional.length > 0) && (
           <Section title="Technical Skills">
-            <Focus on={on("skills")}><Mark on={marks?.skills}>
+            <Focus on={on("skills")}><Mark on={marks?.skills} name="skills">
               {technical.length > 0 && <p>{additional.length > 0 && "Technical: "}{technical.join(", ")}</p>}
               {additional.length > 0 && <p>Additional: {additional.join(", ")}</p>}
             </Mark></Focus>
@@ -89,7 +90,7 @@ export default function JkResumePage({ content, marks, focus, width, height, cla
           <Section title="Professional Experience">
             {content.experience!.map((job, i) => (
               <div key={i} className={cn(i > 0 && "mt-[0.9em]")}>
-                <Focus on={on("experience", i)}><Mark on={marks?.experience.includes(i)}>
+                <Focus on={on("experience", i)}><Mark on={marks?.experience.includes(i)} name="experience">
                   <p className="flex justify-between gap-3 font-bold"><span>{clean([job.title, job.company]).join(", ")}</span><span className="shrink-0">{job.date}</span></p>
                   {clean(job.details).map((d, j) => <p key={j} className="pl-[0.6em] -indent-[0.6em]">• {d}</p>)}
                 </Mark></Focus>
@@ -122,7 +123,7 @@ export default function JkResumePage({ content, marks, focus, width, height, cla
         {(content.projects?.length ?? 0) > 0 && (
           <Section title="Projects">
             {content.projects!.map((p, i) => (
-              <Focus key={i} on={on("projects", i)}><Mark on={marks?.projects.includes(i)}><p><span className="font-bold">{p.name}</span> {p.description}</p>{clean(p.details).map((d, j) => <p key={j} className="pl-[0.6em] -indent-[0.6em]">• {d}</p>)}</Mark></Focus>
+              <Focus key={i} on={on("projects", i)}><Mark on={marks?.projects.includes(i)} name="projects"><p><span className="font-bold">{p.name}</span> {p.description}</p>{clean(p.details).map((d, j) => <p key={j} className="pl-[0.6em] -indent-[0.6em]">• {d}</p>)}</Mark></Focus>
             ))}
           </Section>
         )}

@@ -3,6 +3,7 @@ import { mutation, query, internalMutation, internalQuery } from "./_generated/s
 import { Auth } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { shouldSeedBaseResume } from "./baseResume";
+import { tailoringValidator } from "./tailoring";
 
 // Resume functions
 export const saveResume = mutation({
@@ -283,6 +284,7 @@ export const saveGeneratedResumeWithFile = mutation({
     template: v.optional(v.string()),
     label: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    tailoring: v.optional(tailoringValidator),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -301,6 +303,7 @@ export const saveGeneratedResumeWithFile = mutation({
       template: args.template || 'jake',
       label: args.label,
       tags: args.tags,
+      ...(args.tailoring ? { tailoring: args.tailoring } : {}),
       createdAt: now,
       updatedAt: now,
       // Generated resumes are OUTPUTS, not the master base — seed if empty,

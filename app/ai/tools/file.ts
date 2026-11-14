@@ -18,6 +18,20 @@ import { generateResumeLatex } from "@/lib/resume/generators";
 import { canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
 import { rankLabel, type PlanRank } from "@/convex/plans";
 import { applyFactGuard, type FactGuard } from "@/lib/resume/noInventedFacts";
+import { describeResumeChanges } from "@/lib/onboarding/resumeChanges";
+import { extractMustHaves, scoreMustHaves, countPdfPages, type MustHaves } from "@/lib/chat/mustHaves";
+import type { ResumeContent } from "@/lib/resume/types";
+
+/**
+ * What this chat turn knows beyond the model's arguments: the job and base resume the
+ * person attached or the model fetched. The resume tool uses it to say what changed,
+ * score must-haves and link the resume to the job.
+ */
+export type ChatTurnContext = {
+  jobIds?: string[];
+  job?: { _id: string; title?: string; company?: string; description?: string; skills?: string[]; keywords?: string[] } | null;
+  baseResume?: { id?: string; name?: string } | null;
+};
 
 
 // Helper function to escape LaTeX special characters
@@ -45,9 +59,9 @@ function getFormattedTime() {
 
 const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverletter/jakeCoverLetter.tex');
 
- const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) => tool({
+ const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard, turn: ChatTurnContext = {}) => tool({
    name: 'createResumeJakeTemplate',
-   description: 'Generate a professional resume. Three templates are available: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward) and "mar" (Times serif, centered header, categorized skills, separate internships section). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents.',
+   description: 'Generate a professional resume. Three templates are available: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward) and "mar" (Times serif, centered header, categorized skills, separate internships section). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents. When the resume is for a job saved in My Jobs, pass its jobId: the resume is then linked to that job. The result has `changes` (what moved, per section) and `mustHaves` (met/missing counts). After it succeeds, reply in one or two plain sentences that start with "Done." and say what you moved to the top, naming only skills and work already on the resume. Do not mention numbers, counts, must-haves, where the file is saved, or tools named only in the job posting: the app shows the file, the changes and the must-haves under your reply.',
    parameters: z.object({
     personalInfo: z.object({
       firstName: z.string().describe('First name of the person'),
@@ -115,6 +129,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       references: z.array(z.string()).optional().nullable().describe('References'),
     }).optional().nullable(),
     targetCompany: z.string().optional().nullable().describe('Target company name for this resume (will be included in document name)'),
+    jobId: z.string().optional().nullable().describe('Convex id of the saved job (My Jobs) this resume is tailored to, when there is one'),
     templateId: z.enum(['jake', 'joseph', 'mar']).default('jake').describe('Template to use: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward with Core Competencies and Early Career sections) or "mar" (Times serif, centered header repeated on every page, categorized technical skills, merged Education & Certifications, separate Internships section). Use the template from RESUME_TEMPLATE_PREFERENCE.'),
   }),
   execute: async (rawInput) => {
@@ -123,10 +138,11 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
     const startTime = Date.now();
     
     try {
+      // An explicit URL wins, so local dev can point at the deployed compile service
+      // (same rule as lib/onboarding/server.ts).
       const LATEX_SERVICE_URL =
-        process.env.NODE_ENV === 'development'
-          ? 'http://127.0.0.1:8080'
-          : process.env.LATEX_SERVICE_URL;
+        process.env.LATEX_SERVICE_URL ||
+        (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8080' : undefined);
       if (!LATEX_SERVICE_URL) {
         return {
           success: false,
@@ -229,6 +245,42 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
       // from, instead of shipping the whole PDF back through the model's context.
       let savedStorageId: string | undefined;
       let savedResumeId: string | undefined;
+      let savedResumeName: string | undefined;
+
+      /// SECTION TAILORING: what changed, must-haves, which job
+      // The job: the one the model named, else the one attached to this turn, else the
+      // one the model read this turn. A job id that fails to load is simply no job.
+      const tailoring = await (async () => {
+        let job = turn.job ?? null;
+        const wanted = input.jobId || turn.jobIds?.[0];
+        if (wanted && job?._id !== wanted) {
+          job = await convexClient.query(api.jobs.get, { id: wanted as any }).catch(() => null) as any;
+        }
+        const base = factGuard?.source && typeof factGuard.source === 'object' ? (factGuard.source as Partial<ResumeContent>) : null;
+        const role = job?.title || input.targetCompany || 'this role';
+        const diff = base ? describeResumeChanges(base, input as Partial<ResumeContent>, { role }) : null;
+        let mustHaves: MustHaves | undefined;
+        if (job && base) {
+          // Terms come from the posting (what the job needs); coverage comes only from the
+          // person's own resume. The posting is never evidence about the candidate.
+          const terms = await extractMustHaves(job).catch(() => [] as string[]);
+          if (terms.length) mustHaves = scoreMustHaves(terms, base);
+        }
+        const pages = await countPdfPages(pdfBuffer);
+        return {
+          ...(job?._id ? { jobId: job._id as any, jobTitle: job.title, jobCompany: job.company } : {}),
+          ...(turn.baseResume?.id ? { baseResumeId: turn.baseResume.id as any } : {}),
+          ...(turn.baseResume?.name ? { baseResumeName: turn.baseResume.name } : {}),
+          ...(pages ? { pages } : {}),
+          changes: diff?.changes ?? [],
+          ...(diff ? { marks: diff.marks } : {}),
+          ...(mustHaves ? { mustHaves } : {}),
+        };
+      })().catch((e) => {
+        console.error(`[${toolExecutionId}] [RESUME_TOOL] tailoring summary failed`, e instanceof Error ? e.message : e);
+        return { changes: [] as { section: string; title: string; note: string }[] } as any;
+      });
+      let linkedToJob = false;
       try {
         // Get upload URL from Convex
         console.log(`[${toolExecutionId}] [RESUME_TOOL] Getting upload URL...`);
@@ -271,14 +323,32 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
           const companySuffix = input.targetCompany ? ` - ${input.targetCompany}` : '';
           const resumeName = `${input.personalInfo.firstName} ${input.personalInfo.lastName} Resume${companySuffix} (${formattedTime})`;
           
-          savedResumeId = await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, {
+          const { jobId: _jobId, ...resumeContent } = input;
+          const saveArgs = {
             name: resumeName,
             fileId: storageId,
             fileName: `resume-${input.personalInfo.firstName}-${input.personalInfo.lastName}-${formattedTime}.pdf`,
             fileSize: pdfBuffer.length,
-            content: input,
+            content: resumeContent,
             template: templateId,
-          });
+          };
+          try {
+            savedResumeId = await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, { ...saveArgs, tailoring });
+          } catch (e) {
+            // A deployment without the optional `tailoring` field rejects the argument;
+            // the resume still saves, and the tool result carries the summary.
+            console.warn(`[${toolExecutionId}] [RESUME_TOOL] saving without tailoring field`, e instanceof Error ? e.message.slice(0, 160) : e);
+            savedResumeId = await convexClient.mutation(api.documents.saveGeneratedResumeWithFile, saveArgs);
+          }
+          savedResumeName = resumeName;
+
+          // Link the resume to its job in My Jobs (the "Resume used" field).
+          if (tailoring.jobId) {
+            linkedToJob = await convexClient
+              .mutation(api.jobs.update, { id: tailoring.jobId, resumeUsed: resumeName })
+              .then(() => true)
+              .catch(() => false);
+          }
           
         } else {
           console.error(`[${toolExecutionId}] [RESUME_TOOL] Upload failed`, {
@@ -323,6 +393,10 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         //   skillsContent
         // },
         documentType: 'resume',
+        resumeName: savedResumeName,
+        seconds: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
+        tailoring,
+        linkedToJob,
         ...(templateDowngraded ? { templateDowngraded } : {}),
       };
     } catch (error) {
@@ -350,7 +424,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
 });
 
 // Cover Letter Generation Tool - Jake Template Style
-const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) => tool({
+const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard, turn: ChatTurnContext = {}) => tool({
   name: 'createCoverLetterJakeTemplate',
   description: 'Generate a professional cover letter using the Jake LaTeX template style. This tool creates a well-formatted cover letter tailored for the specific job and company. Automatically saves the cover letter to the user\'s documents.',
   parameters: z.object({
@@ -454,9 +528,8 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factG
       /// SECTION PDF GENERATION (LaTeX service)
       
       const LATEX_SERVICE_URL =
-        process.env.NODE_ENV === 'development'
-          ? 'http://127.0.0.1:8080'
-          : process.env.LATEX_SERVICE_URL;
+        process.env.LATEX_SERVICE_URL ||
+        (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8080' : undefined);
       if (!LATEX_SERVICE_URL) {
         return {
           success: false,
@@ -497,6 +570,8 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factG
 
       /// SECTION AUTO-SAVE TO CONVEX
       
+      let coverStorageId: string | undefined;
+      let coverName: string | undefined;
       try {
         const uploadUrl = await convexClient.mutation(api.documents.generateUploadUrl);
         const pdfBlob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' });
@@ -509,6 +584,7 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factG
         
         if (uploadResponse.ok) {
           const { storageId } = await uploadResponse.json();
+          coverStorageId = storageId;
           
           // Include company name in cover letter title
           const companySuffix = input.jobInfo?.company ? ` - ${input.jobInfo.company}` : '';
@@ -522,6 +598,12 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factG
             content: input,
             template: 'jake',
           });
+          coverName = coverLetterName;
+          // Link the letter to its job in My Jobs (the "Cover letter" field).
+          const jobId = turn.job?._id || turn.jobIds?.[0];
+          if (jobId) {
+            await convexClient.mutation(api.jobs.update, { id: jobId as any, coverLetterUsed: coverLetterName }).catch(() => undefined);
+          }
         }
       } catch (saveError) {
         console.error('Failed to auto-save cover letter:', saveError);
@@ -544,6 +626,8 @@ const createCoverLetterJakeTemplateTool = (convexClient: ConvexHttpClient, factG
         message: 'Cover letter generated and saved successfully',
         // textContent: latexTemplate,
         pdfBase64: pdfBase64,
+        storageId: coverStorageId,
+        coverLetterName: coverName,
         fileName: `coverletter-${input.personalInfo.firstName}-${input.personalInfo.lastName}--${formattedTime}.pdf`,
         documentType: 'cover-letter',
       };
@@ -903,7 +987,7 @@ const createAddToJobsTool = (convexClient: ConvexHttpClient) =>
   });
 
 // Get Specific Resume by ID Tool
-const createGetResumeByIdTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard) =>
+const createGetResumeByIdTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard, turn: ChatTurnContext = {}) =>
   tool({
     name: "getResumeById",
     description:
@@ -928,6 +1012,7 @@ const createGetResumeByIdTool = (convexClient: ConvexHttpClient, factGuard?: Fac
         }
 
         if (factGuard && resume.content) factGuard.source = resume.content;
+        if (resume.content) turn.baseResume = { id: String(resume._id), name: resume.name };
 
         return {
           success: true,
@@ -947,7 +1032,7 @@ const createGetResumeByIdTool = (convexClient: ConvexHttpClient, factGuard?: Fac
   });
 
 // Get Specific Job by ID Tool
-const createGetJobByIdTool = (convexClient: ConvexHttpClient) =>
+const createGetJobByIdTool = (convexClient: ConvexHttpClient, turn: ChatTurnContext = {}) =>
   tool({
     name: "getJobById",
     description:
@@ -971,6 +1056,7 @@ const createGetJobByIdTool = (convexClient: ConvexHttpClient) =>
           };
         }
         
+        turn.job = job as ChatTurnContext["job"];
         return {
           success: true,
           message: `Successfully fetched job: ${job.title} at ${job.company}`,
