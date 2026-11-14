@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,17 +29,8 @@ export type JkFolder = {
   coverLetterCount: number;
 };
 
-/**
- * Blue manila folder. Deliberately a sibling of the sticky notes in
- * jkChatWindow-ResourcesMode.tsx — same color-object shape, same hover spring —
- * but with no index rotation, because a row of filing folders reads better flat
- * and keeps its labels legible.
- */
-const folderColor = {
-  bg: 'var(--accent)',
-  border: 'var(--border-strong)',
-  shadow: 'var(--scrim)',
-};
+/** Folder accents cycle through the four brand bars, as in D07. */
+export const FOLDER_ACCENTS = ["var(--bar-1)", "var(--bar-2)", "var(--bar-3)", "var(--bar-4)"] as const;
 
 export default function JkDocumentFolderCard({
   folder,
@@ -49,7 +39,9 @@ export default function JkDocumentFolderCard({
   onRename,
   onDelete,
   onDropDocument,
+  accent = FOLDER_ACCENTS[0],
 }: {
+  accent?: string;
   folder: JkFolder;
   count: number;
   onOpen: () => void;
@@ -76,11 +68,9 @@ export default function JkDocumentFolderCard({
   };
 
   return (
-    <motion.div
-      layout
-      whileHover={{ scale: 1.05 }}
-      transition={{ type: "spring", stiffness: 300, damping: 25 }}
-      className="relative"
+    <div
+      className="relative pt-2"
+      style={{ "--accent-c": accent } as React.CSSProperties}
       onDragOver={(event) => {
         if (!onDropDocument) return;
         event.preventDefault();
@@ -102,16 +92,8 @@ export default function JkDocumentFolderCard({
         }
       }}
     >
-      {/* Tab */}
-      <div
-        className="h-3.5 w-2/5 rounded-t-md"
-        style={{
-          backgroundColor: folderColor.bg,
-          border: `1px solid ${folderColor.border}`,
-          borderBottom: 'none',
-        }}
-      />
-      {/* Body */}
+      {/* Folder tab peeking over the card (D07: 84x20 at 55%). Desktop only; M06 has none. */}
+      <span aria-hidden className="absolute left-4 top-0 hidden h-5 w-[84px] rounded-[8px] opacity-55 lg:block" style={{ background: "var(--accent-c)" }} />
       <div
         role="button"
         tabIndex={0}
@@ -126,16 +108,13 @@ export default function JkDocumentFolderCard({
           }
         }}
         className={cn(
-          "flex min-h-[104px] cursor-pointer flex-col justify-between rounded-b-xl rounded-tr-xl p-4 text-foreground transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-          isDropTarget && "ring-4 ring-brand/40"
+          "group relative flex min-h-[56px] cursor-pointer items-center gap-4 rounded-[16px] border border-border bg-card py-3 pl-4 pr-2 text-foreground transition-colors hover:border-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-h-16 lg:rounded-[18px] lg:pl-5",
+          isDropTarget && "border-ring ring-2 ring-ring/40"
         )}
-        style={{
-          backgroundColor: folderColor.bg,
-          border: `1px solid ${folderColor.border}`,
-          boxShadow: `0 4px 12px ${folderColor.shadow}, 0 2px 4px rgba(0,0,0,0.1)`,
-        }}
       >
-        <div className="flex items-start justify-between gap-2">
+        <span aria-hidden className="absolute left-0 top-1/2 hidden h-8 w-[3px] -translate-y-1/2 rounded-full lg:block" style={{ background: "var(--accent-c)" }} />
+        <FolderIcon />
+        <div className="min-w-0 flex-1">
           {isRenaming ? (
             <Input
               autoFocus
@@ -152,71 +131,76 @@ export default function JkDocumentFolderCard({
                   setIsRenaming(false);
                 }
               }}
-              className="h-8 bg-card/80 text-foreground"
+              className="h-8"
             />
           ) : (
-            <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-              {folder.name}
+            <p className="truncate text-[15px] font-medium leading-[18px]">{folder.name}</p>
+          )}
+          {showDeleteConfirm ? null : (
+            <p className="mt-[3px] font-mono text-[11.5px] leading-[15px] text-subtle-foreground">
+              {count} document{count === 1 ? "" : "s"}
             </p>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-foreground/70 hover:bg-scrim hover:text-foreground"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`${folder.name} options`}
+              className="text-subtle-foreground opacity-100 hover:text-foreground lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 lg:data-[state=open]:opacity-100"
               onClick={(event) => event.stopPropagation()}
             >
-              <DropdownMenuItem
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDraftName(folder.name);
-                  hasCommittedRef.current = false;
-                  setIsRenaming(true);
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-                <span>Rename</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowDeleteConfirm(true);
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Delete folder</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {showDeleteConfirm ? (
-          <div className="mt-2" onClick={(event) => event.stopPropagation()}>
-            <JkConfirmDelete
-              message={`Delete "${folder.name}"? Its documents will be moved out, not deleted.`}
-              onConfirm={() => {
-                setShowDeleteConfirm(false);
-                onDelete();
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation();
+                setDraftName(folder.name);
+                hasCommittedRef.current = false;
+                setIsRenaming(true);
               }}
-              onCancel={() => setShowDeleteConfirm(false)}
-            />
-          </div>
-        ) : (
-          <p className="mt-2 text-xs text-foreground/70">
-            {count} document{count === 1 ? '' : 's'}
-          </p>
-        )}
+            >
+              <Pencil className="h-4 w-4" />
+              <span>Rename</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowDeleteConfirm(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete folder</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </motion.div>
+      {showDeleteConfirm && (
+        <div className="mt-2" onClick={(event) => event.stopPropagation()}>
+          <JkConfirmDelete
+            message={`Delete "${folder.name}"? Its documents will be moved out, not deleted.`}
+            onConfirm={() => {
+              setShowDeleteConfirm(false);
+              onDelete();
+            }}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** D07 folder glyph: 16x11 outline in the folder's accent. */
+function FolderIcon() {
+  return (
+    <svg aria-hidden width="18" height="14" viewBox="0 0 18 14" fill="none" className="shrink-0" style={{ color: "var(--accent-c)" }}>
+      <path d="M1.5 3V11.5C1.5 12.05 1.95 12.5 2.5 12.5H15.5C16.05 12.5 16.5 12.05 16.5 11.5V4.5C16.5 3.95 16.05 3.5 15.5 3.5H8.6L7 1.5H2.5C1.95 1.5 1.5 1.95 1.5 2.5V3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
   );
 }

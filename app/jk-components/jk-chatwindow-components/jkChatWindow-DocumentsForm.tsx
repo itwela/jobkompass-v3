@@ -9,21 +9,28 @@ import React, { useEffect, useState, useRef } from "react";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { cn } from "@/lib/utils";
-import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star, FolderPlus, Link2, Link2Off } from "lucide-react";
+import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star, FolderPlus, Link2, Link2Off, Pin } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
 import JkConfirmDelete from "../jkConfirmDelete";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES, getDefaultResumeTemplateId, getDefaultCoverLetterTemplateId } from "@/lib/templates";
+import { getAppResumeTemplateOptions, COVER_LETTER_TEMPLATES, getDefaultResumeTemplateId, getDefaultCoverLetterTemplateId, getResumeTemplateById, resolveResumeTemplateId } from "@/lib/templates";
 import JkCW_DynamicJSONEditor from "./jkChatWindow-DynamicJSONEditor";
 import JkCW_CoverLetterContentEditor from "./jkChatWindow-CoverLetterContentEditor";
 import { toast } from "@/lib/toast";
 import { buildResumeContentFromPastedText } from "@/lib/resume/contentFromPastedText";
-import { BlurFade } from "@/components/ui/blur-fade";
 import { resolveBaseResumeId, sortDocuments } from "@/lib/documents/sortDocuments";
-import JkDocumentFolderCard, { DRAG_MIME, type JkDraggedDocument, type JkFolder } from "../jk-documents/jkDocumentFolderCard";
+import JkDocumentFolderCard, { FOLDER_ACCENTS, type JkDraggedDocument, type JkFolder } from "../jk-documents/jkDocumentFolderCard";
+import JkDocumentCard, { JkDocMenuTrigger } from "../jk-documents/jkDocumentCard";
+import JkDocFilterTabs, { type JkDocFilter } from "../jk-documents/jkDocFilterTabs";
+import JkAppPageHeader from "../jk-app/jkAppPageHeader";
+import JkSectionLabel from "../jk-app/jkSectionLabel";
+import JkDocPreview from "../jkDocPreview";
+import { JkEditorTopBar } from "../jk-documents/jkEditorTopBar";
+import { useJobs } from "@/providers/jkJobsProvider";
+import { editedAgo, linkedCompanyFor, shortDate, templateShortName } from "@/lib/documents/documentMeta";
 import JkFolderBreadcrumb from "../jk-documents/jkFolderBreadcrumb";
 import JkMoveToFolderMenu from "../jk-documents/jkMoveToFolderMenu";
 import { markResumeCreateSource } from "@/lib/analytics/client";
@@ -88,10 +95,12 @@ function DocumentPreviewThumbnail({
 }
 
 interface JkCW_DocumentsFormProps {
-    typeFilter?: DocumentTypeFilter;
+    initialFilter?: JkDocFilter;
 }
 
-export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_DocumentsFormProps) {
+export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_DocumentsFormProps) {
+    const [typeFilter, setTypeFilter] = useState<JkDocFilter>(initialFilter);
+    const { allJobs } = useJobs();
 
     const {
         resumes,
@@ -689,14 +698,16 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     // Filter documents by type and search term
     const filteredDocuments = allDocuments.filter((doc: any) => {
         // Filter by type
-        if (typeFilter !== "all" && doc.documentType !== typeFilter) {
+        if (typeFilter === "favorites") {
+            if (!doc?.isFavorite) return false;
+        } else if (typeFilter !== "all" && doc.documentType !== typeFilter) {
             return false;
         }
 
         // Folder scope. Search overrides folders entirely: when the user is
         // searching, every document is in scope regardless of where it is filed,
         // because the flat list being unsearchable is the problem folders solve.
-        const isSearching = searchTerm.trim().length > 0;
+        const isSearching = searchTerm.trim().length > 0 || typeFilter === "favorites";
         if (!isSearching) {
             if (openFolderId) {
                 if (String(doc?.folderId ?? "") !== String(openFolderId)) return false;
@@ -719,437 +730,110 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
     const orderedDocuments = sortDocuments(filteredDocuments, baseResumeId);
 
 
-    if (isLoading) {
+    const resumeCount = allDocuments.filter((d: any) => d.documentType === "resume").length;
+    const coverLetterCount = allDocuments.length - resumeCount;
+    const favoriteCount = allDocuments.filter((d: any) => d.isFavorite).length;
+    const filterCounts = { all: allDocuments.length, resume: resumeCount, "cover-letter": coverLetterCount, favorites: favoriteCount };
+    const headerSub = isLoading
+        ? undefined
+        : [
+            `${resumeCount} resume${resumeCount === 1 ? "" : "s"}`,
+            `${coverLetterCount} cover letter${coverLetterCount === 1 ? "" : "s"}`,
+            `${folders.length} folder${folders.length === 1 ? "" : "s"}`,
+        ].join(" · ");
+
+    // The editor (D08 / M15) takes over the page while it is open.
+    if (editingContentResumeId) {
         return (
-            <div className="space-y-4">
-                <div className="h-9 w-full max-w-sm animate-pulse rounded-lg bg-muted/40" />
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {Array.from({ length: 6 }).map((_, index) => (
-                        <div
-                            key={index}
-                            className="flex h-48 animate-pulse flex-col gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4"
-                        >
-                            <div className="aspect-[3/4] w-full rounded-xl bg-muted/50" />
-                            <div className="h-4 w-3/4 rounded bg-muted/50" />
-                            <div className="h-3 w-1/2 rounded bg-muted/40" />
-                        </div>
-                    ))}
+            <JkCW_DynamicJSONEditor
+                key={String(editingContentResumeId)}
+                resumeId={editingContentResumeId}
+                onClose={() => setEditingContentResumeId(null)}
+            />
+        );
+    }
+    if (editingContentCoverLetterId) {
+        return (
+            <div key={String(editingContentCoverLetterId)} data-enter className="jk-stagger flex min-h-0 flex-1 flex-col">
+                <JkEditorTopBar
+                    title={allDocuments.find((d: any) => String(d._id) === String(editingContentCoverLetterId))?.name || "Cover letter"}
+                    onBack={() => setEditingContentCoverLetterId(null)}
+                />
+                <div className="mx-auto w-full max-w-4xl px-5 py-6 lg:px-8">
+                    <div className="overflow-hidden rounded-[20px] border border-border bg-card">
+                        <JkCW_CoverLetterContentEditor
+                            coverLetterId={editingContentCoverLetterId}
+                            onClose={() => setEditingContentCoverLetterId(null)}
+                        />
+                    </div>
                 </div>
             </div>
         );
     }
 
-    if (!hasDocuments) {
-        return (
-            <div className="space-y-6">
-                <section className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-8 py-14 text-center">
-                    <div className="mx-auto flex max-w-xl flex-col items-center gap-5">
-                        <div className="inline-flex size-12 items-center justify-center rounded-full bg-brand/10 text-brand">
-                            <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-3">
-                            <h2 className="text-xl font-semibold">No documents yet</h2>
-                            <p className="text-sm text-muted-foreground">
-                                Upload a PDF resume and we&apos;ll extract your content into an editable format. Or generate resumes using the AI chat.
-                            </p>
-                        </div>
-                        <Button
-                            onClick={() => setShowUploadDialog(true)}
-                            className="gap-2"
-                            size="lg"
-                        >
-                            <Upload className="h-4 w-4" />
-                            Upload PDF Resume
-                        </Button>
-                    </div>
-                </section>
+    const openDocument = (doc: any) => {
+        const id = String(doc._id);
+        if (selectionMode) {
+            if (doc.documentType === "resume") toggleResumeSelection(id);
+            return;
+        }
+        void markDocumentAsSeen(id, doc.documentType);
+        selectDocument(id, doc.documentType);
+        if (doc.documentType === "resume") setEditingContentResumeId(doc._id as Id<"resumes">);
+        else setEditingContentCoverLetterId(doc._id as Id<"coverLetters">);
+    };
 
-                {/* Pre-upload dialog for empty state */}
-                <Dialog open={showUploadDialog} onOpenChange={(open) => {
-                    if (!open) {
-                        handleCancelUpload();
-                    }
-                }}>
-                    <DialogContent className="sm:max-w-[500px]">
-                        <DialogHeader>
-                            <DialogTitle>Upload Resume</DialogTitle>
-                            <DialogDescription>
-                                {pendingFile
-                                    ? "We'll extract your resume content with AI and make it editable. Add a name and optional metadata."
-                                    : "Choose a PDF, or paste your resume text if the PDF is scanned (image-only)."}
-                            </DialogDescription>
-                        </DialogHeader>
-                        
-                        <div className="space-y-4 py-4">
-                            {!pendingFile ? (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border hover:border-brand/50 hover:bg-muted/30 py-10 px-4 transition-colors"
-                                    >
-                                        <Upload className="h-10 w-10 text-muted-foreground" />
-                                        <span className="text-sm font-medium text-foreground">Choose PDF file</span>
-                                        <span className="text-xs text-muted-foreground">Optional if you paste text below</span>
-                                    </button>
-                                    <p className="text-center text-xs text-muted-foreground">or</p>
-                                    <div className="space-y-2">
-                                        <label htmlFor="paste-resume-empty" className="text-sm font-medium text-foreground">
-                                            Paste resume text <span className="text-muted-foreground font-normal">(for scanned PDFs)</span>
-                                        </label>
-                                        <Textarea
-                                            id="paste-resume-empty"
-                                            value={pastedResumeText}
-                                            onChange={(e) => setPastedResumeText(e.target.value)}
-                                            placeholder="Paste the full text of your resume here…"
-                                            rows={5}
-                                            showBorder
-                                            size="sm"
-                                            className="field-sizing-fixed min-h-[100px] max-h-[min(42vh,240px)] overflow-y-auto resize-none"
-                                            disabled={isUploading}
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            At least {MIN_PASTE_RESUME_CHARS} characters if you are not uploading a PDF.
-                                        </p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="upload-name-empty-early" className="text-sm font-medium text-foreground">
-                                            Name <span className="text-muted-foreground">(required)</span>
-                                        </label>
-                                        <Input
-                                            id="upload-name-empty-early"
-                                            value={uploadName}
-                                            onChange={(e) => setUploadName(e.target.value)}
-                                            placeholder="e.g., Software Engineer Resume"
-                                            className="h-9"
-                                            disabled={isUploading}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="upload-label-empty-early" className="text-sm font-medium text-foreground">
-                                            Label <span className="text-muted-foreground">(optional)</span>
-                                        </label>
-                                        <Input
-                                            id="upload-label-empty-early"
-                                            value={uploadLabel}
-                                            onChange={(e) => setUploadLabel(e.target.value)}
-                                            placeholder="e.g., Software Engineer, Marketing Manager"
-                                            className="h-9"
-                                            disabled={isUploading}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-foreground">
-                                            Tags <span className="text-muted-foreground">(optional)</span>
-                                        </label>
-                                        <div className="flex flex-wrap gap-2 mb-2">
-                                            {uploadTags.map((tag, idx) => (
-                                                <span
-                                                    key={idx}
-                                                    className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
-                                                >
-                                                    {tag}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveUploadTag(tag)}
-                                                        className="hover:text-brand"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                value={uploadTagInput}
-                                                onChange={(e) => setUploadTagInput(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                        e.preventDefault();
-                                                        handleAddUploadTag();
-                                                    }
-                                                }}
-                                                placeholder="Add a tag and press Enter"
-                                                className="h-9 flex-1"
-                                                disabled={isUploading}
-                                            />
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                onClick={handleAddUploadTag}
-                                                disabled={!uploadTagInput.trim() || isUploading}
-                                                variant="outline"
-                                            >
-                                                Add
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {isUploading && (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-2 flex-1 rounded-full bg-muted">
-                                                    <div
-                                                        className="h-2 rounded-full bg-brand transition-all duration-300"
-                                                        style={{ width: `${uploadProgress}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-sm text-muted-foreground whitespace-nowrap">{uploadProgress}%</span>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground text-center">
-                                                {uploadStatusLabel || "Uploading your resume…"}
-                                            </p>
-                                        </div>
-                                    )}
-                                    <DialogFooter>
-                                        <Button type="button" variant="outline" onClick={handleCancelUpload} disabled={isUploading}>
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            onClick={handleConfirmUpload}
-                                            disabled={!canSubmitResumeUpload || isUploading}
-                                        >
-                                            {isUploading ? "Uploading..." : "Save resume"}
-                                        </Button>
-                                    </DialogFooter>
-                                </>
-                            ) : null}
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".pdf,application/pdf"
-                                onChange={handleFileInputChange}
-                                className="hidden"
-                                key="file-input-upload-dialog"
-                            />
-
-                            {pendingFile && (
-                                <>
-                                <div className="rounded-lg border border-border bg-muted/20 p-3">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-sm font-medium">{pendingFile.name}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            ({(pendingFile.size / 1024).toFixed(1)} KB)
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="paste-resume-empty-file" className="text-sm font-medium text-foreground">
-                                        Paste text instead <span className="text-muted-foreground font-normal">(if PDF is scanned)</span>
-                                    </label>
-                                    <Textarea
-                                        id="paste-resume-empty-file"
-                                        value={pastedResumeText}
-                                        onChange={(e) => setPastedResumeText(e.target.value)}
-                                        placeholder="If extraction fails or your PDF has no selectable text, paste your resume here. Pasted text takes priority over the file."
-                                        rows={3}
-                                        showBorder
-                                        size="sm"
-                                        className="field-sizing-fixed min-h-[80px] max-h-[min(36vh,200px)] overflow-y-auto resize-none"
-                                        disabled={isUploading}
-                                    />
-                                </div>
-
-                            {/* Name input */}
-                            <div className="space-y-2">
-                                <label htmlFor="upload-name-empty" className="text-sm font-medium text-foreground">
-                                    Name <span className="text-muted-foreground">(required)</span>
-                                </label>
-                                <Input
-                                    id="upload-name-empty"
-                                    value={uploadName}
-                                    onChange={(e) => setUploadName(e.target.value)}
-                                    placeholder="e.g., Software Engineer Resume"
-                                    className="h-9"
-                                    disabled={isUploading}
-                                />
-                            </div>
-
-                            {/* Label input */}
-                            <div className="space-y-2">
-                                <label htmlFor="upload-label-empty" className="text-sm font-medium text-foreground">
-                                    Label <span className="text-muted-foreground">(optional)</span>
-                                </label>
-                                <Input
-                                    id="upload-label-empty"
-                                    value={uploadLabel}
-                                    onChange={(e) => setUploadLabel(e.target.value)}
-                                    placeholder="e.g., Software Engineer, Marketing Manager"
-                                    className="h-9"
-                                    disabled={isUploading}
-                                />
-                            </div>
-
-                            {/* Tags input */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-foreground">
-                                    Tags <span className="text-muted-foreground">(optional)</span>
-                                </label>
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                    {uploadTags.map((tag, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-1 text-xs font-medium text-brand"
-                                        >
-                                            {tag}
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveUploadTag(tag)}
-                                                className="hover:text-brand"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <Input
-                                        value={uploadTagInput}
-                                        onChange={(e) => setUploadTagInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                handleAddUploadTag();
-                                            }
-                                        }}
-                                        placeholder="Add a tag and press Enter"
-                                        className="h-9 flex-1"
-                                        disabled={isUploading}
-                                    />
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={handleAddUploadTag}
-                                        disabled={!uploadTagInput.trim() || isUploading}
-                                        variant="outline"
-                                    >
-                                        Add
-                                    </Button>
-                                </div>
-                            </div>
-
-                        {/* Upload progress indicator */}
-                        {isUploading && (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-2 flex-1 rounded-full bg-muted">
-                                        <div 
-                                            className="h-2 rounded-full bg-brand transition-all duration-300"
-                                            style={{ width: `${uploadProgress}%` }}
-                                        />
-                                    </div>
-                                    <span className="text-sm text-muted-foreground whitespace-nowrap">{uploadProgress}%</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground text-center">
-                                    {uploadStatusLabel || "Uploading your resume…"}
-                                </p>
-                            </div>
-                        )}
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleCancelUpload}
-                                disabled={isUploading}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleConfirmUpload}
-                                disabled={!canSubmitResumeUpload || isUploading}
-                            >
-                                {isUploading ? "Uploading..." : "Upload Resume"}
-                            </Button>
-                        </DialogFooter>
-                                </>
-                            )}
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            </div>
-        );
-    }
+    const showBaseLabel = orderedDocuments.length > 0 && baseResumeId != null && String(orderedDocuments[0]?._id) === baseResumeId;
 
     return (
-        <div className="space-y-6 py-2">
-            {/* Header with stats and upload */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-                    <div className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                            <CalendarClock className="h-4 w-4 text-foreground/70" />
-                            <span>
-                                <span className="font-semibold text-foreground">{allDocuments.length}</span> document{allDocuments.length !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-                    </div>
-                    {!selectionMode && (
-                        <>
+        <div className="flex min-h-0 flex-col">
+            <JkAppPageHeader
+                title="My Documents"
+                sub={headerSub}
+                art="papers"
+                artHeight={220}
+                artPosition="62% 38%"
+                divider={false}
+                className="lg:pb-0"
+                actions={
+                    <>
                         <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleEnterSelectionMode}
-                        >
-                            Multi-select
-                        </Button>
-                            <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => setShowUploadDialog(true)}
-                                className="gap-2"
-                            >
-                                <Upload className="h-4 w-4" />
-                                Upload PDF Resume
-                            </Button>
-                        </>
-                    )}
-                </div>
-                <div className="relative w-full min-w-0 max-w-sm">
-                    <Input
-                        type="text"
-                        placeholder="Search by name, label, or tags..."
-                        value={searchTerm}
-                        onChange={(event) => setSearchTerm(event.target.value)}
-                        className="w-full pr-8"
-                    />
-                    {searchTerm && (
-                        <button
-                            type="button"
+                            variant="secondary"
                             onClick={() => {
-                                setSearchTerm("");
-                                setEditingContentResumeId(null);
-                                setEditingContentCoverLetterId(null);
+                                setNewFolderName("");
+                                setShowNewFolderDialog(true);
                             }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
+                            className="h-9 bg-popover px-5 text-[13.5px] lg:h-10 lg:px-6"
                         >
-                            <X className="h-4 w-4" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {isUploading && (
-                <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
-                    <div className="flex items-center gap-3">
-                        <div className="h-2 flex-1 rounded-full bg-muted">
-                            <div 
-                                className="h-2 rounded-full bg-brand transition-all duration-300"
-                                style={{ width: `${uploadProgress}%` }}
-                            />
-                        </div>
-                        <span className="text-sm text-muted-foreground">{uploadProgress}%</span>
+                            New folder
+                        </Button>
+                        <Button onClick={() => setShowUploadDialog(true)} className="h-9 px-6 text-[14.5px] lg:h-10 lg:px-8">
+                            Upload
+                        </Button>
+                    </>
+                }
+                bottom={
+                    <div className="lg:mt-[34px]">
+                        <JkDocFilterTabs value={typeFilter} onChange={(v) => { setTypeFilter(v); setOpenFolderId(null); }} counts={filterCounts} />
                     </div>
-                    {uploadStatusLabel ? (
-                        <p className="text-xs text-muted-foreground">{uploadStatusLabel}</p>
-                    ) : null}
+                }
+            />
+
+            <div data-enter className="flex flex-col gap-5 px-5 pb-28 pt-1 lg:gap-0 lg:px-8 lg:pb-10 lg:pt-[14px]">
+            {isUploading && (
+                <div className="jk-enter rounded-[16px] border border-border bg-card p-4 lg:mb-5">
+                    <div className="flex items-center gap-3">
+                        <div className="h-1.5 flex-1 rounded-full bg-accent">
+                            <div className="h-1.5 rounded-full bg-ring transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                        <span className="font-mono text-[12px] text-muted-foreground">{uploadProgress}%</span>
+                    </div>
+                    {uploadStatusLabel ? <p className="mt-2 text-xs text-muted-foreground">{uploadStatusLabel}</p> : null}
                 </div>
             )}
 
             {selectionMode && (
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="jk-enter flex flex-wrap items-center gap-2 lg:mb-5">
                     <span className="text-sm text-muted-foreground">
                         {selectedResumeIds.length} selected
                     </span>
@@ -1230,7 +914,7 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
             )}
 
             {selectionMode && showBulkDeleteConfirm && (
-                <div className="max-w-xl">
+                <div className="max-w-xl lg:mb-5">
                     <JkConfirmDelete
                         message={`Delete ${selectedResumeIds.length} selected resume${selectedResumeIds.length === 1 ? '' : 's'}?`}
                         onConfirm={handleConfirmBulkDeleteResumes}
@@ -1240,343 +924,134 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                 </div>
             )}
 
-            {searchTerm.trim().length === 0 && openFolder && (
-                <JkFolderBreadcrumb
-                    folderName={openFolder.name}
-                    onBack={() => setOpenFolderId(null)}
-                    onDropDocument={(payload) => {
-                        void handleMoveDocuments([payload], null);
-                    }}
-                />
+
+            {openFolder && (
+                <div className="jk-enter lg:mb-5">
+                    <JkFolderBreadcrumb
+                        folderName={openFolder.name}
+                        onBack={() => setOpenFolderId(null)}
+                        onDropDocument={(payload) => {
+                            void handleMoveDocuments([payload], null);
+                        }}
+                    />
+                </div>
             )}
 
-            {searchTerm.trim().length === 0 && !openFolderId && (
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Folders
-                        </h2>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => {
-                                setNewFolderName("");
-                                setShowNewFolderDialog(true);
-                            }}
-                        >
-                            <FolderPlus className="h-4 w-4" />
-                            New folder
-                        </Button>
+            {!openFolderId && folders.length > 0 && typeFilter !== "favorites" && (
+                <section aria-label="Folders" className="jk-enter lg:mb-[26px]" style={{ "--i": 1 } as React.CSSProperties}>
+                    <JkSectionLabel as="h2" className="mb-[13px] hidden lg:flex">Folders</JkSectionLabel>
+                    <div className="grid grid-cols-2 gap-2 lg:-mt-1 lg:grid-cols-[repeat(auto-fill,minmax(232px,1fr))] lg:gap-3">
+                        {folders.map((folder: JkFolder, folderIndex: number) => (
+                            <JkDocumentFolderCard
+                                key={String(folder._id)}
+                                folder={folder}
+                                accent={FOLDER_ACCENTS[folderIndex % FOLDER_ACCENTS.length]}
+                                count={
+                                    typeFilter === "resume"
+                                        ? folder.resumeCount
+                                        : typeFilter === "cover-letter"
+                                          ? folder.coverLetterCount
+                                          : folder.resumeCount + folder.coverLetterCount
+                                }
+                                onOpen={() => setOpenFolderId(folder._id)}
+                                onRename={(name) => {
+                                    void renameFolder({ folderId: folder._id, name })
+                                        .catch(() => toast.error("Could not rename folder."));
+                                }}
+                                onDelete={() => {
+                                    void deleteFolder({ folderId: folder._id })
+                                        .then(() => toast.success(`Deleted "${folder.name}". Its documents were moved out.`))
+                                        .catch(() => toast.error("Could not delete folder."));
+                                }}
+                                onDropDocument={(payload) => {
+                                    void handleMoveDocuments([payload], folder._id, folder.name);
+                                }}
+                            />
+                        ))}
                     </div>
-                    {folders.length > 0 && (
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                            {folders.map((folder: JkFolder) => (
-                                <JkDocumentFolderCard
-                                    key={String(folder._id)}
-                                    folder={folder}
-                                    count={
-                                        typeFilter === "resume"
-                                            ? folder.resumeCount
-                                            : typeFilter === "cover-letter"
-                                              ? folder.coverLetterCount
-                                              : folder.resumeCount + folder.coverLetterCount
-                                    }
-                                    onOpen={() => setOpenFolderId(folder._id)}
-                                    onRename={(name) => {
-                                        void renameFolder({ folderId: folder._id, name })
-                                            .catch(() => toast.error("Could not rename folder."));
-                                    }}
-                                    onDelete={() => {
-                                        void deleteFolder({ folderId: folder._id })
-                                            .then(() => toast.success(`Deleted "${folder.name}". Its documents were moved out.`))
-                                            .catch(() => toast.error("Could not delete folder."));
-                                    }}
-                                    onDropDocument={(payload) => {
-                                        void handleMoveDocuments([payload], folder._id, folder.name);
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    )}
-                    <div className="border-b border-border" />
-                </div>
+                </section>
             )}
 
-            {searchTerm.trim().length > 0 && folders.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                    Searching across all folders.
+            {isLoading ? (
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-[repeat(auto-fill,minmax(232px,1fr))] lg:gap-3 lg:pt-[29px]">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="h-[238px] animate-pulse rounded-[18px] border border-border bg-card lg:h-[256px] lg:rounded-[20px]" />
+                    ))}
+                </div>
+            ) : !hasDocuments ? (
+                <section className="jk-enter flex flex-col items-center gap-4 rounded-[20px] border border-dashed border-input bg-card px-6 py-14 text-center lg:mt-2">
+                    <JkDocPreview size="sm" className="opacity-90" />
+                    <h2 className="text-[20px] font-medium text-foreground">No documents yet</h2>
+                    <p className="max-w-md text-[14px] leading-5 text-muted-foreground">
+                        Upload a PDF resume and we pull the content out so you can edit it here. Resumes you write in chat land here too.
+                    </p>
+                    <Button onClick={() => setShowUploadDialog(true)} className="h-10 px-7">Upload a resume</Button>
+                </section>
+            ) : orderedDocuments.length === 0 ? (
+                <p className="jk-enter rounded-[18px] border border-border bg-card px-6 py-12 text-center text-[14px] text-muted-foreground lg:mt-2">
+                    {typeFilter === "favorites"
+                        ? "No favorites yet. Star a document to keep it here."
+                        : openFolder
+                          ? "This folder is empty. Drag a document onto it to file it."
+                          : "Nothing here yet."}
                 </p>
-            )}
-
-            {/* Upload progress */}
-            {/* Documents grid */}
-            {filteredDocuments.length === 0 ? (
-                <div className="rounded-xl border border-border/60 bg-muted/10 px-6 py-12 text-center text-sm text-muted-foreground">
-                    {searchTerm ? (
-                        <>No documents match "{searchTerm}". Try a different keyword.</>
-                    ) : (
-                        <>No documents found. Upload your first document to get started.</>
-                    )}
-                </div>
             ) : (
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 min-w-0">
+                <section aria-label="Documents">
+                    <div aria-hidden className="mb-3 hidden grid-cols-[repeat(auto-fill,minmax(232px,1fr))] gap-3 lg:grid">
+                        {showBaseLabel && <JkSectionLabel tone="plan">Base resume</JkSectionLabel>}
+                        <JkSectionLabel>{openFolder ? openFolder.name : typeFilter === "favorites" ? "Favorites" : "Recent"}</JkSectionLabel>
+                    </div>
+                    <div data-enter className="grid grid-cols-2 gap-2 lg:grid-cols-[repeat(auto-fill,minmax(232px,1fr))] lg:gap-3">
                     {orderedDocuments.map((doc: any, index: number) => {
                         const resume = doc;
                         const documentType = doc.documentType || "resume";
                         const resumeId = String(resume?._id ?? resume?.id ?? `resume-${index}`);
-                        const isActive = Boolean(
-                            selectedDocument &&
-                            selectedDocument.type === documentType &&
-                            String(selectedDocument.id) === String(resumeId)
-                        );
                         const isSelectedForBulk = selectedResumeIds.includes(resumeId);
                         const title =
                             resume?.name ||
                             (resume?.jobTitle ? `${resume.jobTitle} Resume` : `Resume ${index + 1}`);
-                        const roleFocus =
-                            resume?.targetRole ||
-                            resume?.jobTitle ||
-                            "General purpose";
-                        const updatedAt = resume?.updatedAt
-                            ? new Date(resume.updatedAt).toLocaleDateString()
-                            : "Recently created";
-
-                        // Get stats for this document by title/name
-                        const stats = documentType === "resume"
-                            ? (resumeStats[title] || resumeStats[resume?.name] || null)
-                            : (coverLetterStats[title] || coverLetterStats[resume?.name] || null);
-                        const totalJobs = stats?.totalJobs || 0;
-                        const offered = stats?.offered || 0;
-                        const rejected = stats?.rejected || 0;
-                        const ghosted = stats?.ghosted || 0;
-                        const callback = stats?.callback ?? 0;
-                        const interviewing = stats?.interviewing || 0;
-
-                        // Check if document is new (never seen)
-                        const isNew = !resume?.seenAt;
-
-                        // The base resume feeding job leads (resumes.isActive === true)
                         const isBaseResume = documentType === "resume" && baseResumeId != null && resumeId === baseResumeId;
                         const isFavorite = Boolean(resume?.isFavorite);
-
+                        const templateName = documentType === "resume"
+                            ? (resume?.template ? getResumeTemplateById(resolveResumeTemplateId(resume.template))?.name ?? null : null)
+                            : null;
+                        const stamp = resume?.updatedAt ?? resume?._creationTime ?? Date.now();
                         return (
-                            <BlurFade key={resumeId} delay={0.0618 + index * 0.05} inView>
-                            <div
-                                role="button"
-                                tabIndex={0}
-                                draggable={!selectionMode}
-                                onDragStart={(event) => {
-                                    if (selectionMode) return;
-                                    event.dataTransfer.setData(
-                                        DRAG_MIME,
-                                        JSON.stringify({ id: resumeId, type: documentType })
-                                    );
-                                    event.dataTransfer.effectAllowed = "move";
+                            <JkDocumentCard
+                                key={resumeId}
+                                index={index}
+                                id={resumeId}
+                                type={documentType}
+                                title={title}
+                                kindLabel={documentType === "resume" ? "Resume" : "Cover letter"}
+                                templateShort={templateShortName(templateName)}
+                                company={linkedCompanyFor(resume, allJobs)}
+                                edited={editedAgo(stamp)}
+                                dateShort={shortDate(stamp)}
+                                isBase={isBaseResume}
+                                isFavorite={isFavorite}
+                                isNew={!resume?.seenAt}
+                                content={resume?.content}
+                                fileId={resume?.fileId}
+                                selectionMode={selectionMode}
+                                selected={isSelectedForBulk}
+                                onOpen={() => openDocument(resume)}
+                                onToggleFavorite={() => {
+                                    void toggleFavorite({ documentId: resumeId, documentType }).catch(() => {
+                                        toast.error("Could not update favorite. Please try again.");
+                                    });
                                 }}
-                                onClick={() => handleDocumentClick(resumeId, documentType)}
-                                onKeyDown={(event) => {
-                                    const target = event.target as HTMLElement;
-                                    const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-                                    if (isInput) return;
-                                    if (event.key === "Enter" || event.key === " ") {
-                                        event.preventDefault();
-                                        handleDocumentClick(resumeId, documentType);
-                                    }
-                                }}
-                                className={cn(
-                                    "group flex flex-col gap-3 sm:gap-4 rounded-xl border bg-card p-3 sm:p-4 text-left transition-all hover:border-brand/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand min-w-0 overflow-hidden",
-                                    !selectionMode && isNew && "border-brand border-2",
-                                    selectionMode && isSelectedForBulk && "border-brand ring-2 ring-brand/30",
-                                    // Favorite: purple border, kept distinct from the blue
-                                    // bulk-selection border above. Base resume still wins.
-                                    isFavorite && !isBaseResume && "border-bar-1 border-2",
-                                    // Base resume treatment wins over new/selected styling
-                                    isBaseResume && "border-warn border-2 ring-1 ring-warn/30 hover:border-warn"
-                                )}
-                            >
-                                {/* Document preview thumbnail with job count badge and type indicator */}
-                                <div className="relative flex h-24 sm:h-28 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted/30 overflow-hidden">
-                                    <DocumentPreviewThumbnail
-                                        fileId={resume?.fileId}
-                                        documentType={documentType}
-                                        className="absolute inset-0"
-                                    />
-                                    {/* Document type badge - top right */}
-                                    <div className="absolute top-2 right-2 z-10">
-                                        {documentType === "resume" ? (
-                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground shadow-sm backdrop-blur-sm">
-                                                <FileText className="h-3 w-3" />
-                                                Resume
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground shadow-sm backdrop-blur-sm">
-                                                <FileCheck className="h-3 w-3" />
-                                                Cover Letter
-                                            </span>
-                                        )}
-                                    </div>
-                                    {/* Job count badge - top left */}
-                                    {totalJobs > 0 && (
-                                        <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-                                            <div className="flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-[10px] font-semibold text-on-fill shadow-sm">
-                                                <Briefcase className="h-3 w-3" />
-                                                <span>{totalJobs} job{totalJobs !== 1 ? 's' : ''}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* Favorite toggle — bottom-right so it clears the
-                                        type badge (top-right) and job count (top-left) */}
-                                    <button
-                                        type="button"
-                                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                                        aria-pressed={isFavorite}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            void toggleFavorite({
-                                                documentId: resumeId,
-                                                documentType,
-                                            }).catch(() => {
-                                                toast.error("Could not update favorite. Please try again.");
-                                            });
-                                        }}
-                                        className="absolute bottom-2 right-2 z-10 rounded-full bg-card/90 p-1.5 shadow-sm transition-colors hover:bg-card"
-                                    >
-                                        <Star
-                                            className={cn(
-                                                "h-3.5 w-3.5",
-                                                isFavorite
-                                                    ? "fill-bar-1 text-bar-1"
-                                                    : "text-muted-foreground"
-                                            )}
-                                        />
-                                    </button>
-                                </div>
-
-                                <div className="flex min-w-0 flex-1 flex-col gap-2 sm:gap-3">
-                                    <div className="flex min-w-0 items-start justify-between gap-2">
-                                        <div className="min-w-0 flex-1 space-y-1.5">
-                                            <div>
-                                                {isBaseResume && (
-                                                    <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-warn/10 px-2 py-0.5 text-[10px] font-semibold text-warn border border-warn/30">
-                                                        ⭐ Base resume · used for job leads
-                                                    </span>
-                                                )}
-                                                <p className="text-sm font-semibold text-foreground truncate">{title}</p>
-                                                {resume?.fileName && (
-                                                    <p className="text-xs text-muted-foreground truncate">{resume.fileName}</p>
-                                                )}
-                                            </div>
-                                            {resume?.label && (
-                                                <p className="text-xs font-medium text-brand">{resume.label}</p>
-                                            )}
-                                            <div className="flex flex-wrap gap-1 items-center">
-                                                {resume?.template && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-bar-1/10 px-2 py-0.5 text-[10px] font-medium text-bar-1 border border-bar-1/30">
-                                                        {resume.template}
-                                                    </span>
-                                                )}
-                                                {resume?.tags && resume.tags.length > 0 && (
-                                                    <>
-                                                        {resume.tags.slice(0, 3).map((tag: string, tagIdx: number) => (
-                                                            <span
-                                                                key={tagIdx}
-                                                                className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand"
-                                                            >
-                                                                <Tag className="h-2.5 w-2.5" />
-                                                                {tag}
-                                                            </span>
-                                                        ))}
-                                                        {resume.tags.length > 3 && (
-                                                            <span className="text-[10px] text-muted-foreground self-center">
-                                                                +{resume.tags.length - 3}
-                                                            </span>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                            {/* Status badges - matching My Jobs status colors (only for resumes) */}
-                                            {documentType === "resume" && (offered > 0 || rejected > 0 || ghosted > 0 || interviewing > 0 || callback > 0) && (
-                                                <div className="flex flex-wrap gap-1.5 pt-1">
-                                                    {offered > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-ok/10 px-2 py-0.5 text-[10px] font-semibold text-ok">
-                                                            <TrendingUp className="h-2.5 w-2.5" />
-                                                            {offered} offered
-                                                        </span>
-                                                    )}
-                                                    {callback > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">
-                                                            <Phone className="h-2.5 w-2.5" />
-                                                            {callback} callback
-                                                        </span>
-                                                    )}
-                                                    {interviewing > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-bar-1/10 px-2 py-0.5 text-[10px] font-semibold text-bar-1">
-                                                            <Users className="h-2.5 w-2.5" />
-                                                            {interviewing} interviewing
-                                                        </span>
-                                                    )}
-                                                    {rejected > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                                                            <TrendingDown className="h-2.5 w-2.5" />
-                                                            {rejected} rejected
-                                                        </span>
-                                                    )}
-                                                    {ghosted > 0 && (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                                            <Ghost className="h-2.5 w-2.5" />
-                                                            {ghosted} ghosted
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {selectionMode ? (
-                                                documentType === "resume" ? (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className={cn(
-                                                            "h-8 w-8 text-muted-foreground hover:text-brand",
-                                                            "transition-colors",
-                                                            isSelectedForBulk && "text-brand"
-                                                        )}
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            toggleResumeSelection(resumeId);
-                                                        }}
-                                                    >
-                                                        {isSelectedForBulk ? (
-                                                            <CheckCircle2 className="h-4 w-4" />
-                                                        ) : (
-                                                            <Circle className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                ) : null
-                                            ) : (
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                            onClick={(event) => {
-                                                                event.stopPropagation();
-                                                            }}
-                                                        >
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+                                menu={
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <JkDocMenuTrigger label={`${title} options`} />
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                                                         {/* Edit content - for both resumes and cover letters */}
                                                         <DropdownMenuItem
                                                             onClick={async (event) => {
                                                                 event.stopPropagation();
                                                                 await markDocumentAsSeen(resumeId, documentType);
-                                                                setSearchTerm(title);
                                                                 if (documentType === "resume") {
                                                                     selectDocument(resumeId, "resume");
                                                                     setEditingContentResumeId(resume._id);
@@ -1600,6 +1075,36 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             <Settings className="h-4 w-4" />
                                                             <span>Edit labels & tags</span>
                                                         </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                void toggleFavorite({ documentId: resumeId, documentType }).catch(() => toast.error("Could not update favorite. Please try again."));
+                                                            }}
+                                                        >
+                                                            <Star className="h-4 w-4" />
+                                                            <span>{isFavorite ? "Remove from favorites" : "Add to favorites"}</span>
+                                                        </DropdownMenuItem>
+                                                        {documentType === "resume" && !isBaseResume && (
+                                                            <DropdownMenuItem
+                                                                disabled={settingBaseId === resumeId}
+                                                                onClick={(event) => void handleSetBaseResume(resumeId, event)}
+                                                            >
+                                                                <Pin className="h-4 w-4" />
+                                                                <span>Make this my base resume</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {documentType === "resume" && (
+                                                            <DropdownMenuItem
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    handleEnterSelectionMode();
+                                                                    toggleResumeSelection(resumeId);
+                                                                }}
+                                                            >
+                                                                <CheckCircle2 className="h-4 w-4" />
+                                                                <span>Select</span>
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         {/* Download - works for both if they have a fileId */}
                                                         {resume?.fileId && (
                                                             <DropdownMenuItem
@@ -1708,10 +1213,10 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                                             <span>Delete</span>
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            )}
-                                        </div>
-                                    </div>
+                                    </DropdownMenu>
+                                }
+                                below={
+                                    <div onClick={(event) => event.stopPropagation()} className="cursor-auto">
                                     {!selectionMode && confirmingId === resumeId && (
                                         <div
                                             className="mt-2"
@@ -1837,56 +1342,17 @@ export default function JkCW_DocumentsForm({ typeFilter = "all" }: JkCW_Document
                                             </div>
                                         </div>
                                     )}
-                                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-                                        <span className="flex items-center gap-1">
-                                            <CalendarClock className="h-3 w-3" />
-                                            {updatedAt}
-                                            </span>
-                                        <div className="flex items-center gap-1">
-                                            {resume?.fileSize && (
-                                                <span className="text-[10px]">
-                                                    {(resume.fileSize / 1024).toFixed(1)} KB
-                                            </span>
-                                        )}
-                                        </div>
+                                    
                                     </div>
-
-                                    {documentType === "resume" && !isBaseResume && (
-                                        <button
-                                            type="button"
-                                            onClick={(event) => handleSetBaseResume(resumeId, event)}
-                                            disabled={settingBaseId === resumeId}
-                                            className="mt-1 inline-flex items-center justify-center gap-1 rounded-lg border border-warn/30 bg-warn/10 px-3 py-1.5 text-xs font-medium text-warn transition-colors hover:bg-warn/10 disabled:opacity-60"
-                                        >
-                                            {settingBaseId === resumeId ? "Setting…" : "⭐ Make this my base resume"}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                            </BlurFade>
+                                }
+                            />
                         );
                     })}
-                </div>
+                    </div>
+                </section>
             )}
+            </div>
 
-            {/* Content Editor - Inline */}
-            {editingContentResumeId && (
-                <div className="mt-6 rounded-xl border border-border bg-card overflow-hidden">
-                    <JkCW_DynamicJSONEditor
-                        resumeId={editingContentResumeId}
-                        onClose={() => { setEditingContentResumeId(null); setSearchTerm(""); }}
-                    />
-                </div>
-            )}
-
-            {editingContentCoverLetterId && (
-                <div className="mt-6 rounded-xl border border-border bg-card overflow-hidden">
-                    <JkCW_CoverLetterContentEditor
-                        coverLetterId={editingContentCoverLetterId}
-                        onClose={() => { setEditingContentCoverLetterId(null); setSearchTerm(""); }}
-                    />
-                </div>
-            )}
 
             {/* Upload PDF modal - shared between empty state and documents view */}
             <Dialog open={showUploadDialog} onOpenChange={(open) => {

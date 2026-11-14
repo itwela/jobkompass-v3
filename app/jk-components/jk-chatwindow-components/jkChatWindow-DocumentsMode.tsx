@@ -12,7 +12,6 @@ import { JobKompassDocumentsProvider } from "@/providers/jkDocumentsProvider";
 type DocumentTypeFilter = "all" | "resume" | "cover-letter";
 
 export default function JkCW_DocumentsMode() {
-  const [typeFilter, setTypeFilter] = useState<DocumentTypeFilter>("all");
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   if (authLoading) {
@@ -54,64 +53,10 @@ export default function JkCW_DocumentsMode() {
   }
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden min-w-0">
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 min-w-0">
-        <header className="space-y-4 border-b border-border pb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">My Documents</h1>
-            <p className="text-muted-foreground mt-1">
-                Upload and manage your documents such as resumes and cover letters. Add labels and tags to organize them.
-              </p>
-          </div>
-          
-          {/* Document Type Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={typeFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTypeFilter("all")}
-                className={cn(
-                  "gap-2",
-                  typeFilter === "all" && "bg-primary text-primary-foreground"
-                )}
-              >
-                All
-              </Button>
-              <Button
-                variant={typeFilter === "resume" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTypeFilter("resume")}
-                className={cn(
-                  "gap-2",
-                  typeFilter === "resume" && "bg-primary text-primary-foreground"
-                )}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Resumes
-              </Button>
-              <Button
-                variant={typeFilter === "cover-letter" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTypeFilter("cover-letter")}
-                className={cn(
-                  "gap-2",
-                  typeFilter === "cover-letter" && "bg-primary text-primary-foreground"
-                )}
-              >
-                <FileCheck className="h-3.5 w-3.5" />
-                Cover Letters
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        <JobKompassDocumentsProvider>
-          <JkCW_DocumentsForm typeFilter={typeFilter} />
-        </JobKompassDocumentsProvider>
-
-      </div>
+    <div className="h-full min-w-0 overflow-y-auto overflow-x-hidden">
+      <JobKompassDocumentsProvider>
+        <JkCW_DocumentsForm />
+      </JobKompassDocumentsProvider>
     </div>
   );
 }
