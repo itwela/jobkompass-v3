@@ -19,5 +19,7 @@ export const tailoringValidator = v.object({
     total: v.number(),
     met: v.array(v.string()),
     missing: v.array(v.string()),
+    // Each met must-have with the resume line that evidences it (lib/chat/mustHaves.ts).
+    matched: v.optional(v.array(v.object({ term: v.string(), evidence: v.string() }))),
   })),
 });
