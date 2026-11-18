@@ -4,8 +4,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { enforceAiRateLimit } from "@/lib/rateLimit/guard";
 import { convexForCaller } from "@/lib/onboarding/server";
 import { isPremiumRank, tailorAndSave, TailorFailedError } from "@/lib/resume/tailorServer";
-import { canUseResumeTemplate } from "@/lib/templates";
-import type { PlanRank } from "@/convex/plans";
+import { pickTailorTemplate } from "@/lib/resume/tailorCore";
 
 export const maxDuration = 300;
 
@@ -40,8 +39,7 @@ export async function POST(request: NextRequest) {
     // The default template from Settings wins, then the base resume's own template, then Jake.
     // getDefaultTemplate already drops a template above the user's plan.
     const preferred = await convex.query(api.auth.getDefaultTemplate, {}).catch(() => null);
-    const templateId = preferred
-      ?? (base.template && canUseResumeTemplate(base.template, rank as PlanRank) ? base.template : "jake");
+    const templateId = pickTailorTemplate({ accountDefault: preferred, baseTemplate: base.template, rank });
 
     const result = await tailorAndSave({
       convex,

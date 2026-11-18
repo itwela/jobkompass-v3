@@ -9,7 +9,7 @@ import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from 
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
 import { EMPTY_CANDIDATE, NO_INVENTED_FACTS_RULE, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
-import { isPremiumRank, tailorAndSave, TailorFailedError } from '@/lib/resume/tailorServer';
+import { isPremiumRank, tailorAndSave, tailorInstructions, TailorFailedError } from '@/lib/resume/tailorServer';
 import { canUseResumeTemplate } from '@/lib/templates';
 import type { PlanRank } from '@/convex/plans';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
           },
           templateId: usableTemplate,
           premium: isPremiumRank(rank),
-          instructions: [...(Array.isArray(resumePreferences) ? resumePreferences : []), ...(promptText?.trim() ? [promptText.trim()] : [])],
+          instructions: tailorInstructions(resumePreferences, promptText),
         });
         return NextResponse.json({
           success: true,

@@ -1,5 +1,6 @@
-import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from "@/lib/aiModels";
-import { parseTailoredResumeResponse } from "@/lib/emailAgent/draftMessage";
+// Relative imports: this module is also bundled into Convex node actions (agent tailoring).
+import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from "../aiModels";
+import { parseTailoredResumeResponse } from "../emailAgent/draftMessage";
 
 /** How a tailored resume covers the posting's must-haves. */
 export interface MustHaves {
