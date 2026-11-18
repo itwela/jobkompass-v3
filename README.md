@@ -13,12 +13,10 @@
 </p>
 
 <p align="center">
-  <img src="public/images/readme/app-chat.jpg" alt="The JobKompass app: the new-chat screen with the lighthouse painting, the message box and four action cards" width="900">
+  <img src="public/images/readme/hero.jpg" alt="The JobKompass landing page: a night harbour painting with a lighthouse, under the headline A tailored resume for every job you apply to" width="900">
 </p>
 
 JobKompass is a job-search app. You save the postings you care about, and it writes a resume for each one from the resume you already have. It also writes cover letters, builds interview prep decks, and shows how your search is going. The same account can be driven from a terminal or by an AI agent through the `jk` CLI, and a Chrome extension saves postings from the page you are on.
-
-The screenshot uses placeholder data.
 
 ## Contents
 
