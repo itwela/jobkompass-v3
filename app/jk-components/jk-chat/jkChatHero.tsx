@@ -18,11 +18,11 @@ import { cn } from "@/lib/utils";
 
 export type JkChatAction = "tailor" | "save" | "letter" | "prep";
 
-const CARDS: { id: JkChatAction; tick: string; title: string; sub: string; subPhone?: string; phone: boolean }[] = [
-  { id: "tailor", tick: "bg-bar-1", title: "Tailor a resume", sub: "to a job in My Jobs", phone: true },
-  { id: "save", tick: "bg-bar-2", title: "Save a job", sub: "from a link or pasted text", subPhone: "from a link", phone: true },
-  { id: "letter", tick: "bg-bar-3", title: "Write a cover letter", sub: "for a job you applied to", phone: true },
-  { id: "prep", tick: "bg-bar-4", title: "Build a prep deck", sub: "pitch, flashcards, questions", phone: false },
+const CARDS: { id: JkChatAction; tone: string; tick: string; title: string; sub: string; subPhone?: string; phone: boolean }[] = [
+  { id: "tailor", tone: "--bar-1", tick: "bg-bar-1", title: "Tailor a resume", sub: "to a job in My Jobs", phone: true },
+  { id: "save", tone: "--bar-2", tick: "bg-bar-2", title: "Save a job", sub: "from a link or pasted text", subPhone: "from a link", phone: true },
+  { id: "letter", tone: "--bar-3", tick: "bg-bar-3", title: "Write a cover letter", sub: "for a job you applied to", phone: true },
+  { id: "prep", tone: "--bar-4", tick: "bg-bar-4", title: "Build a prep deck", sub: "pitch, flashcards, questions", phone: false },
 ];
 
 /**
@@ -54,19 +54,74 @@ function pickGreeting(): number {
   return next;
 }
 
+type JkPreviewData = { name: string; company: string; title: string; link?: string | null; status: string; resume: string };
+
+/** A small real preview of what each card makes, built from the newest saved job and resume. */
+function JkCardPreview({ id, d }: { id: JkChatAction; d: JkPreviewData }) {
+  const sheet = "h-[72px] overflow-hidden rounded-[10px] border border-border bg-background/80 px-3 py-[10px] backdrop-blur-sm";
+  const paper = "h-[72px] overflow-hidden rounded-[10px] border border-border bg-background/80 px-3 backdrop-blur-sm py-[10px]";
+  if (id === "tailor") return (
+    <div className={sheet}>
+      <p className="truncate text-[11px] font-medium leading-[14px] text-foreground">{d.name || "Your resume"}</p>
+      <p className="mt-[3px] truncate font-mono text-[9.5px] leading-[13px] text-subtle-foreground">{d.resume}</p>
+      <p className="mt-[7px] flex items-center gap-[6px] truncate text-[10.5px] leading-[13px] text-muted-foreground">
+        <span aria-hidden className="h-[10px] w-[2px] shrink-0 rounded-full bg-bar-1" />
+        <span className="truncate">Tailored for {d.company}</span>
+      </p>
+    </div>
+  );
+  if (id === "save") return (
+    <div className={cn(paper, "flex items-center gap-[10px]")}>
+      <JkJobLogo company={d.company} link={d.link} size={26} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[11px] font-medium leading-[14px] text-foreground">{d.title}</span>
+        <span className="mt-[2px] block truncate font-mono text-[9.5px] leading-[13px] text-subtle-foreground">{[d.company, d.status].filter(Boolean).join(" · ")}</span>
+      </span>
+    </div>
+  );
+  if (id === "letter") return (
+    <div className={sheet}>
+      <p className="truncate text-[11px] leading-[14px] text-foreground">Dear {d.company} team,</p>
+      <p className="mt-[4px] line-clamp-2 text-[10.5px] leading-[14px] text-muted-foreground">I'm writing about the {d.title} role, and why my work lines up with it.</p>
+    </div>
+  );
+  return (
+    <div className="relative h-[72px]">
+      <div aria-hidden className="absolute inset-x-[10px] top-0 h-[64px] rounded-[10px] border border-border bg-background/50" />
+      <div className={cn(sheet, "absolute inset-x-0 top-[8px] h-[64px]")}>
+        <p className="font-mono text-[9.5px] uppercase leading-[13px] tracking-[0.1em] text-subtle-foreground">Question</p>
+        <p className="mt-[3px] truncate text-[11px] leading-[14px] text-foreground">Why {d.company}?</p>
+      </div>
+    </div>
+  );
+}
+
 /** "itwela ibomu" -> "Itwela" */
 export function jkFirstName(name?: string | null) {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
   return first ? first[0].toUpperCase() + first.slice(1) : "";
 }
 
-export default function JkChatHero({ firstName, onAction, busy }: { firstName: string; onAction: (a: JkChatAction) => void; busy?: boolean }) {
+export default function JkChatHero({ firstName, fullName, onAction, busy }: { firstName: string; fullName?: string; onAction: (a: JkChatAction) => void; busy?: boolean }) {
   const { allJobs } = useJobs();
   const { resumeList, coverLetterList } = useJobKompassDocuments();
   // Picked after mount so the server and the browser never disagree on the text.
   const [greeting, setGreeting] = useState<number | null>(null);
   useEffect(() => setGreeting(pickGreeting()), []);
   const line = GREETINGS[greeting ?? 0];
+  const preview = useMemo<JkPreviewData>(() => {
+    const newest = <T extends { createdAt?: number }>(xs: T[]) => [...xs].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+    const job = newest(allJobs as any[]);
+    const resume = newest(resumeList as any[]);
+    return {
+      name: (fullName ?? firstName).replace(/\b\w/g, (ch) => ch.toUpperCase()),
+      company: job?.company || "your next company",
+      title: job?.title || "next",
+      link: job?.link,
+      status: job?.status ?? "",
+      resume: resume?.name || "Base resume",
+    };
+  }, [allJobs, resumeList, fullName, firstName]);
   const counts = [
     { tick: "bg-bar-2", n: resumeList.length, label: "resumes" },
     { tick: "bg-bar-3", n: coverLetterList.length, label: "cover letters" },
@@ -103,17 +158,23 @@ export default function JkChatHero({ firstName, onAction, busy }: { firstName: s
           {CARDS.map((c) => (
             <button key={c.id} type="button" onClick={() => onAction(c.id)}
               className={cn(
-                "group rounded-[16px] border border-border bg-card px-4 text-left transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-input sm:rounded-[18px] sm:px-[18px] sm:pb-[18px] sm:pt-5",
-                "flex h-[52px] items-center gap-[13px] sm:block sm:h-[84px]",
+                "group relative overflow-hidden rounded-[16px] border border-border bg-card px-4 text-left transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-input sm:rounded-[18px] sm:px-[18px] sm:pb-[18px] sm:pt-[14px]",
+                "flex h-[52px] items-center gap-[13px] sm:block sm:h-auto",
                 !c.phone && "max-sm:hidden",
               )}>
               <span aria-hidden className={cn("h-[14px] w-[3px] shrink-0 rounded-full sm:hidden", c.tick)} />
-              <span className="hidden items-center gap-[9px] sm:flex">
-                <span aria-hidden className={cn("h-[14px] w-[3px] rounded-full", c.tick)} />
-                <span className="font-mono text-[11px] leading-[15px] tracking-[0.11em] text-subtle-foreground">0{CARDS.indexOf(c) + 1}</span>
+              <span aria-hidden className="pointer-events-none absolute inset-0 hidden opacity-70 transition-opacity duration-300 group-hover:opacity-100 sm:block"
+                style={{ background: `radial-gradient(110% 75% at 50% 0%, color-mix(in srgb, var(${c.tone}) 30%, transparent), transparent 72%)` }} />
+              <span aria-hidden className="pointer-events-none absolute inset-x-6 top-0 hidden h-px sm:block"
+                style={{ background: `linear-gradient(90deg, transparent, var(${c.tone}), transparent)` }} />
+              <span aria-hidden className="relative hidden transition-transform duration-200 group-hover:-translate-y-px sm:block">
+                <JkCardPreview id={c.id} d={preview} />
               </span>
-              <span className="min-w-0 flex-1 truncate text-[15px] font-medium leading-[18px] text-foreground sm:mt-[7px] sm:block">{c.title}</span>
-              <span className="shrink-0 text-[12px] leading-[14px] text-subtle-foreground sm:mt-[3px] sm:block">
+              <span className="min-w-0 flex-1 truncate text-[15px] font-medium leading-[18px] text-foreground sm:relative sm:mt-[14px] sm:flex sm:items-center sm:gap-[9px]">
+                <span aria-hidden className={cn("hidden h-[14px] w-[3px] shrink-0 rounded-full sm:block", c.tick)} />
+                <span className="truncate">{c.title}</span>
+              </span>
+              <span className="shrink-0 text-[12px] leading-[14px] text-subtle-foreground sm:relative sm:mt-[3px] sm:block">
                 <span className="sm:hidden">{c.subPhone ?? c.sub}</span>
                 <span className="hidden sm:inline">{c.sub}</span>
               </span>

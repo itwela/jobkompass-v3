@@ -163,6 +163,7 @@ input[data-quiet-focus]:focus-visible {
   --flow-saved: var(--bar-1);
   --flow-applied: var(--bar-3);
   --flow-idle: var(--border-strong);
+  --flow-strength: 0.4;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(10 18 40 / 0.45);
@@ -237,6 +238,7 @@ input[data-quiet-focus]:focus-visible {
   --flow-saved: var(--primary);
   --flow-applied: var(--warn);
   --flow-idle: var(--bar-3);
+  --flow-strength: 1;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(4 7 15 / 0.72);
@@ -1009,3 +1011,18 @@ input:-webkit-autofill:focus {
    Fixed bottom UI in any screen sits above it with calc(var(--jk-tabbar-h) + …). */
 .jk-app-shell { --jk-tabbar-h: calc(60px + env(safe-area-inset-bottom)); }
 @media (min-width: 1024px) { .jk-app-shell { --jk-tabbar-h: 0px; } }
+
+/* Chat wait state: the logo breathes and a soft light passes over the status line. */
+.jk-wait { color: var(--muted-foreground); }
+@media (prefers-reduced-motion: no-preference) {
+  .jk-breathe { animation: jk-breathe 1.8s ease-in-out infinite; }
+  @keyframes jk-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .jk-wait {
+    width: fit-content;
+    background: linear-gradient(100deg, var(--muted-foreground) 35%, var(--foreground) 50%, var(--muted-foreground) 65%) 0 0 / 250% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: jk-wait-in 0.4s ease-out both, jk-wait-sweep 2.2s linear infinite;
+  }
+  @keyframes jk-wait-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes jk-wait-sweep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+}

@@ -27,6 +27,8 @@ import { usableScorecard } from "../jk-resume-questions/types";
 import { traceSteps, turnArtifacts, type ChatArtifact, type ChatToolCall, type TraceStep } from "@/lib/chat/toolTrace";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
+import { mainAssets } from "@/app/lib/constants";
 
 interface ChatMessage {
   id: string;
@@ -43,13 +45,30 @@ const TICK: Record<TraceStep["tone"], string> = {
   "bar-1": "bg-bar-1", "bar-2": "bg-bar-2", "bar-3": "bg-bar-3", "bar-4": "bg-bar-4", ok: "bg-ok", destructive: "bg-destructive",
 };
 
-/** The four logo bars before "JobKompass". */
-function BrandBars({ className }: { className?: string }) {
-  return (
-    <span aria-hidden className={cn("flex gap-[3px]", className)}>
-      {["bg-bar-1", "bg-bar-2", "bg-bar-3", "bg-bar-4"].map((c) => <span key={c} className={cn("h-[13px] w-[3px] rounded-full", c)} />)}
-    </span>
-  );
+/** The JobKompass logo before the name. It breathes while a reply is on its way. */
+function BrandMark({ waiting }: { waiting?: boolean }) {
+  return <Image src={mainAssets.logo} alt="" width={22} height={21} className={cn("h-[21px] w-[22px] object-contain", waiting && "jk-breathe")} />;
+}
+
+/** What the wait line says, by what was asked. Later lines appear as the wait goes on. */
+function waitLines(asked: string): string[] {
+  const t = asked.toLowerCase();
+  if (/cover letter/.test(t)) return ["Reading the job", "Writing your cover letter", "Building the PDF. Almost there"];
+  if (/resume|tailor/.test(t)) return ["Reading the job and your resume", "Rewriting your bullets for this role", "Building the PDF. Almost there"];
+  if (/https?:\/\/|save .*job|add .*job/.test(t)) return ["Reading the posting", "Saving it to My Jobs"];
+  return ["Reading your message", "Thinking it through", "Still on it. This one takes a moment"];
+}
+
+/** The line under the logo while nothing has come back yet. */
+function WaitLine({ asked }: { asked: string }) {
+  const lines = useMemo(() => waitLines(asked), [asked]);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (i >= lines.length - 1) return;
+    const t = setTimeout(() => setI((n) => n + 1), i === 0 ? 2500 : 9000);
+    return () => clearTimeout(t);
+  }, [i, lines.length]);
+  return <p key={i} role="status" className="jk-wait mt-[15px] text-[15px] leading-[22px] sm:text-[15.5px]">{lines[i]}</p>;
 }
 
 function TraceLine({ tone, children }: { tone: TraceStep["tone"]; children: React.ReactNode }) {
@@ -473,13 +492,13 @@ export default function JkCW_ChatMode() {
 
                 <div ref={messagesContainerRef} onScroll={handleMessagesScroll} className="chat-scroll min-h-0 flex-1 overflow-y-auto">
                     {!inThread ? (
-                        <JkChatHero firstName={firstName} onAction={onAction} busy={isLoading} />
+                        <JkChatHero firstName={firstName} fullName={user?.name ?? undefined} onAction={onAction} busy={isLoading} />
                     ) : (
                         <div key={currentThreadId ?? 'new'} data-enter className="mx-auto w-full max-w-[680px] px-5 pb-8 pt-[18px] sm:px-8 sm:pt-[22px]">
                             {messages.map((message, idx) => {
                                 if (message.type === 'user') {
                                     return (
-                                        <div key={message.id} className={cn("jk-enter flex justify-end", idx > 0 && "mt-10")} style={{ "--i": Math.min(idx, 4) } as React.CSSProperties}>
+                                        <div key={idx} className={cn("jk-enter flex justify-end", idx > 0 && "mt-10")} style={{ "--i": Math.min(idx, 4) } as React.CSSProperties}>
                                             <div className="max-w-[min(440px,78%)] rounded-[20px] bg-accent px-[18px] py-[13px] text-[14.5px] leading-[22px] text-foreground sm:px-5 sm:py-[15px] sm:text-[14px]">
                                                 {message.file && <p className="mb-1 font-mono text-[11px] text-muted-foreground">File · {message.file.name}</p>}
                                                 <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -491,9 +510,9 @@ export default function JkCW_ChatMode() {
                                 const docs = turnArtifacts(message.toolCalls).map(withScore)
                                 const streaming = isLoading && idx === messages.length - 1
                                 return (
-                                    <div key={message.id} className="jk-enter mt-[30px]" style={{ "--i": Math.min(idx, 4) } as React.CSSProperties}>
+                                    <div key={idx} className="jk-enter mt-[30px]" style={{ "--i": Math.min(idx, 4) } as React.CSSProperties}>
                                         <p className="flex items-center gap-[11px]">
-                                            <BrandBars className={cn(streaming && !message.content && "animate-pulse")} />
+                                            <BrandMark waiting={streaming && !message.content} />
                                             <span className="text-[14px] font-semibold leading-[17px] text-foreground">JobKompass</span>
                                         </p>
                                         {steps.length > 0 && (
@@ -502,7 +521,7 @@ export default function JkCW_ChatMode() {
                                             </div>
                                         )}
                                         {streaming && !message.content && steps.length === 0 && (
-                                            <div className="mt-[15px]"><TraceLine tone="bar-3">Working on it</TraceLine></div>
+                                            <WaitLine asked={messages[idx - 1]?.content ?? ""} />
                                         )}
                                         {message.content && (
                                             <div className="mt-[22px] break-words text-[15px] leading-[22.5px] text-foreground sm:text-[15.5px] sm:leading-[24px]">

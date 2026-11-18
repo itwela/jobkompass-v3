@@ -1,17 +1,24 @@
-# JobKompass
+<p align="center">
+  <img src="public/images/jobkompass_logo.svg" alt="JobKompass logo" width="88">
+</p>
 
-[![npm: jobkompass-cli](https://img.shields.io/npm/v/jobkompass-cli?label=jobkompass-cli)](https://www.npmjs.com/package/jobkompass-cli)
+<h1 align="center">JobKompass</h1>
+
+<p align="center">Save the jobs you want. Get a resume written for each one, from the resume you already have.</p>
+
+<p align="center">
+  <a href="https://www.myjobkompass.com"><img src="https://img.shields.io/badge/live-myjobkompass.com-635AD9" alt="Live site"></a>
+  <a href="https://www.npmjs.com/package/jobkompass-cli"><img src="https://img.shields.io/npm/v/jobkompass-cli?label=jk%20cli&color=219BE4" alt="npm: jobkompass-cli"></a>
+  <img src="https://img.shields.io/badge/chrome-extension-7338AC" alt="Chrome extension">
+</p>
+
+<p align="center">
+  <img src="public/images/readme/app-chat.jpg" alt="The JobKompass app: the new-chat screen with the lighthouse painting, the message box and four action cards" width="900">
+</p>
 
 JobKompass is a job-search app. You save the postings you care about, and it writes a resume for each one from the resume you already have. It also writes cover letters, builds interview prep decks, and shows how your search is going. The same account can be driven from a terminal or by an AI agent through the `jk` CLI, and a Chrome extension saves postings from the page you are on.
 
-Live site: <https://www.myjobkompass.com>
-
-<p>
-  <img src="public/images/jobkompass_preview_resume_jake.png" alt="Sample resume in the Jake template" width="260">
-  <img src="public/images/jobkompass_preview_resume_mar.png" alt="Sample resume in the Mar template" width="260">
-</p>
-
-Sample output from two of the three resume templates. Both use placeholder people.
+The screenshot uses placeholder data.
 
 ## Contents
 
@@ -55,6 +62,13 @@ Some of these depend on the plan. The gates are listed in [docs/ARCHITECTURE.md]
 4. A fact guard ([`lib/resume/noInventedFacts.ts`](lib/resume/noInventedFacts.ts)) compares the output with the source resume. A bullet that states something the source does not is replaced with your original wording.
 5. The result is turned into LaTeX for the chosen template and compiled to PDF by a separate service.
 6. The PDF and its JSON are saved to Documents, along with a record of what changed and which questions are still open.
+
+<p>
+  <img src="public/images/jobkompass_preview_resume_jake.png" alt="Sample resume in the Jake template" width="260">
+  <img src="public/images/jobkompass_preview_resume_mar.png" alt="Sample resume in the Mar template" width="260">
+</p>
+
+Sample output from two of the three templates. Both use placeholder people.
 
 The code for steps 2 to 4 is [`lib/resume/tailorResume.ts`](lib/resume/tailorResume.ts). Steps 5 and 6 are in [`lib/resume/tailorServer.ts`](lib/resume/tailorServer.ts).
 
@@ -162,7 +176,7 @@ npx convex dev   # pushes convex/ to your deployment and watches for changes
 npm run dev      # Next.js on http://localhost:3000
 ```
 
-`npx convex dev` writes to whichever deployment `CONVEX_DEPLOYMENT` names. Point it at your own Convex project. The maintainers' environment points at the live deployment, which is why the deploy rule below exists.
+`npx convex dev` writes to whichever deployment `CONVEX_DEPLOYMENT` names. Point it at your own Convex project.
 
 ## Checks
 
@@ -190,15 +204,13 @@ The no-invented-experience suite runs as part of `npm test`. To run it alone, us
 
 ### Backend
 
-The live site, the `jk` CLI and the Chrome extension all run on the Convex deployment `proficient-mammoth-632`. Convex labels it "dev". It is production. Ship backend changes with:
+Backend changes ship with:
 
 ```bash
 npm run deploy:backend
 ```
 
-Do **not** run `npx convex deploy`. It targets a different deployment, labelled "prod", which nothing points at and which has no environment variables. Moving live traffic there would be a planned migration, not a quick switch.
-
-A backend deploy needs the owner's approval. There is no staging deployment.
+A backend deploy needs the owner's approval.
 
 ### Frontend
 

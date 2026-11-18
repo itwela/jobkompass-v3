@@ -190,17 +190,17 @@ export function JkSankey({ data, height = 256, className }: { data: SankeyData; 
           <svg width={W} height={layout.total} className="absolute inset-0 overflow-visible" role="img" aria-label={label}>
             <defs>
               <linearGradient id={`${uid}-a`} x1="0" x2="1">
-                <stop offset="0" style={{ stopColor: "var(--flow-saved)", stopOpacity: 0.5 }} />
-                <stop offset="1" style={{ stopColor: "var(--flow-applied)", stopOpacity: 0.4 }} />
+                <stop offset="0" style={{ stopColor: "var(--flow-saved)", stopOpacity: "calc(var(--flow-strength) * 0.5)" }} />
+                <stop offset="1" style={{ stopColor: "var(--flow-applied)", stopOpacity: "calc(var(--flow-strength) * 0.4)" }} />
               </linearGradient>
               <linearGradient id={`${uid}-n`} x1="0" x2="1">
-                <stop offset="0" style={{ stopColor: "var(--flow-saved)", stopOpacity: 0.5 }} />
-                <stop offset="1" style={{ stopColor: "var(--flow-idle)", stopOpacity: 0.55 }} />
+                <stop offset="0" style={{ stopColor: "var(--flow-saved)", stopOpacity: "calc(var(--flow-strength) * 0.5)" }} />
+                <stop offset="1" style={{ stopColor: "var(--flow-idle)", stopOpacity: "calc(var(--flow-strength) * 0.55)" }} />
               </linearGradient>
               {layout.outs.map((o) => (
                 <linearGradient key={o.key} id={`${uid}-${o.key}`} x1="0" x2="1">
-                  <stop offset="0" style={{ stopColor: "var(--flow-applied)", stopOpacity: 0.35 }} />
-                  <stop offset="1" style={{ stopColor: OUTCOME_COLOR[o.key], stopOpacity: 0.55 }} />
+                  <stop offset="0" style={{ stopColor: "var(--flow-applied)", stopOpacity: "calc(var(--flow-strength) * 0.35)" }} />
+                  <stop offset="1" style={{ stopColor: OUTCOME_COLOR[o.key], stopOpacity: "calc(var(--flow-strength) * 0.55)" }} />
                 </linearGradient>
               ))}
             </defs>

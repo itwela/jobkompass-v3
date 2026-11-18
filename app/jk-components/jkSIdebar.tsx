@@ -31,6 +31,7 @@ import JkSectionLabel from './jk-app/jkSectionLabel'
 import { useJkAppNav, jkInitials, jkPlanBadge } from './jk-app/jkAppNav'
 import { useJobKompassTheme } from '@/providers/jkThemeProvider'
 import { trackUpgradeClicked } from '@/lib/analytics/client'
+import JkArt from "./jkArt"
 import { cn } from '@/lib/utils'
 
 /** Opens search, or the upgrade prompt on the free plan (search is a paid feature). Shared by rail + phone header. */
@@ -57,10 +58,11 @@ export function JkNavRow({ label, count, active, tick, onClick, size = "md" }: {
       type="button"
       onClick={onClick}
       aria-current={active ? "page" : undefined}
+      style={active && size === "md" ? { backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${tick} var(--nav-glow), transparent), transparent 70%)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tick} var(--nav-ring), transparent)` } : undefined}
       className={cn(
         "group flex w-full items-center text-left outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring/50",
         size === "md"
-          ? cn("h-[38px] gap-[13px] rounded-xl px-3 text-[15px] leading-[18px]", active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground")
+          ? cn("h-[38px] gap-[13px] rounded-xl px-3 text-[15px] leading-[18px] [--nav-glow:10%] [--nav-ring:18%] dark:[--nav-glow:45%] dark:[--nav-ring:35%]", active ? "bg-card dark:bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground")
           : cn("min-h-14 gap-[17px] py-2 text-[22px] font-medium leading-[26px] tracking-[-0.3px]", active ? "text-foreground" : "text-muted-foreground hover:text-foreground"),
       )}
     >
@@ -330,8 +332,14 @@ export default function JkSidebar() {
         </div>
       </div>
 
+      {/* Harbour painting under the user chip, dissolving upward into the sidebar. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[260px] opacity-80">
+        <JkArt name="harbour" variant="section" fade="none" position="center 70%" />
+        <div className="absolute inset-0 bg-gradient-to-b from-card via-card/40 to-card/70" />
+      </div>
+
       {/* User chip */}
-      <div className="mx-[18px] shrink-0 border-t border-border pb-[22px] pt-[21px]">
+      <div className="relative mx-[18px] shrink-0 border-t border-border/60 pb-[22px] pt-[21px]">
         <JkUserMenu />
       </div>
 
