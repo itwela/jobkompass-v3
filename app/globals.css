@@ -996,6 +996,9 @@ input[data-quiet-focus]:focus-visible {
 .jk-agent:hover span, .jk-agent:focus-visible span { color: var(--foreground); }
 .jk-agent[data-tone="claude"]:hover svg, .jk-agent[data-tone="claude"]:focus-visible svg { color: var(--agent-claude); }
 .jk-agent[data-tone="gemini"]:hover svg, .jk-agent[data-tone="gemini"]:focus-visible svg { color: var(--agent-gemini); }
+/* Colour marks (Muse, Gemini, Copilot) rest muted like the others and take their colour on hover. */
+.jk-agent img { filter: grayscale(1); opacity: 0.65; transition: filter 200ms, opacity 200ms; }
+.jk-agent:hover img, .jk-agent:focus-visible img { filter: none; opacity: 1; }
 
 /* Browser autofill paints its own grey/blue; keep the field colour. */
 input:-webkit-autofill,
