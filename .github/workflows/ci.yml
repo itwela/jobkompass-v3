@@ -40,12 +40,3 @@ jobs:
       - name: Test
         run: npm test
 
-      # PLACEHOLDER: a teammate will drop the "no invented experience"
-      # resume-content regression test into tests/no-invented-experience/.
-      # This step does not invent resume content and does not run that test.
-      # Vitest will pick up any *.test.ts file added in that folder later.
-      - name: Placeholder — no invented experience resume-content regression
-        run: |
-          echo "PLACEHOLDER: no-invented-experience resume-content regression test is not written yet."
-          echo "Add it under tests/no-invented-experience/ as a Vitest file. Do not invent resume content here."
-          test -d tests/no-invented-experience
