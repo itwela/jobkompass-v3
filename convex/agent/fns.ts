@@ -163,6 +163,15 @@ export const jobsUpdate = internalMutation({
   },
 });
 
+/** Stores the job's extracted must-have list so later tailor runs reuse it. */
+export const jobsSetMustHaves = internalMutation({
+  args: { userId: v.string(), id: v.id("jobs"), mustHaves: v.array(v.string()), mustHavesKey: v.string() },
+  handler: async (ctx, { userId, id, mustHaves, mustHavesKey }) => {
+    await owned(ctx, id, userId, "Job");
+    await ctx.db.patch(id, { mustHaves: mustHaves.slice(0, 20), mustHavesKey });
+  },
+});
+
 export const jobsRemove = internalMutation({
   args: { userId: v.string(), id: v.id("jobs") },
   handler: async (ctx, { userId, id }) => {

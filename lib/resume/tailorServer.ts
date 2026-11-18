@@ -60,6 +60,9 @@ export function convexClientStore(convex: ConvexHttpClient): TailorStore {
     async setTailorMeta(meta) {
       await convex.mutation(api.documents.setResumeTailorMeta, meta);
     },
+    async saveJobMustHaves(id, mustHaves, mustHavesKey) {
+      await convex.mutation(api.jobs.setMustHaves, { id, mustHaves, mustHavesKey });
+    },
   };
 }
 

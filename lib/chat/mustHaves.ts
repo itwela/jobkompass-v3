@@ -1,6 +1,7 @@
 // Relative imports: this module is also bundled into Convex node actions (agent tailoring).
 import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from "../aiModels";
 import { parseTailoredResumeResponse } from "../emailAgent/draftMessage";
+import { mentions, resumeText } from "./mustHaveMatch";
 
 /** How a tailored resume covers the posting's must-haves. */
 export interface MustHaves {
@@ -32,16 +33,74 @@ const clean = (items: unknown): string[] => {
   return out.slice(0, 10);
 };
 
+/** Job fields the must-have list is read from, plus the list stored on the job (if any). */
+export interface MustHaveJob {
+  title?: string;
+  description?: string;
+  skills?: string[];
+  keywords?: string[];
+  /** Must-haves stored on the job by an earlier run. */
+  mustHaves?: string[];
+  /** mustHavesKey(description) at the time mustHaves was stored. */
+  mustHavesKey?: string;
+}
+
+/**
+ * Fingerprint of the posting text a stored list was read from (FNV-1a over the
+ * whitespace-normalised description). A stored list is reused only while it matches,
+ * so editing the description re-extracts.
+ */
+export function mustHavesKey(description: string | undefined): string {
+  const text = (description ?? "").replace(/\s+/g, " ").trim();
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `v1:${text.length}:${h.toString(16)}`;
+}
+
+/** The list stored on the job, when it still belongs to the current description. */
+export function storedMustHaves(job: MustHaveJob): string[] | null {
+  if (!job.mustHaves?.length || job.mustHavesKey !== mustHavesKey(job.description)) return null;
+  const terms = clean(job.mustHaves);
+  return terms.length ? terms : null;
+}
+
+const fallbackTerms = (job: MustHaveJob) => clean([...(job.keywords ?? []), ...(job.skills ?? [])]);
+
 /**
  * The posting's must-haves, read by the extraction model. The posting is the only
  * input: it says what the job needs, never what the candidate has. Falls back to the
  * skills already extracted when the job was saved.
  */
-export async function extractMustHaves(job: { title?: string; description?: string; skills?: string[]; keywords?: string[] }): Promise<string[]> {
-  const fallback = clean([...(job.keywords ?? []), ...(job.skills ?? [])]);
+export async function extractMustHaves(job: MustHaveJob): Promise<string[]> {
+  return (await extractFromModel(job)) ?? fallbackTerms(job);
+}
+
+/**
+ * The must-have list for a job, stable across runs: reuses the list stored on the job
+ * for the same description, otherwise extracts once and hands the model's list to
+ * `save` so the next run reuses it. The keyword/skill fallback is never stored, so a
+ * later run can still get the model's list.
+ */
+export async function mustHavesForJob(
+  job: MustHaveJob,
+  save?: (terms: string[], key: string) => Promise<unknown>
+): Promise<string[]> {
+  const stored = storedMustHaves(job);
+  if (stored) return stored;
+  const fromModel = await extractFromModel(job);
+  if (!fromModel) return fallbackTerms(job);
+  if (save) await save(fromModel, mustHavesKey(job.description)).catch(() => undefined);
+  return fromModel;
+}
+
+/** The model's list, or null when the model is unavailable or returns nothing usable. */
+async function extractFromModel(job: MustHaveJob): Promise<string[] | null> {
   const key = process.env.OPENROUTER_API_KEY;
   const text = (job.description ?? "").trim();
-  if (!key || text.length < 80) return fallback;
+  if (!key || text.length < 80) return null;
   const models = [
     process.env.OPENROUTER_RESUME_MODEL_PRIMARY?.trim() || DEFAULT_RESUME_EXTRACTION_MODEL_IDS[0],
     process.env.OPENROUTER_RESUME_MODEL_FALLBACK?.trim() || DEFAULT_RESUME_EXTRACTION_MODEL_IDS[1],
@@ -56,7 +115,8 @@ export async function extractMustHaves(job: { title?: string; description?: stri
           { role: "system", content: SYSTEM },
           { role: "user", content: `${job.title ? `Role: ${job.title}\n\n` : ""}Posting:\n${text.slice(0, 20000)}` },
         ],
-        temperature: 0.1,
+        // Deterministic: the same posting should give the same list.
+        temperature: 0,
         max_tokens: 800,
         response_format: { type: "json_object" },
       }),
@@ -68,37 +128,10 @@ export async function extractMustHaves(job: { title?: string; description?: stri
     const terms = clean((parsed as { mustHaves?: unknown } | null)?.mustHaves);
     if (terms.length) return terms;
   }
-  return fallback;
+  return null;
 }
 
-/** Every string in a resume document, flattened to one lower-case haystack. */
-function resumeText(resume: unknown): string {
-  const parts: string[] = [];
-  const walk = (v: unknown) => {
-    if (typeof v === "string") parts.push(v);
-    else if (Array.isArray(v)) v.forEach(walk);
-    else if (v && typeof v === "object") Object.values(v).forEach(walk);
-  };
-  walk(resume);
-  return ` ${parts.join(" \n ").toLowerCase().replace(/[‐-―]/g, "-")} `;
-}
-
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** True when the term appears in the text as a whole word or phrase. */
-function mentions(haystack: string, term: string): boolean {
-  const needle = term.toLowerCase().trim();
-  if (!needle) return false;
-  const variants = new Set([needle, needle.replace(/\./g, ""), needle.replace(/-/g, " "), needle.replace(/\s+/g, "")]);
-  // Also against the text with dots dropped, so "nextjs" finds "Next.js".
-  const hays = [haystack, haystack.replace(/(\w)\.(\w)/g, "$1$2")];
-  for (const v of variants) {
-    if (!v) continue;
-    const re = new RegExp(`(^|[^a-z0-9+#])${escape(v)}($|[^a-z0-9+#])`, "i");
-    if (hays.some((h) => re.test(h))) return true;
-  }
-  return false;
-}
+export { MUST_HAVE_ALIASES, mentions, resumeText, stripVendor } from "./mustHaveMatch";
 
 /**
  * Scores must-haves against the person's own (base) resume, never the posting and never

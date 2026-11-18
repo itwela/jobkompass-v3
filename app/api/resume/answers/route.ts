@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const jobId = tailored.tailoredFrom?.jobId ?? tailored.tailoring?.jobId;
     const savedJob = jobId ? await convex.query(api.jobs.get, { id: jobId }).catch(() => null) : null;
     const job: TailorJob | null = savedJob
-      ? { _id: savedJob._id, title: savedJob.title, company: savedJob.company, description: savedJob.description, skills: (savedJob as any).skills, keywords: (savedJob as any).keywords }
+      ? { _id: savedJob._id, title: savedJob.title, company: savedJob.company, description: savedJob.description, skills: (savedJob as any).skills, keywords: (savedJob as any).keywords, mustHaves: savedJob.mustHaves, mustHavesKey: savedJob.mustHavesKey }
       : tailored.tailoring?.jobTitle && tailored.tailoring?.jobCompany
         ? { title: tailored.tailoring.jobTitle, company: tailored.tailoring.jobCompany }
         : null;

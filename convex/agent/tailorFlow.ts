@@ -113,6 +113,8 @@ export async function agentTailor(deps: AgentTailorDeps, args: AgentTailorArgs):
       description: job.description,
       skills: job.skills,
       keywords: job.keywords,
+      mustHaves: job.mustHaves,
+      mustHavesKey: job.mustHavesKey,
     },
     templateId: template,
     premium: isPremiumRank(settings.rank),

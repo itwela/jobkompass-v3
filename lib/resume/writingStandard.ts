@@ -22,8 +22,9 @@ export const RESUME_BULLET_RULES = `BULLETS: achievements, not responsibilities
 - Inside each experience item, put the bullets most relevant to this posting first.`;
 
 export const RESUME_JOB_MATCH_RULES = `JOB MATCH
-- Where the resume already shows something the posting asks for, name it with the posting's own wording so a keyword match finds it (the resume says "retrieval-augmented search", the posting says "RAG": write "RAG"). Do this only when it is the same thing.
-- skills: keep the skills this posting asks for and the ones that are core to the candidate's work; drop skills that have nothing to do with this job; order the rest by relevance to the posting. Never add a skill. Keep the resume's existing grouping and labels exactly as they are.
+- EXACT POSTING WORDING: when the resume already shows a skill, tool or technology the posting asks for, write it in the skills section and in the bullets with the posting's exact wording, casing and phrasing, so a keyword match finds it. The resume says "Lambda" and the posting says "AWS Lambda": write "AWS Lambda". The resume says "S3" and the posting says "Amazon S3": write "Amazon S3". The resume says "retrieval-augmented search" and the posting says "RAG": write "RAG". The resume says "large language models" and the posting says "LLM": write "LLM".
+- Do this only when it is the same thing the candidate already has. Never add a skill, tool or technology the resume does not show, however the posting words it. A posting requirement the resume does not show stays out of the resume.
+- skills: keep the skills this posting asks for and the ones that are core to the candidate's work; drop skills that have nothing to do with this job; order the rest by relevance to the posting. Rename a kept skill to the posting's exact wording when it is the same skill ("Lambda" becomes "AWS Lambda"). Never add a skill. Keep the resume's existing grouping and labels exactly as they are.
 - personalInfo.summary: if one exists, rewrite it in two sentences for this role using only the resume's facts. It may name the target role.`;
 
 export const RESUME_QUESTION_RULES = `QUESTIONS: the numbers and results a recruiter would ask for

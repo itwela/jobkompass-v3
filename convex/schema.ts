@@ -151,6 +151,10 @@ const documentsTables = {
     seenAt: v.optional(v.number()),
     // Every status change with its time, oldest first (appended by jobs.add / jobs.update).
     statusHistory: v.optional(v.array(v.object({ status: v.string(), at: v.number() }))),
+    // Must-haves read from the description once, so every tailor run scores the same list.
+    // mustHavesKey fingerprints the description they came from (lib/chat/mustHaves.ts).
+    mustHaves: v.optional(v.array(v.string())),
+    mustHavesKey: v.optional(v.string()),
   }).index("by_user", ["userId"])
     .index("by_username", ["username"]),
 
