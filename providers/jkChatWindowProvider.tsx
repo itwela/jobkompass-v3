@@ -93,7 +93,6 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     { id: '/chat', name: 'Chat', command: 'Chat' },
     { id: '/help', name: 'Help', command: 'Help' },
     { id: '/settings', name: 'Settings', command: 'Settings' },
-    { id: '/leads', name: 'Job Leads', command: 'Job Leads' },
   ]);
   // STUB -----
 
@@ -168,7 +167,7 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
   const [textValue, setTextValue] = React.useState('')
   const [dynamicTextAreaHeight, setDynamicTextAreaHeight] = React.useState(0)
   // STUB - STEP 2 OF ADDING A NEW MODE/ACTION
-  const commands = ['/help', '/chat', '/documents', '/my-jobs', '/interview-prep', '/resources', '/settings', '/performance', '/leads']
+  const commands = ['/help', '/chat', '/documents', '/my-jobs', '/interview-prep', '/resources', '/settings', '/performance']
   const commandActions: string[] = []
   const allCommandsAndActions = [...commands, ...commandActions]
   // STUB -----

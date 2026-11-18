@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils"
 function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+  // Not modal by default: a menu item that opens a dialog otherwise leaves the page
+  // locked (body pointer-events: none) after that dialog closes.
+  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" modal={false} {...props} />
 }
 
 function DropdownMenuPortal({

@@ -15,6 +15,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Id } from "@/convex/_generated/dataModel"
 import Link from "next/link"
 import { trackUpgradeClicked } from "@/lib/analytics/client"
+import { JkJobLogo, JkKbd } from "./jk-jobs/jkJobBits"
+import { JkStatusGlyph } from "./jkStatusChip"
+import { STATUS_TEXT, statusKey } from "@/lib/jkStatus"
 
 interface SearchResult {
   id: string
@@ -22,6 +25,7 @@ interface SearchResult {
   title: string
   subtitle?: string
   company?: string // For jobs
+  link?: string | null // For jobs: the posting, used to find the company logo
   status?: string // For jobs
   statusColorClass?: string // For jobs
   icon: typeof MessageSquare
@@ -171,7 +175,8 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
             id: job._id,
             type: 'job',
             title: job.title,
-            subtitle: [job.company, job.status].filter(Boolean).join(' · '),
+            subtitle: job.company,
+            link: job.link,
             company: job.company,
             status: job.status,
             statusColorClass: statusOption?.colorClass || 'bg-muted text-foreground border-border',
@@ -244,7 +249,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
   // Grouped as the frame shows them; one flat order for arrow keys.
   const groups = useMemo(() => {
     const order: { type: SearchResult['type']; label: string; tag: string; tick: string }[] = [
-      { type: 'job', label: 'Jobs', tag: 'JOB', tick: 'var(--bar-4)' },
+      { type: 'job', label: 'Jobs', tag: 'JOB', tick: 'var(--bar-4-ink)' },
       { type: 'document', label: 'Documents', tag: 'PDF', tick: 'var(--bar-2)' },
       { type: 'resource', label: 'Links', tag: 'LINK', tick: 'var(--bar-3)' },
       { type: 'chat', label: 'Conversations', tag: 'CHAT', tick: 'var(--bar-1)' },
@@ -283,16 +288,17 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
               className="pointer-events-auto flex h-dvh w-full flex-col overflow-hidden bg-card sm:h-auto sm:max-h-[560px] sm:min-h-[400px] sm:max-w-[700px] sm:rounded-[28px] sm:border sm:border-input"
             >
               <div className="flex h-[68px] shrink-0 items-center gap-4 border-b border-border px-6">
-                <Search className="size-[18px] shrink-0 text-plan" strokeWidth={2} />
+                <Search className="size-[18px] shrink-0 text-subtle-foreground" strokeWidth={2} />
                 <input
                   ref={inputRef}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Search jobs, documents, links, chats"
+                  data-quiet-focus
                   role="combobox" aria-expanded={flat.length > 0} aria-controls="jk-search-list"
                   aria-activedescendant={flat.length ? `jk-search-opt-${active}` : undefined}
-                  className="min-w-0 flex-1 bg-transparent text-[19px] text-foreground caret-plan outline-none placeholder:text-subtle-foreground max-sm:text-[17px]"
+                  className="min-w-0 flex-1 border-0 bg-transparent text-[19px] text-foreground caret-foreground shadow-none outline-none ring-0 placeholder:text-subtle-foreground focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 max-sm:text-[17px]"
                 />
                 <button type="button" onClick={onClose} className="rounded-md bg-accent px-2 py-1 font-mono text-[9.5px] font-medium tracking-[0.8px] text-muted-foreground hover:text-foreground">
                   <span className="max-sm:hidden">ESC</span><X className="size-4 sm:hidden" />
@@ -306,7 +312,7 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
                     <Link href="/pricing" onClick={() => { trackUpgradeClicked({ surface: 'search', authenticated: true }); onClose() }} className="mt-2 inline-block text-[13.5px] text-muted-foreground underline underline-offset-4">See plans</Link>
                   </div>
                 ) : !searchQuery.trim() ? (
-                  <p className="px-3 py-10 text-center text-[13.5px] text-subtle-foreground">Type to search. Use ↑ ↓ to move, Enter to open.</p>
+                  <p className="px-3 py-10 text-center text-[13.5px] text-subtle-foreground">Search your jobs, documents, links and chats.</p>
                 ) : flat.length === 0 ? (
                   <p className="px-3 py-10 text-center text-[13.5px] text-subtle-foreground">Nothing matches &ldquo;{searchQuery}&rdquo;</p>
                 ) : groups.map((g) => (
@@ -320,21 +326,40 @@ export default function JkSearchModal({ isOpen, onClose }: JkSearchModalProps) {
                         <button
                           key={`${r.type}-${r.id}`} id={`jk-search-opt-${i}`} type="button" role="option" aria-selected={on}
                           onMouseMove={() => setActive(i)} onClick={() => handleResultClick(r)}
-                          className={cn("flex h-[52px] w-full items-center gap-3.5 rounded-[14px] px-3.5 text-left transition-colors", on && "bg-accent")}
+                          className={cn("flex h-[56px] w-full items-center gap-3.5 rounded-[14px] px-3.5 text-left transition-colors", on && "bg-accent")}
                         >
-                          <span aria-hidden className="h-3.5 w-[3px] shrink-0 rounded-full" style={{ background: g.tick }} />
+                          {r.type === 'job' ? (
+                            <JkJobLogo company={r.company || r.title} link={r.link} size={30} />
+                          ) : (
+                            <span aria-hidden className="flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border border-border-strong bg-accent">
+                              <r.icon className="size-[15px]" strokeWidth={1.8} style={{ color: g.tick }} />
+                            </span>
+                          )}
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[15px] leading-[18px] text-foreground">{r.title || 'Untitled'}</span>
-                            {r.subtitle && <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted-foreground">{r.subtitle}</span>}
+                            <span className="mt-[3px] flex min-w-0 items-center gap-2 text-[12px] leading-4 text-muted-foreground">
+                              {r.subtitle && <span className="truncate">{r.subtitle}</span>}
+                              {r.type === 'job' && r.status && (
+                                <span className={cn("flex shrink-0 items-center gap-1.5", STATUS_TEXT[statusKey(r.status)])}>
+                                  <JkStatusGlyph status={r.status} className="size-[10px]" />{r.status}
+                                </span>
+                              )}
+                            </span>
                           </span>
-                          <span className="font-mono text-[9.5px] tracking-[1.2px] text-subtle-foreground">{g.tag}</span>
-                          <CornerDownLeft aria-hidden className={cn("size-3.5 shrink-0 text-plan", !on && "invisible")} />
+                          <CornerDownLeft aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground", !on && "invisible")} />
                         </button>
                       )
                     })}
                   </div>
                 ))}
               </div>
+              {!isFree && (
+                <div className="hidden h-11 shrink-0 items-center gap-5 border-t border-border px-6 font-mono text-[10px] uppercase tracking-[1px] text-subtle-foreground sm:flex">
+                  <span className="flex items-center gap-1.5"><JkKbd>↑</JkKbd><JkKbd>↓</JkKbd>Move</span>
+                  <span className="flex items-center gap-1.5"><JkKbd>↵</JkKbd>Open</span>
+                  <span className="ml-auto">{flat.length ? `${flat.length} result${flat.length === 1 ? '' : 's'}` : ''}</span>
+                </div>
+              )}
             </motion.div>
           </div>
         </>

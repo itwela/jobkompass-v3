@@ -29,9 +29,11 @@ import { plans } from "../jkPricing"
 import JkAppPageHeader from "../jk-app/jkAppPageHeader"
 import JkSectionLabel from "../jk-app/jkSectionLabel"
 import { useJkAppNav } from "../jk-app/jkAppNav"
-import { JkNavRow, JkUserChipBody } from "../jkSIdebar"
+import { JkNavRow, JkUserMenu } from "../jkSIdebar"
 import { JkFieldLabel, jkFieldCls } from "../jkField"
 import JkUpgradeModal from "../jkUpgradeModal"
+import JkSignOutButton from "../jkSignOutButton"
+import { JkConfirmText } from "../jkConfirm"
 import JkArt from "../jkArt"
 import { JkDefaultTemplateProbe } from "../jkDefaultTemplate"
 
@@ -79,7 +81,7 @@ function useActiveSection() {
 const goToSection = (id: string) =>
   document.getElementById(sectionDomId(id))?.scrollIntoView({ behavior: "smooth", block: "start" })
 
-/** Desktop rail while Settings is open (D13): back, section nav, sign out, user chip. */
+/** Desktop rail while Settings is open (D13): back, section nav, and the same account menu as the app rail. */
 export function JkSettingsRail() {
   const nav = useJkAppNav()
   const active = useActiveSection()
@@ -105,11 +107,8 @@ export function JkSettingsRail() {
           <JkNavRow key={s.id} label={s.label} count={null} tick="var(--plan)" active={active === s.id} onClick={() => goToSection(s.id)} />
         ))}
       </nav>
-      <div className="mt-auto px-[26px] pb-5">
-        <button type="button" onClick={async () => { setCurrentThreadId(null); await signOut() }} className="text-[14px] text-destructive hover:underline">Sign out</button>
-      </div>
-      <div className="mx-[18px] shrink-0 border-t border-border pb-[22px] pt-[21px]">
-        <span className="block pl-[6px] pr-[3px]"><JkUserChipBody /></span>
+      <div className="mx-[18px] mt-auto shrink-0 border-t border-border pb-[22px] pt-[21px]">
+        <JkUserMenu />
       </div>
     </div>
   )
@@ -397,7 +396,7 @@ export default function JkCW_SettingsMode() {
             <div className="flex h-14 items-center gap-3 rounded-[16px] border border-input bg-card pl-[18px] pr-3">
               <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground">{maskKey(extensionApiKey.key)}</code>
               <button type="button" aria-label="Copy extension key" onClick={() => copy(extensionApiKey.key, "Extension key")} className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><Copy className="size-4" /></button>
-              <button type="button" disabled={busy === "extr"} onClick={async () => { setBusy("extr"); try { await revokeApiKey() } finally { setBusy(null) } }} className="px-2 text-[12.5px] text-subtle-foreground hover:text-destructive">Revoke</button>
+              <JkConfirmText disabled={busy === "extr"} onConfirm={async () => { setBusy("extr"); try { await revokeApiKey() } finally { setBusy(null) } }} className="px-2 text-[12.5px] text-subtle-foreground hover:text-destructive">Revoke</JkConfirmText>
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-dashed border-input px-[18px] py-4">
@@ -436,8 +435,8 @@ export default function JkCW_SettingsMode() {
                   <span className="text-[12.5px] text-muted-foreground max-lg:col-start-2 max-lg:row-start-2 max-lg:mt-0.5 max-lg:text-[14px]">
                     <span className="max-lg:hidden">created {fmtDay(k.createdAt)} · </span>{fmtUsed(k.lastUsedAt)}
                   </span>
-                  <button type="button" disabled={busy === k._id} onClick={async () => { setBusy(k._id); try { await revokeCliKey({ id: k._id as Id<"agentApiKeys"> }) } finally { setBusy(null) } }}
-                    className="text-[12.5px] text-subtle-foreground transition-colors hover:text-destructive max-lg:col-start-3 max-lg:row-span-2 max-lg:row-start-1 max-lg:text-[14px]">Revoke</button>
+                  <JkConfirmText disabled={busy === k._id} onConfirm={async () => { setBusy(k._id); try { await revokeCliKey({ id: k._id as Id<"agentApiKeys"> }) } finally { setBusy(null) } }}
+                    className="text-[12.5px] text-subtle-foreground transition-colors hover:text-destructive max-lg:col-start-3 max-lg:row-span-2 max-lg:row-start-1 max-lg:text-[14px]">Revoke</JkConfirmText>
                 </li>
               ))}
             </ul>
@@ -447,7 +446,7 @@ export default function JkCW_SettingsMode() {
           <Button variant="outline" className="mt-7 h-12 w-full text-[16px] lg:hidden" onClick={() => rank < RANK_PRO ? setUpgrade({ feature: "jk CLI" }) : setCliOpen(true)}>New key</Button>
         </JkSettingsSection>
 
-        <button type="button" onClick={async () => { setCurrentThreadId(null); await signOut() }} className="mt-6 text-[16px] text-destructive hover:underline lg:hidden">Sign out</button>
+        <JkSignOutButton className="mt-6 text-[16px] hover:underline lg:hidden" onConfirm={async () => { setCurrentThreadId(null); await signOut() }} />
       </div>
 
       <JkUpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} feature={upgrade?.feature ?? ""} requiredPlan={upgrade?.requiredPlan} />

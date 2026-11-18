@@ -5,7 +5,8 @@
  *
  *   <JkAppMobileHeader onBack={…} onMenu={…} extra={…} />   sticky 56px bar: logo (or back arrow on
  *        sub-screens), short title + real count, search, menu. `extra` adds a control before search.
- *   <JkAppMobileMenu open onClose />                           full-screen menu (M10), circle reveal from the menu button.
+ *   <JkAppMobileMenu open onClose />                           menu (M10), circle reveal from the menu button. Full screen on
+ *        phones; from 640px it is a 440px panel on the right over a dimmed page, so it never sits as a thin column in a wide void.
  *   <JkAppTabBar onMore />                                     bottom tabs Jobs / Docs / Chat / More.
  *
  * The shell (jkConsole.tsx) sets --jk-tabbar-h on its root so fixed bottom UI (chat input,
@@ -15,17 +16,19 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronLeft, Search } from "lucide-react";
+import { BriefcaseBusiness, ChevronLeft, FileText, LayoutGrid, MessageCircle, Search, type LucideIcon } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { mainAssets } from "@/app/lib/constants";
 import { useAuth } from "@/providers/jkAuthProvider";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import { cn } from "@/lib/utils";
 import JkThemeSwitch from "../jkThemeSwitch";
+import JkSignOutButton from "../jkSignOutButton";
 import { JkNavRow, JkUserChipBody } from "../jkSIdebar";
 import { JK_TABS, JK_TOP_LEVEL, useJkAppNav } from "./jkAppNav";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+const TAB_ICON: Record<string, LucideIcon> = { "/my-jobs": BriefcaseBusiness, "/documents": FileText, "/chat": MessageCircle, more: LayoutGrid };
 
 export function JkAppMobileHeader({ onBack, onMenu, onSearch, extra, menuOpen }: {
   onBack: () => void;
@@ -116,17 +119,30 @@ export function JkAppMobileMenu({ open, onClose }: { open: boolean; onClose: () 
     <AnimatePresence>
       {open && (
         <motion.div
+          key="scrim"
+          aria-hidden
+          onClick={onClose}
+          className="fixed inset-0 z-[59] hidden bg-scrim sm:block lg:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+      {open && (
+        <motion.div
+          key="menu"
           id="jk-app-menu"
           role="dialog"
           aria-modal="true"
           aria-label="Menu"
-          className="fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-card lg:hidden"
+          className="fixed inset-y-0 right-0 z-[60] flex w-full flex-col overflow-y-auto bg-card sm:w-[440px] sm:border-l sm:border-border sm:shadow-2xl lg:hidden"
           initial={reduce ? { opacity: 0 } : { clipPath: from }}
           animate={reduce ? { opacity: 1 } : { clipPath: to }}
           exit={reduce ? { opacity: 0 } : { clipPath: from }}
           transition={{ duration: reduce ? 0.2 : 0.6, ease: EASE }}
         >
-          <div className="mx-auto flex w-full max-w-[560px] flex-1 flex-col px-5 pb-[max(24px,env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
+          <div className="flex w-full flex-1 flex-col px-5 pb-[max(24px,env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] sm:px-7">
             <div className="flex h-14 shrink-0 items-center justify-between">
               <Link href="/" onClick={onClose} className="flex items-center gap-2">
                 <Image src={mainAssets.logo} alt="" width={32} height={30} className="h-[30px] w-8 object-contain" />
@@ -153,7 +169,6 @@ export function JkAppMobileMenu({ open, onClose }: { open: boolean; onClose: () 
             <motion.div {...rise(6)} className="border-t border-border pb-6 pt-3.5">
               <button type="button" className={secondary} onClick={() => go("/settings")}>Settings</button>
               <button type="button" className={secondary} onClick={() => go("/help")}>Help & Guides</button>
-              <button type="button" className={secondary} onClick={() => go("/leads")}>Job leads</button>
               <Link href="/" onClick={onClose} className={secondary}>Landing page</Link>
             </motion.div>
 
@@ -164,9 +179,7 @@ export function JkAppMobileMenu({ open, onClose }: { open: boolean; onClose: () 
                     <JkUserChipBody size="lg" />
                   </button>
                   <div className="mt-5 flex items-center justify-between">
-                    <button type="button" onClick={async () => { onClose(); setCurrentThreadId(null); await signOut(); }} className="text-[14px] text-destructive hover:underline">
-                      Sign out
-                    </button>
+                    <JkSignOutButton className="text-[14px] hover:underline" onConfirm={async () => { onClose(); setCurrentThreadId(null); await signOut(); }} />
                     <JkThemeSwitch />
                   </div>
                 </>
@@ -188,11 +201,13 @@ export function JkAppTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpen
   const nav = useJkAppNav();
   const { setCurrentThreadId } = useJobKompassChatWindow();
   const inTabs = JK_TABS.some((t) => t.id === nav.currentId);
+  const reduce = useReducedMotion();
   return (
     <nav aria-label="Tabs" className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <ul className="mx-auto grid h-[60px] max-w-[640px] grid-cols-4">
+      <ul className="mx-auto grid h-[60px] max-w-[520px] grid-cols-4">
         {JK_TABS.map((t) => {
           const on = t.id === "more" ? moreOpen || !inTabs : nav.currentId === t.id;
+          const Icon = TAB_ICON[t.id];
           return (
             <li key={t.id}>
               <button
@@ -203,9 +218,12 @@ export function JkAppTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpen
                   if (t.id === "/chat" && nav.currentId === "/chat") setCurrentThreadId(null);
                   nav.go(t.id);
                 }}
-                className={cn("relative flex h-full w-full flex-col items-center pt-[29px] text-[13.5px] leading-4 transition-colors", on ? "font-semibold text-foreground" : "text-subtle-foreground hover:text-muted-foreground")}
+                className={cn("flex h-full w-full flex-col items-center justify-center gap-[3px] text-[11.5px] leading-[14px] transition-colors", on ? "font-semibold text-foreground" : "text-subtle-foreground hover:text-muted-foreground")}
               >
-                <span aria-hidden className={cn("absolute top-3.5 h-[3px] w-[18px] rounded-full transition-opacity duration-300", on ? "opacity-100" : "opacity-0")} style={{ background: t.tick }} />
+                <span className="relative flex h-[30px] w-[58px] items-center justify-center">
+                  {on && <motion.span layoutId="jk-tab-pill" aria-hidden className="absolute inset-0 rounded-full bg-accent" transition={{ duration: reduce ? 0 : 0.35, ease: EASE }} />}
+                  <Icon aria-hidden className="relative size-[19px]" strokeWidth={on ? 2 : 1.7} />
+                </span>
                 {t.label}
               </button>
             </li>

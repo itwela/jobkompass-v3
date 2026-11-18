@@ -6,6 +6,7 @@
  * rows that edit in place and Write resume / Prep at the bottom.
  * Opens when useJobs().selectedJobId is set.
  */
+import { JkConfirmButton } from "../jkConfirm";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft } from "lucide-react";
 import { useMutation } from "convex/react";
@@ -162,14 +163,8 @@ export default function JkJobExpanded({ onWriteResume, onPrep }: { onWriteResume
   const f = form;
   const date = job ? appliedDate(job.dateApplied) : null;
 
-  const deleteBtn = confirmDelete ? (
-    <span className="flex items-center gap-2">
-      <span className="text-[13.5px] text-muted-foreground">Delete this job?</span>
-      <Button variant="destructive" className="h-10 px-5 text-[13.5px]" onClick={remove}>Delete</Button>
-      <Button variant="ghost" className="h-10 px-4 text-[13.5px]" onClick={() => setConfirmDelete(false)}>Keep</Button>
-    </span>
-  ) : (
-    <Button variant="destructive" className="h-10 px-[22px] text-[13.5px]" onClick={() => setConfirmDelete(true)}>Delete job</Button>
+  const deleteBtn = (
+    <JkConfirmButton variant="destructive" className="h-10 px-[22px] text-[13.5px]" onConfirm={remove} busyLabel="Deleting…">Delete job</JkConfirmButton>
   );
 
   return (

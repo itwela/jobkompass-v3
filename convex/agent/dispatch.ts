@@ -3,6 +3,22 @@ import { httpAction } from "../_generated/server";
 import { AgentError, authenticate } from "./auth";
 import { agentRoutes, type AgentRoute, type ParamSpec } from "./routes";
 import { RANK_PRO } from "../plans";
+import { QUESTIONS_RULE } from "./resumeQuestions";
+
+/** Taught to every agent via GET /agent/schema. */
+const RESUME_QUESTIONS_WORKFLOW = {
+  rule: QUESTIONS_RULE,
+  why: "Strong bullets carry numbers and state results, not duties. Only the human knows their numbers.",
+  steps: [
+    "Optional, before writing: GET /agent/resumes/questions?id=<base resume>[&jobId=<job>] (jk resumes questions). Ask your human each question.",
+    "POST /agent/resumes/answers {id, answers:[{id, answer}]} (jk resumes answer) with ONLY what the human said. Saved on the base resume as bulletAnswers; GET /agent/resumes/get shows them.",
+    "Write the resume yourself using those answers, then POST /agent/resumes/generate (jk resumes add). The response carries questions + scorecard for bullets still missing a number: relay them, save answers, then PATCH /agent/resumes/content (jk resumes update) to fold them in.",
+    "Or let the server write it: POST /agent/resumes/tailor {base, jobId} (jk resumes tailor) uses the saved answers and returns the new resume plus remaining questions.",
+  ],
+  question: "{id, section: experience|projects, index, bullet, question, example?} — example is a made-up placeholder in the right unit, never a fact",
+  scorecard: "{bullets, quantified, dutyStyle, quantifiedPct, mustHaves?: {met, total, missing}} — mustHaves only when a jobId is given",
+  questionSource: "template (built-in, free, default) | ai (aiQuestions/ai=true; model questions about YOUR text, which is never rewritten) | none (every bullet has a number or is answered)",
+};
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -139,6 +155,7 @@ export function registerAgentRoutes(http: HttpRouter): void {
           envelope: "{ ok: true, data } | { ok: false, error: { code, message, hint } }",
           auth: "Authorization: Bearer <key>",
           routes: agentRoutes.map(({ fn: _fn, ...rest }) => rest),
+          workflows: { resumeQuestions: RESUME_QUESTIONS_WORKFLOW },
         });
       } catch (err) {
         if (err instanceof AgentError) return fail(err.status, err.code, err.message, err.hint);

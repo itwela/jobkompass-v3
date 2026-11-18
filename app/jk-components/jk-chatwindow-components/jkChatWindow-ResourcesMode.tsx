@@ -6,7 +6,7 @@
  * counts; the search field filters title, URL, notes and tags.
  */
 import { useMemo, useState } from "react";
-import { Search, Link2, MoreVertical, ExternalLink, Pencil, Trash2, X } from "lucide-react";
+import { Check, Copy, Search, Link2, MoreVertical, ExternalLink, Pencil, Trash2, X } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { useResources, type JkResource, type JkResourceInput } from "@/providers/jkResourcesProvider";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import JkAppPageHeader from "../jk-app/jkAppPageHeader";
 import JkArt from "../jkArt";
 import { JkField, jkFieldCls, JkFormError } from "../jkField";
-import JkConfirmDelete from "../jkConfirmDelete";
+import { JkConfirmMenuItem } from "../jkConfirm";
 import { cn } from "@/lib/utils";
 
 /** Categories in the frame's order. `tone` is the CSS colour of the dot, tag edge and monogram. */
@@ -42,8 +42,8 @@ const hrefOf = (url: string) => (/^[a-z]+:\/\//i.test(url) ? url : `https://${ur
 // A hand-hung row: each tag sits a touch off level. Cycles so neighbours never match.
 const TILT = [-1.1, 0.7, -0.4, 0.9, -0.7, 0.4, -0.9, 1.1, 0.5];
 
-function JkLinkTag({ resource, index, onEdit, onDelete }: {
-  resource: JkResource; index: number; onEdit: () => void; onDelete: () => void;
+function JkLinkTag({ resource, index, onOpen, onEdit, onDelete }: {
+  resource: JkResource; index: number; onOpen: () => void; onEdit: () => void; onDelete: () => void | Promise<void>;
 }) {
   const cat = categoryOf(resource.category);
   const initial = (resource.title || resource.url || "?").trim().charAt(0).toUpperCase();
@@ -63,6 +63,8 @@ function JkLinkTag({ resource, index, onEdit, onDelete }: {
         {/* border then surface, same outline */}
         <div className="relative h-full bg-border-strong p-px" style={{ clipPath: tag }}>
           <div className="relative flex h-full min-h-[203px] flex-col bg-popover pb-6 pl-[54px] pr-9 pt-[33px] sm:min-h-[203px]" style={{ clipPath: tag }}>
+            {/* The whole tag opens the reader; the link and the menu sit above it. */}
+            <button type="button" onClick={onOpen} aria-label={`Read ${resource.title || "this note"}`} className="absolute inset-0 z-0 cursor-pointer focus-visible:outline-none" />
             {/* coloured right edge */}
             <span aria-hidden className="absolute inset-y-0 right-0 w-[7px]" style={{ background: cat.tone }} />
 
@@ -83,7 +85,7 @@ function JkLinkTag({ resource, index, onEdit, onDelete }: {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" aria-label={`Options for ${resource.title}`} className="-mr-3 -mt-3 flex size-8 items-center justify-center rounded-full text-subtle-foreground transition-colors hover:bg-accent hover:text-foreground">
+                  <button type="button" aria-label={`Options for ${resource.title}`} className="relative z-10 -mr-3 -mt-3 flex size-8 items-center justify-center rounded-full text-subtle-foreground transition-colors hover:bg-accent hover:text-foreground">
                     <MoreVertical className="size-4" />
                   </button>
                 </DropdownMenuTrigger>
@@ -94,7 +96,7 @@ function JkLinkTag({ resource, index, onEdit, onDelete }: {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem onSelect={onEdit}><Pencil className="size-4" />Edit</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive"><Trash2 className="size-4" />Delete</DropdownMenuItem>
+                  <JkConfirmMenuItem onConfirm={onDelete}><Trash2 className="size-4" />Delete</JkConfirmMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -102,7 +104,7 @@ function JkLinkTag({ resource, index, onEdit, onDelete }: {
             <div aria-hidden className="mb-4 mt-[13px] border-t border-dashed border-input" />
 
             {resource.url ? (
-              <a href={hrefOf(resource.url)} target="_blank" rel="noopener noreferrer" className="flex min-w-0 items-center gap-2 font-mono text-[11.5px] leading-[18px] text-bar-4-ink hover:underline">
+              <a href={hrefOf(resource.url)} target="_blank" rel="noopener noreferrer" className="relative z-10 flex min-w-0 max-w-full items-center gap-2 self-start font-mono text-[11.5px] leading-[18px] text-bar-4-ink hover:underline">
                 <Link2 className="size-3.5 shrink-0 -rotate-45 text-subtle-foreground" />
                 <span className="truncate">{jkShortUrl(resource.url)}</span>
               </a>
@@ -112,7 +114,7 @@ function JkLinkTag({ resource, index, onEdit, onDelete }: {
               </p>
             )}
             {resource.description && (
-              <p className="mt-2.5 line-clamp-3 whitespace-pre-line text-[13.5px] leading-[22px] text-muted-foreground">{resource.description}</p>
+              <p className="pointer-events-none mt-2.5 line-clamp-3 whitespace-pre-line [overflow-wrap:anywhere] text-[13.5px] leading-[22px] text-muted-foreground">{resource.description}</p>
             )}
           </div>
         </div>
@@ -124,6 +126,46 @@ function JkLinkTag({ resource, index, onEdit, onDelete }: {
         </span>
       </div>
     </div>
+  );
+}
+
+/** Read a saved link or note in full, copy it, or go on to edit it. */
+function JkLinkReader({ resource, onClose, onEdit }: { resource: JkResource | null; onClose: () => void; onEdit: () => void }) {
+  const [copied, setCopied] = useState(false);
+  if (!resource) return null;
+  const cat = categoryOf(resource.category);
+  const text = resource.description || resource.url || "";
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setCopied(true); window.setTimeout(() => setCopied(false), 1800); } catch {}
+  };
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="flex max-h-[85dvh] max-w-[560px] flex-col gap-0 rounded-3xl border-border bg-card p-0">
+        <DialogHeader className="px-6 pb-4 pt-6 text-left sm:px-7">
+          <p className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[1.2px] text-muted-foreground">
+            <span aria-hidden className="size-2 rounded-full" style={{ background: cat.tone }} />{cat.label}
+          </p>
+          <DialogTitle className="mt-1 pr-6 text-[22px] font-medium leading-[27px] tracking-[-0.3px]">{resource.title || jkShortUrl(resource.url ?? "") || "Untitled"}</DialogTitle>
+          <DialogDescription className="sr-only">Saved link or note</DialogDescription>
+          {resource.url && (
+            <a href={hrefOf(resource.url)} target="_blank" rel="noopener noreferrer" className="mt-2 flex min-w-0 items-center gap-2 font-mono text-[12px] leading-[18px] text-bar-4-ink hover:underline">
+              <ExternalLink className="size-3.5 shrink-0 text-subtle-foreground" /><span className="truncate">{jkShortUrl(resource.url)}</span>
+            </a>
+          )}
+        </DialogHeader>
+        {resource.description && (
+          <div className="chat-scroll min-h-0 flex-1 overflow-y-auto border-t border-border px-6 py-5 sm:px-7">
+            <p className="whitespace-pre-line break-words text-[15px] leading-[25px] text-foreground">{resource.description}</p>
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-2 border-t border-border px-6 py-4 sm:px-7">
+          <Button type="button" variant="outline" className="h-10 gap-2 px-5" onClick={copy} disabled={!text}>
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}{copied ? "Copied" : resource.description ? "Copy note" : "Copy link"}
+          </Button>
+          <Button type="button" variant="outline" className="h-10 gap-2 px-5" onClick={onEdit}><Pencil className="size-4" />Edit</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -209,6 +251,8 @@ export default function JkCW_ResourcesMode() {
   } = useResources();
   const [sheet, setSheet] = useState<{ id: Id<"resources"> | null; initial: JkResourceInput | null } | null>(null);
   const [deleting, setDeleting] = useState<JkResource | null>(null);
+  const [reading, setReading] = useState<JkResource | null>(null);
+  const edit = (r: JkResource) => setSheet({ id: r._id, initial: { title: r.title, url: r.url ?? "", description: r.description ?? "", category: r.category ?? "" } });
   const [busy, setBusy] = useState(false);
 
   const chips = useMemo(() => JK_LINK_CATEGORIES
@@ -298,8 +342,9 @@ export default function JkCW_ResourcesMode() {
                 key={r._id}
                 resource={r}
                 index={i}
-                onEdit={() => setSheet({ id: r._id, initial: { title: r.title, url: r.url ?? "", description: r.description ?? "", category: r.category ?? "" } })}
-                onDelete={() => setDeleting(r)}
+                onOpen={() => setReading(r)}
+                onEdit={() => edit(r)}
+                onDelete={() => handleDelete(r._id)}
               />
             ))}
           </div>
@@ -313,6 +358,8 @@ export default function JkCW_ResourcesMode() {
         onClick={() => setSheet({ id: null, initial: null })}
       >Add link</Button>
 
+      <JkLinkReader resource={reading} onClose={() => setReading(null)} onEdit={() => { const r = reading; setReading(null); if (r) edit(r); }} />
+
       <JkLinkSheet
         open={sheet !== null}
         initial={sheet?.initial ?? null}
@@ -323,18 +370,6 @@ export default function JkCW_ResourcesMode() {
         }}
       />
 
-      <Dialog open={deleting !== null} onOpenChange={(o) => { if (!o) setDeleting(null); }}>
-        <DialogContent className="max-w-[420px] rounded-3xl border-border bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-[20px] font-medium">Delete {deleting?.title || "this link"}?</DialogTitle>
-          </DialogHeader>
-          <JkConfirmDelete
-            onConfirm={async () => { if (!deleting) return; setBusy(true); await handleDelete(deleting._id); setBusy(false); setDeleting(null); }}
-            onCancel={() => setDeleting(null)}
-            isLoading={busy}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

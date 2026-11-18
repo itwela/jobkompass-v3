@@ -1,5 +1,6 @@
 'use client'
 
+import JkSignOutButton from "./jkSignOutButton"
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -121,7 +122,7 @@ export default function JkPublicHeader({
 
           {isAuthenticated && user ? (
             <>
-              {showPricing && (
+              {showPricing && !showNav && (
                 <Link href="/pricing" className="max-sm:hidden">
                   <Button variant="ghost" size="sm">
                     Pricing
@@ -173,16 +174,7 @@ export default function JkPublicHeader({
                         <span className="text-sm font-medium">Pricing</span>
                       </motion.div>
                     </Link>
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      onClick={handleSignOut}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-t border-border"
-                    >
-                      <LogOut className="h-4 w-4 text-destructive" />
-                      <span className="text-sm font-medium text-destructive">Sign out</span>
-                    </motion.div>
+                    <JkSignOutButton icon onConfirm={handleSignOut} className="flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-accent" />
                   </div>
                 </PopoverContent>
               </Popover>

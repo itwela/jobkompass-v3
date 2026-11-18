@@ -1,5 +1,6 @@
 'use client'
 
+import { JkConfirmMenuItem } from "../jkConfirm";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { ChevronLeft, ChevronRight, MoreVertical, Plus, Trash2, ArrowUp, ArrowDown, X } from "lucide-react";
@@ -279,7 +280,7 @@ function ListSection({ tab, content, update, item, onItem, resumeName }: { tab: 
             <DropdownMenuItem disabled={i === 0} onClick={() => move(i - 1)}><ArrowUp className="size-4" />Move up</DropdownMenuItem>
             <DropdownMenuItem disabled={i === list.length - 1} onClick={() => move(i + 1)}><ArrowDown className="size-4" />Move down</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={remove}><Trash2 className="size-4" />Delete this {singular(tab)}</DropdownMenuItem>
+            <JkConfirmMenuItem onConfirm={remove}><Trash2 className="size-4" />Delete this {singular(tab)}</JkConfirmMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

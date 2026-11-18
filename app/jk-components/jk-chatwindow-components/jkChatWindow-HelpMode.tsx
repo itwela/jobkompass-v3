@@ -5,7 +5,6 @@
  * Phone: search, group chips, the open guide, then "More guides" and Contact.
  */
 import { useState } from "react";
-import Image from "next/image";
 import { Search, ChevronRight } from "lucide-react";
 import { useHelp, HELP_GROUPS, helpReadMinutes, type HelpGuide, type HelpGroup, type HelpVisual } from "@/providers/jkHelpProvider";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
@@ -14,6 +13,8 @@ import JkAppPageHeader from "../jk-app/jkAppPageHeader";
 import JkSectionLabel from "../jk-app/jkSectionLabel";
 import { cn } from "@/lib/utils";
 
+import JkResumePage from "../jk-onboarding/jkResumePage";
+import type { ResumeContent } from "@/lib/resume/types";
 const SUPPORT_EMAIL = "itwela@cavemancreativehq.com";
 const GROUP_TONE: Record<HelpGroup, string> = { Start: "var(--bar-2)", Documents: "var(--bar-3)", Automation: "var(--bar-4)" };
 const STEP_TONE = ["var(--bar-1)", "var(--bar-2)", "var(--bar-3)", "var(--bar-4)"];
@@ -39,24 +40,36 @@ function Callout({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A made-up person's resume for the "What you get" picture. */
+const HELP_RESUME = {
+  personalInfo: { firstName: "Jordan", lastName: "Avery", email: "jordan@example.com", location: "Atlanta, GA", linkedin: "linkedin.com/in/jordan-avery", summary: "Backend developer applying for Platform Engineer. Builds the APIs and internal tools a logistics team runs on every day." },
+  skills: { technical: ["Python", "FastAPI", "PostgreSQL", "AWS", "React"], additional: [] },
+  projects: [{ name: "Route Planner", description: "Delivery routing service", details: ["Plans 1,200 daily deliveries across 40 drivers", "Cut average route time by 18 minutes"] }],
+  experience: [
+    { company: "Northgate Logistics", title: "Software Developer", date: "2024 - Present", details: ["Built the backend API for the driver mobile app in Python and FastAPI", "Built a React dashboard dispatchers use to assign deliveries"] },
+    { company: "Peachtree Dental Group", title: "IT Support Specialist", date: "2022 - 2024", details: ["Wrote Python scripts that send patient appointment reminders"] },
+  ],
+  education: [{ name: "State University", degree: "B.S. Computer Science", startDate: "2018", endDate: "2022" }],
+} as unknown as ResumeContent;
+
 /** "What you get": a picture of the result each guide leads to. */
-function JkHelpVisual({ kind }: { kind: HelpVisual }) {
+export function JkHelpVisual({ kind }: { kind: HelpVisual }) {
+  // The real page component with a sample resume, so the marked passages are the ones the notes name.
   const page = (
-    <div className="relative aspect-[186/294] w-[186px] shrink-0 overflow-hidden rounded-[4px] shadow-lg">
-      <Image src="/images/jobkompass_preview_resume_jake.png" alt="A resume in the Jake template" fill sizes="186px" className="object-cover object-top" />
-      {kind === "tailored" && [ [10, 13], [22, 11], [32, 14] ].map(([top, h]) => (
-        <span key={top} aria-hidden className="absolute inset-x-[6%] bg-bar-3/15" style={{ top: `${top}%`, height: `${h}%` }}>
-          <span className="absolute -right-[6px] top-1/4 h-1/2 w-[3px] bg-bar-3" />
-        </span>
-      ))}
-    </div>
+    <JkResumePage
+      content={HELP_RESUME}
+      template={kind === "tailored" ? undefined : "jake"}
+      marks={kind === "tailored" ? { summary: true, skills: true, experience: [], projects: [0] } : undefined}
+      width={186}
+      height={294}
+    />
   );
   let body: React.ReactNode;
   if (kind === "tailored") {
     body = (
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         {page}
-        <div className="flex flex-col gap-1.5 pt-3">
+        <div className="flex flex-col gap-1.5">
           <Callout>Summary leads with the role</Callout>
           <Callout>Skills ordered for the posting</Callout>
           <Callout>Best project on top</Callout>

@@ -1,5 +1,6 @@
 import JkArt from "../jkArt";
 import { CLI_AGENTS } from "./jkLandingAgents";
+import JkCopyAgentPrompt from "./jkCopyAgentPrompt";
 import { CLI_NOTES, CLI_STEPS } from "./jkLandingData";
 import { LandingContainer, Reveal, SectionHeading } from "./jkLandingShell";
 
@@ -113,6 +114,7 @@ function AgentRow() {
           </li>
         ))}
       </ul>
+      <JkCopyAgentPrompt />
     </Reveal>
   );
 }

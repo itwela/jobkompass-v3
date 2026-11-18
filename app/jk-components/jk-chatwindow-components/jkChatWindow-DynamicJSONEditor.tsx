@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Lock, X } from "lucide-react";
+import { Loader2, Lock, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import type { ResumeContent } from "@/lib/resume/types";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useJobs } from "@/providers/jkJobsProvider";
-import JkResumePage from "../jk-onboarding/jkResumePage";
+import JkResumePage, { type JkResumeTemplate } from "../jk-onboarding/jkResumePage";
 import JkResumeSectionEditor, { focusFor, resumeTabs, type JkResumeTab } from "../jk-documents/jkResumeSectionEditor";
 import { JkEditorTopBar, JkSavePill, type JkSaveState } from "../jk-documents/jkEditorTopBar";
 import { hasRenderableResume } from "../jk-documents/jkDocThumb";
@@ -196,25 +196,31 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
     const switchTemplate = async (next: string) => {
         if (next === template || switching) return;
         if (rank < resumeTemplateMinRank(next)) { setUpgradeFor(next); return; }
+        // Show the new layout and a spinner at once; the PDF is rebuilt behind it. Put it back if that fails.
+        const previous = template;
         setSwitching(next);
+        setTemplate(next);
+        setSaveState("saving");
+        const revert = () => { setTemplate(previous); setSaveState("saved"); };
         try {
             // The switch route re-renders the stored content, so store the latest first.
             const ok = await flush();
-            if (!ok) return;
+            if (!ok) { revert(); return; }
             const res = await fetch("/api/resume/switch-template", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ resumeId, templateId: next }),
             });
-            if (res.status === 402) { setUpgradeFor(next); return; }
+            if (res.status === 402) { revert(); setUpgradeFor(next); return; }
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body.message || body.error || "Template switch failed");
             }
-            setTemplate(next);
             setPages(null);
             setSaveState("saved");
+            toast.success(`Switched to ${templateShortName(RESUME_TEMPLATES.find((t) => t.id === next)?.name) ?? "the new"} template`, { description: "Your PDF was rebuilt in this layout.", position: TOAST_AT });
         } catch (error) {
+            revert();
             toast.error("Couldn't switch the template", { description: error instanceof Error ? error.message : undefined, position: TOAST_AT });
         } finally {
             setSwitching(null);
@@ -334,7 +340,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
 
                 {/* Right: live page with the section being edited highlighted */}
                 <aside aria-label="Preview" className="jk-enter hidden min-w-0 flex-col bg-card xl:flex xl:min-h-0" style={{ "--i": 2 } as React.CSSProperties}>
-                    <JkLivePreview content={content} focus={focus} pages={pages} />
+                    <JkLivePreview content={content} focus={focus} pages={pages} template={template as JkResumeTemplate} />
                 </aside>
             </div>
 
@@ -352,7 +358,7 @@ export default function JkCW_DynamicJSONEditor({ resumeId, onClose }: DynamicJSO
                         <button type="button" aria-label="Close preview" onClick={() => setShowPreview(false)} className="flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><X className="size-5" /></button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-5">
-                        <JkFitPage content={content} focus={focus} />
+                        <JkFitPage content={content} focus={focus} template={template as JkResumeTemplate} />
                     </div>
                     <div className="flex gap-2 border-t border-border bg-card px-5 py-3.5">
                         <Button onClick={() => void download()} disabled={isDownloading} className="h-11 flex-1 text-[15px]">{isDownloading ? "Preparing…" : "Download PDF"}</Button>
@@ -393,22 +399,24 @@ function JkTemplateRow({ template, rank, switching, pages, onPick }: { template:
                             className={cn(
                                 "flex h-11 items-center gap-1.5 rounded-full border px-6 text-[15px] font-medium transition-colors disabled:cursor-wait lg:h-7 lg:px-4 lg:text-[12.5px]",
                                 active ? "border-plan bg-accent text-foreground" : "border-input text-muted-foreground hover:text-foreground",
-                                switching === t.id && "animate-pulse",
+                                switching !== null && switching !== t.id && "opacity-50",
                             )}
                         >
+                            {switching === t.id && <Loader2 aria-hidden className="size-3.5 animate-spin lg:size-3" />}
                             {templateShortName(t.name)}
                             {locked && <Lock aria-label="Paid plan" className="size-3 text-plan-text" />}
                         </button>
                     );
                 })}
             </div>
+            {switching !== null && <p role="status" className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Rebuilding your PDF…</p>}
             {pages ? <p className="ml-auto font-mono text-[10px] uppercase tracking-[0.12em] text-subtle-foreground lg:hidden">{pages} page{pages === 1 ? "" : "s"}</p> : null}
         </div>
     );
 }
 
 /** D08 preview column: "PREVIEW · PAGE 1 OF N", zoom %, the page scaled to fit. */
-function JkLivePreview({ content, focus, pages }: { content: ResumeContent; focus: ReturnType<typeof focusFor>; pages: number | null }) {
+function JkLivePreview({ content, focus, pages, template }: { content: ResumeContent; focus: ReturnType<typeof focusFor>; pages: number | null; template?: JkResumeTemplate }) {
     const boxRef = useRef<HTMLDivElement | null>(null);
     const [w, setW] = useState(PAGE_W);
     useEffect(() => {
@@ -441,7 +449,7 @@ function JkLivePreview({ content, focus, pages }: { content: ResumeContent; focu
             <div ref={boxRef} className="min-h-0 flex-1">
                 <div ref={scroller} className="flex h-full justify-center overflow-y-auto px-8 pb-8 pt-[17px]">
                     {hasRenderableResume(content) ? (
-                        <JkResumePage content={content} focus={focus} width={w} height="auto" className="shadow-none ring-1 ring-border dark:shadow-[0_24px_60px_var(--scrim)] dark:ring-0" />
+                        <JkResumePage content={content} focus={focus} template={template} width={w} height="auto" className="shadow-none ring-1 ring-border dark:shadow-[0_24px_60px_var(--scrim)] dark:ring-0" />
                     ) : (
                         <p className="mt-20 text-[14px] text-muted-foreground">Fill in the header to see your page.</p>
                     )}
@@ -452,7 +460,7 @@ function JkLivePreview({ content, focus, pages }: { content: ResumeContent; focu
 }
 
 /** Phone preview: the page at the screen's width. */
-function JkFitPage({ content, focus }: { content: ResumeContent; focus: ReturnType<typeof focusFor> }) {
+function JkFitPage({ content, focus, template }: { content: ResumeContent; focus: ReturnType<typeof focusFor>; template?: JkResumeTemplate }) {
     const ref = useRef<HTMLDivElement | null>(null);
     const [w, setW] = useState(340);
     useEffect(() => {
@@ -464,7 +472,7 @@ function JkFitPage({ content, focus }: { content: ResumeContent; focus: ReturnTy
     }, []);
     return (
         <div ref={ref} className="mx-auto w-full max-w-[480px]">
-            <JkResumePage content={content} focus={focus} width={w} height="auto" />
+            <JkResumePage content={content} focus={focus} template={template} width={w} height="auto" />
         </div>
     );
 }

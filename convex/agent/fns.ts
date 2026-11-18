@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { documentsUsedSince } from "../documentCount";
 import { internalMutation, internalQuery, internalAction } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -16,6 +17,16 @@ import {
   trapValidator,
   checklistItemValidator,
 } from "../interviewPreps";
+import type { BulletQuestion } from "../../lib/resume/bulletQuestions";
+import type { ResumeScorecard } from "../../lib/resume/scorecard";
+import {
+  QUESTIONS_RULE,
+  isAnswered,
+  resolveAnswers,
+  scorecardFor,
+  storedToAnswers,
+  templatedQuestions,
+} from "./resumeQuestions";
 
 /**
  * The caller's plan rank, resolved from their subscription row. Used by the
@@ -228,9 +239,7 @@ export const resumesCanGenerate = internalQuery({
       .query("coverLetters")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
-    const used =
-      resumes.filter((r) => r.fileId && r.createdAt >= monthStart).length +
-      coverLetters.filter((c) => c.fileId && c.createdAt >= monthStart).length;
+    const used = documentsUsedSince(resumes, coverLetters, monthStart);
 
     return { allowed: used < limit, limit, used };
   },
@@ -265,6 +274,164 @@ export const resumesInsertGenerated = internalMutation({
   },
 });
 
+// ---- bullet questions (agent path) ----
+
+/** The user's base resume (isActive), or null. Its bulletAnswers are the saved facts. */
+export const baseResumeForUser = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const rows = await ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const base = rows.find((r) => r.isActive === true);
+    if (!base) return null;
+    return { _id: base._id, name: base.name, bulletAnswers: base.bulletAnswers ?? [] };
+  },
+});
+
+type QuestionsBlock = {
+  questions: BulletQuestion[];
+  questionSource: "template" | "ai" | "none";
+  questionsError?: string;
+  scorecard: ResumeScorecard;
+  rule: string;
+};
+
+/**
+ * Questions + scorecard for content the calling agent wrote. Deterministic by
+ * default; `ai` asks the model (rewrite discarded) and falls back to the
+ * templated questions if the model is unavailable. Never changes `content`.
+ */
+async function questionsFor(
+  ctx: any,
+  args: { userId: string; content: any; jobId?: Id<"jobs">; ai?: boolean; answers?: unknown }
+): Promise<QuestionsBlock> {
+  const job: any = args.jobId
+    ? await ctx.runQuery(internal.agent.fns.jobsGet, { userId: args.userId, id: args.jobId })
+    : null;
+  let answers = args.answers;
+  if (answers === undefined) {
+    const base: any = await ctx.runQuery(internal.agent.fns.baseResumeForUser, { userId: args.userId });
+    answers = base?.bulletAnswers ?? [];
+  }
+  const clean = storedToAnswers(answers);
+  const scorecard = scorecardFor(args.content, job);
+  let questions: BulletQuestion[] = [];
+  let questionSource: QuestionsBlock["questionSource"] = "template";
+  let questionsError: string | undefined;
+  if (args.ai) {
+    try {
+      questions = await ctx.runAction(internal.agent.tailor.modelQuestions, {
+        userId: args.userId,
+        content: args.content,
+        company: job?.company,
+        role: job?.title,
+        jobDescription: job?.description,
+        answers: clean,
+      });
+      questionSource = "ai";
+    } catch (err) {
+      questionsError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  if (questionSource !== "ai" || questions.length === 0) {
+    questions = templatedQuestions(args.content, clean);
+    questionSource = "template";
+  }
+  if (questions.length === 0) questionSource = "none";
+  return { questions, questionSource, ...(questionsError ? { questionsError } : {}), scorecard, rule: QUESTIONS_RULE };
+}
+
+/** Saves open questions on the resume so the app can show them too. Best effort. */
+async function savePending(ctx: any, userId: string, resumeId: Id<"resumes">, questions: BulletQuestion[]): Promise<void> {
+  try {
+    await ctx.runMutation(internal.documents.setResumeTailorMetaInternal, {
+      userId,
+      resumeId,
+      pendingQuestions: questions,
+    });
+  } catch (err) {
+    console.warn(`savePending ${resumeId}: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
+/**
+ * Questions for an existing resume, BEFORE generating anything, so an agent can
+ * ask its human first. Answers already saved (on this resume, or on the base it
+ * was tailored from) suppress their questions.
+ */
+export const resumesQuestions = internalAction({
+  args: {
+    userId: v.string(),
+    id: v.id("resumes"),
+    jobId: v.optional(v.id("jobs")),
+    ai: v.optional(v.boolean()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<QuestionsBlock & { resumeId: Id<"resumes">; answersOn: Id<"resumes">; answers: unknown[] }> => {
+    const resume: any = await ctx.runQuery(internal.agent.fns.resumesGet, { userId: args.userId, id: args.id });
+    const answersOn: Id<"resumes"> = resume.tailoredFrom?.baseResumeId ?? resume._id;
+    const holder: any =
+      answersOn === resume._id
+        ? resume
+        : await ctx.runQuery(internal.agent.fns.resumesGet, { userId: args.userId, id: answersOn }).catch(() => resume);
+    const answers = [...(holder.bulletAnswers ?? []), ...(holder === resume ? [] : resume.bulletAnswers ?? [])];
+    const block = await questionsFor(ctx, {
+      userId: args.userId,
+      content: resume.content ?? {},
+      jobId: args.jobId ?? resume.tailoredFrom?.jobId,
+      ai: args.ai,
+      answers,
+    });
+    return { resumeId: resume._id, answersOn: holder._id, answers, ...block };
+  },
+});
+
+/**
+ * Saves the human's answers as facts on the BASE resume. Passing a tailored
+ * resume's id saves onto the base it came from (indices line up: tailoring never
+ * reorders jobs or projects). Each answer is {id, answer} using a question id
+ * from this API, or {section, index, bullet, answer}.
+ */
+export const resumesAnswer = internalAction({
+  args: { userId: v.string(), id: v.id("resumes"), answers: v.any() },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ savedTo: Id<"resumes">; saved: number; unresolved: string[]; bulletAnswers: unknown[] }> => {
+    const resume: any = await ctx.runQuery(internal.agent.fns.resumesGet, { userId: args.userId, id: args.id });
+    if (!Array.isArray(args.answers) || args.answers.length === 0) {
+      throw new AgentError(400, "invalid_param", "answers must be a non-empty JSON array", 'Example: [{"id":"experience-0-abc12","answer":"about 40 tickets a day"}]');
+    }
+    const { answers, unresolved } = resolveAnswers(resume.content ?? {}, args.answers);
+    if (answers.length === 0) {
+      throw new AgentError(
+        400,
+        "invalid_param",
+        `No usable answers${unresolved.length ? ` (unknown question ids: ${unresolved.join(", ")})` : ""}`,
+        "Use ids from 'jk resumes questions --id <same resume>', or pass {section,index,bullet,answer}."
+      );
+    }
+    const target: Id<"resumes"> = resume.tailoredFrom?.baseResumeId ?? resume._id;
+    const result: { bulletAnswers: unknown[] } = await ctx.runMutation(internal.documents.saveBulletAnswersInternal, {
+      userId: args.userId,
+      resumeId: target,
+      answers,
+    });
+    // Answered questions are no longer pending on the resume they were asked about.
+    if (Array.isArray(resume.pendingQuestions) && resume.pendingQuestions.length) {
+      const remaining = resume.pendingQuestions.filter(
+        (q: any) => !isAnswered(answers, q.section, q.index, String(q.bullet ?? ""))
+      );
+      if (remaining.length !== resume.pendingQuestions.length) await savePending(ctx, args.userId, resume._id, remaining);
+    }
+    return { savedTo: target, saved: answers.length, unresolved, bulletAnswers: result.bulletAnswers };
+  },
+});
+
 function formattedTimestamp(): string {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const d = new Date();
@@ -290,8 +457,17 @@ export const resumesGenerate = internalAction({
     additionalInfo: v.optional(v.any()),
     targetCompany: v.optional(v.string()),
     template: v.optional(v.string()),
+    jobId: v.optional(v.id("jobs")),
+    aiQuestions: v.optional(v.boolean()),
+    /** Internal: the tailor action computes its own questions. */
+    skipQuestions: v.optional(v.boolean()),
   },
-  handler: async (ctx, args): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null } & Partial<QuestionsBlock>> => {
+    // Ownership of the job is checked before anything is spent.
+    if (args.jobId) await ctx.runQuery(internal.agent.fns.jobsGet, { userId: args.userId, id: args.jobId });
     const canGenerate = await ctx.runQuery(internal.agent.fns.resumesCanGenerate, { userId: args.userId });
     if (!canGenerate.allowed) {
       throw new AgentError(
@@ -367,7 +543,10 @@ export const resumesGenerate = internalAction({
       template,
     });
 
-    return { id, name, fileUrl };
+    if (args.skipQuestions) return { id, name, fileUrl };
+    const block = await questionsFor(ctx, { userId: args.userId, content, jobId: args.jobId, ai: args.aiQuestions });
+    await savePending(ctx, args.userId, id, block.questions);
+    return { id, name, fileUrl, ...block };
   },
 });
 
@@ -423,13 +602,19 @@ export const resumesUpdateContent = internalAction({
     earlyCareer: v.optional(v.any()),
     additionalInfo: v.optional(v.any()),
     template: v.optional(v.string()),
+    jobId: v.optional(v.id("jobs")),
+    aiQuestions: v.optional(v.boolean()),
   },
-  handler: async (ctx, args): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ id: Id<"resumes">; name: string; fileUrl: string | null } & QuestionsBlock> => {
     const existing: any = await ctx.runQuery(internal.agent.fns.resumesGet, {
       userId: args.userId,
       id: args.id,
     });
     if (!existing) throw new AgentError(404, "not_found", "Resume not found");
+    if (args.jobId) await ctx.runQuery(internal.agent.fns.jobsGet, { userId: args.userId, id: args.jobId });
 
     const prev = existing.content ?? {};
     const pick = <T,>(next: T | undefined, fallback: T): T => (next === undefined ? fallback : next);
@@ -494,7 +679,14 @@ export const resumesUpdateContent = internalAction({
       }
     );
 
-    return { id: result.id, name: result.name, fileUrl };
+    const block = await questionsFor(ctx, {
+      userId: args.userId,
+      content,
+      jobId: args.jobId ?? existing.tailoredFrom?.jobId,
+      ai: args.aiQuestions,
+    });
+    await savePending(ctx, args.userId, result.id, block.questions);
+    return { id: result.id, name: result.name, fileUrl, ...block };
   },
 });
 

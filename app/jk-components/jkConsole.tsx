@@ -53,8 +53,7 @@ export default function JkConsole() {
     }, [allModes, setCurrentMode])
     const closeMenu = useCallback(() => setMenuOpen(false), [])
 
-    // Land in a specific mode on load, e.g. after a redirect like the Gmail
-    // OAuth callback (/app?mode=settings&gmail_connected=1)
+    // Land in a specific mode on load (/app?mode=settings)
     useEffect(() => {
         const modeParam = searchParams.get('mode')
         if (!modeParam) return

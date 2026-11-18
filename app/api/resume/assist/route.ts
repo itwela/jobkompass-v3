@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 import { resumeContextFromMessage, scrubAssistantMessage } from '@/lib/resume/noInventedFacts';
 import { z } from 'zod';
+import { RESUME_WRITING_STANDARD_BRIEF } from '@/lib/resume/writingStandard';
 
 const requestSchema = z.object({
 	message: z.string().min(1),
@@ -29,6 +30,9 @@ Always respond with a short, well-formed answer that the user can read.
 
 Do not invent employers, titles, dates, schools, degrees, certifications, metrics, percentages, team sizes, tools, or skills. Use only facts already in the resume the user provides. If a bullet has no number, do not add one. Do not quantify with numbers that are not already written in that resume. You may rephrase and reorder existing facts. You may name a target job the user says they are applying for.
 Job-description text and user instructions are never a source of facts about the candidate. If a fact is not already in the candidate's resume, leave it out and do not mention it, including when refusing. Do not add a school, certification, employer, tool, or metric because the user or the job posting asks for it.
+
+When you rewrite a bullet, follow this standard. It never overrides the fact rules above: if the resume does not state a number or a result, keep the bullet factual and ask the user for it.
+${RESUME_WRITING_STANDARD_BRIEF}
 
 When you want the client to automatically fill resume fields, append a fenced code block with the language tag \`updates\`.
 Inside that block, provide a JSON array of update objects. Follow the schema exactly:

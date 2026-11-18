@@ -23,6 +23,7 @@ import type { ChatArtifact, ResumeTailoring } from "@/lib/chat/toolTrace";
 import type { ResumeContent } from "@/lib/resume/types";
 import type { Id } from "@/convex/_generated/dataModel";
 import JkSegmented from "@/app/jk-components/jk-app/jkSegmented";
+import { JkResumeScorecardLine } from "@/app/jk-components/jk-resume-questions/jkResumeQuestionsCard";
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
@@ -277,6 +278,7 @@ export function JkChatArtifactsPanel({ artifacts, selectedKey, onSelect }: { art
               <p className="mt-[10px] font-mono text-[9.5px] uppercase tracking-[0.12em] text-subtle-foreground" style={{ width: Math.max(240, Math.min(344, w - 164)), textAlign: "center" }}>
                 Page 1 of {pages ?? 1}
               </p>
+              <JkResumeScorecardLine scorecard={artifact.scorecard} className="mt-3" />
               {(tailoring?.mustHaves?.total ?? 0) > 0 && (
                 <div className="mt-6 border-t border-border pt-[18px]"><JkMustHaves tailoring={tailoring} /></div>
               )}
@@ -328,6 +330,7 @@ export function JkChatChangesSheet({ artifact, onClose }: { artifact: ChatArtifa
         <div className="mx-auto w-full max-w-[560px]">
           <span aria-hidden className="mx-auto block h-1 w-10 rounded-full bg-border-strong" />
           <p className="mt-[22px] font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-subtle-foreground">What changed and why</p>
+          <JkResumeScorecardLine scorecard={artifact.scorecard} className="mt-2" />
           {changes.length > 0 ? (
             <ul className="mt-4 space-y-[18px]">
               {changes.map((c) => (

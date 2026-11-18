@@ -129,8 +129,11 @@ export const agentRoutes: AgentRoute[] = [
       { name: "additionalInfo", type: "json", description: '{"languages"?:[...],"references"?}' },
       { name: "targetCompany", type: "string", description: "Included in the saved resume's name" },
       { name: "template", type: "string", description: 'Template id: "jake" (default), "joseph" or "mar"' },
+      { name: "jobId", type: "string", description: "Saved job this resume targets: adds must-haves to the scorecard and gives --aiQuestions the posting" },
+      { name: "aiQuestions", type: "boolean", description: "true asks the model for sharper questions (slower, rate-limited). Default: built-in questions. The submitted content is never rewritten" },
     ],
-    description: "Generate a resume PDF (template: jake, joseph or mar) and save it to the user's documents",
+    description:
+      "Generate a resume PDF (template: jake, joseph or mar) from the content YOU wrote and save it. Returns {id,name,fileUrl,questions,questionSource,scorecard,rule}: relay questions to your human, never invent the numbers yourself",
   },
   {
     method: "PATCH", path: "/agent/resumes", fn: internal.agent.fns.resumesRename, kind: "mutation",
@@ -163,11 +166,42 @@ export const agentRoutes: AgentRoute[] = [
       { name: "earlyCareer", type: "json", description: "Joseph template only: Array of {title,company,location?,date}" },
       { name: "additionalInfo", type: "json", description: '{"languages"?:[...],"references"?}' },
       { name: "template", type: "string", description: 'Switch template: "jake", "joseph" or "mar"' },
+      { name: "jobId", type: "string", description: "Saved job this resume targets: adds must-haves to the scorecard and gives --aiQuestions the posting" },
+      { name: "aiQuestions", type: "boolean", description: "true asks the model for sharper questions (slower, rate-limited). Default: built-in questions. The submitted content is never rewritten" },
     ],
     description:
-      "Update an existing resume's content in place and regenerate its PDF, keeping the same id, name, label and favorite flag",
+      "Update an existing resume's content in place and regenerate its PDF, keeping the same id, name, label and favorite flag. Returns the same questions/scorecard block as generate",
   },
 
+  {
+    method: "GET", path: "/agent/resumes/questions", fn: internal.agent.fns.resumesQuestions, kind: "action",
+    params: [
+      { name: "id", type: "string", required: true },
+      { name: "jobId", type: "string", description: "Saved job to target (defaults to the job a tailored resume came from)" },
+      { name: "ai", type: "boolean", description: "true asks the model (slower, rate-limited); default is built-in questions" },
+    ],
+    description:
+      "Questions about bullets that lack a number, BEFORE generating. Returns {resumeId,questions:[{id,section,index,bullet,question,example?}],questionSource,scorecard,answers,answersOn,rule}. Ask your human, then POST /agent/resumes/answers",
+  },
+  {
+    method: "POST", path: "/agent/resumes/answers", fn: internal.agent.fns.resumesAnswer, kind: "action",
+    params: [
+      { name: "id", type: "string", required: true, description: "Resume the questions were asked about. A tailored resume's answers are saved on its base" },
+      { name: "answers", type: "json", required: true, description: '[{"id":"<question id>","answer":"..."}] or [{"section":"experience|projects","index":0,"bullet":"...","answer":"..."}]' },
+    ],
+    description:
+      "Save the human's answers as facts on the base resume (bulletAnswers). Every later generate/tailor reuses them. Only save what the human actually said",
+  },
+  {
+    method: "POST", path: "/agent/resumes/tailor", fn: internal.agent.tailor.resumesTailor, kind: "action",
+    params: [
+      { name: "base", type: "string", required: true, description: "Resume to tailor from (usually the base resume); it is not modified" },
+      { name: "jobId", type: "string", required: true, description: "Saved job (its company, title and description drive the tailoring)" },
+      { name: "template", type: "string", description: "jake, joseph or mar (defaults to the base resume's template)" },
+    ],
+    description:
+      "Server-side tailoring: rewrites the base resume for one saved job using the user's saved answers (no invented facts), renders a NEW resume PDF and returns {id,name,fileUrl,resume,questions,scorecard,baseScorecard,model,answersUsed,rule}. Slow (up to a few minutes); costs one document",
+  },
   // ---- cover letters ----
   { method: "GET", path: "/agent/coverletters", fn: internal.agent.fns.coverLettersList, kind: "query", params: [], description: "List cover letters (metadata only)" },
   {

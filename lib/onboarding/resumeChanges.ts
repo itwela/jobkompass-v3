@@ -20,6 +20,8 @@ export interface ResumeMarks {
 const norm = (s: unknown) => (typeof s === "string" ? s.trim().replace(/\s+/g, " ") : "");
 const list = (a: unknown): string[] => (Array.isArray(a) ? a.map(norm).filter(Boolean) : []);
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+// Same bullets in a different order. Anything added, dropped or reworded is a rewrite.
+const reorderedOnly = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join("\n") === [...b].sort().join("\n");
 const skillsOf = (c: Partial<ResumeContent>) => [...list(c.skills?.technical), ...list(c.skills?.additional)];
 
 function joinNames(names: string[]): string {
@@ -55,27 +57,39 @@ export function describeResumeChanges(
   }
 
   const baseExp = base.experience ?? [];
+  let expRewritten = false;
   (tailored.experience ?? []).forEach((job, i) => {
     const before = baseExp[i];
     if (!before) return;
-    if (!same(list(before.details), list(job.details))) marks.experience.push(i);
+    const was = list(before.details);
+    const now = list(job.details);
+    if (same(was, now)) return;
+    marks.experience.push(i);
+    if (!reorderedOnly(was, now)) expRewritten = true;
   });
   if (marks.experience.length) {
     const companies = marks.experience.map((i) => norm(tailored.experience?.[i]?.company)).filter(Boolean).slice(0, 2);
-    changes.push({
-      section: "experience",
-      title: "Experience",
-      note: companies.length ? `The most relevant ${joinNames(companies)} work on top` : "The most relevant work on top",
-    });
+    const note = expRewritten
+      ? companies.length ? `${joinNames(companies)} bullets rewritten for ${target.role}` : `Bullets rewritten for ${target.role}`
+      : companies.length ? `The most relevant ${joinNames(companies)} work on top` : "The most relevant work on top";
+    changes.push({ section: "experience", title: "Experience", note });
   }
 
   const baseProjects = base.projects ?? [];
+  let projRewritten = false;
   (tailored.projects ?? []).forEach((p, i) => {
     const before = baseProjects[i];
     if (!before) return;
-    if (norm(before.description) !== norm(p.description) || !same(list(before.details), list(p.details))) marks.projects.push(i);
+    const descChanged = norm(before.description) !== norm(p.description);
+    const was = list(before.details);
+    const now = list(p.details);
+    if (!descChanged && same(was, now)) return;
+    marks.projects.push(i);
+    if (descChanged || !reorderedOnly(was, now)) projRewritten = true;
   });
-  if (marks.projects.length) changes.push({ section: "projects", title: "Projects", note: "Described for this role" });
+  if (marks.projects.length) {
+    changes.push({ section: "projects", title: "Projects", note: projRewritten ? "Described for this role" : "The most relevant work on top" });
+  }
 
   return { changes, marks };
 }

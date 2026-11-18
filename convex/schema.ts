@@ -31,6 +31,30 @@ const documentsTables = {
     // Set when chat tailored this resume to a saved job: what changed (derived by
     // diffing against the base resume), the marks on the page, and must-haves coverage.
     tailoring: v.optional(tailoringValidator),
+    // Base resume only: the user's answers to bullet questions. Facts reused by every
+    // later tailored resume so the model never has to guess a number.
+    bulletAnswers: v.optional(v.array(v.object({
+      section: v.union(v.literal("experience"), v.literal("projects")),
+      index: v.number(),
+      bullet: v.string(),
+      answer: v.string(),
+      answeredAt: v.number(),
+    }))),
+    // Tailored resume only: which base it came from, and the questions still open.
+    tailoredFrom: v.optional(v.object({
+      baseResumeId: v.id("resumes"),
+      jobId: v.optional(v.id("jobs")),
+    })),
+    pendingQuestions: v.optional(v.array(v.object({
+      id: v.string(),
+      section: v.union(v.literal("experience"), v.literal("projects")),
+      index: v.number(),
+      bullet: v.string(),
+      question: v.string(),
+      example: v.optional(v.string()),
+    }))),
+    // When this resume was rewritten in place by the AI writer. Each is a used document.
+    rerunsAt: v.optional(v.array(v.number())),
   }).index("by_user", ["userId"]).index("by_shareId", ["shareId"]),
   resumeIRs: defineTable({
     userId: v.string(),
@@ -424,6 +448,15 @@ const schema = defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_job", ["jobId"]),
-});
 
+  // "What JobKompass sees" on Performance: the last observations written for a user,
+  // kept with a fingerprint of the numbers they were written from so they are reused
+  // until those numbers change.
+  performanceInsights: defineTable({
+    userId: v.id("users"),
+    factsKey: v.string(),
+    items: v.array(v.object({ headline: v.string(), evidence: v.string(), count: v.optional(v.number()), total: v.optional(v.number()) })),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+});
 export default schema;

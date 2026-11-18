@@ -13,6 +13,8 @@ import {
 } from "@/app/jk-components/jk-onboarding/jkOnboardingSteps";
 import { toDownloadFileName } from "@/lib/downloadFileName";
 import type { ResumeContent } from "@/lib/resume/types";
+import JkResumeQuestionsCard, { JkResumeScorecardLine } from "@/app/jk-components/jk-resume-questions/jkResumeQuestionsCard";
+import { usableQuestions, usableScorecard, type BulletQuestion, type ResumeScorecard } from "@/app/jk-components/jk-resume-questions/types";
 
 const ART = { 1: "papers", 2: "chart", 3: "signal" } as const;
 const FOOTNOTE = { 1: "PDF or plain text · you can edit everything later", 2: "Works with any job board or company careers page", 3: undefined } as const;
@@ -27,7 +29,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [base, setBase] = useState<OnbBase | null>(null);
   const [job, setJob] = useState<OnbJob | null>(null);
-  const [result, setResult] = useState<OnbResult | null>(null);
+  // The tailor route also returns questions about bullets missing a number, and a scorecard.
+  const [result, setResult] = useState<(OnbResult & { questions?: BulletQuestion[]; scorecard?: ResumeScorecard | null }) | null>(null);
   const [tailorError, setTailorError] = useState<{ text: string; code?: string } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const tailoring = useRef<string | null>(null);
@@ -52,7 +55,7 @@ export default function OnboardingPage() {
       const res = await fetch("/api/onboarding/tailor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: forJob.jobId }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error(data.error || "The resume could not be written this time."), { code: data.code });
-      setResult(data as OnbResult);
+      setResult({ ...(data as OnbResult), questions: usableQuestions(data.questions), scorecard: usableScorecard(data.scorecard) });
     } catch (e) {
       const err = e as Error & { code?: string };
       setTailorError({ text: err.message || "Could not reach JobKompass.", code: err.code });
@@ -68,7 +71,9 @@ export default function OnboardingPage() {
     if (!result) return;
     setDownloading(true);
     try {
-      const url = await convex.query(api.documents.getFileUrl, { fileId: result.storageId as Id<"_storage"> });
+      // Answering questions rewrites the resume: take the document's current file.
+      const live = resumes?.find((r) => String(r._id) === String(result.resumeId)) as { fileId?: string } | undefined;
+      const url = await convex.query(api.documents.getFileUrl, { fileId: (live?.fileId ?? result.storageId) as Id<"_storage"> });
       if (!url) throw new Error("missing");
       const blob = await (await fetch(url)).blob();
       const href = URL.createObjectURL(blob);
@@ -120,6 +125,24 @@ export default function OnboardingPage() {
           downloading={downloading}
           onOpenJobs={() => router.push("/app?mode=my-jobs")}
         />
+      )}
+      {step === 3 && result && (
+        <div className="mt-6 space-y-3">
+          <JkResumeScorecardLine scorecard={result.scorecard} />
+          {result.resumeId && (result.questions?.length ?? 0) > 0 && (
+            <JkResumeQuestionsCard
+              key="onboarding-questions"
+              resumeId={result.resumeId}
+              questions={result.questions!}
+              onUpdated={(r) => setResult((prev) => prev ? {
+                ...prev,
+                resumeId: r.resumeId || prev.resumeId,
+                ...(r.content && typeof r.content === "object" ? { content: r.content as ResumeContent } : {}),
+                scorecard: usableScorecard(r.scorecard) ?? prev.scorecard,
+              } : prev)}
+            />
+          )}
+        </div>
       )}
     </JkOnboardingShell>
   );

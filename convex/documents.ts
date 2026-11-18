@@ -1,9 +1,12 @@
 import { v } from "convex/values";
+import { MAX_RERUN_STAMPS } from "./documentCount";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { Auth } from "convex/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { shouldSeedBaseResume } from "./baseResume";
 import { tailoringValidator } from "./tailoring";
+import type { Doc } from "./_generated/dataModel";
+import { bulletSimilarity } from "../lib/resume/bulletQuestions";
 
 // Resume functions
 export const saveResume = mutation({
@@ -1313,5 +1316,148 @@ export const duplicateCoverLetter = mutation({
       tags: coverLetter.tags,
       template: coverLetter.template,
     });
+  },
+});
+
+// ---- Bullet answers and tailoring meta ----
+
+const sectionValidator = v.union(v.literal("experience"), v.literal("projects"));
+const bulletAnswerInput = v.object({
+  section: sectionValidator,
+  index: v.number(),
+  bullet: v.string(),
+  answer: v.string(),
+});
+const tailoredFromValidator = v.object({
+  baseResumeId: v.id("resumes"),
+  jobId: v.optional(v.id("jobs")),
+});
+const pendingQuestionValidator = v.object({
+  id: v.string(),
+  section: sectionValidator,
+  index: v.number(),
+  bullet: v.string(),
+  question: v.string(),
+  example: v.optional(v.string()),
+});
+
+export type StoredBulletAnswer = {
+  section: "experience" | "projects";
+  index: number;
+  bullet: string;
+  answer: string;
+  answeredAt: number;
+};
+
+export const MAX_BULLET_ANSWERS = 50;
+export const MAX_ANSWER_CHARS = 400;
+const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * Merges new answers into the stored list. A new answer replaces an old one on the
+ * same bullet (same section + index and a similar bullet), so re-answering updates
+ * the fact instead of piling up copies. Newest wins when the cap is hit.
+ */
+export function mergeBulletAnswers(
+  existing: StoredBulletAnswer[] | undefined,
+  incoming: Array<Omit<StoredBulletAnswer, "answeredAt">>,
+  now: number,
+): StoredBulletAnswer[] {
+  let merged: StoredBulletAnswer[] = [...(existing ?? [])];
+  for (const raw of incoming) {
+    const bullet = squash(raw.bullet ?? "");
+    const answer = squash(raw.answer ?? "").slice(0, MAX_ANSWER_CHARS).trim();
+    if (!bullet || !answer || !Number.isInteger(raw.index) || raw.index < 0) continue;
+    merged = merged.filter(
+      (a) => !(a.section === raw.section && a.index === raw.index && bulletSimilarity(a.bullet, bullet) >= 0.5),
+    );
+    merged.push({ section: raw.section, index: raw.index, bullet, answer, answeredAt: now });
+  }
+  return merged.length > MAX_BULLET_ANSWERS ? merged.slice(merged.length - MAX_BULLET_ANSWERS) : merged;
+}
+
+async function ownedResumeForCaller(ctx: any, resumeId: any): Promise<Doc<"resumes">> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Not authenticated");
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Not authenticated");
+  const resume = await ctx.db.get(resumeId);
+  // Check both new userId format and old tokenIdentifier format for backward compatibility
+  if (!resume || (resume.userId !== userId && resume.userId !== identity.tokenIdentifier)) {
+    throw new Error("Resume not found or access denied");
+  }
+  return resume;
+}
+
+async function ownedResumeForUser(ctx: any, resumeId: any, userId: string): Promise<Doc<"resumes">> {
+  const resume = await ctx.db.get(resumeId);
+  if (!resume || resume.userId !== userId) throw new Error("Resume not found or access denied");
+  return resume;
+}
+
+async function writeBulletAnswers(ctx: any, resume: Doc<"resumes">, answers: Array<Omit<StoredBulletAnswer, "answeredAt">>) {
+  const now = Date.now();
+  const bulletAnswers = mergeBulletAnswers(resume.bulletAnswers, answers, now);
+  await ctx.db.patch(resume._id, { bulletAnswers, updatedAt: now });
+  return { bulletAnswers };
+}
+
+async function writeTailorMeta(ctx: any, resume: Doc<"resumes">, args: { tailoredFrom?: any; pendingQuestions?: any[] }) {
+  const patch: Record<string, unknown> = {};
+  if (args.tailoredFrom !== undefined) patch.tailoredFrom = args.tailoredFrom;
+  if (args.pendingQuestions !== undefined) patch.pendingQuestions = args.pendingQuestions;
+  if (Object.keys(patch).length) await ctx.db.patch(resume._id, patch);
+  return null;
+}
+
+export const saveBulletAnswers = mutation({
+  args: { resumeId: v.id("resumes"), answers: v.array(bulletAnswerInput) },
+  handler: async (ctx, args): Promise<{ bulletAnswers: StoredBulletAnswer[] }> => {
+    const resume = await ownedResumeForCaller(ctx, args.resumeId);
+    return writeBulletAnswers(ctx, resume, args.answers);
+  },
+});
+
+export const saveBulletAnswersInternal = internalMutation({
+  args: { userId: v.string(), resumeId: v.id("resumes"), answers: v.array(bulletAnswerInput) },
+  handler: async (ctx, args): Promise<{ bulletAnswers: StoredBulletAnswer[] }> => {
+    const resume = await ownedResumeForUser(ctx, args.resumeId, args.userId);
+    return writeBulletAnswers(ctx, resume, args.answers);
+  },
+});
+
+export const setResumeTailorMeta = mutation({
+  args: {
+    resumeId: v.id("resumes"),
+    tailoredFrom: v.optional(tailoredFromValidator),
+    pendingQuestions: v.optional(v.array(pendingQuestionValidator)),
+  },
+  handler: async (ctx, args): Promise<null> => {
+    const resume = await ownedResumeForCaller(ctx, args.resumeId);
+    return writeTailorMeta(ctx, resume, args);
+  },
+});
+
+/** Records one in-place AI rewrite of a resume so it counts against the monthly limit. */
+export const recordResumeRerun = mutation({
+  args: { resumeId: v.id("resumes") },
+  handler: async (ctx, args): Promise<null> => {
+    const resume = await ownedResumeForCaller(ctx, args.resumeId);
+    const stamps = [...((resume as { rerunsAt?: number[] }).rerunsAt ?? []), Date.now()].slice(-MAX_RERUN_STAMPS);
+    await ctx.db.patch(resume._id, { rerunsAt: stamps });
+    return null;
+  },
+});
+
+export const setResumeTailorMetaInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    resumeId: v.id("resumes"),
+    tailoredFrom: v.optional(tailoredFromValidator),
+    pendingQuestions: v.optional(v.array(pendingQuestionValidator)),
+  },
+  handler: async (ctx, args): Promise<null> => {
+    const resume = await ownedResumeForUser(ctx, args.resumeId, args.userId);
+    return writeTailorMeta(ctx, resume, args);
   },
 });

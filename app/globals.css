@@ -51,6 +51,7 @@
   --color-bar-4: var(--bar-4);
   --color-ok: var(--ok);
   --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
   --color-scrim: var(--scrim);
   --color-sky-top: var(--sky-top);
   --color-sky: var(--sky);
@@ -117,6 +118,17 @@ textarea[aria-label="Message input"]:focus-visible {
   outline: none;
 }
 
+/* Day theme: a white resume page on a white card needs a hairline to show its edge. */
+html:not(.dark) .bg-paper-warm {
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+
+/* A field that is the only thing in its panel (the search palette) needs no ring around it. */
+input[data-quiet-focus]:focus-visible {
+  outline: none;
+}
+
 :root {
   /* JobKompass v4 — night voyage (light: day). Logo colours are exact. */
   --radius: 1rem;
@@ -144,7 +156,13 @@ textarea[aria-label="Message input"]:focus-visible {
   --plan-text: #A46A08;
   --plan-foreground: #0A1228;
   --ok: #0F8A55;
-  --warn: #9A6E06;
+  /* Amber for fills (status bars, progress, dots). Text on white uses --warn-ink. */
+  --warn: #F0A818;
+  --warn-ink: #9A6E06;
+  /* Performance flow chart: saved > applied > not applied yet. Cool logo colours on white. */
+  --flow-saved: var(--bar-1);
+  --flow-applied: var(--bar-3);
+  --flow-idle: var(--border-strong);
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(10 18 40 / 0.45);
@@ -183,7 +201,8 @@ textarea[aria-label="Message input"]:focus-visible {
   --bar-4-ink: #0B7A99;
   --terminal: #EEF2F9;
   --paper: #FFFFFF;
-  --paper-warm: #FAF7EE;
+  /* Resume pages are white in the day theme, like the PDF. The night theme keeps the cream page. */
+  --paper-warm: #FFFFFF;
   --paper-foreground: #111111;
 }
 
@@ -214,6 +233,10 @@ textarea[aria-label="Message input"]:focus-visible {
   --plan-foreground: #0A1228;
   --ok: #3DDC97;
   --warn: #F5C542;
+  --warn-ink: var(--warn);
+  --flow-saved: var(--primary);
+  --flow-applied: var(--warn);
+  --flow-idle: var(--bar-3);
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(4 7 15 / 0.72);

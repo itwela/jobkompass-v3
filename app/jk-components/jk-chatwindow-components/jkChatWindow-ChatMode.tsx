@@ -22,6 +22,8 @@ import JkInputSection from "../jkInputSection";
 import JkChatThreadMenu from "../jk-app/jkChatThreadMenu";
 import JkChatHero, { JkChatJobPicker, jkFirstName, useBaseResumeId, type JkChatAction } from "../jk-chat/jkChatHero";
 import { JkChatArtifactsPanel, JkChatChangesSheet, JkChatResultCard } from "../jk-chat/jkChatResume";
+import JkResumeQuestionsCard from "../jk-resume-questions/jkResumeQuestionsCard";
+import { usableScorecard } from "../jk-resume-questions/types";
 import { traceSteps, turnArtifacts, type ChatArtifact, type ChatToolCall, type TraceStep } from "@/lib/chat/toolTrace";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "next/navigation";
@@ -133,6 +135,10 @@ export default function JkCW_ChatMode() {
     const lastThreadIdRef = useRef<string | null>(null)
     const pendingScrollRef = useRef(false)
     const [picker, setPicker] = useState<null | "tailor" | "letter" | "prep">(null)
+    // Scorecards from answering a resume's questions, by artifact key (the resume itself
+    // updates through the live document).
+    const [scores, setScores] = useState<Record<string, ChatArtifact["scorecard"]>>({})
+    const withScore = useCallback((a: ChatArtifact): ChatArtifact => (scores[a.key] ? { ...a, scorecard: scores[a.key] } : a), [scores])
     const [selectedArtifact, setSelectedArtifact] = useState<string | null>(null)
     const [sheetArtifact, setSheetArtifact] = useState<string | null>(null)
 
@@ -409,7 +415,7 @@ export default function JkCW_ChatMode() {
     }
 
     // Every document this conversation wrote, oldest first.
-    const artifacts = useMemo(() => messages.flatMap(m => m.type === 'assistant' ? turnArtifacts(m.toolCalls) : []), [messages])
+    const artifacts = useMemo(() => messages.flatMap(m => m.type === 'assistant' ? turnArtifacts(m.toolCalls).map(withScore) : []), [messages, withScore])
     const lastArtifactKey = artifacts[artifacts.length - 1]?.key ?? null
     useEffect(() => { setSelectedArtifact(lastArtifactKey) }, [lastArtifactKey])
     const showPanel = wide && artifacts.length > 0
@@ -482,7 +488,7 @@ export default function JkCW_ChatMode() {
                                     )
                                 }
                                 const steps = traceSteps(message.toolCalls)
-                                const docs = turnArtifacts(message.toolCalls)
+                                const docs = turnArtifacts(message.toolCalls).map(withScore)
                                 const streaming = isLoading && idx === messages.length - 1
                                 return (
                                     <div key={message.id} className="jk-enter mt-[30px]" style={{ "--i": Math.min(idx, 4) } as React.CSSProperties}>
@@ -517,6 +523,14 @@ export default function JkCW_ChatMode() {
                                                             <span className="sm:hidden">Linked to this job in My Jobs</span>
                                                         </TraceLine>
                                                     </div>
+                                                )}
+                                                {doc.kind === 'resume' && doc.resumeId && (doc.questions?.length ?? 0) > 0 && !streaming && (
+                                                    <JkResumeQuestionsCard
+                                                        className="mt-[18px]"
+                                                        resumeId={doc.resumeId}
+                                                        questions={doc.questions!}
+                                                        onUpdated={(r) => { const sc = usableScorecard(r.scorecard); if (sc) setScores(prev => ({ ...prev, [doc.key]: sc })) }}
+                                                    />
                                                 )}
                                             </div>
                                         ))}

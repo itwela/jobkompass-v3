@@ -21,6 +21,9 @@ import { applyFactGuard, type FactGuard } from "@/lib/resume/noInventedFacts";
 import { describeResumeChanges } from "@/lib/onboarding/resumeChanges";
 import { extractMustHaves, scoreMustHaves, countPdfPages, type MustHaves } from "@/lib/chat/mustHaves";
 import type { ResumeContent } from "@/lib/resume/types";
+import { tailorResume } from "@/lib/resume/tailorResume";
+import { scoreResume } from "@/lib/resume/scorecard";
+import type { BulletQuestion } from "@/lib/resume/bulletQuestions";
 
 /**
  * What this chat turn knows beyond the model's arguments: the job and base resume the
@@ -61,7 +64,7 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
 
  const createResumeJakeTemplateTool = (convexClient: ConvexHttpClient, factGuard?: FactGuard, turn: ChatTurnContext = {}) => tool({
    name: 'createResumeJakeTemplate',
-   description: 'Generate a professional resume. Three templates are available: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward) and "mar" (Times serif, centered header, categorized skills, separate internships section). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents. When the resume is for a job saved in My Jobs, pass its jobId: the resume is then linked to that job. The result has `changes` (what moved, per section) and `mustHaves` (met/missing counts). After it succeeds, reply in one or two plain sentences that start with "Done." and say what you moved to the top, naming only skills and work already on the resume. Do not mention numbers, counts, must-haves, where the file is saved, or tools named only in the job posting: the app shows the file, the changes and the must-haves under your reply.',
+   description: 'Generate a professional resume. Three templates are available: "jake" (default, tech-focused), "joseph" (Calibri-style, competencies-forward) and "mar" (Times serif, centered header, categorized skills, separate internships section). Pass templateId to choose; default to the value in RESUME_TEMPLATE_PREFERENCE and do not ask the user to open a selector. Automatically saves the resume to the user\'s documents. When the resume is for a job saved in My Jobs, pass its jobId: the resume is then linked to that job. The result has `changes` (what moved, per section) and `mustHaves` (met/missing counts). After it succeeds, reply in one or two plain sentences that start with "Done." and say what you moved to the top, naming only skills and work already on the resume. Do not mention numbers, counts, must-haves, where the file is saved, or tools named only in the job posting: the app shows the file, the changes and the must-haves under your reply. The result may carry `questions` about bullets missing a number: the app shows them as a card, so do not repeat or answer them.',
    parameters: z.object({
     personalInfo: z.object({
       firstName: z.string().describe('First name of the person'),
@@ -194,6 +197,49 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         };
         console.log(`[${toolExecutionId}] [RESUME_TOOL] Template over tier, falling back to jake`, templateDowngraded);
         templateId = 'jake';
+      }
+
+      /// SECTION ONE WRITER: the shared resume writer, when there is a base resume and a job
+      // With a base resume and a posting, the bullets come from tailorResume (the same
+      // writer and standard as onboarding and My Jobs), not from the chat model's draft.
+      // It also returns questions about bullets that are missing a number. Anything it
+      // returns passes through the same fact guard as the model's arguments. If it fails,
+      // the chat model's own (already guarded) draft is used, as before.
+      let questions: BulletQuestion[] = [];
+      const writerJob = await (async () => {
+        let job = turn.job ?? null;
+        const wanted = input.jobId || turn.jobIds?.[0];
+        if (wanted && job?._id !== wanted) {
+          job = await convexClient.query(api.jobs.get, { id: wanted as any }).catch(() => null) as any;
+        }
+        return job;
+      })().catch(() => null);
+      const writerBase = factGuard?.source && typeof factGuard.source === 'object' ? (factGuard.source as Record<string, any>) : null;
+      if (writerBase && writerJob?.description?.trim()) {
+        try {
+          const tailored = await tailorResume({
+            baseContent: writerBase,
+            company: writerJob.company || input.targetCompany || '',
+            role: writerJob.title || '',
+            jobDescription: writerJob.description,
+            premium: (userRank as number) >= 1,
+          });
+          if (tailored?.resume && typeof tailored.resume === 'object') {
+            const written = applyFactGuard(factGuard, { ...tailored.resume } as any) as Record<string, any>;
+            const personalInfo = { ...(input.personalInfo ?? {}), ...(written.personalInfo ?? {}) };
+            if (personalInfo.firstName && personalInfo.lastName) {
+              Object.assign(input, written, {
+                personalInfo,
+                jobId: input.jobId ?? writerJob._id,
+                targetCompany: input.targetCompany ?? writerJob.company,
+                templateId: input.templateId,
+              });
+              questions = tailored.questions ?? [];
+            }
+          }
+        } catch (e) {
+          console.error(`[${toolExecutionId}] [RESUME_TOOL] shared writer failed, using the chat draft`, e instanceof Error ? e.message.slice(0, 160) : e);
+        }
       }
 
       const latexTemplate = generateResumeLatex(input as any, templateId);
@@ -397,6 +443,11 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         seconds: Math.max(1, Math.round((Date.now() - startTime) / 1000)),
         tailoring,
         linkedToJob,
+        // Questions are only useful against a saved resume: answers rewrite that document.
+        // The answers route rewrites from the saved base resume, so a resume written from
+        // pasted text (no base id) gets no questions.
+        questions: savedResumeId && tailoring.baseResumeId ? questions : [],
+        scorecard: scoreResume(input as Record<string, any>, tailoring.mustHaves ? { mustHaves: tailoring.mustHaves } : undefined),
         ...(templateDowngraded ? { templateDowngraded } : {}),
       };
     } catch (error) {

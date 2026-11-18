@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { enforceAiRateLimit } from "@/lib/rateLimit/guard";
-import { convexForCaller, compileResumePdf } from "@/lib/onboarding/server";
-import { tailorResumeContent, tailoredResumeName } from "@/lib/emailAgent/draftMessage";
-import { describeResumeChanges } from "@/lib/onboarding/resumeChanges";
+import { convexForCaller } from "@/lib/onboarding/server";
+import { isPremiumRank, tailorAndSave, TailorFailedError } from "@/lib/resume/tailorServer";
 import { canUseResumeTemplate } from "@/lib/templates";
 import type { PlanRank } from "@/convex/plans";
-import type { ResumeContent } from "@/lib/resume/types";
 
 export const maxDuration = 300;
 
@@ -39,39 +37,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ code: "limit", error: `You have used all ${can.limit} AI documents this month.` }, { status: 402 });
     }
 
-    const baseContent = base.content as ResumeContent;
-    const tailored = (await tailorResumeContent({
-      baseContent,
-      company: job.company,
-      role: job.title,
-      jobDescription: job.description,
-    })) as ResumeContent | null;
-    if (!tailored) return NextResponse.json({ error: "The resume could not be written this time. Try again." }, { status: 502 });
-
     // The default template from Settings wins, then the base resume's own template, then Jake.
     // getDefaultTemplate already drops a template above the user's plan.
     const preferred = await convex.query(api.auth.getDefaultTemplate, {}).catch(() => null);
     const templateId = preferred
       ?? (base.template && canUseResumeTemplate(base.template, rank as PlanRank) ? base.template : "jake");
-    const pdf = await compileResumePdf(tailored, templateId);
-    const uploadUrl = await convex.mutation(api.documents.generateUploadUrl, {});
-    const upload = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": "application/pdf" }, body: new Uint8Array(pdf) });
-    if (!upload.ok) throw new Error(`upload failed ${upload.status}`);
-    const { storageId } = (await upload.json()) as { storageId: Id<"_storage"> };
-    const { displayName, fileName } = tailoredResumeName({ content: tailored, company: job.company, role: job.title });
-    const resumeId = await convex.mutation(api.documents.saveGeneratedResumeWithFile, {
-      name: displayName,
-      fileId: storageId,
-      fileName,
-      fileSize: pdf.length,
-      content: tailored,
-      template: templateId,
-    });
-    await convex.mutation(api.jobs.update, { id: job._id, resumeUsed: displayName }).catch(() => undefined);
 
-    const { changes, marks } = describeResumeChanges(baseContent, tailored, { role: job.title });
-    return NextResponse.json({ resumeId, storageId, fileName, content: tailored, changes, marks, job: { title: job.title, company: job.company } });
+    const result = await tailorAndSave({
+      convex,
+      baseResume: base,
+      job,
+      templateId,
+      premium: isPremiumRank(rank),
+    });
+    await convex.mutation(api.jobs.update, { id: job._id, resumeUsed: result.displayName }).catch(() => undefined);
+
+    return NextResponse.json({
+      resumeId: result.resumeId,
+      storageId: result.storageId,
+      fileName: result.fileName,
+      content: result.content,
+      changes: result.changes,
+      marks: result.marks,
+      job: { title: job.title, company: job.company },
+      questions: result.questions,
+      scorecard: result.scorecard,
+    });
   } catch (error) {
+    if (error instanceof TailorFailedError) return NextResponse.json({ error: error.message }, { status: 502 });
     console.error("[onboarding/tailor]", error instanceof Error ? error.message.slice(0, 300) : error);
     return NextResponse.json({ error: "The resume could not be written this time. Try again." }, { status: 500 });
   }

@@ -9,6 +9,10 @@ import { createResumeJakeTemplateTool, createCoverLetterJakeTemplateTool } from 
 import { extractResumeContent } from '@/lib/resume/extractFromPdf';
 import { EMPTY_CANDIDATE, NO_INVENTED_FACTS_RULE, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
+import { isPremiumRank, tailorAndSave, TailorFailedError } from '@/lib/resume/tailorServer';
+import { canUseResumeTemplate } from '@/lib/templates';
+import type { PlanRank } from '@/convex/plans';
+import type { Id } from '@/convex/_generated/dataModel';
 
 setDefaultOpenAIKey(process.env.NODE_ENV === 'production' ? process.env.OPENAI_API_KEY! : process.env.NEXT_PUBLIC_OPENAI_API_KEY!);
 
@@ -90,6 +94,8 @@ export async function POST(request: NextRequest) {
     // Facts about the candidate come from a selected resume, an upload, pasted text,
     // or — for a cover letter with none of those — the account's saved resume.
     let referenceResume: { name: string; content: any } | null = null;
+    // The saved row behind referenceResume, when there is one: its stored answers are reused.
+    let referenceRow: { _id: Id<"resumes">; name?: string; content?: any; bulletAnswers?: any[] } | null = null;
 
     if (hasReferenceResume && referenceResumeId) {
         try {
@@ -98,6 +104,7 @@ export async function POST(request: NextRequest) {
             resumeId: referenceResumeId as any,
           });
           if (fetched) {
+            referenceRow = fetched as any;
             referenceResume = {
               name: fetched.name || 'Reference Resume',
               content: fetched.content || {},
@@ -202,46 +209,50 @@ export async function POST(request: NextRequest) {
     // Get current user info (needed for cover letter name generation)
     const currentUser = await convexClient.query(api.auth.currentUser, {});
 
-    // ── Keyword Extraction Agent (resume only, when job data exists) ──────────
-    let extractedKeywords: string[] = [];
-    if (templateType === 'resume' && jobDetails) {
-      const keywordAgent = new Agent({
-        name: 'KeywordExtractor',
-        instructions: `You are an ATS keyword extraction specialist. Analyze the job posting and list keywords and phrases the posting emphasizes. These labels describe the job, not the candidate.
-
-Extract keywords across these categories:
-1. Technical skills, tools, and technologies (exact names matter — "React.js" not just "React")
-2. Soft skills explicitly stated in the posting
-3. Role-specific action verbs (e.g. "architected", "spearheaded", "optimized")
-4. Industry terms, methodologies, and certifications named in the posting
-5. Key responsibilities stated in the posting
-
-Rules:
-- Output ONLY a raw JSON array of strings. No markdown, no explanation, no code fences.
-- Format: ["keyword1", "keyword2", ...]
-- Limit to the 15–20 highest-impact keywords.
-- Prefer exact phrasing from the job posting.`,
-        model: "gpt-4o-mini",
-      });
-
-      const keywordUserMessage = `Extract ATS keywords from this job posting:
-Title: ${jobTitle || (jobDetails as any)?.title || 'N/A'}
-Company: ${jobCompany || (jobDetails as any)?.company || 'N/A'}
-Full job data: ${JSON.stringify(jobDetails)}`;
-
+    // ── Resume tailored to a saved job: the shared writer sees the full posting ──
+    if (templateType === 'resume' && jobDetails && referenceResume?.content) {
+      const job = jobDetails as any;
+      const rank = await convexClient.query(api.usage.currentPlanRank, {}).catch(() => 0);
+      const usableTemplate = canUseResumeTemplate(templateId, rank as PlanRank) ? templateId : 'jake';
       try {
-        const keywordResult = await run(keywordAgent, [user(keywordUserMessage)], { maxTurns: 1 });
-        const output = (keywordResult.finalOutput || '').trim();
-        const match = output.match(/\[[\s\S]*\]/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (Array.isArray(parsed)) extractedKeywords = parsed.filter((k: any) => typeof k === 'string');
-        }
-        console.log(`[${requestId}] [KEYWORD_EXTRACTOR] Extracted ${extractedKeywords.length} keywords`);
+        const result = await tailorAndSave({
+          convex: convexClient,
+          baseResume: referenceRow
+            ? { _id: referenceRow._id, name: referenceRow.name, content: referenceResume.content, bulletAnswers: referenceRow.bulletAnswers }
+            : { name: referenceResume.name, content: referenceResume.content },
+          job: {
+            _id: job._id,
+            title: jobTitle || job.title || '',
+            company: jobCompany || job.company || '',
+            description: job.description,
+            skills: job.skills,
+            keywords: job.keywords,
+          },
+          templateId: usableTemplate,
+          premium: isPremiumRank(rank),
+          instructions: [...(Array.isArray(resumePreferences) ? resumePreferences : []), ...(promptText?.trim() ? [promptText.trim()] : [])],
+        });
+        return NextResponse.json({
+          success: true,
+          message: 'Resume generated and saved successfully',
+          keywords: result.mustHaves.met,
+          resumeId: result.resumeId,
+          fileName: result.fileName,
+          questions: result.questions,
+          scorecard: result.scorecard,
+          changes: result.changes,
+        });
       } catch (e) {
-        console.warn(`[${requestId}] [KEYWORD_EXTRACTOR] Extraction failed (non-fatal):`, e);
+        console.error(`[${requestId}] [TEMPLATE_GENERATE] Tailoring failed:`, e instanceof Error ? e.message.slice(0, 300) : e);
+        return NextResponse.json(
+          { success: false, error: 'The resume could not be written this time. Try again.' },
+          { status: e instanceof TailorFailedError ? 502 : 500 }
+        );
       }
     }
+
+    // Resumes without a job (and cover letters) still go through the template agent.
+    const extractedKeywords: string[] = [];
 
     // Create tool instances (only the generation tool is needed).
     // The tool drops employers, schools, tools, and metrics that are not in the source resume.

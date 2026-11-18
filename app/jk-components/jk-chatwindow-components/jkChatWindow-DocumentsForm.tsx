@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { CalendarClock, FileText, Trash2, CheckCircle2, Circle, Upload, X, Tag, Edit2, Download, Briefcase, TrendingUp, TrendingDown, Ghost, Users, MoreVertical, Pencil, Settings, FileCheck, Loader2, Phone, Copy, Star, FolderPlus, Link2, Link2Off, Pin } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import JkGap from "../jkGap";
-import JkConfirmDelete from "../jkConfirmDelete";
+import { JkConfirmButton, JkConfirmMenuItem } from "../jkConfirm";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -139,7 +139,7 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
         setSettingBaseId(resumeId);
         try {
             await setBaseResume({ resumeId: resumeId as Id<"resumes"> });
-            toast.success("Base resume updated — job leads will tailor from this one.");
+            toast.success("Base resume updated. New resumes are tailored from this one.");
         } catch {
             toast.error("Could not set base resume. Please try again.");
         } finally {
@@ -850,17 +850,16 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
                     >
                         Select All
                     </Button>
-                    <Button
+                    <JkConfirmButton
                         variant="destructive"
                         size="sm"
-                        onClick={() => {
-                            if (selectedResumeIds.length === 0) return;
-                            setShowBulkDeleteConfirm(true);
-                        }}
-                        disabled={selectedResumeIds.length === 0}
+                        disabled={selectedResumeIds.length === 0 || isBulkDeleting}
+                        busyLabel="Deleting…"
+                        confirmLabel={`Sure? Delete ${selectedResumeIds.length}`}
+                        onConfirm={handleConfirmBulkDeleteResumes}
                     >
                         Delete Selected
-                    </Button>
+                    </JkConfirmButton>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
@@ -918,16 +917,6 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
                 </div>
             )}
 
-            {selectionMode && showBulkDeleteConfirm && (
-                <div className="max-w-xl lg:mb-5">
-                    <JkConfirmDelete
-                        message={`Delete ${selectedResumeIds.length} selected resume${selectedResumeIds.length === 1 ? '' : 's'}?`}
-                        onConfirm={handleConfirmBulkDeleteResumes}
-                        onCancel={() => setShowBulkDeleteConfirm(false)}
-                        isLoading={isBulkDeleting}
-                    />
-                </div>
-            )}
 
 
             {openFolder && (
@@ -1206,40 +1195,15 @@ export default function JkCW_DocumentsForm({ initialFilter = "all" }: JkCW_Docum
                                                             />
                                                         </div>
                                                         <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            variant="destructive"
-                                                            onClick={async (event) => {
-                                                                await markDocumentAsSeen(resumeId, documentType);
-                                                                event.stopPropagation();
-                                                                setConfirmingId(resumeId);
-                                                            }}
-                                                            disabled={isDeleting === resumeId}
-                                                        >
+                                                        <JkConfirmMenuItem disabled={isDeleting === resumeId} onConfirm={() => handleDocumentDelete(resumeId, documentType)}>
                                                             <Trash2 className="h-4 w-4" />
                                                             <span>Delete</span>
-                                                        </DropdownMenuItem>
+                                                        </JkConfirmMenuItem>
                                                     </DropdownMenuContent>
                                     </DropdownMenu>
                                 }
                                 below={
                                     <div onClick={(event) => event.stopPropagation()} className="cursor-auto">
-                                    {!selectionMode && confirmingId === resumeId && (
-                                        <div
-                                            className="mt-2"
-                                            onClick={(event) => event.stopPropagation()}
-                                        >
-                                            <JkConfirmDelete
-                                                onConfirm={() => {
-                                                    if (isDeleting === resumeId) return;
-                                                    void handleDocumentDelete(resumeId, documentType).finally(() => {
-                                                        setConfirmingId(null);
-                                                    });
-                                                }}
-                                                onCancel={() => setConfirmingId(null)}
-                                                isLoading={isDeleting === resumeId}
-                                            />
-                                        </div>
-                                    )}
                                     {/* Metadata editor - works for both resumes and cover letters */}
                                     {!selectionMode && editingResumeId === resumeId && editingDocType === documentType && (
                                         <div

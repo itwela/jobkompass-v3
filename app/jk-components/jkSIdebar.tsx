@@ -3,7 +3,7 @@
 /**
  * Desktop left rail (D01 / D03): logo, search + new chat, the six places with a tick and real
  * counts, CONVERSATIONS from the real threads, and the user chip (opens account + settings).
- * Settings, Help & Guides, Job Leads, theme, plan and sign out live in the user chip menu —
+ * Settings, Help & Guides, theme, plan and sign out live in the user chip menu —
  * the frames keep them out of the rail.
  *
  * Nav data comes from useJkAppNav() (jk-app/jkAppNav.ts), shared with the phone menu.
@@ -13,9 +13,11 @@ import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
+import JkSignOutButton from "./jkSignOutButton"
+import { JkConfirmText } from "./jkConfirm"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider"
-import { Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home, Moon, Sun, LifeBuoy, Inbox } from "lucide-react"
+import { Trash2, Plus, LogIn, LogOut, Settings, Search, CreditCard, Home, Moon, Sun, LifeBuoy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useAuthActions } from "@convex-dev/auth/react"
@@ -109,9 +111,93 @@ export function JkUserChipBody({ size = "md" }: { size?: "md" | "lg" }) {
   )
 }
 
+/**
+ * The signed-in person's chip at the foot of a rail. Clicking it opens the account menu:
+ * usage, Settings, Help, theme, plan, landing page, sign out. Used by the app rail and
+ * the Settings rail, so the menu is the same everywhere.
+ */
+export function JkUserMenu() {
+  const { user, isAuthenticated } = useAuth()
+  const { planId, isFree } = useSubscription()
+  const { getUsageStats } = useFeatureAccess()
+  const usage = getUsageStats()
+  const { setCurrentThreadId } = useJobKompassChatWindow()
+  const nav = useJkAppNav()
+  const { theme, toggleTheme } = useJobKompassTheme()
+  const { signOut } = useAuthActions()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const handleSignOut = async () => {
+    await signOut()
+    setCurrentThreadId(null)
+  }
+  const menuItem = "flex w-full items-center gap-3 px-4 py-3 text-left text-[14px] font-medium text-foreground transition-colors hover:bg-accent"
+  return (
+    <>
+        {isAuthenticated && user ? (
+          <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label="Account and settings" className="-mx-3 flex w-[calc(100%+24px)] rounded-xl px-3 py-1.5 transition-colors hover:bg-accent/60">
+                <span className="w-full pl-[6px] pr-[3px]"><JkUserChipBody /></span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" side="top" sideOffset={10} className="w-[268px] overflow-hidden rounded-2xl border border-border bg-popover p-0 shadow-xl">
+              {planId && planId !== 'free' && (
+                <div className="space-y-2 border-b border-border px-4 py-3">
+                  <div className="flex items-center justify-between font-mono text-[11px]">
+                    <span className="uppercase tracking-[1.2px] text-subtle-foreground">AI documents</span>
+                    <span className="text-foreground">{usage.documentsUsed} / {usage.documentsLimit}</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent">
+                    <div className="h-full rounded-full bg-bar-3" style={{ width: `${Math.min(100, (usage.documentsUsed / usage.documentsLimit) * 100)}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between font-mono text-[11px]">
+                    <span className="uppercase tracking-[1.2px] text-subtle-foreground">Jobs</span>
+                    <span className="text-foreground">{usage.jobsUsed}{usage.jobsLimit !== null ? ` / ${usage.jobsLimit}` : ''}</span>
+                  </div>
+                </div>
+              )}
+              <button type="button" className={menuItem} onClick={() => { nav.go('/settings'); setUserMenuOpen(false) }}>
+                <Settings className="size-4 text-muted-foreground" />Settings
+              </button>
+              <button type="button" className={menuItem} onClick={() => { nav.go('/help'); setUserMenuOpen(false) }}>
+                <LifeBuoy className="size-4 text-muted-foreground" />Help & Guides
+              </button>
+              <button type="button" className={menuItem} onClick={toggleTheme}>
+                {theme === 'dark' ? <Sun className="size-4 text-muted-foreground" /> : <Moon className="size-4 text-muted-foreground" />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </button>
+              {isFree ? (
+                <Link href="/pricing" className={menuItem} onClick={() => { setUserMenuOpen(false); trackUpgradeClicked({ surface: 'sidebar', authenticated: true }) }}>
+                  <CreditCard className="size-4 text-muted-foreground" />Upgrade your plan
+                </Link>
+              ) : (
+                // Paid: straight to the plan in Settings (usage, renewal date, Manage billing).
+                <button type="button" className={menuItem} onClick={() => {
+                  setUserMenuOpen(false)
+                  nav.go('/settings')
+                  window.setTimeout(() => document.getElementById('jk-settings-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350)
+                }}>
+                  <CreditCard className="size-4 text-muted-foreground" />Manage my plan
+                </button>
+              )}
+              <Link href="/" className={menuItem} onClick={() => setUserMenuOpen(false)}>
+                <Home className="size-4 text-muted-foreground" />Landing page
+              </Link>
+              <JkSignOutButton icon className={cn(menuItem, "border-t border-border text-destructive")} onConfirm={async () => { await handleSignOut(); setUserMenuOpen(false) }} />
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Button asChild variant="outline" className="w-full justify-start gap-2">
+            <Link href="/auth"><LogIn className="size-4" />Sign in</Link>
+          </Button>
+        )}
+    </>
+  )
+}
+
 export default function JkSidebar() {
   const { user, isAuthenticated } = useAuth()
-  const { planId, isPro, isProAnnual } = useSubscription()
+  const { planId, isFree } = useSubscription()
   const { getUsageStats, upgradeModal, setUpgradeModal } = useFeatureAccess()
   const usage = getUsageStats()
   const { currentThreadId, setCurrentThreadId } = useJobKompassChatWindow()
@@ -122,7 +208,10 @@ export default function JkSidebar() {
   const { theme, toggleTheme } = useJobKompassTheme()
 
   const threads = useQuery(api.threads.list, isAuthenticated ? {} : "skip")
-  const pendingLeads = useQuery(api.jobLeads.list, isAuthenticated ? { status: "pending_approval" } : "skip")
+  // The rail shows the most recent few; the rest are one click away (and in Search).
+  const [allThreads, setAllThreads] = useState(false)
+  const RECENT = 8
+  const shownThreads = !threads || allThreads ? threads : threads.filter((t, i) => i < RECENT || t._id === currentThreadId)
   const deleteThread = useMutation(api.threads.remove)
   const { signOut } = useAuthActions()
 
@@ -143,14 +232,12 @@ export default function JkSidebar() {
     nav.go('/chat')
   }
 
-  const handleDeleteConfirm = async () => {
-    if (!threadToDelete) return
-    await deleteThread({ threadId: threadToDelete })
-    if (currentThreadId === threadToDelete) {
+  const deleteThreadNow = async (id: any) => {
+    await deleteThread({ threadId: id })
+    if (currentThreadId === id) {
       setCurrentThreadId(null)
       nav.go('/chat')
     }
-    setThreadToDelete(null)
   }
 
   const handleSignOut = async () => {
@@ -204,7 +291,7 @@ export default function JkSidebar() {
             <p className="px-3 text-[13.5px] text-subtle-foreground">No chats yet</p>
           ) : (
             <ul className="flex flex-col">
-              {threads.map((thread) => {
+              {shownThreads!.map((thread) => {
                 const on = nav.currentId === '/chat' && currentThreadId === thread._id
                 return (
                   <li key={thread._id} className="group relative">
@@ -218,17 +305,26 @@ export default function JkSidebar() {
                     >
                       <span className="truncate">{thread.title}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setThreadToDelete(thread._id)}
+                    <JkConfirmText
+                      onConfirm={() => deleteThreadNow(thread._id)}
                       aria-label={`Delete ${thread.title}`}
-                      className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                      confirmLabel="Delete?"
+                      className="absolute right-1.5 top-1/2 flex h-6 min-w-6 -translate-y-1/2 items-center justify-center rounded-md px-1 text-[11.5px] font-medium text-subtle-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                      askingClassName="bg-card text-destructive opacity-100"
                     >
                       <Trash2 className="size-3.5" />
-                    </button>
+                    </JkConfirmText>
                   </li>
                 )
               })}
+              {threads.length > RECENT && (
+                <li>
+                  <button type="button" onClick={() => setAllThreads((v) => !v)}
+                    className="flex h-[34px] w-full items-center rounded-lg px-3 text-left text-[13px] text-subtle-foreground transition-colors hover:bg-accent/50 hover:text-foreground">
+                    {allThreads ? "Show fewer" : `Show all ${threads.length}`}
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </div>
@@ -236,76 +332,9 @@ export default function JkSidebar() {
 
       {/* User chip */}
       <div className="mx-[18px] shrink-0 border-t border-border pb-[22px] pt-[21px]">
-        {isAuthenticated && user ? (
-          <Popover open={userMenuOpen} onOpenChange={setUserMenuOpen}>
-            <PopoverTrigger asChild>
-              <button type="button" aria-label="Account and settings" className="-mx-3 flex w-[calc(100%+24px)] rounded-xl px-3 py-1.5 transition-colors hover:bg-accent/60">
-                <span className="w-full pl-[6px] pr-[3px]"><JkUserChipBody /></span>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" side="top" sideOffset={10} className="w-[268px] overflow-hidden rounded-2xl border border-border bg-popover p-0 shadow-xl">
-              {planId && planId !== 'free' && (
-                <div className="space-y-2 border-b border-border px-4 py-3">
-                  <div className="flex items-center justify-between font-mono text-[11px]">
-                    <span className="uppercase tracking-[1.2px] text-subtle-foreground">AI documents</span>
-                    <span className="text-foreground">{usage.documentsUsed} / {usage.documentsLimit}</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent">
-                    <div className="h-full rounded-full bg-bar-3" style={{ width: `${Math.min(100, (usage.documentsUsed / usage.documentsLimit) * 100)}%` }} />
-                  </div>
-                  <div className="flex items-center justify-between font-mono text-[11px]">
-                    <span className="uppercase tracking-[1.2px] text-subtle-foreground">Jobs</span>
-                    <span className="text-foreground">{usage.jobsUsed}{usage.jobsLimit !== null ? ` / ${usage.jobsLimit}` : ''}</span>
-                  </div>
-                </div>
-              )}
-              <button type="button" className={menuItem} onClick={() => { nav.go('/settings'); setUserMenuOpen(false) }}>
-                <Settings className="size-4 text-muted-foreground" />Settings
-              </button>
-              <button type="button" className={menuItem} onClick={() => { nav.go('/help'); setUserMenuOpen(false) }}>
-                <LifeBuoy className="size-4 text-muted-foreground" />Help & Guides
-              </button>
-              <button type="button" className={menuItem} onClick={() => { nav.go('/leads'); setUserMenuOpen(false) }}>
-                <Inbox className="size-4 text-muted-foreground" /><span className="flex-1">Job leads</span>
-                {pendingLeads && pendingLeads.length > 0 && <span className="font-mono text-[12px] text-subtle-foreground">{pendingLeads.length}</span>}
-              </button>
-              <button type="button" className={menuItem} onClick={toggleTheme}>
-                {theme === 'dark' ? <Sun className="size-4 text-muted-foreground" /> : <Moon className="size-4 text-muted-foreground" />}
-                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              </button>
-              <Link href="/pricing" className={menuItem} onClick={() => {
-                setUserMenuOpen(false)
-                if (!(isPro || isProAnnual)) trackUpgradeClicked({ surface: 'sidebar', authenticated: true })
-              }}>
-                <CreditCard className="size-4 text-muted-foreground" />{isPro || isProAnnual ? 'Manage my plan' : 'Upgrade your plan'}
-              </Link>
-              <Link href="/" className={menuItem} onClick={() => setUserMenuOpen(false)}>
-                <Home className="size-4 text-muted-foreground" />Landing page
-              </Link>
-              <button type="button" className={cn(menuItem, "border-t border-border text-destructive")} onClick={() => { handleSignOut(); setUserMenuOpen(false) }}>
-                <LogOut className="size-4" />Sign out
-              </button>
-            </PopoverContent>
-          </Popover>
-        ) : (
-          <Button asChild variant="outline" className="w-full justify-start gap-2">
-            <Link href="/auth"><LogIn className="size-4" />Sign in</Link>
-          </Button>
-        )}
+        <JkUserMenu />
       </div>
 
-      <Dialog open={threadToDelete !== null} onOpenChange={(o) => { if (!o) setThreadToDelete(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete this chat?</DialogTitle>
-            <DialogDescription>The conversation is removed for good.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setThreadToDelete(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>Delete</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <JkSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
       <JkUpgradeModal
         isOpen={upgradeModal.isOpen}

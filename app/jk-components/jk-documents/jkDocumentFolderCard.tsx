@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import JkConfirmDelete from "../jkConfirmDelete";
+import { JkConfirmMenuItem } from "../jkConfirm";
 import { Id } from "@/convex/_generated/dataModel";
 
 /** Payload key for dragging a document card onto a folder. */
@@ -167,31 +167,13 @@ export default function JkDocumentFolderCard({
               <Pencil className="h-4 w-4" />
               <span>Rename</span>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowDeleteConfirm(true);
-              }}
-            >
+            <JkConfirmMenuItem onConfirm={onDelete} confirmLabel="Sure? Documents are kept">
               <Trash2 className="h-4 w-4" />
               <span>Delete folder</span>
-            </DropdownMenuItem>
+            </JkConfirmMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {showDeleteConfirm && (
-        <div className="mt-2" onClick={(event) => event.stopPropagation()}>
-          <JkConfirmDelete
-            message={`Delete "${folder.name}"? Its documents will be moved out, not deleted.`}
-            onConfirm={() => {
-              setShowDeleteConfirm(false);
-              onDelete();
-            }}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        </div>
-      )}
     </div>
   );
 }

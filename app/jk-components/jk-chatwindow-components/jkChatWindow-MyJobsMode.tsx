@@ -8,6 +8,7 @@
  * Keyboard (desktop): J/K or ↓/↑ move, Enter opens, G writes a resume, / searches,
  * X toggles a row while selecting, Esc clears, ⌘K opens the command bar.
  */
+import { JkConfirmButton } from "../jkConfirm";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, LogIn, Plus, Search, X } from "lucide-react";
 import { useJobs, type Job } from "@/providers/jkJobsProvider";
@@ -31,9 +32,11 @@ import { useJkAppNav } from "../jk-app/jkAppNav";
 import JkStatusBar from "../jkStatusBar";
 import { JkStatusGlyph } from "../jkStatusChip";
 import JkTemplateSelector, { TemplateType, ResumeInputOptions } from "../jkTemplateSelector";
+import JkResumeQuestionsCard, { JkResumeScorecardLine } from "../jk-resume-questions/jkResumeQuestionsCard";
+import { usableQuestions, usableScorecard, type BulletQuestion, type ResumeScorecard } from "../jk-resume-questions/types";
 import JkUpgradeModal from "../jkUpgradeModal";
 import JkJobInputModal from "../jkJobInputModal";
-import { JkJobsGrouped, JkJobsPhoneList, JkJobsTable } from "./jkJobsGrid";
+import { JkJobsGrouped, JkJobsPhoneList, JkJobsTable, nextJobSort, sortJobs, type JkJobSort } from "./jkJobsGrid";
 import JkJobExpanded from "./jkJobExpanded";
 import JkJobRail from "./jkJobRail";
 import JkJobsCommandBar from "./jkJobsCommandBar";
@@ -109,6 +112,10 @@ export default function JkCW_MyJobsMode() {
   useEffect(() => { try { const v = localStorage.getItem(VIEW_KEY); if (v === "table" || v === "grouped") setViewState(v); } catch { /* storage blocked */ } }, []);
   const setView = (v: View) => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* storage blocked */ } };
 
+  // Column sort for the table (click a heading). J/K and the rail follow the same order.
+  const [sort, setSort] = useState<JkJobSort>(null);
+  const shownJobs = useMemo(() => sortJobs(filteredJobs, sort), [filteredJobs, sort]);
+
   const [focusedId, setFocusedId] = useState<JobId | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -122,15 +129,17 @@ export default function JkCW_MyJobsMode() {
   const [jobForGeneration, setJobForGeneration] = useState<Job | null>(null);
   const [referenceResumeId, setReferenceResumeId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  // Questions about the resume just written, shown in a card over the page until answered or closed.
+  const [asked, setAsked] = useState<{ key: number; resumeId: string; company?: string; questions: BulletQuestion[]; scorecard: ResumeScorecard | null } | null>(null);
 
   // Keep the focused job valid as the list filters and changes.
   useEffect(() => {
-    if (filteredJobs.length === 0) { if (focusedId) setFocusedId(null); return; }
-    if (!focusedId || !filteredJobs.some((j) => j._id === focusedId)) setFocusedId(filteredJobs[0]._id);
-  }, [filteredJobs, focusedId]);
+    if (shownJobs.length === 0) { if (focusedId) setFocusedId(null); return; }
+    if (!focusedId || !shownJobs.some((j) => j._id === focusedId)) setFocusedId(shownJobs[0]._id);
+  }, [shownJobs, focusedId]);
   useEffect(() => { if (!selectionMode) setConfirmBulkDelete(false); }, [selectionMode]);
 
-  const focusedJob = useMemo(() => filteredJobs.find((j) => j._id === focusedId) ?? null, [filteredJobs, focusedId]);
+  const focusedJob = useMemo(() => shownJobs.find((j) => j._id === focusedId) ?? null, [shownJobs, focusedId]);
 
   const counts = useMemo(() => {
     const known = JOB_STATUSES.map((s) => ({ status: s as string, count: statusCounts[s] ?? 0 }));
@@ -167,10 +176,10 @@ export default function JkCW_MyJobsMode() {
     requestAnimationFrame(() => document.querySelector(`[data-job-row="${id}"]`)?.scrollIntoView({ block: "nearest" }));
   };
   const move = useCallback((delta: number) => {
-    const i = filteredJobs.findIndex((j) => j._id === focusedId);
-    const next = stepIndex(i, delta, filteredJobs.length);
-    if (next >= 0) { setFocusedId(filteredJobs[next]._id); scrollToJob(filteredJobs[next]._id); }
-  }, [filteredJobs, focusedId]);
+    const i = shownJobs.findIndex((j) => j._id === focusedId);
+    const next = stepIndex(i, delta, shownJobs.length);
+    if (next >= 0) { setFocusedId(shownJobs[next]._id); scrollToJob(shownJobs[next]._id); }
+  }, [shownJobs, focusedId]);
 
   // Keyboard.
   useEffect(() => {
@@ -229,6 +238,10 @@ export default function JkCW_MyJobsMode() {
         description: data.keywords?.length ? `Keywords used: ${data.keywords.join(", ")}` : "It is in My Documents.",
       });
       setIsTemplateModalOpen(false);
+      const questions = usableQuestions(data.questions);
+      if (templateSelectorType === "resume" && data.resumeId && questions.length > 0) {
+        setAsked({ key: Date.now(), resumeId: String(data.resumeId), company: jobForGeneration.company, questions, scorecard: usableScorecard(data.scorecard) });
+      }
       setJobForGeneration(null);
     } catch (error) {
       toast.dismiss(toastId);
@@ -257,7 +270,7 @@ export default function JkCW_MyJobsMode() {
   const showRail = desk && wide && view === "table";
   const onRowClick = (id: JobId) => { setFocusedId(id); if (!showRail) setSelectedJobId(id); };
 
-  const empty = !loading && filteredJobs.length === 0 && (
+  const empty = !loading && shownJobs.length === 0 && (
     <div className="flex flex-col items-center px-6 py-20 text-center">
       {total === 0 ? (
         <>
@@ -327,10 +340,12 @@ export default function JkCW_MyJobsMode() {
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-card" />)}
             </div>
           ) : empty ? empty : !desk ? (
-            <JkJobsPhoneList jobs={filteredJobs} total={total} selectionMode={selectionMode} selectedIds={selectedJobIds} onOpen={(id) => setSelectedJobId(id)} onToggle={toggleJobSelection} />
+            <JkJobsPhoneList jobs={shownJobs} total={total} selectionMode={selectionMode} selectedIds={selectedJobIds} onOpen={(id) => setSelectedJobId(id)} onToggle={toggleJobSelection} />
           ) : view === "table" ? (
             <JkJobsTable
-              jobs={filteredJobs}
+              sort={sort}
+              onSort={(key) => setSort((cur) => nextJobSort(cur, key))}
+              jobs={shownJobs}
               total={total}
               focusedId={focusedId}
               selectionMode={selectionMode}
@@ -341,7 +356,7 @@ export default function JkCW_MyJobsMode() {
             />
           ) : (
             <JkJobsGrouped
-              jobs={filteredJobs}
+              jobs={shownJobs}
               focusedId={focusedId}
               selectionMode={selectionMode}
               selectedIds={selectedJobIds}
@@ -380,13 +395,7 @@ export default function JkCW_MyJobsMode() {
         <div className="fixed inset-x-0 bottom-[calc(var(--jk-tabbar-h)+16px)] z-30 flex justify-center px-4 lg:absolute lg:bottom-4">
           <div role="toolbar" aria-label="Selected jobs" className="flex max-w-full flex-wrap items-center gap-2 rounded-full border border-input bg-popover py-1.5 pl-5 pr-1.5 shadow-[0_10px_40px_-12px_var(--scrim)] [animation:jk-enter_0.4s_cubic-bezier(0.16,1,0.3,1)_both]">
             <span className="mr-1 font-mono text-[12px] text-muted-foreground">{selectedJobIds.length} selected</span>
-            {confirmBulkDelete ? (
-              <>
-                <span className="text-[13.5px] text-foreground">Delete {selectedJobIds.length} job{selectedJobIds.length === 1 ? "" : "s"}?</span>
-                <Button variant="destructive" className="h-9 px-4 text-[13px]" onClick={async () => { const n = selectedJobIds.length; await handleBulkDeleteJobs(); toast.success(`Deleted ${n} job${n === 1 ? "" : "s"}`); }}>Delete</Button>
-                <Button variant="ghost" className="h-9 px-4 text-[13px]" onClick={() => setConfirmBulkDelete(false)}>Keep</Button>
-              </>
-            ) : (
+            {(
               <>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -402,13 +411,15 @@ export default function JkCW_MyJobsMode() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button variant="destructive" className="h-9 px-4 text-[13px]" disabled={selectedJobIds.length === 0} onClick={() => setConfirmBulkDelete(true)}>Delete</Button>
+                <JkConfirmButton variant="destructive" className="h-9 px-4 text-[13px]" disabled={selectedJobIds.length === 0} busyLabel="Deleting…"
+                  confirmLabel={`Sure? Delete ${selectedJobIds.length} job${selectedJobIds.length === 1 ? "" : "s"}`}
+                  onConfirm={async () => { const n = selectedJobIds.length; await handleBulkDeleteJobs(); toast.success(`Deleted ${n} job${n === 1 ? "" : "s"}`); }}>Delete</JkConfirmButton>
                 <Button
                   variant="ghost"
                   className="h-9 px-4 text-[13px]"
-                  onClick={() => (selectedJobIds.length === filteredJobs.length ? clearJobSelection() : setJobSelection(filteredJobs.map((j) => j._id)))}
+                  onClick={() => (selectedJobIds.length === shownJobs.length ? clearJobSelection() : setJobSelection(shownJobs.map((j) => j._id)))}
                 >
-                  {selectedJobIds.length === filteredJobs.length && filteredJobs.length > 0 ? "Select none" : "Select all shown"}
+                  {selectedJobIds.length === shownJobs.length && shownJobs.length > 0 ? "Select none" : "Select all shown"}
                 </Button>
                 <Button className="h-9 px-5 text-[13px]" onClick={() => setSelectionMode(false)}>Done</Button>
               </>
@@ -438,6 +449,26 @@ export default function JkCW_MyJobsMode() {
         onOpenExtension={() => { setAddOpen(false); nav.go("/settings"); }}
       />
 
+      {asked && (
+        <div className="fixed inset-x-4 bottom-4 z-50 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[420px]">
+          <div className="max-h-[calc(100dvh-32px)] overflow-y-auto rounded-[22px] shadow-[0_10px_40px_-12px_var(--scrim)] sm:rounded-[20px]">
+            {asked.scorecard && (
+              <div className="rounded-t-[22px] border border-b-0 border-border bg-card px-4 pt-4 sm:rounded-t-[20px] sm:px-5">
+                <p className="text-[13px] font-medium text-foreground">Resume for {asked.company || "this job"} is saved</p>
+                <JkResumeScorecardLine scorecard={asked.scorecard} className="mt-1" />
+              </div>
+            )}
+            <JkResumeQuestionsCard
+              key={asked.key}
+              resumeId={asked.resumeId}
+              questions={asked.questions}
+              className={asked.scorecard ? "rounded-t-none border-t-0 sm:rounded-t-none" : undefined}
+              onUpdated={(r) => setAsked((a) => (a ? { ...a, scorecard: usableScorecard(r.scorecard) ?? a.scorecard } : a))}
+              onDismiss={() => setAsked(null)}
+            />
+          </div>
+        </div>
+      )}
       <JkTemplateSelector
         isOpen={isTemplateModalOpen}
         onClose={() => { setIsTemplateModalOpen(false); setJobForGeneration(null); setReferenceResumeId(null); }}

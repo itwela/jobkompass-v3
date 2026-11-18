@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalQuery, action } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery, internalAction, action } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -220,5 +220,52 @@ export const getById = internalQuery({
   args: { accountId: v.id("emailAccounts") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.accountId);
+  },
+});
+
+// ── Retirement of the job-leads email agent (Nov 17 2026) ─────────────────────
+// One-off cleanup: revoke every stored Gmail grant at Google, then delete the row.
+// Run with: npx convex run emailAccounts:revokeAndPurgeAll
+
+export const countStored = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<number> => (await ctx.db.query("emailAccounts").collect()).length,
+});
+
+export const tokensForPurge = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<Array<{ id: Id<"emailAccounts">; refreshToken: string }>> =>
+    (await ctx.db.query("emailAccounts").collect()).map((a) => ({ id: a._id, refreshToken: a.refreshToken })),
+});
+
+export const deleteStored = internalMutation({
+  args: { id: v.id("emailAccounts") },
+  handler: async (ctx, args): Promise<null> => {
+    await ctx.db.delete(args.id);
+    return null;
+  },
+});
+
+export const revokeAndPurgeAll = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ total: number; revoked: number; revokeFailed: number; deleted: number }> => {
+    const accounts: Array<{ id: Id<"emailAccounts">; refreshToken: string }> = await ctx.runQuery(internal.emailAccounts.tokensForPurge, {});
+    let revoked = 0;
+    let revokeFailed = 0;
+    let deleted = 0;
+    for (const account of accounts) {
+      // Revoking the refresh token ends the grant at Google. A token that is already
+      // dead returns 400; the row is deleted either way.
+      const res = await fetch("https://oauth2.googleapis.com/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ token: account.refreshToken }).toString(),
+      }).catch(() => null);
+      if (res?.ok) revoked++;
+      else revokeFailed++;
+      await ctx.runMutation(internal.emailAccounts.deleteStored, { id: account.id });
+      deleted++;
+    }
+    return { total: accounts.length, revoked, revokeFailed, deleted };
   },
 });

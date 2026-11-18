@@ -3,6 +3,7 @@ import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { planRank } from "./plans";
+import { documentsUsedSince } from "./documentCount";
 
 /**
  * The signed-in caller's plan rank, for app-side callers that need to pass a
@@ -68,17 +69,8 @@ export const getUserUsage = query({
       .withIndex("by_user", (q) => q.eq("userId", convexUserId))
       .collect();
 
-    // Count generated documents (have fileId and created this month)
-    const generatedResumesThisMonth = allResumes.filter(
-      (r) => r.fileId && r.createdAt >= monthStart
-    ).length;
-
-    const generatedCoverLettersThisMonth = allCoverLetters.filter(
-      (c) => c.fileId && c.createdAt >= monthStart
-    ).length;
-
-    const documentsGeneratedThisMonth =
-      generatedResumesThisMonth + generatedCoverLettersThisMonth;
+    // Generated documents this month, plus in-place AI rewrites.
+    const documentsGeneratedThisMonth = documentsUsedSince(allResumes, allCoverLetters, monthStart);
 
     // Count total jobs - use userId (convex_user_id) only
     const allJobs = await ctx.db
@@ -158,15 +150,7 @@ export const canGenerateDocument = query({
       .withIndex("by_user", (q) => q.eq("userId", convexUserId))
       .collect();
 
-    const generatedResumesThisMonth = allResumes.filter(
-      (r) => r.fileId && r.createdAt >= monthStart
-    ).length;
-
-    const generatedCoverLettersThisMonth = allCoverLetters.filter(
-      (c) => c.fileId && c.createdAt >= monthStart
-    ).length;
-
-    const used = generatedResumesThisMonth + generatedCoverLettersThisMonth;
+    const used = documentsUsedSince(allResumes, allCoverLetters, monthStart);
 
     if (used >= limit) {
       return {

@@ -6,7 +6,7 @@
  * comes from /api/performance/summary (three headline + evidence items).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, LogIn } from 'lucide-react'
 import { useAuth } from '@/providers/jkAuthProvider'
 import { useSubscription } from '@/providers/jkSubscriptionProvider'
@@ -81,6 +81,7 @@ export default function JkCW_PerformanceMode() {
 
   const docsSub = `${plural(stats.docs.resumes, 'resume')}, ${plural(stats.docs.letters, 'letter')}`
 
+  const rateDigits = fmtPct(rate.interviewRate).length
   return (
     <div className="chat-scroll h-full overflow-y-auto pb-[calc(var(--jk-tabbar-h)+24px)] lg:pb-10">
       <JkAppPageHeader
@@ -98,15 +99,16 @@ export default function JkCW_PerformanceMode() {
       ) : (
         <div key={scope}>
           {/* ── Headline numbers ─────────────────────────────────────────── */}
-          <section data-enter className="mx-5 grid grid-cols-3 border-b border-border pb-7 lg:mx-0 lg:px-8 lg:pb-7 lg:pt-[26px] xl:grid-cols-[minmax(0,420fr)_repeat(3,minmax(0,240fr))]">
-            <div className="jk-enter col-span-3 pt-3 lg:pt-0 xl:col-span-1 xl:pr-6" style={enter(0)}>
+          <section data-enter className="mx-5 grid grid-cols-[repeat(3,minmax(0,1fr))] border-b border-border pb-7 lg:mx-0 lg:px-8 lg:pb-7 lg:pt-[26px] xl:grid-cols-[minmax(0,420fr)_repeat(3,minmax(0,240fr))]">
+            <div className="jk-enter @container col-span-3 min-w-0 pt-3 lg:pt-0 xl:col-span-1 xl:pr-6" style={enter(0)}>
               <JkSectionLabel as="h2" className="tracking-[1.4px] lg:tracking-[1.6px]">Interview rate</JkSectionLabel>
-              <div className="mt-0 flex items-end justify-between gap-2 lg:justify-start lg:gap-12">
-                <p className="flex items-baseline whitespace-nowrap text-foreground" aria-label={`Interview rate ${fmtPct(rate.interviewRate)} percent`}>
-                  <span className="text-[100px] font-medium leading-[119px] tracking-[-4px] lg:text-[112px] lg:leading-[133px]">{fmtPct(rate.interviewRate)}</span>
+              {/* Sized from this column's own width, so the number and the dial never spill into the next tile. */}
+              <div className="mt-0 flex items-end justify-between gap-3 lg:justify-start lg:gap-[clamp(12px,6cqw,48px)]">
+                <p className="flex min-w-0 items-baseline whitespace-nowrap text-foreground" aria-label={`Interview rate ${fmtPct(rate.interviewRate)} percent`}>
+                  <span className="font-medium leading-[1.19] tracking-[-0.035em]" style={{ fontSize: `clamp(56px, ${rateDigits > 3 ? 16 : rateDigits > 2 ? 20 : 26}cqw, 112px)` }}>{fmtPct(rate.interviewRate)}</span>
                   <span className="ml-2.5 text-[38px] font-medium text-subtle-foreground lg:text-[44px]">%</span>
                 </p>
-                <JkGauge value={rate.interviewRate} previous={month ? prevRate?.interviewRate ?? null : null} previousLabel={shortPrev} className="mb-3 shrink-0 lg:mb-6" />
+                <JkGauge value={rate.interviewRate} previous={month ? prevRate?.interviewRate ?? null : null} previousLabel={shortPrev} className="mb-3 h-auto w-[clamp(116px,36cqw,158px)] shrink-0 lg:mb-6" />
               </div>
               <p className="-mt-1 max-w-[420px] text-[14.5px] leading-5 text-muted-foreground">
                 {rateLine}
@@ -114,7 +116,7 @@ export default function JkCW_PerformanceMode() {
               </p>
             </div>
 
-            <div className="col-span-3 mt-8 grid grid-cols-3 border-t border-border pt-7 lg:mt-7 xl:contents">
+            <div className="col-span-3 mt-8 grid grid-cols-[repeat(3,minmax(0,1fr))] border-t border-border pt-7 lg:mt-7 xl:contents">
               <StatTile
                 i={1}
                 label={<><span className="xl:hidden">Offer rate</span><span className="hidden xl:inline">Offer rate</span></>}
@@ -142,7 +144,7 @@ export default function JkCW_PerformanceMode() {
           </section>
 
           {/* ── Sankey + weekly chart ────────────────────────────────────── */}
-          <section data-enter className="grid border-b-0 border-border xl:grid-cols-[minmax(0,682fr)_minmax(0,494fr)] xl:border-b">
+          <section data-enter className="grid grid-cols-[minmax(0,1fr)] border-b-0 border-border xl:grid-cols-[minmax(0,682fr)_minmax(0,494fr)] xl:border-b">
             <div className="jk-enter border-b border-border px-5 pb-10 pt-7 lg:px-8 lg:pt-[26px] xl:border-b-0 xl:border-r xl:pb-6" style={enter(0)}>
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                 <JkSectionLabel as="h2" className="tracking-[1.4px] lg:tracking-[1.6px]">Where {plural(stats.sankey.saved, 'job')} ended up</JkSectionLabel>
@@ -199,18 +201,44 @@ function StatTile({ i, label, value, sub, spark }: { i: number; label: React.Rea
   )
 }
 
-type SeesItem = { headline: string; evidence: string }
+type SeesItem = { headline: string; evidence: string; count?: number; total?: number }
 const SEES_TICKS = ['var(--bar-2)', 'var(--bar-3)', 'var(--bar-4)']
 
+// Last items shown this session, so coming back to the page shows them at once.
+let seesMemory: SeesItem[] | null = null
+
+/** One finding: the figure it rests on and how big a share that is, then what it means. */
+export function JkSeesFinding({ item, color }: { item: SeesItem; color: string }) {
+  const hasFigure = typeof item.count === 'number' && typeof item.total === 'number' && item.total > 0
+  return (
+    <div className="min-w-0 py-4 first:pt-0 last:pb-0 md:px-6 md:py-0 md:first:pl-0 md:last:pr-0">
+      {hasFigure ? (
+        <>
+          <p className="flex items-baseline gap-2">
+            <span className="text-[34px] font-medium leading-[38px] tracking-[-0.8px] text-foreground lg:text-[40px] lg:leading-[44px]">{item.count}</span>
+            <span className="font-mono text-[12px] text-subtle-foreground">of {item.total}</span>
+          </p>
+          <div aria-hidden className="mt-2.5 h-[4px] overflow-hidden rounded-full bg-border">
+            <div className="h-full rounded-full" style={{ width: `${Math.max(2, (item.count! / item.total!) * 100)}%`, background: color }} />
+          </div>
+        </>
+      ) : (
+        <span aria-hidden className="block h-[4px] w-8 rounded-full" style={{ background: color }} />
+      )}
+      <p className="mt-3.5 text-[16px] font-medium leading-[21px] text-foreground">{item.headline}</p>
+      <p className="mt-1 text-[13.5px] leading-[19px] text-muted-foreground">{item.evidence}</p>
+    </div>
+  )
+}
+
 function JkSees({ isPro, applications, onUpgrade }: { isPro: boolean; applications: number; onUpgrade: () => void }) {
-  const [items, setItems] = useState<SeesItem[] | null>(null)
+  const [items, setItems] = useState<SeesItem[] | null>(seesMemory)
   const [state, setState] = useState<'idle' | 'loading' | 'error' | 'thin'>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
-  const rowRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
-    setState('loading')
+    // With items already on screen, check quietly instead of showing the loader.
+    if (!seesMemory) setState('loading')
     setError(null)
     try {
       const res = await fetch('/api/performance/summary', { method: 'POST' })
@@ -218,9 +246,11 @@ function JkSees({ isPro, applications, onUpgrade }: { isPro: boolean; applicatio
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Something went wrong.')
       if (data.reason === 'not-enough-data') { setState('thin'); setItems([]); return }
+      seesMemory = data.items
       setItems(data.items)
       setState('idle')
     } catch (e) {
+      if (seesMemory) { setState('idle'); return }
       setError(e instanceof Error ? e.message : 'Something went wrong.')
       setState('error')
     }
@@ -228,19 +258,13 @@ function JkSees({ isPro, applications, onUpgrade }: { isPro: boolean; applicatio
 
   useEffect(() => { if (isPro) load() }, [isPro, load])
 
-  const onScroll = () => {
-    const el = rowRef.current
-    if (!el) return
-    setPage(Math.round(el.scrollLeft / el.clientWidth))
-  }
-
   return (
     <div>
       <div className="relative isolate overflow-hidden rounded-[22px] border border-input bg-card lg:rounded-3xl">
-        <div aria-hidden className="pointer-events-none absolute bottom-1 right-4 top-1 -z-10 hidden aspect-square md:block">
+        <div aria-hidden className="pointer-events-none absolute bottom-1 right-4 top-1 -z-10 hidden aspect-square xl:block">
           <JkArt name="step3" variant="spot" fade="all" />
         </div>
-        <div className="px-[18px] pb-6 pt-5 lg:px-6 lg:pb-7 lg:pt-6 md:pr-[220px]">
+        <div className="px-[18px] pb-5 pt-5 lg:px-6 lg:pb-7 lg:pt-6 xl:pr-[250px]">
           <div className="flex items-center justify-between gap-3 md:justify-start md:gap-5">
             <h2 className="flex items-center gap-3 text-[15px] font-medium text-foreground lg:text-[15px]">
               <span aria-hidden className="flex gap-[3px]">
@@ -268,23 +292,12 @@ function JkSees({ isPro, applications, onUpgrade }: { isPro: boolean; applicatio
               {error} <button className="ml-1 text-foreground underline underline-offset-4" onClick={load}>Try again</button>
             </div>
           ) : items && (
-            <div ref={rowRef} onScroll={onScroll} className="-mx-[18px] mt-4 flex snap-x snap-mandatory overflow-x-auto px-[18px] [scrollbar-width:none] md:mx-0 md:block md:overflow-visible md:px-0 md:space-y-[13px]">
-              {items.map((it, i) => (
-                <div key={i} className="flex w-full shrink-0 snap-start gap-[13px] md:w-auto">
-                  <span aria-hidden className="mt-[3px] h-[26px] w-[3px] shrink-0 rounded-full md:h-[26px]" style={{ background: SEES_TICKS[i % 3] }} />
-                  <div className="min-w-0 pr-2">
-                    <p className="text-[18px] font-medium leading-6 text-foreground md:text-[14px] md:leading-[17px]">{it.headline}</p>
-                    <p className="mt-1 text-[15px] leading-[22px] text-muted-foreground md:mt-0.5 md:text-[12.5px] md:leading-[15px]">{it.evidence}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-5 grid divide-y divide-border md:mt-6 md:grid-cols-3 md:divide-x md:divide-y-0">
+              {items.map((it, i) => <JkSeesFinding key={i} item={it} color={SEES_TICKS[i % 3]} />)}
             </div>
           )}
         </div>
       </div>
-      {isPro && items && items.length > 1 && (
-        <p className="mt-2.5 text-center font-mono text-[9.5px] tracking-[1.2px] text-subtle-foreground md:hidden">{page + 1} OF {items.length}</p>
-      )}
     </div>
   )
 }

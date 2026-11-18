@@ -1,5 +1,6 @@
 import type { ResumeChange, ResumeMarks } from "@/lib/onboarding/resumeChanges";
 import type { MustHaves } from "@/lib/chat/mustHaves";
+import type { BulletQuestion } from "@/lib/resume/bulletQuestions";
 
 export interface ChatToolCall {
   name: string;
@@ -38,6 +39,10 @@ export interface ChatArtifact {
   seconds?: number;
   tailoring?: ResumeTailoring;
   linkedToJob?: boolean;
+  /** Questions about bullets missing a number; answers rewrite this resume. */
+  questions?: BulletQuestion[];
+  /** Writing-standard readout (lib/resume/scorecard.ts shape), when the tool returned one. */
+  scorecard?: { bullets: number; quantified: number; dutyStyle: number; quantifiedPct: number; mustHaves?: { met: number; total: number; missing: string[] } };
 }
 
 /** Tool results arrive in a few shapes depending on how the run was serialised. */
@@ -147,6 +152,8 @@ export function turnArtifacts(calls: ChatToolCall[] | undefined): ChatArtifact[]
         seconds: typeof r.seconds === "number" ? r.seconds : undefined,
         tailoring: t,
         linkedToJob: !!r.linkedToJob,
+        questions: Array.isArray(r.questions) ? r.questions : [],
+        ...(r.scorecard && typeof r.scorecard === "object" ? { scorecard: r.scorecard } : {}),
       });
     } else if (call.name === "createCoverLetterJakeTemplate") {
       out.push({

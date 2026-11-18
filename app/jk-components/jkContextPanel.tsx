@@ -13,7 +13,7 @@ import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassChatWindow } from "@/providers/jkChatWindowProvider";
 import JkSegmented from "./jk-app/jkSegmented";
-import JkCompanyLogo from "./jkCompanyLogo";
+import { JkJobLogo } from "./jk-jobs/jkJobBits";
 import { cn } from "@/lib/utils";
 
 type Tone = "bar-2" | "bar-3" | "bar-4";
@@ -86,9 +86,12 @@ export default function JkContextPanel({ open, onClose }: { open: boolean; onClo
 
   if (!open) return null;
 
-  const resumeRows = (resumes ?? []).map((r: any) => ({ id: r._id, title: r.name || "Untitled", sub: r.isActive ? "Base resume" : new Date(r.createdAt ?? r._creationTime).toLocaleDateString(), on: attachedResumeIds.includes(r._id), toggle: () => (attachedResumeIds.includes(r._id) ? removeResumeAttachment(r._id) : addResumeAttachment(r._id)) }));
-  const letterRows = (coverLetterList ?? []).map((c: any) => ({ id: c._id, title: c.name || "Untitled", sub: new Date(c.createdAt ?? c._creationTime).toLocaleDateString(), on: attachedCoverLetterIds.includes(c._id), toggle: () => (attachedCoverLetterIds.includes(c._id) ? removeCoverLetterAttachment(c._id) : addCoverLetterAttachment(c._id)) }));
-  const jobRows = (allJobs ?? []).map((j: any) => ({ id: j._id, title: j.title, sub: [j.company, j.status].filter(Boolean).join(" · "), company: j.company, on: attachedJobIds.includes(j._id), toggle: () => (attachedJobIds.includes(j._id) ? removeJobAttachment(j._id) : addJobAttachment(j._id)) }));
+  // Newest activity first (edited, else created); the base resume always leads.
+  const when = (d: any) => d.updatedAt ?? d.createdAt ?? d._creationTime ?? 0;
+  const recent = (list: any[] | undefined | null) => [...(list ?? [])].sort((x, y) => when(y) - when(x));
+  const resumeRows = recent(resumes).sort((x, y) => Number(!!y.isActive) - Number(!!x.isActive)).map((r: any) => ({ id: r._id, title: r.name || "Untitled", sub: r.isActive ? "Base resume" : new Date(when(r)).toLocaleDateString(), base: !!r.isActive, on: attachedResumeIds.includes(r._id), toggle: () => (attachedResumeIds.includes(r._id) ? removeResumeAttachment(r._id) : addResumeAttachment(r._id)) }));
+  const letterRows = recent(coverLetterList).map((c: any) => ({ id: c._id, title: c.name || "Untitled", sub: new Date(when(c)).toLocaleDateString(), on: attachedCoverLetterIds.includes(c._id), toggle: () => (attachedCoverLetterIds.includes(c._id) ? removeCoverLetterAttachment(c._id) : addCoverLetterAttachment(c._id)) }));
+  const jobRows = (allJobs ?? []).map((j: any) => ({ id: j._id, title: j.title, sub: [j.company, j.status].filter(Boolean).join(" · "), company: j.company, link: j.link, on: attachedJobIds.includes(j._id), toggle: () => (attachedJobIds.includes(j._id) ? removeJobAttachment(j._id) : addJobAttachment(j._id)) }));
   const rows = tab === "resumes" ? resumeRows : tab === "coverLetters" ? letterRows : jobRows;
   const empty = tab === "resumes" ? "No resumes yet." : tab === "coverLetters" ? "No cover letters yet." : "No saved jobs yet.";
 
@@ -115,10 +118,10 @@ export default function JkContextPanel({ open, onClose }: { open: boolean; onClo
         {rows.map((row: any) => (
           <button key={row.id} type="button" onClick={row.toggle} data-on={row.on ? "" : undefined}
             className="flex w-full items-center gap-3 rounded-[12px] px-3 py-[9px] text-left transition-colors hover:bg-accent data-[on]:bg-accent">
-            {tab === "jobs" ? <JkCompanyLogo company={row.company || row.title} size="sm" /> : <span aria-hidden className={cn("h-4 w-[3px] shrink-0 rounded-full", tab === "resumes" ? "bg-bar-2" : "bg-bar-3")} />}
+            {tab === "jobs" ? <JkJobLogo company={row.company || row.title} link={row.link} size={24} /> : <span aria-hidden className={cn("h-4 w-[3px] shrink-0 rounded-full", row.base ? "bg-plan" : tab === "resumes" ? "bg-bar-2" : "bg-bar-3")} />}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[14px] leading-[18px] text-foreground">{row.title}</span>
-              <span className="block truncate font-mono text-[11px] leading-[15px] text-subtle-foreground">{row.sub}</span>
+              <span className={cn("block truncate font-mono text-[11px] leading-[15px]", row.base ? "text-plan-text" : "text-subtle-foreground")}>{row.sub}</span>
             </span>
             {row.on && <Check className="size-4 shrink-0 text-bar-3" />}
           </button>

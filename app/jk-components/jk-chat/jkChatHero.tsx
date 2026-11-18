@@ -1,15 +1,15 @@
 'use client'
 
 /**
- * New chat (D01 desktop, M03 phone): the night-voyage painting as a band, "Where to next,
- * {first name}?", the composer, four action cards that start real flows, and the context
+ * New chat (D01 desktop, M03 phone): the night-voyage painting as a band, a greeting
+ * that changes each visit ("What's the next move, {first name}?"), the composer, four action cards that start real flows, and the context
  * counts. Phone shows three cards and no counts, as M03 does.
  */
 import { createPortal } from "react-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import JkArt from "../jkArt";
-import JkCompanyLogo from "../jkCompanyLogo";
+import { JkJobLogo } from "../jk-jobs/jkJobBits";
 import JkInputSection from "../jkInputSection";
 import { useJobs } from "@/providers/jkJobsProvider";
 import { useJobKompassDocuments } from "@/providers/jkDocumentsProvider";
@@ -25,6 +25,35 @@ const CARDS: { id: JkChatAction; tick: string; title: string; sub: string; subPh
   { id: "prep", tick: "bg-bar-4", title: "Build a prep deck", sub: "pitch, flashcards, questions", phone: false },
 ];
 
+/**
+ * New-chat greetings. One is picked at random each time the screen opens, never the
+ * same one twice in a row. Keep each line to about 21 characters so it fits one line
+ * on a phone, where the name sits on the line below.
+ */
+const GREETINGS: { text: string; end: "?" | "." }[] = [
+  { text: "What's the next move", end: "?" },
+  { text: "Which role is next", end: "?" },
+  { text: "Where are we applying", end: "?" },
+  { text: "What are we landing", end: "?" },
+  { text: "Ready for an offer", end: "?" },
+  { text: "Let's get you hired", end: "." },
+];
+const GREETING_KEY = "jk:lastChatGreeting";
+
+/** A random greeting index that differs from the one shown last time. */
+function pickGreeting(): number {
+  let last = -1;
+  try {
+    last = Number.parseInt(window.localStorage.getItem(GREETING_KEY) ?? "", 10);
+  } catch {}
+  let next = Math.floor(Math.random() * GREETINGS.length);
+  if (next === last) next = (next + 1) % GREETINGS.length;
+  try {
+    window.localStorage.setItem(GREETING_KEY, String(next));
+  } catch {}
+  return next;
+}
+
 /** "itwela ibomu" -> "Itwela" */
 export function jkFirstName(name?: string | null) {
   const first = (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -34,6 +63,10 @@ export function jkFirstName(name?: string | null) {
 export default function JkChatHero({ firstName, onAction, busy }: { firstName: string; onAction: (a: JkChatAction) => void; busy?: boolean }) {
   const { allJobs } = useJobs();
   const { resumeList, coverLetterList } = useJobKompassDocuments();
+  // Picked after mount so the server and the browser never disagree on the text.
+  const [greeting, setGreeting] = useState<number | null>(null);
+  useEffect(() => setGreeting(pickGreeting()), []);
+  const line = GREETINGS[greeting ?? 0];
   const counts = [
     { tick: "bg-bar-2", n: resumeList.length, label: "resumes" },
     { tick: "bg-bar-3", n: coverLetterList.length, label: "cover letters" },
@@ -53,8 +86,8 @@ export default function JkChatHero({ firstName, onAction, busy }: { firstName: s
           <span aria-hidden className="h-[14px] w-[3px] rounded-full bg-plan" />
           New chat
         </p>
-        <h1 className="jk-enter mt-3 text-[34px] font-medium leading-[38px] tracking-[-0.8px] text-foreground sm:mt-2 sm:text-[48px] sm:leading-[57px] sm:tracking-[-1.1px]" style={{ "--i": 1 } as React.CSSProperties}>
-          Where to next{firstName ? <>,<br className="sm:hidden" /> {firstName}?</> : "?"}
+        <h1 aria-hidden={greeting === null} className="jk-enter mt-3 text-[34px] font-medium leading-[38px] tracking-[-0.8px] text-foreground sm:mt-2 sm:text-[48px] sm:leading-[57px] sm:tracking-[-1.1px]" style={{ "--i": 1, visibility: greeting === null ? "hidden" : undefined } as React.CSSProperties}>
+          {line.text}{firstName ? <>,<br className="sm:hidden" /> {firstName}{line.end}</> : line.end}
         </h1>
         <p className="jk-enter mt-[6px] hidden text-[16px] leading-[19px] text-muted-foreground sm:block" style={{ "--i": 2 } as React.CSSProperties}>
           Paste a posting, ask for a resume, or pick up a job you already saved.
@@ -136,7 +169,7 @@ export function JkChatJobPicker({ open, title, onPick, onClose, onSaveJob }: { o
             </div>
           ) : jobs.map((j) => (
             <button key={j._id} type="button" onClick={() => onPick(String(j._id))} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-[10px] text-left transition-colors hover:bg-accent">
-              <JkCompanyLogo company={j.company} size="md" />
+              <JkJobLogo company={j.company} link={j.link} size={32} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14.5px] leading-[18px] text-foreground">{j.title}</span>
                 <span className="block truncate font-mono text-[11px] leading-[15px] text-subtle-foreground">{[j.company, j.status].filter(Boolean).join(" · ")}</span>

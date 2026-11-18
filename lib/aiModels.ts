@@ -68,6 +68,23 @@ export function getModelsForFreeResume(): AIModelInfo[] {
   );
 }
 
+/**
+ * OpenRouter models that write resume content (tailoring and bullet rewrites).
+ * Chosen in a bake-off on Nov 17 2026: the standard writer costs about a third of a
+ * cent per resume, the premium one three to seven cents and is the most careful about
+ * not overstating the candidate's part. Override with OPENROUTER_RESUME_WRITER_MODEL
+ * and OPENROUTER_RESUME_WRITER_MODEL_PREMIUM.
+ */
+export const RESUME_WRITER_MODEL_ID = 'openai/gpt-5.6-luna';
+export const RESUME_WRITER_PREMIUM_MODEL_ID = 'anthropic/claude-sonnet-5.5';
+
+/** The writers to try, in order: the plan's model first, the standard one as fallback. */
+export function resumeWriterModels(premium: boolean): string[] {
+  const standard = process.env.OPENROUTER_RESUME_WRITER_MODEL?.trim() || RESUME_WRITER_MODEL_ID;
+  const top = process.env.OPENROUTER_RESUME_WRITER_MODEL_PREMIUM?.trim() || RESUME_WRITER_PREMIUM_MODEL_ID;
+  return premium && top !== standard ? [top, standard] : [standard];
+}
+
 /** Model used for JobKompass chat (main app chat). */
 export const CHAT_MODEL_ID = 'gpt-5-mini';
 

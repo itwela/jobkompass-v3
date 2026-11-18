@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import JkGetStartedButton from "../jkGetStartedButton";
 import JkPaintingLoop from "../jkPaintingLoop";
+import JkLandingHeroNotes from "./jkLandingHeroNotes";
 import { HERO_LOOP_FRAGMENT, HERO_LOOP_SECONDS, HERO_LOOP_SPACE } from "./jkHeroLoopShader";
 
 /**
@@ -44,24 +45,8 @@ export default function JkLandingHero() {
           </Link>
         </div>
 
-        {/* Two notes from the product, pinned either side of the buttons. */}
-        <div aria-hidden style={{ "--i": 6 } as React.CSSProperties} className="jk-enter absolute left-24 top-[474px] hidden h-[84px] w-[268px] rounded-[18px] border border-hero-ink/20 bg-background/60 px-5 pt-[15px] text-left xl:block">
-          <p className="font-mono text-[9.5px] font-medium uppercase tracking-[1.2px] text-bar-4-ink">Saved to My Jobs</p>
-          <p className="mt-[5px] text-[15.5px] font-medium leading-[18px] text-hero-ink">GTM AI Solutions Engineer</p>
-          <p className="mt-1 text-[13px] leading-[15px] text-hero-ink/75">PTC (via Mondo)</p>
-        </div>
-        <div aria-hidden style={{ "--i": 7 } as React.CSSProperties} className="jk-enter absolute right-24 top-[468px] hidden h-24 w-[262px] rounded-[18px] border border-hero-ink/20 bg-background/60 px-5 pt-[15px] text-left xl:block">
-          <div className="flex items-center justify-between">
-            <p className="text-[15px] font-medium leading-[18px] text-hero-ink">Must-haves matched</p>
-            <p className="font-mono text-xs font-medium text-bar-4-ink">8/10</p>
-          </div>
-          <div className="mt-[19px] flex justify-between">
-            {Array.from({ length: 10 }, (_, i) => (
-              <span key={i} className={i < 8 ? "size-3 rounded-full bg-bar-4" : "size-3 rounded-full bg-border-strong"} />
-            ))}
-          </div>
-          <p className="mt-[10px] font-mono text-[9.5px] uppercase tracking-[1px] text-hero-ink/75">Resume written · 1 page</p>
-        </div>
+        {/* Two pieces of the app, pinned either side of the buttons, each playing a short loop. */}
+        <JkLandingHeroNotes />
       </div>
 
       {/* Sky band (desktop), then the painting at its own shape. */}

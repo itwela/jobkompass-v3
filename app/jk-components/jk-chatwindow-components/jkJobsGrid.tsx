@@ -8,10 +8,10 @@
  * All three take the already-filtered jobs from useJobs() and report clicks up; the page
  * (jkChatWindow-MyJobsMode.tsx) owns focus (J/K), selection and dialogs.
  */
-import { Check } from "lucide-react";
+import { ArrowDown, ArrowUp, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { appliedDate } from "@/lib/jkJobs";
-import { STATUS_BG, STATUS_TEXT, statusKey } from "@/lib/jkStatus";
+import { annualPay, appliedDate } from "@/lib/jkJobs";
+import { JOB_STATUSES, STATUS_BG, STATUS_TEXT, statusKey } from "@/lib/jkStatus";
 import type { Job } from "@/providers/jkJobsProvider";
 import type { Id } from "@/convex/_generated/dataModel";
 import { JkStatusGlyph } from "../jkStatusChip";
@@ -37,13 +37,49 @@ function SelectBox({ on, label }: { on: boolean; label: string }) {
   );
 }
 
+export type JkJobSortKey = "title" | "company" | "status" | "applied" | "comp";
+export type JkJobSort = { key: JkJobSortKey; dir: "asc" | "desc" } | null;
+const SORT_COLS: { key: JkJobSortKey; label: string }[] = [
+  { key: "title", label: "Title" }, { key: "company", label: "Company" }, { key: "status", label: "Status" },
+  { key: "applied", label: "Applied" }, { key: "comp", label: "Comp" },
+];
+
+/** Click a column: A to Z, then Z to A, then back to the usual order (most recently changed first). */
+export function nextJobSort(current: JkJobSort, key: JkJobSortKey): JkJobSort {
+  if (!current || current.key !== key) return { key, dir: "asc" };
+  return current.dir === "asc" ? { key, dir: "desc" } : null;
+}
+
+/** Jobs in the chosen column order. Rows with nothing in that column always go last. */
+export function sortJobs(jobs: Job[], sort: JkJobSort): Job[] {
+  if (!sort) return jobs;
+  const text = (v?: string | null) => (v ?? "").trim().toLowerCase();
+  const value = (j: Job): string | number | null => {
+    if (sort.key === "title") return text(j.title) || null;
+    if (sort.key === "company") return text(j.company) || null;
+    if (sort.key === "status") { const i = (JOB_STATUSES as readonly string[]).indexOf(j.status); return i < 0 ? null : i; }
+    if (sort.key === "applied") { const t = j.dateApplied ? Date.parse(j.dateApplied) : NaN; return Number.isNaN(t) ? null : t; }
+    return annualPay(j.compensation);
+  };
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return [...jobs].sort((a, b) => {
+    const x = value(a), y = value(b);
+    if (x === null && y === null) return 0;
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return (typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))) * sign;
+  });
+}
+
 const TABLE_COLS = "grid grid-cols-[minmax(0,1fr)_minmax(120px,166px)_124px_84px_56px] items-center gap-x-0";
 
 export function JkJobsTable({
-  jobs, total, focusedId, selectionMode, selectedIds, onRowClick, onRowOpen, onToggle,
+  jobs, total, focusedId, selectionMode, selectedIds, onRowClick, onRowOpen, onToggle, sort = null, onSort,
 }: {
   jobs: Job[];
   total: number;
+  sort?: JkJobSort;
+  onSort?: (key: JkJobSortKey) => void;
   focusedId: JobId | null;
   selectionMode: boolean;
   selectedIds: JobId[];
@@ -54,11 +90,19 @@ export function JkJobsTable({
   return (
     <div role="table" aria-label="Jobs" aria-rowcount={jobs.length} className="min-w-0">
       <div role="row" className={cn(TABLE_COLS, "sticky top-0 z-[1] h-10 border-b border-border bg-background pl-8 pr-5")}>
-        {["Title", "Company", "Status", "Applied", "Comp"].map((h) => (
-          <JkMonoLabel key={h} as="span" className="tracking-[0.12em]">
-            <span role="columnheader">{h}</span>
-          </JkMonoLabel>
-        ))}
+        {SORT_COLS.map((c) => {
+          const on = sort?.key === c.key;
+          return (
+            <span key={c.key} role="columnheader" aria-sort={on ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"} className="min-w-0">
+              <button type="button" onClick={() => onSort?.(c.key)} title={`Sort by ${c.label.toLowerCase()}`}
+                className={cn("group/h -ml-1.5 flex h-7 items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-accent", on && "text-foreground")}>
+                <JkMonoLabel as="span" className={cn("tracking-[0.12em] transition-colors group-hover/h:text-foreground", on && "text-foreground")}>{c.label}</JkMonoLabel>
+                {on ? (sort!.dir === "asc" ? <ArrowUp className="size-3" strokeWidth={2} /> : <ArrowDown className="size-3" strokeWidth={2} />)
+                  : <ArrowUp aria-hidden className="size-3 text-subtle-foreground opacity-0 transition-opacity group-hover/h:opacity-60" strokeWidth={2} />}
+              </button>
+            </span>
+          );
+        })}
       </div>
       <div data-enter className="relative">
         {jobs.map((job, i) => {
@@ -231,14 +275,14 @@ export function JkJobsPhoneList({
                 type="button"
                 data-job-row={job._id}
                 onClick={() => (selectionMode ? onToggle(job._id) : onOpen(job._id))}
-                className={cn("flex min-h-20 w-full items-start gap-[13px] py-[17px] text-left", selected && "bg-accent/40")}
+                className={cn("flex min-h-20 w-full items-center gap-[14px] py-[15px] text-left", selected && "bg-accent/40")}
               >
-                <span className="mt-[3px]">{selectionMode ? <SelectBox on={selected} label={`Select ${job.title}`} /> : <JkStatusGlyph status={job.status} className="size-[13px]" />}</span>
+                {selectionMode ? <SelectBox on={selected} label={`Select ${job.title}`} /> : <JkJobLogo company={job.company} link={job.link} size={40} />}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[16px] font-medium leading-[19px] text-foreground">{job.title}</span>
-                  <span className="mt-1.5 flex min-w-0 items-baseline gap-3 text-[13px] leading-[15px]">
+                  <span className="mt-1.5 flex min-w-0 items-center gap-2 text-[13px] leading-[15px]">
                     <span className="truncate text-muted-foreground">{job.company}</span>
-                    <span className={cn("shrink-0", STATUS_TEXT[k])}>· {job.status}</span>
+                    <span className={cn("flex shrink-0 items-center gap-1.5", STATUS_TEXT[k])}><JkStatusGlyph status={job.status} className="size-[11px]" />{job.status}</span>
                     <JkCompBars compensation={job.compensation} className="ml-auto shrink-0 pl-2 text-[11px]" />
                   </span>
                 </span>

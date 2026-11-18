@@ -24,6 +24,9 @@ import { mcpTools } from '@/app/lib/mcp-tools';
 import { enforceAiRateLimit } from '@/lib/rateLimit/guard';
 import { chatTurnNamesInventedFact, guardChatTurn, resumeJsonFromText, scrubInventedExperience, type FactGuard } from '@/lib/resume/noInventedFacts';
 
+// A resume turn runs the shared resume writer (up to a few minutes on a slow model).
+export const maxDuration = 300;
+
 /** Id and name of the resume loadSignedInResume picks, for the chat's step trace. */
 async function baseResumeLabel(client: ConvexHttpClient, contextResumeIds: string[] | undefined): Promise<ChatTurnContext["baseResume"]> {
   const turn: ChatTurnContext = {};

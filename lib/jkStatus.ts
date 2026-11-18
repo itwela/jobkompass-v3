@@ -47,7 +47,7 @@ export const STATUS_BG: Record<StatusKey, string> = {
 };
 export const STATUS_TEXT: Record<StatusKey, string> = {
   interested: "text-status-interested",
-  applied: "text-status-applied",
+  applied: "text-warn-ink",
   callback: "text-status-callback",
   interviewing: "text-status-interviewing",
   offered: "text-status-offered",

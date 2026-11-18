@@ -81,7 +81,7 @@ export function JkSparkline({
 export function JkGauge({
   value, previous, previousLabel, max: maxIn, className,
 }: { value: number | null; previous: number | null; previousLabel: string; max?: number; className?: string }) {
-  const max = maxIn ?? Math.max(10, Math.ceil((Math.max(value ?? 0, previous ?? 0) * 1.2) / 10) * 10);
+  const max = maxIn ?? Math.min(100, Math.max(10, Math.ceil((Math.max(value ?? 0, previous ?? 0) * 1.2) / 10) * 10));
   const cx = 79, cy = 95, r = 57.5;
   const ang = (v: number) => Math.PI - (Math.min(Math.max(v, 0), max) / max) * Math.PI;
   const pt = (a: number, rr: number) => [cx + rr * Math.cos(a), cy - rr * Math.sin(a)] as const;
@@ -150,8 +150,11 @@ export function JkSankey({ data, height = 256, className }: { data: SankeyData; 
 
   const layout = useMemo(() => {
     if (!W || data.saved === 0) return null;
-    const c1 = Math.round(W * (narrow ? 0.31 : 0.39));
-    const c2 = Math.round(W * (narrow ? 0.56 : 0.72));
+    // The outcome labels ("Interviewing  40") keep a fixed column on the right so they
+    // never get cut off; the ribbons take whatever width is left.
+    const LABELS = narrow ? 112 : 150;
+    const c2 = Math.min(Math.round(W * 0.72), W - LABELS - NODE);
+    const c1 = Math.min(Math.round(W * (narrow ? 0.31 : 0.39)), c2 - (narrow ? 96 : 140));
     const hasSplit = data.applied > 0 && data.notApplied > 0;
     const k = (height - (hasSplit ? GAP : 0)) / data.saved;
     const savedH = data.saved * k;
@@ -187,16 +190,16 @@ export function JkSankey({ data, height = 256, className }: { data: SankeyData; 
           <svg width={W} height={layout.total} className="absolute inset-0 overflow-visible" role="img" aria-label={label}>
             <defs>
               <linearGradient id={`${uid}-a`} x1="0" x2="1">
-                <stop offset="0" style={{ stopColor: "var(--primary)", stopOpacity: 0.5 }} />
-                <stop offset="1" style={{ stopColor: "var(--warn)", stopOpacity: 0.4 }} />
+                <stop offset="0" style={{ stopColor: "var(--flow-saved)", stopOpacity: 0.5 }} />
+                <stop offset="1" style={{ stopColor: "var(--flow-applied)", stopOpacity: 0.4 }} />
               </linearGradient>
               <linearGradient id={`${uid}-n`} x1="0" x2="1">
-                <stop offset="0" style={{ stopColor: "var(--primary)", stopOpacity: 0.5 }} />
-                <stop offset="1" style={{ stopColor: "var(--bar-3)", stopOpacity: 0.55 }} />
+                <stop offset="0" style={{ stopColor: "var(--flow-saved)", stopOpacity: 0.5 }} />
+                <stop offset="1" style={{ stopColor: "var(--flow-idle)", stopOpacity: 0.55 }} />
               </linearGradient>
               {layout.outs.map((o) => (
                 <linearGradient key={o.key} id={`${uid}-${o.key}`} x1="0" x2="1">
-                  <stop offset="0" style={{ stopColor: "var(--warn)", stopOpacity: 0.35 }} />
+                  <stop offset="0" style={{ stopColor: "var(--flow-applied)", stopOpacity: 0.35 }} />
                   <stop offset="1" style={{ stopColor: OUTCOME_COLOR[o.key], stopOpacity: 0.55 }} />
                 </linearGradient>
               ))}
@@ -206,9 +209,9 @@ export function JkSankey({ data, height = 256, className }: { data: SankeyData; 
             {layout.outs.map((o) => (
               <path key={o.key} d={ribbon(layout.c1 + NODE, o.srcY, o.srcY + o.srcH, layout.c2, o.y, o.y + o.h)} fill={`url(#${uid}-${o.key})`} />
             ))}
-            <rect x={0} y={0} width={NODE} height={layout.savedH} rx={3} style={{ fill: "var(--primary)" }} />
-            {data.applied > 0 && <rect x={layout.c1} y={0} width={NODE} height={layout.appliedH} rx={3} style={{ fill: "var(--warn)" }} />}
-            {data.notApplied > 0 && <rect x={layout.c1} y={layout.notY} width={NODE} height={layout.notH} rx={3} style={{ fill: "var(--bar-3)" }} />}
+            <rect x={0} y={0} width={NODE} height={layout.savedH} rx={3} style={{ fill: "var(--flow-saved)" }} />
+            {data.applied > 0 && <rect x={layout.c1} y={0} width={NODE} height={layout.appliedH} rx={3} style={{ fill: "var(--flow-applied)" }} />}
+            {data.notApplied > 0 && <rect x={layout.c1} y={layout.notY} width={NODE} height={layout.notH} rx={3} style={{ fill: "var(--flow-idle)" }} />}
             {layout.outs.map((o) => (
               <rect key={o.key} x={layout.c2} y={o.y} width={NODE} height={o.h} rx={2.5} style={{ fill: OUTCOME_COLOR[o.key] }} />
             ))}
@@ -216,9 +219,9 @@ export function JkSankey({ data, height = 256, className }: { data: SankeyData; 
 
           <SankeyNodeLabel x={22} y={layout.savedH / 2 + (data.notApplied > 0 ? 18 : -14)} value={data.saved} label="Saved" big />
           {data.applied > 0 && <SankeyNodeLabel x={layout.c1 + 22} y={Math.min(layout.appliedH / 2, layout.appliedH - 44) - 4} value={data.applied} label="Applied" />}
-          {data.notApplied > 0 && <SankeyNodeLabel x={layout.c1 + 22} y={layout.notY + layout.notH / 2} value={data.notApplied} label="Not applied yet" />}
+          {data.notApplied > 0 && <SankeyNodeLabel x={layout.c1 + 22} y={layout.notY + layout.notH / 2} value={data.notApplied} label={narrow ? "Not applied" : "Not applied yet"} />}
           {layout.outs.map((o) => (
-            <div key={o.key} className="absolute flex items-center justify-between gap-3 text-[13.5px] leading-4" style={{ left: layout.c2 + 24, right: 0, top: o.cy - 8 }}>
+            <div key={o.key} className="absolute flex items-center justify-between gap-2 text-[12.5px] leading-4 sm:gap-3 sm:text-[13.5px]" style={{ left: layout.c2 + (narrow ? 18 : 24), right: 0, top: o.cy - 8 }}>
               <span className="truncate text-foreground">{o.label}</span>
               <span className="font-mono text-[13px] font-medium text-foreground">{o.count}</span>
             </div>
@@ -278,10 +281,11 @@ export function JkWeeklyChart({
   const tipRight = xs(active) < 170;
 
   return (
-    <div ref={ref} className={cn("relative w-full", className)}>
+    <div ref={ref} className={cn("relative w-full", className)} style={{ height }}>
       {W > 0 && (
         <>
-          <svg width={W} height={height} className="block overflow-visible" role="img"
+          {/* Absolute so a stale measured width never props the column open when the window shrinks. */}
+          <svg width={W} height={height} className="absolute left-0 top-0 overflow-visible" role="img"
             aria-label={`Applications per week, last 12 weeks: ${weeks.map((x) => `${shortDate(x.start)} ${x.applied}`).join(", ")}. Average ${average.toFixed(1)}.`}>
             <defs>
               <linearGradient id={`${uid}-fill`} x1="0" x2="0" y1="0" y2="1">

@@ -2,31 +2,27 @@
 
 /**
  * Reads the signed-in user's default resume template (users.defaultTemplate, set in
- * Settings > Resume preferences). Rendered as an invisible probe inside an error boundary so
- * a backend without `auth.getDefaultTemplate` deployed yet degrades to "jake" instead of
+ * Settings > Resume preferences). Rendered as an invisible probe so a backend without `auth.getDefaultTemplate` deployed yet degrades to "jake" instead of
  * crashing the screen.
  *
  *   const [tpl, setTpl] = useState<string | null>(null)
  *   <JkDefaultTemplateProbe onChange={setTpl} />
  */
-import { Component, useEffect, type ReactNode } from "react"
-import { useConvexAuth, useQuery } from "convex/react"
+import { useEffect } from "react"
+import { useConvex, useConvexAuth } from "convex/react"
 import { api } from "@/convex/_generated/api"
 
-class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch() { /* backend not deployed yet: keep the app default */ }
-  render() { return this.state.failed ? null : this.props.children }
-}
-
-function Probe({ onChange }: { onChange: (id: string | null) => void }) {
-  const { isAuthenticated } = useConvexAuth()
-  const value = useQuery(api.auth.getDefaultTemplate, isAuthenticated ? {} : "skip")
-  useEffect(() => { if (value !== undefined) onChange(value) }, [value, onChange])
-  return null
-}
-
+// A one-shot query (not useQuery): useQuery throws into React when the function isn't
+// deployed, which the dev overlay shows as a crash even inside an error boundary.
+// The probe remounts with each screen, so a read on mount is fresh enough.
 export function JkDefaultTemplateProbe({ onChange }: { onChange: (id: string | null) => void }) {
-  return <Boundary><Probe onChange={onChange} /></Boundary>
+  const convex = useConvex()
+  const { isAuthenticated } = useConvexAuth()
+  useEffect(() => {
+    if (!isAuthenticated) return
+    let live = true
+    convex.query(api.auth.getDefaultTemplate, {}).then((v) => { if (live) onChange(v) }, () => { /* not deployed yet: keep the app default */ })
+    return () => { live = false }
+  }, [convex, isAuthenticated, onChange])
+  return null
 }

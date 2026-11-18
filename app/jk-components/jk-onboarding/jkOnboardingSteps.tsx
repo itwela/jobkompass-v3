@@ -210,6 +210,8 @@ export function JkOnbJobStep({ job, onJob, onBack, onWrite }: { job: OnbJob | nu
   const [error, setError] = useState<{ text: string; code?: string } | null>(null);
   const [needsText, setNeedsText] = useState(false);
   const savedFor = useRef<string | null>(job ? (job.link ?? "") : null);
+  // Same value as state, for what the screen shows (a ref must not be read while rendering).
+  const [savedKey, setSavedKey] = useState<string | null>(job ? (job.link ?? "") : null);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
   const save = async (): Promise<boolean> => {
@@ -229,12 +231,13 @@ export function JkOnbJobStep({ job, onJob, onBack, onWrite }: { job: OnbJob | nu
       return false;
     }
     savedFor.current = key;
+    setSavedKey(key);
     onJob(r.data);
     return true;
   };
 
   const write = async () => { if (await save()) onWrite(); };
-  const linkSaved = !!job && savedFor.current === `${link.trim()}|${description.trim()}` && !!link.trim();
+  const linkSaved = !!job && savedKey === `${link.trim()}|${description.trim()}` && !!link.trim();
 
   return (
     <>
