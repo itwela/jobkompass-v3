@@ -16,7 +16,7 @@ const RESUME_QUESTIONS_WORKFLOW = {
     "Or let the server write it: POST /agent/resumes/tailor {base, jobId} (jk resumes tailor) uses the saved answers and returns the new resume plus remaining questions.",
   ],
   question: "{id, section: experience|projects, index, bullet, question, example?} — example is a made-up placeholder in the right unit, never a fact",
-  scorecard: "{bullets, quantified, dutyStyle, quantifiedPct, mustHaves?: {met, total, missing}} — mustHaves only when a jobId is given",
+  scorecard: "{bullets, quantified, dutyStyle, quantifiedPct, mustHaves?: {met, total, missing, matched?: [{term, evidence}]}} — mustHaves only when a jobId is given",
   questionSource: "template (built-in, free, default) | ai (aiQuestions/ai=true; model questions about YOUR text, which is never rewritten) | none (every bullet has a number or is answered)",
 };
 

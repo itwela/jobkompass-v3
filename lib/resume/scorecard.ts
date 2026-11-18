@@ -10,7 +10,8 @@ export interface ResumeScorecard {
   dutyStyle: number;
   /** 0 to 100, rounded. 0 when there are no bullets. */
   quantifiedPct: number;
-  mustHaves?: { met: number; total: number; missing: string[] };
+  /** matched: each met must-have with the resume evidence for it, when the scorer gave it. */
+  mustHaves?: { met: number; total: number; missing: string[]; matched?: { term: string; evidence: string }[] };
 }
 
 export interface ScorecardDelta {
@@ -47,7 +48,7 @@ function bulletsOf(resume: Record<string, any> | null | undefined): string[] {
 
 export function scoreResume(
   resume: Record<string, any> | null | undefined,
-  opts?: { mustHaves?: { met: string[]; missing: string[] } },
+  opts?: { mustHaves?: { met: string[]; missing: string[]; matched?: { term: string; evidence: string }[] } },
 ): ResumeScorecard {
   const bullets = bulletsOf(resume);
   const quantified = bullets.filter(bulletHasNumber).length;
@@ -62,6 +63,7 @@ export function scoreResume(
     const met = opts.mustHaves.met ?? [];
     const missing = opts.mustHaves.missing ?? [];
     card.mustHaves = { met: met.length, total: met.length + missing.length, missing: [...missing] };
+    if (opts.mustHaves.matched) card.mustHaves.matched = opts.mustHaves.matched.map((m) => ({ ...m }));
   }
   return card;
 }

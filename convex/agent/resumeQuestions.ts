@@ -17,7 +17,7 @@ import {
   type QuestionSection,
 } from "../../lib/resume/bulletQuestions";
 import { scoreResume, type ResumeScorecard } from "../../lib/resume/scorecard";
-import { mentions, resumeText } from "../../lib/chat/mustHaveMatch";
+import { matchMustHave } from "../../lib/chat/mustHaveMatch";
 
 type AnyResume = Record<string, any>;
 
@@ -179,14 +179,20 @@ export function mustHavesFromJob(job: { skills?: string[]; keywords?: string[] }
 export function mustHavesCoverage(
   content: AnyResume,
   job: { skills?: string[]; keywords?: string[] } | null | undefined
-): { met: string[]; missing: string[] } | undefined {
+): { met: string[]; missing: string[]; matched: { term: string; evidence: string }[] } | undefined {
   const wanted = mustHavesFromJob(job);
   if (!wanted) return undefined;
-  const text = resumeText(content ?? {});
   const met: string[] = [];
   const missing: string[] = [];
-  for (const m of wanted) (mentions(text, m) ? met : missing).push(m);
-  return { met, missing };
+  const matched: { term: string; evidence: string }[] = [];
+  for (const m of wanted) {
+    const evidence = matchMustHave(content ?? {}, m);
+    if (evidence) {
+      met.push(m);
+      matched.push({ term: m, evidence });
+    } else missing.push(m);
+  }
+  return { met, missing, matched };
 }
 
 export function scorecardFor(content: AnyResume, job?: { skills?: string[]; keywords?: string[] } | null): ResumeScorecard {

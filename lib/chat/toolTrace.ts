@@ -42,7 +42,7 @@ export interface ChatArtifact {
   /** Questions about bullets missing a number; answers rewrite this resume. */
   questions?: BulletQuestion[];
   /** Writing-standard readout (lib/resume/scorecard.ts shape), when the tool returned one. */
-  scorecard?: { bullets: number; quantified: number; dutyStyle: number; quantifiedPct: number; mustHaves?: { met: number; total: number; missing: string[] } };
+  scorecard?: { bullets: number; quantified: number; dutyStyle: number; quantifiedPct: number; mustHaves?: { met: number; total: number; missing: string[]; matched?: { term: string; evidence: string }[] } };
 }
 
 /** Tool results arrive in a few shapes depending on how the run was serialised. */

@@ -1,7 +1,7 @@
 // Relative imports: this module is also bundled into Convex node actions (agent tailoring).
 import { DEFAULT_RESUME_EXTRACTION_MODEL_IDS } from "../aiModels";
 import { parseTailoredResumeResponse } from "../emailAgent/draftMessage";
-import { mentions, resumeText } from "./mustHaveMatch";
+import { matchMustHave } from "./mustHaveMatch";
 
 /** How a tailored resume covers the posting's must-haves. */
 export interface MustHaves {
@@ -10,6 +10,17 @@ export interface MustHaves {
   met: string[];
   /** Must-haves the resume does not show, so tailoring left them out. */
   missing: string[];
+  /**
+   * Each met must-have with the resume snippet or skill that satisfied it, in the same
+   * order as `met`. Optional so older stored results still type-check.
+   */
+  matched?: MustHaveMatch[];
+}
+
+/** One met must-have and the piece of the resume that shows it. */
+export interface MustHaveMatch {
+  term: string;
+  evidence: string;
 }
 
 const SYSTEM = `You read one job posting and list its must-have requirements as JSON. Return ONLY:
@@ -131,18 +142,24 @@ async function extractFromModel(job: MustHaveJob): Promise<string[] | null> {
   return null;
 }
 
-export { MUST_HAVE_ALIASES, mentions, resumeText, stripVendor } from "./mustHaveMatch";
+export { MUST_HAVE_ALIASES, MUST_HAVE_CONCEPTS, conceptFor, findEvidence, matchMustHave, mentions, resumeText, stripVendor } from "./mustHaveMatch";
 
 /**
  * Scores must-haves against the person's own (base) resume, never the posting and never
  * the model's rewrite: a must-have counts only when the base resume already shows it.
  */
 export function scoreMustHaves(terms: string[], baseResume: unknown): MustHaves {
-  const haystack = resumeText(baseResume);
   const met: string[] = [];
   const missing: string[] = [];
-  for (const term of clean(terms)) (mentions(haystack, term) ? met : missing).push(term);
-  return { total: met.length + missing.length, met, missing };
+  const matched: MustHaveMatch[] = [];
+  for (const term of clean(terms)) {
+    const evidence = matchMustHave(baseResume, term);
+    if (evidence) {
+      met.push(term);
+      matched.push({ term, evidence });
+    } else missing.push(term);
+  }
+  return { total: met.length + missing.length, met, missing, matched };
 }
 
 /** Page count of a PDF. */

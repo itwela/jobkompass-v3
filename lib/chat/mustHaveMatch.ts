@@ -60,30 +60,159 @@ function spellings(term: string): string[] {
   return [...out];
 }
 
-/** True when the exact phrase appears as a whole word or phrase ("Java" never inside "JavaScript"). */
-function phraseIn(haystack: string, term: string): boolean {
+/**
+ * Where the phrase appears as a whole word or phrase ("Java" never inside "JavaScript"):
+ * its index, -1 when found only with dots dropped, null when absent.
+ */
+function phraseAt(haystack: string, term: string): number | null {
   const needle = term.toLowerCase().trim();
-  if (!needle) return false;
+  if (!needle) return null;
   const variants = new Set([needle, needle.replace(/\./g, ""), needle.replace(/-/g, " "), needle.replace(/\s+/g, "")]);
   // Also against the text with dots dropped, so "nextjs" finds "Next.js".
-  const hays = [haystack, haystack.replace(/(\w)\.(\w)/g, "$1$2")];
+  const dotless = haystack.replace(/(\w)\.(\w)/g, "$1$2");
   for (const v of variants) {
     if (!v) continue;
     const re = new RegExp(`(^|[^a-z0-9+#])${escape(v)}($|[^a-z0-9+#])`, "i");
-    if (hays.some((h) => re.test(h))) return true;
+    const m = re.exec(haystack);
+    if (m) return m.index + m[1].length;
+    if (re.test(dotless)) return -1;
   }
-  return false;
+  return null;
 }
 
 /**
- * True when the resume text shows the requirement: as written, without a vendor prefix
- * ("AWS Lambda" is met by "Lambda"), through an alias ("LLM" by "large language
- * models"), or, for a combined term such as "Node.js/TypeScript", when every part is shown.
+ * Concepts and role phrases a posting names ("chatbot/copilot", "enterprise knowledge
+ * assistants") that a resume shows by describing the work rather than with the same
+ * words. `names` are the posting's spellings (lower case, singular). Each `evidence`
+ * pattern runs on one resume string at a time and needs a specific signal: a bare "AI",
+ * "search", "agent" or "team" never satisfies a concept on its own.
+ */
+export interface MustHaveConcept {
+  names: string[];
+  evidence: RegExp[];
+}
+
+export const MUST_HAVE_CONCEPTS: MustHaveConcept[] = [
+  {
+    names: [
+      "generative ai rag/search", "genai rag/search", "gen ai rag/search", "generative ai rag",
+      "rag/search", "rag and search", "rag/vector search", "rag and vector search",
+    ],
+    evidence: [
+      /\b(?:rag|retrieval[- ]augmented generation)\b/,
+      /\b(?:vector|semantic|embeddings?)[- ](?:search|retrieval)\b/,
+    ],
+  },
+  {
+    names: [
+      "chatbot/copilot", "copilot/chatbot", "ai copilot/chatbot", "ai chatbot/copilot", "chatbot", "ai chatbot",
+      "ai copilot", "ai assistant", "conversational ai",
+    ],
+    evidence: [
+      /\b(?:chat ?bots?|copilots?|ai assistants?|virtual assistants?|chat assistants?|conversational ai)\b/,
+      /\b(?:quer\w*|ask\w*|answer\w*|search\w*|chat\w*)\b[^\n]{0,60}\bconversational(?:ly)?\b/,
+      /\bconversational(?:ly)?\b[^\n]{0,60}\b(?:quer\w*|ask\w*|answer\w*|search\w*|interface)\b/,
+      /\bnatural[- ]language (?:quer\w*|questions?|interface)\b/,
+      /\b(?:llm|ai|bedrock|gpt|rag)[- ](?:powered |based )?assistants?\b/,
+    ],
+  },
+  {
+    names: ["enterprise knowledge assistant", "knowledge assistant", "internal knowledge assistant", "enterprise ai assistant"],
+    evidence: [
+      /\b(?:enterprise|internal) (?:knowledge|ai) assistants?\b/,
+      /\b(?:internal|enterprise|company[- ]wide)\b[^\n]{0,60}\b(?:ai|llm|rag|gpt|chat\w*|copilot)\b[^\n]{0,100}\b(?:quer\w*|search\w*|ask\w*|answer\w*)\b[^\n]{0,40}\b(?:company|internal|enterprise|knowledge|documents?|data)\b/,
+    ],
+  },
+];
+
+/** The concept a must-have names, by its exact spelling (plural or singular), or null. */
+export function conceptFor(term: string): MustHaveConcept | null {
+  const k = term.toLowerCase().replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ").trim();
+  const keys = [k, k.replace(/s$/, "")];
+  return MUST_HAVE_CONCEPTS.find((c) => keys.some((key) => c.names.includes(key))) ?? null;
+}
+
+/** Every non-empty string in a resume document, in order. */
+export function resumeStrings(resume: unknown): string[] {
+  const parts: string[] = [];
+  const walk = (v: unknown) => {
+    if (typeof v === "string") {
+      if (v.trim()) parts.push(v.trim());
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === "object") Object.values(v).forEach(walk);
+  };
+  walk(resume);
+  return parts;
+}
+
+const norm = (s: string) => s.toLowerCase().replace(/[‐-―]/g, "-");
+
+/** A short piece of the resume string around a match; the whole string when it is short. */
+function snippet(text: string, at: number, len: number): string {
+  const max = 140;
+  if (text.length <= max) return text;
+  const from = Math.max(0, at);
+  let start = Math.max(0, from - 40);
+  let end = Math.min(text.length, Math.max(from + len + 40, start + 80), start + max);
+  while (start > 0 && /\S/.test(text[start - 1])) start--;
+  while (end < text.length && /\S/.test(text[end])) end++;
+  return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
+}
+
+/** Evidence for one requirement as a whole (never split into parts). */
+function evidenceOne(texts: string[], term: string): string | null {
+  const names = spellings(term);
+  for (const t of texts) {
+    const n = norm(t);
+    for (const s of names) {
+      const at = phraseAt(n, s);
+      if (at !== null) return snippet(t, at, s.length);
+    }
+  }
+  const concept = conceptFor(term);
+  if (concept) {
+    for (const re of concept.evidence) {
+      for (const t of texts) {
+        const m = re.exec(norm(t));
+        if (m) return snippet(t, m.index, m[0].length);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * The resume snippet that shows a requirement, or null. Met as written, without a vendor
+ * prefix ("AWS Lambda" by "Lambda"), through an alias ("LLM" by "large language models"),
+ * through a documented concept ("chatbot/copilot" by a platform people query
+ * conversationally) or, for a combined term such as "Node.js/TypeScript", when every part
+ * is shown. A concept term is never split, so "Generative AI RAG/search" is not met by
+ * "search" alone.
+ */
+export function findEvidence(texts: string[], term: string): string | null {
+  const whole = evidenceOne(texts, term);
+  if (whole) return whole;
+  if (conceptFor(term)) return null;
+  const parts = term.split(/\s*[\/,]\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  const found: string[] = [];
+  for (const p of parts) {
+    const e = evidenceOne(texts, p);
+    if (!e) return null;
+    if (!found.includes(e)) found.push(e);
+  }
+  return found.join(" | ");
+}
+
+/** findEvidence over a whole resume document (or any JSON holding its strings). */
+export function matchMustHave(resume: unknown, term: string): string | null {
+  return findEvidence(resumeStrings(resume), term);
+}
+
+/**
+ * True when the resume text shows the requirement (see findEvidence).
  * `haystack` is resumeText() output (lower case).
  */
 export function mentions(haystack: string, term: string): boolean {
-  const one = (t: string) => spellings(t).some((s) => phraseIn(haystack, s));
-  if (one(term)) return true;
-  const parts = term.split(/\s*[\/,]\s*/).map((p) => p.trim()).filter(Boolean);
-  return parts.length > 1 && parts.every(one);
+  return findEvidence([haystack], term) !== null;
 }

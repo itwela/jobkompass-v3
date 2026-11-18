@@ -5,7 +5,12 @@
  *
  * Rewording and reordering of real content is allowed. A job description passed
  * in options is never added to the allowlist.
+ *
+ * A posting's concept phrase ("enterprise knowledge assistant", "chatbot/copilot") is
+ * allowed only when the source resume shows evidence of that concept, judged by the same
+ * concept table the must-have scorer uses. The posting itself never supplies evidence.
  */
+import { MUST_HAVE_CONCEPTS, resumeStrings } from "../../lib/chat/mustHaveMatch";
 
 export type ViolationKind =
   | "employer"
@@ -54,6 +59,8 @@ type Allow = {
   experienceDates: DateFacts;
   educationDates: DateFacts;
   allDates: DateFacts;
+  /** Concept phrases the source resume shows evidence of (lower case). */
+  conceptNames: Set<string>;
 };
 
 const MONTHS: Record<string, string> = {
@@ -181,6 +188,7 @@ const LEXICON = [
   "grpc",
   "elasticsearch",
   "dynamodb",
+  "api gateway",
   "ansible",
   "linux",
   "webpack",
@@ -620,6 +628,9 @@ function checkFreeText(raw: string, allow: Allow, where: string, accomplishments
   for (const skill of lexiconHitsFor(text, allow)) {
     if (!skillOk(skill, allow)) out.push({ kind: "skill", value: skill, where });
   }
+  for (const concept of conceptHits(text)) {
+    if (!allow.conceptNames.has(concept)) out.push({ kind: "skill", value: concept, where });
+  }
   for (const degree of degreeHits(text)) {
     if (!degreeOk(degree, allow)) out.push({ kind: "degree", value: degree, where });
   }
@@ -948,6 +959,7 @@ function buildAllow(input: unknown): Allow {
     experienceDates: dateFacts(experienceDateText),
     educationDates: dateFacts(educationDateText),
     allDates: dateFacts(allDateText),
+    conceptNames: evidencedConcepts(textSource ? [input as string] : resumeStrings(input), tokens),
   };
 }
 
@@ -957,6 +969,7 @@ function employerSupported(name: string, allow: Allow): boolean {
 
 function unsupportedEmployer(name: string, allow: Allow): boolean {
   if (isSingleTokenLexicon(name)) return false;
+  if (isEvidencedConcept(name, allow)) return false;
   return !employerSupported(name, allow) && !schoolOk(name, allow);
 }
 
@@ -1076,9 +1089,56 @@ function lexiconHitsFor(text: string, allow: Allow): string[] {
   return lexiconHits(withoutKnownVendorPrefixes(text, allow));
 }
 
+/**
+ * Concept phrases the source resume shows evidence of: a concept's own name in the
+ * resume, or one of its evidence patterns ("query company data conversationally" for
+ * "chatbot/copilot"). Their words join the known tokens so the posting's phrasing reads
+ * as a rewording of work already there.
+ */
+function evidencedConcepts(texts: string[], tokens: Set<string>): Set<string> {
+  const names = new Set<string>();
+  const lower = texts.map((t) => t.toLowerCase().replace(/[‐-―]/g, "-"));
+  for (const concept of MUST_HAVE_CONCEPTS) {
+    const shown =
+      concept.evidence.some((re) => lower.some((t) => re.test(t))) ||
+      concept.names.some((name) => lower.some((t) => conceptPhraseRe(name).test(t)));
+    if (!shown) continue;
+    for (const name of concept.names) {
+      names.add(name);
+      for (const word of words(name.replace(/\//g, " "))) {
+        tokens.add(word);
+        tokens.add(stem(word));
+      }
+    }
+  }
+  return names;
+}
+
+/** "Generative AI RAG": the posting's name for a concept the resume shows, not a company. */
+function isEvidencedConcept(phrase: string, allow: Allow): boolean {
+  const lower = phrase.toLowerCase().replace(/\s+/g, " ").trim();
+  return lower.length > 0 && [...allow.conceptNames].some((concept) => concept.includes(lower));
+}
+
+function conceptPhraseRe(name: string): RegExp {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\?\//g, "\\s*/\\s*").replace(/\s+/g, "\\s+");
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}s?(?=$|[^a-z0-9])`, "i");
+}
+
+/** Concept phrases from the shared table named in the text ("enterprise knowledge assistants"). */
+function conceptHits(text: string): string[] {
+  const lower = text.toLowerCase();
+  const hits: string[] = [];
+  for (const concept of MUST_HAVE_CONCEPTS) {
+    for (const name of concept.names) if (conceptPhraseRe(name).test(lower)) hits.push(name);
+  }
+  return hits;
+}
+
 function oneSkillOk(phrase: string, allow: Allow): boolean {
   const norm = normSkill(phrase);
   if (!norm) return true;
+  if (conceptHits(phrase).some((name) => !allow.conceptNames.has(name))) return false;
   if (vendorRenameOk(norm, allow)) return true;
   const canonical = canon(norm);
   if (allow.skillCanons.has(canonical)) return true;
@@ -1345,6 +1405,7 @@ function namedOrgHits(text: string): string[] {
 
 function namedOrgUnsupported(phrase: string, allow: Allow): boolean {
   if (phraseIn(phrase, allow.corpus)) return false;
+  if (isEvidencedConcept(phrase, allow)) return false;
   if (employerSupported(phrase, allow) || schoolOk(phrase, allow)) return false;
   return true;
 }
