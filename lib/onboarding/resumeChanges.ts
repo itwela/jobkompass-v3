@@ -1,4 +1,4 @@
-import type { ResumeContent } from "@/lib/resume/types";
+import type { ResumeContent } from "../resume/types";
 
 /** One line in "What changed and why". */
 export interface ResumeChange {

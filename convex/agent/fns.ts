@@ -9,6 +9,10 @@ import { shouldSeedBaseResume } from "../baseResume";
 import { nextStatusHistory } from "../jobStatusHistory";
 import { planRank } from "../plans";
 import { setResumeShared } from "../resumeShares";
+import { tailoringValidator } from "../tailoring";
+import { exportResumePdf } from "./resumePdf";
+import { canUseResumeTemplate, isValidResumeTemplateId, resolveResumeTemplateId } from "../../lib/templates";
+import type { PlanRank } from "../plans";
 import {
   flashcardValidator,
   storyValidator,
@@ -40,6 +44,31 @@ export const agentPlanRank = internalQuery({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
     return planRank(subscription);
+  },
+});
+
+/**
+ * What the in-app tailor reads from the account before writing: saved resume
+ * preferences (auth.getResumePreferences) and the Settings default template, dropped
+ * when it is above the plan (auth.getDefaultTemplate).
+ */
+export const tailorSettings = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }): Promise<{ resumePreferences: string[]; defaultTemplate: string | null; rank: number }> => {
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    const rank = planRank(subscription);
+    const id = ctx.db.normalizeId("users", userId);
+    const user: any = id ? await ctx.db.get(id) : null;
+    const resumePreferences: string[] = Array.isArray(user?.resumePreferences) ? user.resumePreferences : [];
+    const stored = user?.defaultTemplate as string | undefined;
+    const defaultTemplate =
+      stored && isValidResumeTemplateId(stored) && canUseResumeTemplate(stored, rank as PlanRank)
+        ? resolveResumeTemplateId(stored)
+        : null;
+    return { resumePreferences, defaultTemplate, rank };
   },
 });
 
@@ -254,9 +283,13 @@ export const resumesInsertGenerated = internalMutation({
     fileSize: v.number(),
     content: v.any(),
     template: v.string(),
+    /** Set by server-side tailoring so the Documents UI can mark what changed. */
+    tailoring: v.optional(tailoringValidator),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    if (args.tailoring?.baseResumeId) await owned(ctx, args.tailoring.baseResumeId, args.userId, "Resume");
+    if (args.tailoring?.jobId) await owned(ctx, args.tailoring.jobId, args.userId, "Job");
     return await ctx.db.insert("resumes", {
       userId: args.userId,
       name: args.name,
@@ -266,6 +299,7 @@ export const resumesInsertGenerated = internalMutation({
       fileType: "application/pdf",
       content: args.content,
       template: args.template,
+      ...(args.tailoring ? { tailoring: args.tailoring } : {}),
       // Seed if empty, never steal — see convex/baseResume.ts
       isActive: await shouldSeedBaseResume(ctx, args.userId),
       createdAt: now,
@@ -493,34 +527,7 @@ export const resumesGenerate = internalAction({
 
     const template = args.template || "jake";
     const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, { userId: args.userId });
-    const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${template}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-jk-export-secret": process.env.RESUME_EXPORT_SECRET ?? "",
-      },
-      body: JSON.stringify({ content, rank }),
-    });
-    if (!exportResponse.ok) {
-      const errorBody = await exportResponse.json().catch(() => ({}));
-      // The export route is the single template tier gate; surface its 402 verbatim.
-      if (exportResponse.status === 402) {
-        throw new AgentError(
-          402,
-          "tier_required",
-          errorBody.message || "This template requires a higher plan.",
-          errorBody.hint
-        );
-      }
-      throw new AgentError(
-        502,
-        "generation_failed",
-        `Resume PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
-        errorBody.details
-      );
-    }
-    const pdfArrayBuffer = await exportResponse.arrayBuffer();
+    const pdfArrayBuffer = await exportResumePdf(content, template, rank);
     const pdfBlob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
 
     const fileId = await ctx.storage.store(pdfBlob);
@@ -633,34 +640,7 @@ export const resumesUpdateContent = internalAction({
 
     const template = args.template || existing.template || "jake";
     const rank = await ctx.runQuery(internal.agent.fns.agentPlanRank, { userId: args.userId });
-    const appBaseUrl = process.env.APP_BASE_URL || "https://www.myjobkompass.com";
-    const exportResponse = await fetch(`${appBaseUrl}/api/resume/export/${template}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-jk-export-secret": process.env.RESUME_EXPORT_SECRET ?? "",
-      },
-      body: JSON.stringify({ content, rank }),
-    });
-    if (!exportResponse.ok) {
-      const errorBody = await exportResponse.json().catch(() => ({}));
-      // The export route is the single template tier gate; surface its 402 verbatim.
-      if (exportResponse.status === 402) {
-        throw new AgentError(
-          402,
-          "tier_required",
-          errorBody.message || "This template requires a higher plan.",
-          errorBody.hint
-        );
-      }
-      throw new AgentError(
-        502,
-        "generation_failed",
-        `Resume PDF generation failed: ${errorBody.error || exportResponse.statusText}`,
-        errorBody.details
-      );
-    }
-    const pdfArrayBuffer = await exportResponse.arrayBuffer();
+    const pdfArrayBuffer = await exportResumePdf(content, template, rank);
     const pdfBlob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
 
     const fileId = await ctx.storage.store(pdfBlob);

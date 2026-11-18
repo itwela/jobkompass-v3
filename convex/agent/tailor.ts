@@ -16,6 +16,9 @@ import type { ResumeScorecard } from "../../lib/resume/scorecard";
 import { consumeOrFailOpen } from "../rateLimit";
 import { RATE_LIMIT_FRIENDLY } from "../rateLimitConfig";
 import { pointQuestionsAt, scorecardFor, storedToAnswers, QUESTIONS_RULE } from "./resumeQuestions";
+import type { TailorStore } from "../../lib/resume/tailorCore";
+import { exportResumePdf } from "./resumePdf";
+import { agentTailor } from "./tailorFlow";
 
 function requireModelKey(): void {
   if (!process.env.OPENROUTER_API_KEY) {
@@ -60,15 +63,28 @@ export const modelQuestions = internalAction({
   },
 });
 
-const CONTENT_KEYS = [
-  "personalInfo", "education", "experience", "projects", "skills", "certifications",
-  "internships", "coreCompetencies", "earlyCareer", "additionalInfo",
-] as const;
+/** Internal-function storage for the shared tailor pipeline (lib/resume/tailorCore.ts). */
+function agentStore(ctx: any, userId: string, rank: () => Promise<number>): TailorStore {
+  return {
+    async saveAnswers(resumeId, answers) {
+      await ctx.runMutation(internal.documents.saveBulletAnswersInternal, { userId, resumeId, answers });
+    },
+    async renderPdf(content, templateId) {
+      return new Uint8Array(await exportResumePdf(content, templateId, await rank()));
+    },
+    storePdf: (pdf) => ctx.storage.store(new Blob([pdf], { type: "application/pdf" })),
+    insertResume: (row) => ctx.runMutation(internal.agent.fns.resumesInsertGenerated, { userId, ...row }),
+    async setTailorMeta(meta) {
+      await ctx.runMutation(internal.documents.setResumeTailorMetaInternal, { userId, ...meta });
+    },
+  };
+}
 
 /**
  * Server-side tailoring: base resume + saved job + the base's stored answers in,
  * a NEW tailored resume (PDF) out, with the questions that would still make it
- * stronger. The base resume is never modified.
+ * stronger. Same pipeline and saved result as the in-app tailor. The base resume is
+ * never modified.
  */
 export const resumesTailor = internalAction({
   args: {
@@ -76,6 +92,8 @@ export const resumesTailor = internalAction({
     base: v.id("resumes"),
     jobId: v.id("jobs"),
     template: v.optional(v.string()),
+    instructions: v.optional(v.string()),
+    preferences: v.optional(v.any()),
   },
   handler: async (
     ctx,
@@ -83,77 +101,78 @@ export const resumesTailor = internalAction({
   ): Promise<{
     id: Id<"resumes">;
     name: string;
+    fileName: string;
     fileUrl: string | null;
+    template: string;
+    notice?: string;
     baseResumeId: Id<"resumes">;
+    requestedBase: Id<"resumes">;
     jobId: Id<"jobs">;
     model: string;
     resume: any;
     questions: BulletQuestion[];
     scorecard: ResumeScorecard;
     baseScorecard: ResumeScorecard;
+    changes: unknown[];
+    marks: unknown;
+    mustHaves: unknown;
+    pages?: number;
+    instructionsUsed: number;
     answersUsed: number;
     rule: string;
   }> => {
     requireModelKey();
-    // Ownership: both queries throw "... not found" for another user's record.
-    const base: any = await ctx.runQuery(internal.agent.fns.resumesGet, { userId: args.userId, id: args.base });
-    const job: any = await ctx.runQuery(internal.agent.fns.jobsGet, { userId: args.userId, id: args.jobId });
-    if (!base?.content) throw new Error("Resume has no structured content to tailor. Pick a resume created by JobKompass (jk resumes get shows content).");
-
-    // Check the monthly document quota BEFORE spending a model call.
-    const canGenerate = await ctx.runQuery(internal.agent.fns.resumesCanGenerate, { userId: args.userId });
-    if (!canGenerate.allowed) {
-      throw new Error(`Limit reached: you've used ${canGenerate.used} of ${canGenerate.limit} documents this month.`);
-    }
-    await spendAi(ctx, args.userId);
-
-    const answers = storedToAnswers(base.bulletAnswers);
-    const result = await tailorResume({
-      baseContent: base.content,
-      company: job.company,
-      role: job.title,
-      jobDescription: job.description,
-      answers,
-      premium: true,
-    });
-    if (!result) throw new Error("Tailoring failed: the resume writer returned no usable output. Retry in a minute.");
-
-    const tailored = result.resume ?? {};
-    const contentArgs: Record<string, unknown> = {};
-    for (const k of CONTENT_KEYS) {
-      const value = tailored[k] ?? base.content[k];
-      if (value !== undefined && value !== null) contentArgs[k] = value;
-    }
-    if (!contentArgs.personalInfo) contentArgs.personalInfo = base.content.personalInfo ?? {};
-
-    const generated: { id: Id<"resumes">; name: string; fileUrl: string | null } = await ctx.runAction(
-      internal.agent.fns.resumesGenerate,
+    let rank: number | undefined;
+    const settingsOnce = async () => ctx.runQuery(internal.agent.fns.tailorSettings, { userId: args.userId });
+    const out = await agentTailor(
       {
-        userId: args.userId,
-        ...(contentArgs as any),
-        targetCompany: job.company,
-        template: args.template || base.template || "jake",
-        skipQuestions: true,
+        // Ownership: both queries throw "... not found" for another user's record.
+        getResume: (id) => ctx.runQuery(internal.agent.fns.resumesGet, { userId: args.userId, id }),
+        getJob: (id) => ctx.runQuery(internal.agent.fns.jobsGet, { userId: args.userId, id }),
+        settings: async () => {
+          const s = await settingsOnce();
+          rank = s.rank;
+          return s;
+        },
+        canGenerate: () => ctx.runQuery(internal.agent.fns.resumesCanGenerate, { userId: args.userId }),
+        spendAi: () => spendAi(ctx, args.userId),
+        store: agentStore(ctx, args.userId, async () => rank ?? (await settingsOnce()).rank),
+        setJobResumeUsed: async (id, resumeUsed) => {
+          await ctx.runMutation(internal.agent.fns.jobsUpdate, { userId: args.userId, id, resumeUsed });
+        },
+        fileUrl: (storageId) => ctx.storage.getUrl(storageId),
+      },
+      {
+        base: args.base,
+        jobId: args.jobId,
+        template: args.template,
+        instructions: args.instructions,
+        preferences: args.preferences,
       }
     );
-
-    await ctx.runMutation(internal.documents.setResumeTailorMetaInternal, {
-      userId: args.userId,
-      resumeId: generated.id,
-      tailoredFrom: { baseResumeId: args.base, jobId: args.jobId },
-      pendingQuestions: result.questions,
-    });
+    const { result, job, baseRow } = out;
 
     return {
-      ...generated,
-      baseResumeId: args.base,
+      id: result.resumeId,
+      name: result.displayName,
+      fileName: result.fileName,
+      fileUrl: out.fileUrl,
+      template: out.template,
+      ...(out.notice ? { notice: out.notice } : {}),
+      baseResumeId: out.base,
+      requestedBase: args.base,
       jobId: args.jobId,
       model: result.model,
-      resume: tailored,
+      resume: result.content,
       questions: result.questions,
-      scorecard: scorecardFor(tailored, job),
-      baseScorecard: scorecardFor(base.content, job),
-      answersUsed: answers.length,
+      scorecard: result.scorecard,
+      baseScorecard: scorecardFor(baseRow.content, job),
+      changes: result.changes,
+      marks: result.marks,
+      mustHaves: result.mustHaves,
+      pages: result.pages,
+      instructionsUsed: out.instructions.length,
+      answersUsed: storedToAnswers(baseRow.bulletAnswers).length,
       rule: QUESTIONS_RULE,
     };
   },

@@ -190,7 +190,9 @@ tailorResume()            lib/resume/tailorResume.ts
   questions               sanitizeQuestions()
         |
         v
-tailorAndSave()           lib/resume/tailorServer.ts
+tailorAndSaveWith()       lib/resume/tailorCore.ts
+                          (app: tailorAndSave() in lib/resume/tailorServer.ts;
+                           agent API: convex/agent/tailor.ts + tailorFlow.ts)
   must-haves              lib/chat/mustHaves.ts
   scorecard               lib/resume/scorecard.ts
   change list             lib/onboarding/resumeChanges.ts

@@ -10,6 +10,12 @@ describe("resume question commands", () => {
     expect(find("resumes tailor")).toMatchObject({ method: "POST", path: "/agent/resumes/tailor" });
   });
 
+  it("tailor takes an optional --instructions", () => {
+    const opt = find("resumes tailor")!.opts.find((o) => o.api === "instructions");
+    expect(opt).toMatchObject({ flag: "--instructions <text>", type: "str" });
+    expect(opt).not.toHaveProperty("required", true);
+  });
+
   it("add and update take --job and --ai-questions", () => {
     for (const name of ["resumes add", "resumes update"]) {
       const apis = find(name)!.opts.map((o) => o.api);

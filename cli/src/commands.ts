@@ -156,7 +156,8 @@ export const commands: CommandSpec[] = [
     opts: [
       { flag: "--base <id>", api: "base", type: "str", required: true, desc: "Resume to tailor from (not modified)" },
       { flag: "--job <id>", api: "jobId", type: "str", required: true },
-      { flag: "--template <id>", api: "template", type: "str", desc: "jake, joseph or mar (default: the base's)" },
+      { flag: "--template <id>", api: "template", type: "str", desc: "jake, joseph or mar (default: your default template, then the base's)" },
+      { flag: "--instructions <text>", api: "instructions", type: "str", desc: "One-off instruction (wording and emphasis only, never new facts); added after your saved resume preferences" },
     ] },
 
   // coverletters
