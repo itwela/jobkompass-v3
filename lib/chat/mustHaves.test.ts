@@ -85,7 +85,11 @@ describe("scoreMustHaves: Wellmark-style must-haves", () => {
 describe("agent baseScorecard uses the same matcher", () => {
   it("mustHavesCoverage meets vendor-prefixed and aliased job skills", () => {
     const cov = mustHavesCoverage(summitBase as any, { skills: ["AWS Lambda", "Amazon S3", "LLM", "Java"] });
-    expect(cov).toEqual({ met: ["AWS Lambda", "Amazon S3", "LLM"], missing: ["Java"] });
+    expect(cov).toMatchObject({ met: ["AWS Lambda", "Amazon S3", "LLM"], missing: ["Java"] });
+    expect(cov!.matched.map((m) => m.term)).toEqual(["AWS Lambda", "Amazon S3", "LLM"]);
+    expect(cov!.matched[0].evidence).toMatch(/Lambda/);
+    expect(cov!.matched[1].evidence).toMatch(/S3/);
+    expect(cov!.matched[2].evidence).toMatch(/large language model/);
   });
 });
 

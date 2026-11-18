@@ -92,14 +92,15 @@ describe("resolveAnswers", () => {
 
 describe("scorecard", () => {
   it("counts bullets and checks must-haves literally", () => {
-    expect(mustHavesCoverage(resume, { skills: ["React", "Kubernetes"], keywords: ["react", "SQL"] })).toEqual({
-      met: ["React", "SQL"],
-      missing: ["Kubernetes"],
-    });
+    const cov = mustHavesCoverage(resume, { skills: ["React", "Kubernetes"], keywords: ["react", "SQL"] });
+    expect(cov).toMatchObject({ met: ["React", "SQL"], missing: ["Kubernetes"] });
+    expect(cov!.matched.map((m) => m.term)).toEqual(["React", "SQL"]);
+    expect(cov!.matched.every((m) => m.evidence.length > 0)).toBe(true);
     const card = scorecardFor(resume, { skills: ["React", "Kubernetes"] });
     expect(card.bullets).toBe(4);
     expect(card.quantified).toBe(1);
-    expect(card.mustHaves).toEqual({ met: 1, total: 2, missing: ["Kubernetes"] });
+    expect(card.mustHaves).toMatchObject({ met: 1, total: 2, missing: ["Kubernetes"] });
+    expect(card.mustHaves!.matched!.map((m) => m.term)).toEqual(["React"]);
     expect(scorecardFor(resume).mustHaves).toBeUndefined();
   });
 });
