@@ -45,16 +45,64 @@ export function stripVendor(term: string): string | null {
   return out !== t && out ? out : null;
 }
 
-/** Every equivalent spelling of one requirement: as written, without a vendor, aliases. */
+/**
+ * Generic trailing words a posting tacks onto a skill ("MCP Integration", "REST API
+ * Development"). Dropped for matching only when a distinguishing core term remains.
+ */
+export const GENERIC_SUFFIXES = [
+  "integration", "integrations", "development", "experience", "skills", "frameworks",
+  "framework", "expertise", "proficiency", "knowledge",
+];
+
+/** Cores too vague to stand for a requirement on their own ("Web Development" is not "web"). */
+const VAGUE_CORES = new Set([
+  "web", "software", "app", "apps", "application", "applications", "product", "systems", "system",
+  "data", "cloud", "backend", "frontend", "full stack", "technical", "team", "industry", "work",
+]);
+
+/** The phrase without a generic trailing word, or null when it has none or no core would remain. */
+export function stripGenericSuffix(term: string): string | null {
+  const words = term.trim().split(/\s+/);
+  if (words.length < 2 || !GENERIC_SUFFIXES.includes(words[words.length - 1].toLowerCase())) return null;
+  const core = words.slice(0, -1).join(" ").trim();
+  const k = core.toLowerCase();
+  if (!/[a-z0-9]/i.test(core) || GENERIC_SUFFIXES.includes(k) || VAGUE_CORES.has(k)) return null;
+  return core;
+}
+
+/**
+ * The singular or plural of the phrase's last word ("claude apis" ↔ "claude api"), or null.
+ * An acronym plural ("APIs", "LLMs", "KPIs") always loses its s; otherwise short words and
+ * -ss/-is/-us endings are left alone so "AWS", "iOS", "Redis" never lose an s.
+ */
+function numberVariant(term: string): string | null {
+  const acronym = /^(.*?[^A-Za-z0-9]|)([A-Z0-9]{2,})s$/.exec(term.trim());
+  if (acronym) return (acronym[1] + acronym[2]).toLowerCase();
+  const m = /^(.*?)([a-z0-9]+)$/.exec(term.toLowerCase().trim());
+  if (!m) return null;
+  const [, head, last] = m;
+  if (last.length > 3 && /[^siu]s$/.test(last)) return head + last.slice(0, -1);
+  if (/[a-z]$/.test(last) && !last.endsWith("s") && last.length >= 2) return head + last + "s";
+  return null;
+}
+
+/**
+ * Every equivalent spelling of one requirement: as written, without a vendor, without a
+ * generic trailing word, singular/plural, aliases. Each is still matched as a whole word.
+ */
 function spellings(term: string): string[] {
   const out = new Set<string>();
-  const add = (t: string) => {
+  const add = (t: string, inflect = true) => {
     const k = t.toLowerCase().trim();
     if (!k || out.has(k)) return;
     out.add(k);
-    for (const group of MUST_HAVE_ALIASES) if (group.includes(k)) group.forEach(add);
+    for (const group of MUST_HAVE_ALIASES) if (group.includes(k)) group.forEach((g) => add(g));
     const bare = stripVendor(k);
     if (bare) add(bare);
+    const core = stripGenericSuffix(t);
+    if (core) add(core);
+    const other = inflect ? numberVariant(t) : null;
+    if (other) add(other, false);
   };
   add(term);
   return [...out];
