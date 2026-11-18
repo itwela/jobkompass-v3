@@ -11,6 +11,7 @@ import { tailorResume } from "./tailorResume";
 import {
   originalBaseId,
   pickTailorTemplate,
+  pickTailorTemplateWithNotice,
   tailorAndSaveWith,
   tailorInstructions,
   TailorFailedError,
@@ -53,6 +54,20 @@ describe("tailorInstructions", () => {
     expect(tailorInstructions(["One page"], "  lead with data  ")).toEqual(["One page", "lead with data"]);
     expect(tailorInstructions(null, "")).toEqual([]);
     expect(tailorInstructions(["a", 3, "b"], undefined)).toEqual(["a", "b"]);
+  });
+});
+
+describe("pickTailorTemplateWithNotice", () => {
+  it("swaps an explicit template above the plan for jake, with the notice", () => {
+    expect(pickTailorTemplateWithNotice({ explicit: "mar", rank: 0 })).toEqual({
+      template: "jake",
+      notice: "Your plan doesn't include mar; used jake instead. Upgrade to use it.",
+    });
+  });
+  it("leaves allowed, defaulted and unknown picks alone", () => {
+    expect(pickTailorTemplateWithNotice({ explicit: "mar", rank: 3 })).toEqual({ template: "mar" });
+    expect(pickTailorTemplateWithNotice({ baseTemplate: "mar", rank: 0 })).toEqual({ template: "jake" });
+    expect(pickTailorTemplateWithNotice({ explicit: "nope", rank: 0 })).toEqual({ template: "nope" });
   });
 });
 

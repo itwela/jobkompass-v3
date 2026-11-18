@@ -41,6 +41,8 @@ your content. Relay questions to your human, save their answers with `jk resumes
 your default template (unless `--template`), the app's document name, the "what changed" marks and must-haves shown in
 Documents, and the job's `resumeUsed`. Passing an already-tailored resume as `--base` writes from the original base it
 came from, with that base's saved answers. The raw API also takes `preferences` (a JSON array) to replace the saved ones.
+If `--template` is above your plan, tailoring still runs with `jake` and prints a notice (the `notice` field in `--json`)
+instead of failing.
 
 Resume templates: `jake` (default), `joseph` (Calibri-style, competencies-forward: use `--core-competencies` and `--early-career`) or `mar` (Times serif, categorized skills). Joseph and Mar need a paid plan. Run `jk resumes add --help` for all fields.
 

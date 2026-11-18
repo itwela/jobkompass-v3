@@ -8,7 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import {
   isPremiumRank,
   originalBaseId,
-  pickTailorTemplate,
+  pickTailorTemplateWithNotice,
   tailorAndSaveWith,
   tailorInstructions,
   type TailorAndSaveResult,
@@ -43,6 +43,8 @@ export interface AgentTailorDeps {
 export interface AgentTailorResult {
   base: Id<"resumes">;
   template: string;
+  /** Set when the requested template is above the plan and Jake was used instead. */
+  notice?: string;
   instructions: string[];
   job: any;
   baseRow: any;
@@ -89,7 +91,8 @@ export async function agentTailor(deps: AgentTailorDeps, args: AgentTailorArgs):
   const settings = await deps.settings();
   await deps.spendAi();
 
-  const template = pickTailorTemplate({
+  // An explicit template above the plan falls back to Jake with a notice (never a 402).
+  const { template, notice } = pickTailorTemplateWithNotice({
     explicit: args.template,
     accountDefault: settings.defaultTemplate,
     baseTemplate: baseRow.template,
@@ -115,5 +118,5 @@ export async function agentTailor(deps: AgentTailorDeps, args: AgentTailorArgs):
   await deps.setJobResumeUsed(job._id, result.displayName).catch(() => undefined);
   const fileUrl = await deps.fileUrl(result.storageId).catch(() => null);
 
-  return { base: baseRow._id, template, instructions, job, baseRow, result, fileUrl };
+  return { base: baseRow._id, template, ...(notice ? { notice } : {}), instructions, job, baseRow, result, fileUrl };
 }

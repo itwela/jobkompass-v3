@@ -10,7 +10,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { describeResumeChanges, type ResumeChange, type ResumeMarks } from "../onboarding/resumeChanges";
 import { tailoredResumeName } from "../emailAgent/draftMessage";
 import { extractMustHaves, scoreMustHaves, countPdfPages, type MustHaves } from "../chat/mustHaves";
-import { canUseResumeTemplate } from "../templates";
+import { canUseResumeTemplate, isValidResumeTemplateId } from "../templates";
 import type { PlanRank } from "../../convex/plans";
 import { sanitizeAnswers, type BulletAnswer, type BulletQuestion } from "./bulletQuestions";
 import { scoreResume, type ResumeScorecard } from "./scorecard";
@@ -151,6 +151,30 @@ export function pickTailorTemplate(input: {
   const rank = (typeof input.rank === "number" ? input.rank : 0) as PlanRank;
   if (input.baseTemplate && canUseResumeTemplate(input.baseTemplate, rank)) return input.baseTemplate;
   return "jake";
+}
+
+/** Shown when an explicitly requested template is above the plan and Jake was used instead. */
+export function templateFallbackNotice(requested: string): string {
+  return `Your plan doesn't include ${requested}; used jake instead. Upgrade to use it.`;
+}
+
+/**
+ * pickTailorTemplate for the agent API, where an explicit template above the plan falls
+ * back to Jake with a notice instead of failing. Unknown ids pass through unchanged so they
+ * still fail as invalid rather than reading as an upgrade prompt.
+ */
+export function pickTailorTemplateWithNotice(input: {
+  explicit?: string | null;
+  accountDefault?: string | null;
+  baseTemplate?: string | null;
+  rank: unknown;
+}): { template: string; notice?: string } {
+  const template = pickTailorTemplate(input);
+  const rank = (typeof input.rank === "number" ? input.rank : 0) as PlanRank;
+  if (input.explicit && isValidResumeTemplateId(input.explicit) && !canUseResumeTemplate(input.explicit, rank)) {
+    return { template: "jake", notice: templateFallbackNotice(input.explicit) };
+  }
+  return { template };
 }
 
 /** The original base a resume was tailored from, or undefined when it is not a tailored copy. */

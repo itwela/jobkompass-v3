@@ -23,7 +23,20 @@ export function renderPretty(data: unknown): string {
   return String(data);
 }
 
+/**
+ * What emit writes. Machine mode is the JSON as-is (a `notice` field stays in it). Pretty
+ * mode puts a server `notice` (e.g. a template fallback) on its own line first so it is seen.
+ */
+export function formatOutput(data: unknown, machine: boolean): string {
+  if (machine) return JSON.stringify(data, null, 2);
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const { notice, ...rest } = data as Record<string, unknown>;
+    if (typeof notice === "string" && notice) return `Notice: ${notice}\n\n${renderPretty(rest)}`;
+  }
+  return renderPretty(data);
+}
+
 export function emit(data: unknown, opts: { json?: boolean } = {}): void {
-  const machine = opts.json || !process.stdout.isTTY;
-  process.stdout.write((machine ? JSON.stringify(data, null, 2) : renderPretty(data)) + "\n");
+  const machine = Boolean(opts.json) || !process.stdout.isTTY;
+  process.stdout.write(formatOutput(data, machine) + "\n");
 }

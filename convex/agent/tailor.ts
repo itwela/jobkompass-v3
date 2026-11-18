@@ -104,6 +104,7 @@ export const resumesTailor = internalAction({
     fileName: string;
     fileUrl: string | null;
     template: string;
+    notice?: string;
     baseResumeId: Id<"resumes">;
     requestedBase: Id<"resumes">;
     jobId: Id<"jobs">;
@@ -157,6 +158,7 @@ export const resumesTailor = internalAction({
       fileName: result.fileName,
       fileUrl: out.fileUrl,
       template: out.template,
+      ...(out.notice ? { notice: out.notice } : {}),
       baseResumeId: out.base,
       requestedBase: args.base,
       jobId: args.jobId,

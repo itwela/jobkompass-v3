@@ -54,6 +54,25 @@ describe("agentTailor", () => {
     expect((tailor.mock.calls[1] as any)[1].templateId).toBe("jake");
   });
 
+  it("falls back to jake with a notice when the requested template is above the plan", async () => {
+    const { d, tailor, setJobResumeUsed } = deps({ settings: async () => ({ resumePreferences: [], defaultTemplate: null, rank: 0 }) });
+    const out = await agentTailor(d, { base: "base1" as any, jobId: "job1" as any, template: "mar" });
+    expect(tailor).toHaveBeenCalledTimes(1);
+    expect((tailor.mock.calls[0] as any)[1].templateId).toBe("jake");
+    expect(out.template).toBe("jake");
+    expect(out.notice).toBe("Your plan doesn't include mar; used jake instead. Upgrade to use it.");
+    expect(out.result.resumeId).toBe("new1");
+    expect(setJobResumeUsed).toHaveBeenCalled();
+  });
+
+  it("uses an allowed explicit template unchanged, with no notice", async () => {
+    const { d, tailor } = deps();
+    const out = await agentTailor(d, { base: "base1" as any, jobId: "job1" as any, template: "mar" });
+    expect((tailor.mock.calls[0] as any)[1].templateId).toBe("mar");
+    expect(out.template).toBe("mar");
+    expect(out).not.toHaveProperty("notice");
+  });
+
   it("lets preferences replace the saved ones and rejects a non-array", async () => {
     const { d, tailor } = deps();
     await agentTailor(d, { base: "base1" as any, jobId: "job1" as any, preferences: ["No summary"] });
