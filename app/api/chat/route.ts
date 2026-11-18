@@ -1,3 +1,4 @@
+import { CHAT_PUNCTUATION_RULE, plainPunctuation } from "@/lib/chat/plainPunctuation";
 import { getResumeTemplateById } from '@/lib/templates';
 import {
   Agent,
@@ -175,6 +176,7 @@ export async function POST(request: NextRequest) {
 
     // Build context-aware instructions
     let contextInstructions = isFirstTurn ? jobKompassInstructions : jobKompassInstructionsMinimal;
+    contextInstructions += `\n\n${CHAT_PUNCTUATION_RULE}`;
 
     // Resume template preference - CRITICAL for resume creation
     contextInstructions += "\n\n[[RESUME_TEMPLATE_PREFERENCE]]";
@@ -393,7 +395,7 @@ export async function POST(request: NextRequest) {
 
         try {
           // Split message into words for streaming
-          const words = fullMessage.split(' ');
+          const words = plainPunctuation(fullMessage).split(' ');
           
           // Send initial metadata
           sendChunk({
