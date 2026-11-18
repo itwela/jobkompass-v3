@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// Prod convex.site URL — confirmed against `npx convex deploy` output in Task 8.
+// The live backend. Convex labels this deployment "dev", but the site, this CLI and the extension all run on it.
 export const DEFAULT_BASE_URL = "https://proficient-mammoth-632.convex.site";
 
 function configDir(): string {

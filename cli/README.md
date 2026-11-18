@@ -10,7 +10,7 @@ Run your JobKompass job search from the terminal — or let an AI agent (Claude 
 `JK_BASE_URL` overrides the target deployment (defaults to the live one).
 
 ## For agents
-- Run `jk schema` once — it returns every route, param, and type as JSON.
+- Run `jk schema` once — it returns every route, param, and type as JSON, plus `workflows.resumeQuestions` (the never-invent-a-number flow).
 - Output is JSON whenever stdout is piped. Exit codes: 0 ok, 1 your mistake (read `error.hint`), 2 server/network.
 - Destructive commands need `--yes`. Nothing ever prompts.
 
@@ -23,7 +23,20 @@ Run your JobKompass job search from the terminal — or let an AI agent (Claude 
     jk resumes list
     jk resources add --title "Salary guide" --url "https://..."
 
-Resume templates: `jake` (default) or `mar` (Calibri-style, competencies-forward — use `--core-competencies` and `--early-career`). Run `jk resumes add --help` for all fields.
+## Resume questions: never invent a number
+Strong bullets carry numbers. Only the human knows them, so the API asks instead of guessing.
+
+    jk resumes questions --id <baseResumeId> [--job <jobId>] [--ai]   # before writing
+    jk resumes answer --id <baseResumeId> --answers '[{"id":"<question id>","answer":"about 40 a day"}]'
+    jk resumes get --id <baseResumeId>                                 # shows saved bulletAnswers
+    jk resumes add ... --job <jobId> [--ai-questions]                  # response: questions + scorecard
+    jk resumes tailor --base <resumeId> --job <jobId> [--template mar] # server writes it, using saved answers
+
+`resumes add` / `update` return `{id, name, fileUrl, questions, questionSource, scorecard, rule}`.
+Questions are built-in by default (free, instant); `--ai-questions` / `--ai` asks the model instead and never rewrites
+your content. Relay questions to your human, save their answers with `jk resumes answer`, and every later resume reuses them.
+
+Resume templates: `jake` (default), `joseph` (Calibri-style, competencies-forward: use `--core-competencies` and `--early-career`) or `mar` (Times serif, categorized skills). Joseph and Mar need a paid plan. Run `jk resumes add --help` for all fields.
 
 ## Keys
 A key carries full access to one account's data. Name each key after where it lives

@@ -119,6 +119,8 @@ export const commands: CommandSpec[] = [
       { flag: "--additional-info <json>", api: "additionalInfo", type: "json", desc: '{"languages"?:[...],"references"?}' },
       { flag: "--target-company <name>", api: "targetCompany", type: "str", desc: "Included in the saved resume's name" },
       { flag: "--template <id>", api: "template", type: "str", desc: "Template id: jake (default), joseph or mar" },
+      { flag: "--job <id>", api: "jobId", type: "str", desc: "Saved job this targets: scorecard must-haves + context for --ai-questions" },
+      { flag: "--ai-questions", api: "aiQuestions", type: "bool", desc: "Ask the model for sharper questions (slower). Your content is never rewritten" },
     ] },
   { name: "resumes update", desc: "Edit an existing resume's content in place and regenerate its PDF (keeps id, name, label, favorite)", method: "PATCH", path: "/agent/resumes/content",
     opts: [
@@ -135,6 +137,26 @@ export const commands: CommandSpec[] = [
       { flag: "--early-career <json>", api: "earlyCareer", type: "json", desc: "(Joseph template) [{title,company,location?,date}]" },
       { flag: "--additional-info <json>", api: "additionalInfo", type: "json", desc: '{"languages"?:[...],"references"?}' },
       { flag: "--template <id>", api: "template", type: "str", desc: "Switch template: jake, joseph or mar" },
+      { flag: "--job <id>", api: "jobId", type: "str", desc: "Saved job this targets: scorecard must-haves + context for --ai-questions" },
+      { flag: "--ai-questions", api: "aiQuestions", type: "bool", desc: "Ask the model for sharper questions (slower). Your content is never rewritten" },
+    ] },
+  { name: "resumes questions", desc: "Questions about bullets missing a number, before generating (ask your human, then 'jk resumes answer')", method: "GET", path: "/agent/resumes/questions",
+    opts: [
+      { flag: "--id <id>", api: "id", type: "str", required: true },
+      { flag: "--job <id>", api: "jobId", type: "str", desc: "Saved job to target" },
+      { flag: "--ai", api: "ai", type: "bool", desc: "Ask the model (slower); default is built-in questions" },
+    ] },
+  { name: "resumes answer", desc: "Save your human's answers as facts on the base resume (reused by every later resume)", method: "POST", path: "/agent/resumes/answers",
+    opts: [
+      { flag: "--id <id>", api: "id", type: "str", required: true, desc: "Resume the questions came from (a tailored resume saves onto its base)" },
+      { flag: "--answers <json>", api: "answers", type: "json", required: true,
+        desc: '[{"id":"<question id>","answer":"..."}] or [{"section","index","bullet","answer"}]; JSON or @file.json' },
+    ] },
+  { name: "resumes tailor", desc: "Server-side tailoring of a resume to a saved job, using saved answers; makes a NEW resume PDF", method: "POST", path: "/agent/resumes/tailor",
+    opts: [
+      { flag: "--base <id>", api: "base", type: "str", required: true, desc: "Resume to tailor from (not modified)" },
+      { flag: "--job <id>", api: "jobId", type: "str", required: true },
+      { flag: "--template <id>", api: "template", type: "str", desc: "jake, joseph or mar (default: the base's)" },
     ] },
 
   // coverletters
