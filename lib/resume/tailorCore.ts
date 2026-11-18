@@ -9,7 +9,7 @@
 import type { Id } from "../../convex/_generated/dataModel";
 import { describeResumeChanges, type ResumeChange, type ResumeMarks } from "../onboarding/resumeChanges";
 import { tailoredResumeName } from "../emailAgent/draftMessage";
-import { extractMustHaves, scoreMustHaves, countPdfPages, type MustHaves } from "../chat/mustHaves";
+import { mustHavesForJob, scoreMustHaves, countPdfPages, type MustHaves } from "../chat/mustHaves";
 import { canUseResumeTemplate, isValidResumeTemplateId } from "../templates";
 import type { PlanRank } from "../../convex/plans";
 import { sanitizeAnswers, type BulletAnswer, type BulletQuestion } from "./bulletQuestions";
@@ -32,6 +32,9 @@ export interface TailorJob {
   description?: string;
   skills?: string[];
   keywords?: string[];
+  /** Must-haves stored on the job by an earlier run, and the description fingerprint they belong to. */
+  mustHaves?: string[];
+  mustHavesKey?: string;
 }
 
 /** What resumes.tailoring stores; the Documents UI tints changed sections from it. */
@@ -83,6 +86,8 @@ export interface TailorStore {
     tailoredFrom?: { baseResumeId: Id<"resumes">; jobId?: Id<"jobs"> };
     pendingQuestions: PendingQuestion[];
   }): Promise<void>;
+  /** Stores the job's extracted must-have list so every later run scores the same list. */
+  saveJobMustHaves?(jobId: Id<"jobs">, mustHaves: string[], mustHavesKey: string): Promise<void>;
 }
 
 export interface TailorCoreInput {
@@ -215,7 +220,10 @@ export async function tailorAndSaveWith(store: TailorStore, input: TailorCoreInp
       premium,
       instructions: input.instructions,
     }),
-    extractMustHaves(job).catch(() => [] as string[]),
+    mustHavesForJob(
+      job,
+      job._id && store.saveJobMustHaves ? (terms, key) => store.saveJobMustHaves!(job._id!, terms, key) : undefined
+    ).catch(() => [] as string[]),
   ]);
   if (!tailored) throw new TailorFailedError();
 

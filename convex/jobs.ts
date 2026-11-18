@@ -278,6 +278,21 @@ export const update = mutation({
   },
 });
 
+/** Stores the job's extracted must-have list (see lib/chat/mustHaves.ts mustHavesForJob). */
+export const setMustHaves = mutation({
+  args: { id: v.id("jobs"), mustHaves: v.array(v.string()), mustHavesKey: v.string() },
+  handler: async (ctx, { id, mustHaves, mustHavesKey }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    const convexUserId = (user as any).convex_user_id || userId;
+    const job = await ctx.db.get(id);
+    if (!job || job.userId !== convexUserId) throw new Error("Not authorized");
+    await ctx.db.patch(id, { mustHaves: mustHaves.slice(0, 20), mustHavesKey });
+  },
+});
+
 export const remove = mutation({
   args: {
     id: v.id("jobs"),

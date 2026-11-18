@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./tailorResume", () => ({ tailorResume: vi.fn() }));
 vi.mock("../chat/mustHaves", async (orig) => ({
   ...(await orig<typeof import("../chat/mustHaves")>()),
-  extractMustHaves: vi.fn(async () => ["React", "Kubernetes"]),
+  mustHavesForJob: vi.fn(async () => ["React", "Kubernetes"]),
   countPdfPages: vi.fn(async () => 1),
 }));
 

@@ -19,7 +19,7 @@ import { canUseResumeTemplate, resumeTemplateMinRank } from "@/lib/templates";
 import { rankLabel, type PlanRank } from "@/convex/plans";
 import { applyFactGuard, type FactGuard } from "@/lib/resume/noInventedFacts";
 import { describeResumeChanges } from "@/lib/onboarding/resumeChanges";
-import { extractMustHaves, scoreMustHaves, countPdfPages, type MustHaves } from "@/lib/chat/mustHaves";
+import { mustHavesForJob, scoreMustHaves, countPdfPages, type MustHaves } from "@/lib/chat/mustHaves";
 import type { ResumeContent } from "@/lib/resume/types";
 import { tailorResume } from "@/lib/resume/tailorResume";
 import { scoreResume } from "@/lib/resume/scorecard";
@@ -309,7 +309,10 @@ const jakeCoverLetterTemplatePath = path.join(process.cwd(), 'templates/coverlet
         if (job && base) {
           // Terms come from the posting (what the job needs); coverage comes only from the
           // person's own resume. The posting is never evidence about the candidate.
-          const terms = await extractMustHaves(job).catch(() => [] as string[]);
+          // Stored on the job after the first extraction, so every run scores the same list.
+          const terms = await mustHavesForJob(job, job._id
+            ? (list, key) => convexClient.mutation(api.jobs.setMustHaves, { id: job._id as any, mustHaves: list, mustHavesKey: key })
+            : undefined).catch(() => [] as string[]);
           if (terms.length) mustHaves = scoreMustHaves(terms, base);
         }
         const pages = await countPdfPages(pdfBuffer);

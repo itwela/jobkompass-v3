@@ -131,6 +131,8 @@ const ALIAS_GROUPS: string[][] = [
   ["dotnet", ".net"],
   ["html", "html5"],
   ["css", "css3"],
+  ["llm", "llms", "large language model", "large language models"],
+  ["genai", "gen ai", "generative ai"],
 ];
 
 const LEXICON = [
@@ -609,11 +611,13 @@ function checkSummary(
   return out;
 }
 
-function checkFreeText(text: string, allow: Allow, where: string, accomplishments: boolean): Violation[] {
+function checkFreeText(raw: string, allow: Allow, where: string, accomplishments: boolean): Violation[] {
+  // "AWS Lambda" when the resume has "Lambda" is the same fact: check it as "Lambda".
+  const text = withoutKnownVendorPrefixes(raw, allow);
   const out: Violation[] = [];
   out.push(...unsupportedMetrics(text, allow, where));
   out.push(...unsupportedDatesInText(text, allow, where));
-  for (const skill of lexiconHits(text)) {
+  for (const skill of lexiconHitsFor(text, allow)) {
     if (!skillOk(skill, allow)) out.push({ kind: "skill", value: skill, where });
   }
   for (const degree of degreeHits(text)) {
@@ -661,7 +665,7 @@ function accomplishmentViolation(text: string, allow: Allow, where: string): Vio
   const addsHardFact =
     unsupportedMetrics(text, allow, where).length > 0 ||
     unsupportedDatesInText(text, allow, where).length > 0 ||
-    lexiconHits(text).some((skill) => !skillOk(skill, allow)) ||
+    lexiconHitsFor(text, allow).some((skill) => !skillOk(skill, allow)) ||
     certHits(text).some((cert) => !certOk(cert, allow)) ||
     schoolHits(text).some((school) => !schoolOk(school, allow)) ||
     degreeHits(text).some((degree) => !degreeOk(degree, allow)) ||
@@ -672,11 +676,13 @@ function accomplishmentViolation(text: string, allow: Allow, where: string): Vio
 }
 
 function checkProse(
-  text: string,
+  raw: string,
   allow: Allow,
   target: CheckOptions["applicationTarget"],
   where: string,
 ): Violation[] {
+  // "AWS Lambda" when the resume has "Lambda" is the same fact: check it as "Lambda".
+  const text = withoutKnownVendorPrefixes(raw, allow);
   const out: Violation[] = [];
   const sentences = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim());
   const chunks = sentences.length ? sentences : [text];
@@ -687,7 +693,7 @@ function checkProse(
     if (!claimedWork) scanned = withoutApplicationTarget(sentence, target);
     out.push(...unsupportedMetrics(scanned, allow, loc));
     out.push(...unsupportedDatesInText(scanned, allow, loc));
-    for (const skill of lexiconHits(scanned)) {
+    for (const skill of lexiconHitsFor(scanned, allow)) {
       if (!skillOk(skill, allow)) out.push({ kind: "skill", value: skill, where: loc });
     }
     for (const degree of degreeHits(scanned)) {
@@ -1030,9 +1036,50 @@ function skillOk(phrase: string, allow: Allow): boolean {
   return parts.every((part) => oneSkillOk(part, allow));
 }
 
+/** Vendor names a posting puts in front of a product ("AWS Lambda", "Amazon S3"). */
+const VENDOR_PREFIX = /^(?:amazon web services|aws|amazon|microsoft|google cloud|google|azure)\s+(\S.*)$/i;
+
+/**
+ * "AWS Lambda" when the resume says "Lambda": the posting's name for a product the
+ * candidate already has. The product itself must be in the resume; the vendor word
+ * adds nothing new. A product the resume does not show is still rejected.
+ */
+function vendorRenameOk(norm: string, allow: Allow): boolean {
+  const m = norm.match(VENDOR_PREFIX);
+  if (!m) return false;
+  const product = m[1].trim();
+  if (!product) return false;
+  return allow.skillCanons.has(canon(product)) || corpusHas(allow.corpus, product) || vendorRenameOk(product, allow);
+}
+
+/**
+ * Text with each "AWS <product>" / "Amazon <product>" reduced to the product when the
+ * resume already shows that product, so the vendor word alone is not read as a new skill.
+ */
+function withoutKnownVendorPrefixes(text: string, allow: Allow): string {
+  return text.replace(
+    /\b(?:amazon web services|aws|amazon)\s+([A-Za-z0-9.+#-]+(?:\s+[A-Za-z0-9.+#-]+)?)/gi,
+    (whole, rest: string) => {
+      const words = rest.split(/\s+/);
+      for (const product of [words.join(" "), words[0]]) {
+        if (allow.skillCanons.has(canon(product)) || corpusHas(allow.corpus, product)) {
+          return whole.slice(whole.length - rest.length);
+        }
+      }
+      return whole;
+    },
+  );
+}
+
+/** Lexicon tools named in the text, minus vendor words in front of a product the resume has. */
+function lexiconHitsFor(text: string, allow: Allow): string[] {
+  return lexiconHits(withoutKnownVendorPrefixes(text, allow));
+}
+
 function oneSkillOk(phrase: string, allow: Allow): boolean {
   const norm = normSkill(phrase);
   if (!norm) return true;
+  if (vendorRenameOk(norm, allow)) return true;
   const canonical = canon(norm);
   if (allow.skillCanons.has(canonical)) return true;
   if (corpusHas(allow.corpus, norm)) return true;

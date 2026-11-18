@@ -227,6 +227,8 @@ export async function POST(request: NextRequest) {
             description: job.description,
             skills: job.skills,
             keywords: job.keywords,
+            mustHaves: job.mustHaves,
+            mustHavesKey: job.mustHavesKey,
           },
           templateId: usableTemplate,
           premium: isPremiumRank(rank),

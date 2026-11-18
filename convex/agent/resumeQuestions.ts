@@ -17,6 +17,7 @@ import {
   type QuestionSection,
 } from "../../lib/resume/bulletQuestions";
 import { scoreResume, type ResumeScorecard } from "../../lib/resume/scorecard";
+import { mentions, resumeText } from "../../lib/chat/mustHaveMatch";
 
 type AnyResume = Record<string, any>;
 
@@ -172,8 +173,8 @@ export function mustHavesFromJob(job: { skills?: string[]; keywords?: string[] }
 }
 
 /**
- * Which must-haves the resume text mentions (case-insensitive, whole-phrase).
- * A cheap literal check, not a judgment of fit; undefined when there is no job.
+ * Which must-haves the resume text mentions, with the shared matcher (whole-phrase,
+ * vendor prefixes, aliases, "A/B" parts). Not a judgment of fit; undefined when there is no job.
  */
 export function mustHavesCoverage(
   content: AnyResume,
@@ -181,13 +182,10 @@ export function mustHavesCoverage(
 ): { met: string[]; missing: string[] } | undefined {
   const wanted = mustHavesFromJob(job);
   if (!wanted) return undefined;
-  const text = ` ${JSON.stringify(content ?? {}).toLowerCase().replace(/[^a-z0-9+#.]+/g, " ")} `;
+  const text = resumeText(content ?? {});
   const met: string[] = [];
   const missing: string[] = [];
-  for (const m of wanted) {
-    const needle = ` ${m.toLowerCase().replace(/[^a-z0-9+#.]+/g, " ").trim()} `;
-    (needle.trim() && text.includes(needle) ? met : missing).push(m);
-  }
+  for (const m of wanted) (mentions(text, m) ? met : missing).push(m);
   return { met, missing };
 }
 

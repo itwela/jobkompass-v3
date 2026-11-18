@@ -77,6 +77,9 @@ function agentStore(ctx: any, userId: string, rank: () => Promise<number>): Tail
     async setTailorMeta(meta) {
       await ctx.runMutation(internal.documents.setResumeTailorMetaInternal, { userId, ...meta });
     },
+    async saveJobMustHaves(id, mustHaves, mustHavesKey) {
+      await ctx.runMutation(internal.agent.fns.jobsSetMustHaves, { userId, id, mustHaves, mustHavesKey });
+    },
   };
 }
 
