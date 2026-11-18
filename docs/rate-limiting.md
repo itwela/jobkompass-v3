@@ -46,13 +46,13 @@ This repo does not deploy Convex by itself.
 
 A merge to `main` updates the Next.js app. It does not install the rate-limiter component. Vercel may build the Next app. That build does not push Convex functions.
 
-The live site reads the Convex **dev** slot `dev:proficient-mammoth-632`. Pushing this component means running Convex against that slot, for example:
+Pushing this component means a backend deploy:
 
 ```bash
-CONVEX_DEPLOYMENT=dev:proficient-mammoth-632 npx convex dev --once
+npm run deploy:backend
 ```
 
-Do not run that, or `npx convex deploy`, or any Convex dashboard push, without the owner's approval. `npx convex dev` writes to the deployment the live site uses. There is no separate staging slot.
+Do not run that, or `npx convex deploy`, or any Convex dashboard push, without the owner's approval.
 
 What that push changes:
 
@@ -68,7 +68,7 @@ Installing `@convex-dev/rate-limiter@0.4.0` also moved the `convex` npm package 
 
 ## How to tune
 
-Edit `convex/rateLimitConfig.ts` only. Then the new numbers apply on the next approved push to `dev:proficient-mammoth-632`. Changing the file in git does not change production limits by itself.
+Edit `convex/rateLimitConfig.ts` only. Then the new numbers apply on the next approved backend deploy. Changing the file in git does not change production limits by itself.
 
 ## How to test
 
