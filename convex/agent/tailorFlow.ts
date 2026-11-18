@@ -1,3 +1,7 @@
+"use node";
+// Node runtime: imports lib/resume/tailorCore.ts, whose fact guard (noInventedFacts.ts)
+// uses node:fs. Only convex/agent/tailor.ts (also "use node") imports this module.
+
 /**
  * POST /agent/resumes/tailor, minus the Convex plumbing (convex/agent/tailor.ts wires the
  * real queries and storage in). Mirrors the in-app tailor routes: same pipeline
