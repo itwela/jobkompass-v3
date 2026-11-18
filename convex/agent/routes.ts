@@ -197,10 +197,12 @@ export const agentRoutes: AgentRoute[] = [
     params: [
       { name: "base", type: "string", required: true, description: "Resume to tailor from (usually the base resume); it is not modified" },
       { name: "jobId", type: "string", required: true, description: "Saved job (its company, title and description drive the tailoring)" },
-      { name: "template", type: "string", description: "jake, joseph or mar (defaults to the base resume's template)" },
+      { name: "template", type: "string", description: "jake, joseph or mar (defaults to the account's default template, then the base resume's, then jake)" },
+      { name: "instructions", type: "string", description: "One-off instruction for this resume, e.g. 'lead with the data work'. Wording and emphasis only, never new facts" },
+      { name: "preferences", type: "json", description: "Array of strings; replaces the account's saved resume preferences for this call (default: the saved ones, as in the app)" },
     ],
     description:
-      "Server-side tailoring: rewrites the base resume for one saved job using the user's saved answers (no invented facts), renders a NEW resume PDF and returns {id,name,fileUrl,resume,questions,scorecard,baseScorecard,model,answersUsed,rule}. Slow (up to a few minutes); costs one document",
+      "Server-side tailoring, same as the in-app tailor: rewrites the base resume for one saved job using the user's saved answers and resume preferences (no invented facts), renders a NEW resume PDF, records what changed and sets the job's resumeUsed. An already-tailored resume as base is resolved to the original base it came from. Returns {id,name,fileName,fileUrl,template,baseResumeId,requestedBase,resume,questions,scorecard,baseScorecard,changes,marks,mustHaves,pages,model,answersUsed,instructionsUsed,rule}. Slow (up to a few minutes); costs one document",
   },
   // ---- cover letters ----
   { method: "GET", path: "/agent/coverletters", fn: internal.agent.fns.coverLettersList, kind: "query", params: [], description: "List cover letters (metadata only)" },

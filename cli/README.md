@@ -30,11 +30,17 @@ Strong bullets carry numbers. Only the human knows them, so the API asks instead
     jk resumes answer --id <baseResumeId> --answers '[{"id":"<question id>","answer":"about 40 a day"}]'
     jk resumes get --id <baseResumeId>                                 # shows saved bulletAnswers
     jk resumes add ... --job <jobId> [--ai-questions]                  # response: questions + scorecard
-    jk resumes tailor --base <resumeId> --job <jobId> [--template mar] # server writes it, using saved answers
+    jk resumes tailor --base <resumeId> --job <jobId> [--template mar] [--instructions "lead with the data work"]
+                                                                       # server writes it, using saved answers
 
 `resumes add` / `update` return `{id, name, fileUrl, questions, questionSource, scorecard, rule}`.
 Questions are built-in by default (free, instant); `--ai-questions` / `--ai` asks the model instead and never rewrites
 your content. Relay questions to your human, save their answers with `jk resumes answer`, and every later resume reuses them.
+
+`resumes tailor` saves the same result as tailoring in the app: your saved resume preferences plus `--instructions`,
+your default template (unless `--template`), the app's document name, the "what changed" marks and must-haves shown in
+Documents, and the job's `resumeUsed`. Passing an already-tailored resume as `--base` writes from the original base it
+came from, with that base's saved answers. The raw API also takes `preferences` (a JSON array) to replace the saved ones.
 
 Resume templates: `jake` (default), `joseph` (Calibri-style, competencies-forward: use `--core-competencies` and `--early-career`) or `mar` (Times serif, categorized skills). Joseph and Mar need a paid plan. Run `jk resumes add --help` for all fields.
 
