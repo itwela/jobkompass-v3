@@ -366,6 +366,33 @@ const schema = defineSchema({
     .index("by_hash", ["keyHash"])
     .index("by_user", ["userId"]),
 
+  // What agents did through the Agent API (automatic) or outside it (POST /agent/activity).
+  // Identity comes from X-Agent-* headers; "unknown" when not sent. Never bodies or secrets.
+  agentActivityLog: defineTable({
+    userId: v.string(),
+    timestamp: v.number(),
+    agentName: v.string(),
+    agentId: v.string(),
+    model: v.string(),
+    provider: v.string(),
+    actionType: v.string(),
+    source: v.union(v.literal("api"), v.literal("external")),
+    route: v.optional(v.string()),
+    target: v.optional(v.string()),
+    summary: v.string(),
+    status: v.union(v.literal("success"), v.literal("error")),
+    errorMessage: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    bodyHash: v.optional(v.string()),
+  })
+    .index("by_user_time", ["userId", "timestamp"])
+    .index("by_user_agent", ["userId", "agentName", "timestamp"])
+    .index("by_user_model", ["userId", "model", "timestamp"])
+    .index("by_user_action", ["userId", "actionType", "timestamp"]),
+
   interviewPreps: defineTable({
     userId: v.string(),
     jobId: v.optional(v.id("jobs")),

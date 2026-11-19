@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { commands, parseList, type CommandSpec, type OptSpec } from "./commands";
 import { apiRequest, CliError } from "./client";
 import { emit } from "./output";
+import { agentHeaders } from "./agent";
 import { resolveDate } from "./dates";
 import { configPath, deleteConfig, loadConfig, saveConfig } from "./config";
 import pkg from "../package.json";
@@ -12,7 +13,16 @@ program
   .name("jk")
   .description("Agent-first CLI for JobKompass. All output is JSON when piped; add --json to force it.")
   .option("--json", "Force JSON output")
+  .option("--agent <name>", "Agent name for the activity log (env JK_AGENT_NAME)")
+  .option("--agent-id <id>", "Agent id for the activity log (env JK_AGENT_ID)")
+  .option("--model <model>", "Model the agent runs on (env JK_AGENT_MODEL)")
+  .option("--provider <p>", "Model provider, e.g. anthropic (env JK_AGENT_PROVIDER)")
   .version(pkg.version);
+
+function identityHeaders(): Record<string, string> {
+  const { agent, agentId, model, provider } = program.opts();
+  return agentHeaders({ agent, agentId, model, provider });
+}
 
 function coerceOpt(spec: OptSpec, raw: unknown): unknown {
   if (raw === undefined) return undefined;
@@ -83,8 +93,8 @@ function register(spec: CommandSpec): void {
     try {
       const data =
         spec.method === "GET" || spec.method === "DELETE"
-          ? await apiRequest(spec.method, spec.path, { query: payload })
-          : await apiRequest(spec.method, spec.path, { body: payload });
+          ? await apiRequest(spec.method, spec.path, { query: payload, headers: identityHeaders() })
+          : await apiRequest(spec.method, spec.path, { body: payload, headers: identityHeaders() });
       emit(data, { json: Boolean(program.opts().json), itemNoun: spec.itemNoun });
     } catch (err) {
       if (err instanceof CliError) fatal(err.code, err.message, err.hint, err.exitCode);

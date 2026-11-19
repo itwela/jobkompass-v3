@@ -55,9 +55,58 @@ export function renderMove(r: MoveShape, itemNoun = "resume"): string {
   return lines.join("\n");
 }
 
+type ActivityPage = { items: Record<string, unknown>[]; cursor: string | null; isDone: boolean };
+
+function isActivityPage(data: unknown): data is ActivityPage {
+  const d = data as Partial<ActivityPage> | null;
+  return Boolean(d && typeof d === "object" && Array.isArray(d.items) && typeof d.isDone === "boolean");
+}
+
+type Group = Record<string, unknown> & { count: number; successRate: number; avgLatencyMs: number | null };
+type ActivitySummaryShape = { total: number; truncated: boolean; byModel: Group[]; byActionType: Group[]; byModelAndAction: Group[] };
+
+function isActivitySummary(data: unknown): data is ActivitySummaryShape {
+  const d = data as Partial<ActivitySummaryShape> | null;
+  return Boolean(d && typeof d === "object" && typeof d.total === "number" && Array.isArray(d.byModel) && Array.isArray(d.byActionType));
+}
+
+/** Pretty `jk activity list`: one row per action, then the next-page command. */
+export function renderActivityPage(p: ActivityPage): string {
+  const rows = p.items.map((r) => ({
+    when: typeof r.timestamp === "number" ? new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19) : "",
+    agent: r.agentName,
+    model: r.model,
+    action: r.actionType,
+    status: r.status,
+    ms: r.latencyMs,
+    target: r.target,
+    summary: r.summary,
+  }));
+  const lines = [renderPretty(rows)];
+  if (!p.isDone && p.cursor) lines.push("", `More: jk activity list --cursor ${p.cursor}`);
+  return lines.join("\n");
+}
+
+/** Pretty `jk activity summary`: totals, then a table per grouping. */
+export function renderActivitySummary(s: ActivitySummaryShape): string {
+  const pct = (g: Group) => ({
+    ...Object.fromEntries(Object.entries(g).filter(([k]) => !["count", "success", "error", "successRate", "avgLatencyMs", "inputTokens", "outputTokens", "costUsd"].includes(k))),
+    count: g.count,
+    success: `${Math.round(g.successRate * 1000) / 10}%`,
+    avgMs: g.avgLatencyMs ?? "",
+  });
+  const lines = [`${s.total} action(s)${s.truncated ? " (truncated: narrow with --from/--to)" : ""}.`];
+  lines.push("", "By model:", renderPretty(s.byModel.map(pct)));
+  lines.push("", "By action type:", renderPretty(s.byActionType.map(pct)));
+  lines.push("", "By model and action type:", renderPretty(s.byModelAndAction.map(pct)));
+  return lines.join("\n");
+}
+
 export function formatOutput(data: unknown, machine: boolean, itemNoun?: string): string {
   if (machine) return JSON.stringify(data, null, 2);
   if (isMoveResult(data)) return renderMove(data, itemNoun);
+  if (isActivityPage(data)) return renderActivityPage(data);
+  if (isActivitySummary(data)) return renderActivitySummary(data);
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const { notice, ...rest } = data as Record<string, unknown>;
     if (typeof notice === "string" && notice) return `Notice: ${notice}\n\n${renderPretty(rest)}`;
