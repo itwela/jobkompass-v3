@@ -1,6 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { formatOutput, renderPretty } from "../src/output";
 
+describe("resumes move output", () => {
+  const result = {
+    dryRun: true,
+    folder: { id: "f1", name: "archived resumes" },
+    moved: [{ id: "r2", name: "Tailored Acme" }],
+    skipped: [{ id: "r1", name: "Base", reason: "favorite" }],
+    alreadyInFolder: [],
+    counts: { moved: 1, skipped: 1, alreadyInFolder: 0, total: 2 },
+    hint: "Dry run: nothing changed. Re-send with confirm: true (CLI: --yes) to move these.",
+  };
+
+  it("pretty mode leads with a summary and marks dry runs", () => {
+    const out = formatOutput(result, false);
+    expect(out.split("\n")[0]).toBe("DRY RUN: would move 1 of 2 resume(s) into 'archived resumes' (f1).");
+    expect(out).toContain("r2  Tailored Acme");
+    expect(out).toContain("r1  Base  (favorite)");
+    expect(out).toContain("--yes");
+  });
+
+  it("machine mode is the raw JSON", () => {
+    expect(JSON.parse(formatOutput(result, true))).toEqual(result);
+  });
+});
+
 describe("renderPretty", () => {
   it("renders array of objects as aligned columns", () => {
     const out = renderPretty([

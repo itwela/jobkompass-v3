@@ -27,8 +27,37 @@ export function renderPretty(data: unknown): string {
  * What emit writes. Machine mode is the JSON as-is (a `notice` field stays in it). Pretty
  * mode puts a server `notice` (e.g. a template fallback) on its own line first so it is seen.
  */
+type MoveShape = {
+  dryRun: boolean;
+  folder: { id: string; name: string };
+  moved: { id: string; name: string }[];
+  skipped: { id: string; name?: string; reason: string }[];
+  alreadyInFolder: unknown[];
+  counts: { moved: number; skipped: number; alreadyInFolder: number; total: number };
+  hint?: string;
+};
+
+function isMoveResult(data: unknown): data is MoveShape {
+  const d = data as Partial<MoveShape> | null;
+  return Boolean(d && typeof d === "object" && typeof d.dryRun === "boolean" && d.counts && d.folder && Array.isArray(d.moved));
+}
+
+/** Pretty output for `jk resumes move`: a summary line, then the resumes. */
+export function renderMove(r: MoveShape): string {
+  const verb = r.dryRun ? "DRY RUN: would move" : "Moved";
+  const lines = [
+    `${verb} ${r.counts.moved} of ${r.counts.total} resume(s) into '${r.folder.name}' (${r.folder.id}).`,
+    `Already in folder: ${r.counts.alreadyInFolder}. Skipped: ${r.counts.skipped}.`,
+  ];
+  if (r.moved.length) lines.push("", ...r.moved.map((m) => `  ${m.id}  ${m.name}`));
+  if (r.skipped.length) lines.push("", "Skipped:", ...r.skipped.map((s) => `  ${s.id}  ${s.name ?? ""}  (${s.reason})`));
+  if (r.hint) lines.push("", r.hint);
+  return lines.join("\n");
+}
+
 export function formatOutput(data: unknown, machine: boolean): string {
   if (machine) return JSON.stringify(data, null, 2);
+  if (isMoveResult(data)) return renderMove(data);
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const { notice, ...rest } = data as Record<string, unknown>;
     if (typeof notice === "string" && notice) return `Notice: ${notice}\n\n${renderPretty(rest)}`;

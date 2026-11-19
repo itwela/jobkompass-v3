@@ -4,6 +4,7 @@ import { AgentError, authenticate } from "./auth";
 import { agentRoutes, type AgentRoute, type ParamSpec } from "./routes";
 import { RANK_PRO } from "../plans";
 import { QUESTIONS_RULE } from "./resumeQuestions";
+import { AMBIGUOUS, INVALID } from "./resumeMove";
 
 /** Taught to every agent via GET /agent/schema. */
 const RESUME_QUESTIONS_WORKFLOW = {
@@ -117,6 +118,8 @@ function makeHandler(route: AgentRoute) {
       if (err instanceof AgentError) return fail(err.status, err.code, err.message, err.hint);
       const message = err instanceof Error ? err.message : String(err);
       const isArgError = message.includes("ArgumentValidationError") || message.includes("Validator");
+      if (message.includes(AMBIGUOUS)) return fail(409, "ambiguous", message.slice(message.indexOf(AMBIGUOUS)), "Pass the id instead of the name.");
+      if (message.includes(INVALID)) return fail(400, "invalid_param", message.slice(message.indexOf(INVALID)), "GET /agent/schema describes every route's params.");
       const isNotFound = message.includes("not found");
       if (isNotFound) return fail(404, "not_found", message, "List records first to find a valid id.");
       return fail(

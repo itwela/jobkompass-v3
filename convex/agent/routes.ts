@@ -174,6 +174,18 @@ export const agentRoutes: AgentRoute[] = [
   },
 
   {
+    method: "POST", path: "/agent/resumes/move", fn: internal.agent.fns.resumesMove, kind: "mutation",
+    params: [
+      { name: "folder", type: "string", required: true, description: "Target folder: id, or exact name (case-insensitive). An ambiguous or unknown name is an error. GET /agent/folders lists them" },
+      { name: "resumeIds", type: "json", description: "Array of resume ids to move. Ids that aren't yours come back in skipped as not_found" },
+      { name: "allExceptFavorites", type: "boolean", description: "true selects every resume that is NOT a favorite (isFavorite). Use instead of resumeIds" },
+      { name: "dryRun", type: "boolean", description: "true returns what WOULD move without changing anything" },
+      { name: "confirm", type: "boolean", description: "Must be true for allExceptFavorites to actually move; without it the bulk move is a dry run" },
+    ],
+    description:
+      "File resumes into one of your folders. Only folderId changes: never content, never deletes; base and tailored resumes alike. Returns {dryRun,folder:{id,name},moved:[{id,name}],skipped:[{id,name?,reason}],alreadyInFolder:[{id,name}],counts:{moved,skipped,alreadyInFolder,total},hint?}. On a dry run, moved lists what would move",
+  },
+  {
     method: "GET", path: "/agent/resumes/questions", fn: internal.agent.fns.resumesQuestions, kind: "action",
     params: [
       { name: "id", type: "string", required: true },
@@ -204,6 +216,9 @@ export const agentRoutes: AgentRoute[] = [
     description:
       "Server-side tailoring, same as the in-app tailor: rewrites the base resume for one saved job using the user's saved answers and resume preferences (no invented facts), renders a NEW resume PDF, records what changed and sets the job's resumeUsed. An already-tailored resume as base is resolved to the original base it came from. Returns {id,name,fileName,fileUrl,template,notice?,baseResumeId,requestedBase,resume,questions,scorecard,baseScorecard,changes,marks,mustHaves,pages,model,answersUsed,instructionsUsed,rule}; template is the one actually used, and notice is set when the requested template is above the plan so jake was used instead. Slow (up to a few minutes); costs one document",
   },
+  // ---- folders ----
+  { method: "GET", path: "/agent/folders", fn: internal.agent.fns.foldersList, kind: "query", params: [], description: "List document folders: [{id,name,resumeCount,coverLetterCount}] sorted by name" },
+
   // ---- cover letters ----
   { method: "GET", path: "/agent/coverletters", fn: internal.agent.fns.coverLettersList, kind: "query", params: [], description: "List cover letters (metadata only)" },
   {
