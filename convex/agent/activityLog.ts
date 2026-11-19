@@ -240,9 +240,12 @@ export type SummaryGroup = {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  /** Rows that reported token counts / a cost. 0 means "not reported", not "free". */
+  tokenRows: number;
+  costRows: number;
 };
 
-type Acc = { count: number; success: number; error: number; latSum: number; latN: number; inTok: number; outTok: number; cost: number };
+type Acc = { count: number; success: number; error: number; latSum: number; latN: number; inTok: number; outTok: number; cost: number; tokN: number; costN: number };
 
 function finish(a: Acc): SummaryGroup {
   return {
@@ -254,21 +257,24 @@ function finish(a: Acc): SummaryGroup {
     inputTokens: a.inTok,
     outputTokens: a.outTok,
     costUsd: Math.round(a.cost * 1e6) / 1e6,
+    tokenRows: a.tokN,
+    costRows: a.costN,
   };
 }
 
-type GroupKeys = { model?: string; provider?: string; actionType?: string };
+export type SummaryRow = Pick<ActivityRow, "model" | "provider" | "actionType" | "status" | "latencyMs" | "inputTokens" | "outputTokens" | "costUsd"> & {
+  agentName?: string;
+};
 
-type SummaryRow =Pick<ActivityRow, "model" | "provider" | "actionType" | "status" | "latencyMs" | "inputTokens" | "outputTokens" | "costUsd">;
-
-/** Counts, success rate and avg latency by model, by action type, and by model x action type. */
-export function summarize(rows: SummaryRow[], truncated = false) {
-  const groups = new Map<string, { keys: Record<string, string>; acc: Acc }>();
-  const add = (bucket: string, keys: Record<string, string>, r: SummaryRow) => {
-    const id = bucket + "\u0000" + Object.values(keys).join("\u0000");
+/** One accumulator per key; the shared aggregation behind every summary. */
+export function aggregate<K extends Record<string, string>>(rows: SummaryRow[], keyOf: (r: SummaryRow) => K): (K & SummaryGroup)[] {
+  const groups = new Map<string, { keys: K; acc: Acc }>();
+  for (const r of rows) {
+    const keys = keyOf(r);
+    const id = Object.values(keys).join("\u0000");
     let g = groups.get(id);
     if (!g) {
-      g = { keys, acc: { count: 0, success: 0, error: 0, latSum: 0, latN: 0, inTok: 0, outTok: 0, cost: 0 } };
+      g = { keys, acc: { count: 0, success: 0, error: 0, latSum: 0, latN: 0, inTok: 0, outTok: 0, cost: 0, tokN: 0, costN: 0 } };
       groups.set(id, g);
     }
     const a = g.acc;
@@ -279,25 +285,85 @@ export function summarize(rows: SummaryRow[], truncated = false) {
       a.latSum += r.latencyMs;
       a.latN++;
     }
+    if (typeof r.inputTokens === "number" || typeof r.outputTokens === "number") a.tokN++;
     a.inTok += r.inputTokens ?? 0;
     a.outTok += r.outputTokens ?? 0;
+    if (typeof r.costUsd === "number") a.costN++;
     a.cost += r.costUsd ?? 0;
-  };
-  for (const r of rows) {
-    add("model", { model: r.model, provider: r.provider }, r);
-    add("action", { actionType: r.actionType }, r);
-    add("both", { model: r.model, actionType: r.actionType }, r);
   }
-  const collect = (bucket: string): (GroupKeys & SummaryGroup)[] =>
-    [...groups.entries()]
-      .filter(([id]) => id.startsWith(bucket + "\u0000"))
-      .map(([, g]) => ({ ...(g.keys as GroupKeys), ...finish(g.acc) }))
-      .sort((a, b) => b.count - a.count);
+  return [...groups.values()].map((g) => ({ ...g.keys, ...finish(g.acc) })).sort((a, b) => b.count - a.count);
+}
+
+/** Counts, success rate and avg latency by model, by action type, and by model x action type. */
+export function summarize(rows: SummaryRow[], truncated = false) {
   return {
     total: rows.length,
     truncated,
-    byModel: collect("model"),
-    byActionType: collect("action"),
-    byModelAndAction: collect("both"),
+    byModel: aggregate(rows, (r) => ({ model: r.model, provider: r.provider })),
+    byActionType: aggregate(rows, (r) => ({ actionType: r.actionType })),
+    byModelAndAction: aggregate(rows, (r) => ({ model: r.model, actionType: r.actionType })),
   };
+}
+
+// ---- in-app Agent activity page (convex/agent/activity.ts) ----
+
+export type ActivityFilter = { agent?: string; model?: string; actionType?: string; status?: string };
+
+/** Same equality filters the HTTP list applies, for rows already in memory. */
+export function matchesFilter(r: { agentName: string; model: string; actionType: string; status: string }, f: ActivityFilter): boolean {
+  return (
+    (!f.agent || r.agentName === f.agent) &&
+    (!f.model || r.model === f.model) &&
+    (!f.actionType || r.actionType === f.actionType) &&
+    (!f.status || r.status === f.status)
+  );
+}
+
+/**
+ * Per action type, the model with the highest success rate on it. Ties go to the model with more
+ * runs, then to name order, so the pick is stable. Only models that actually ran the action count.
+ */
+export function bestModelByAction(rows: SummaryRow[]): Record<string, { model: string; successRate: number; count: number }> {
+  const out: Record<string, { model: string; successRate: number; count: number }> = {};
+  for (const g of aggregate(rows, (r) => ({ actionType: r.actionType, model: r.model }))) {
+    const cur = out[g.actionType];
+    const better =
+      !cur ||
+      g.successRate > cur.successRate ||
+      (g.successRate === cur.successRate && (g.count > cur.count || (g.count === cur.count && g.model < cur.model)));
+    if (better) out[g.actionType] = { model: g.model, successRate: g.successRate, count: g.count };
+  }
+  return out;
+}
+
+/** Per agent: the shared numbers plus the model it ran most often. */
+export function summarizeAgents(rows: SummaryRow[]) {
+  const usual: Record<string, string> = {};
+  const byPair = aggregate(rows, (r) => ({ agentName: r.agentName ?? UNKNOWN, model: r.model }));
+  // byPair is sorted by count desc, so the first model seen per agent is the usual one.
+  for (const g of byPair) if (!(g.agentName in usual)) usual[g.agentName] = g.model;
+  return aggregate(rows, (r) => ({ agentName: r.agentName ?? UNKNOWN })).map((g) => ({ ...g, usualModel: usual[g.agentName] }));
+}
+
+/** Everything the Agent activity page shows above the feed, from one scan of the user's rows. */
+export function activityOverview(rows: (SummaryRow & { agentName: string; timestamp: number })[], opts: { todayStart: number; truncated?: boolean }) {
+  const totals = aggregate(rows, () => ({}))[0] ?? null;
+  const best = bestModelByAction(rows);
+  return {
+    ...summarize(rows, opts.truncated ?? false),
+    totals,
+    today: rows.filter((r) => r.timestamp >= opts.todayStart).length,
+    byAgent: summarizeAgents(rows),
+    byActionType: aggregate(rows, (r) => ({ actionType: r.actionType })).map((g) => ({ ...g, best: best[g.actionType] ?? null })),
+  };
+}
+
+/** The distinct values a filter menu can offer, most used first. */
+export function filterOptions(rows: { agentName: string; model: string; actionType: string }[]) {
+  const ranked = (pick: (r: (typeof rows)[number]) => string) => {
+    const n = new Map<string, number>();
+    for (const r of rows) n.set(pick(r), (n.get(pick(r)) ?? 0) + 1);
+    return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([k]) => k);
+  };
+  return { agents: ranked((r) => r.agentName), models: ranked((r) => r.model), actionTypes: ranked((r) => r.actionType) };
 }

@@ -10,6 +10,7 @@ import JkCW_ResourcesMode from "./jk-chatwindow-components/jkChatWindow-Resource
 import JkCW_HelpMode from "./jk-chatwindow-components/jkChatWindow-HelpMode";
 import JkCW_SettingsMode from "./jk-chatwindow-components/jkChatWindow-SettingsMode";
 import JkCW_InterviewPrepMode from "./jk-chatwindow-components/jkChatWindow-InterviewPrepMode";
+import JkCW_AgentActivityMode from "./jk-chatwindow-components/jkChatWindow-AgentActivityMode";
 
 export default function JkChatWindow() {
   const { currentMode } = useJobKompassChatWindow()
@@ -24,6 +25,7 @@ export default function JkChatWindow() {
     showTutorialMode: currentMode.id === '/tutorial',
     showSettingsMode: currentMode.id === '/settings',
     showInterviewPrepMode: currentMode.id === '/interview-prep',
+    showAgentActivityMode: currentMode.id === '/agent-activity',
   }
 
   return (
@@ -38,6 +40,7 @@ export default function JkChatWindow() {
       {conditionalStyles.showResourcesMode && <JkCW_ResourcesMode />}
       {conditionalStyles.showSettingsMode && <JkCW_SettingsMode />}
       {conditionalStyles.showInterviewPrepMode && <JkCW_InterviewPrepMode />}
+      {conditionalStyles.showAgentActivityMode && <JkCW_AgentActivityMode />}
     </div>
   )
 }

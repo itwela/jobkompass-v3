@@ -49,9 +49,10 @@ const SCROLL_ID = "jk-settings-scroll"
 const sectionDomId = (id: string) => `jk-settings-${id}`
 
 /** Which section is in view: the last one whose top has passed the upper third of the scroller. */
-function useActiveSection() {
+function useActiveSection(enabled: boolean) {
   const [active, setActive] = useState<string>(JK_SETTINGS_SECTIONS[0].id)
   useEffect(() => {
+    if (!enabled) return
     let scroller: HTMLElement | null = null
     let raf = 0
     const onScroll = () => {
@@ -74,19 +75,29 @@ function useActiveSection() {
     }
     attach()
     return () => { cancelAnimationFrame(raf); scroller?.removeEventListener("scroll", onScroll) }
-  }, [])
+  }, [enabled])
   return active
 }
 
 const goToSection = (id: string) =>
   document.getElementById(sectionDomId(id))?.scrollIntoView({ behavior: "smooth", block: "start" })
 
+/** From another page (Agent activity): open Settings, then scroll once the section has mounted. */
+export function goToSectionWhenMounted(id: string) {
+  let tries = 0
+  const step = () => {
+    const el = document.getElementById(sectionDomId(id))
+    if (el) { el.scrollIntoView({ block: "start" }); return }
+    if (++tries < 60) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
 /** Desktop rail while Settings is open (D13): back, section nav, and the same account menu as the app rail. */
 export function JkSettingsRail() {
   const nav = useJkAppNav()
-  const active = useActiveSection()
-  const { signOut } = useAuthActions()
-  const { setCurrentThreadId } = useJobKompassChatWindow()
+  const onActivity = nav.currentId === "/agent-activity"
+  const active = useActiveSection(!onActivity)
   return (
     <div className="relative flex h-full w-[264px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
       <div className="mt-[22px] flex h-[30px] shrink-0 items-center pl-[22px]">
@@ -104,8 +115,11 @@ export function JkSettingsRail() {
       <JkSectionLabel as="h2" className="mt-8 px-[26px]">Settings</JkSectionLabel>
       <nav aria-label="Settings sections" className="mt-3 flex flex-col gap-0.5 px-3.5">
         {JK_SETTINGS_SECTIONS.map((s) => (
-          <JkNavRow key={s.id} label={s.label} count={null} tick="var(--plan)" active={active === s.id} onClick={() => goToSection(s.id)} />
+          <JkNavRow key={s.id} label={s.label} count={null} tick="var(--plan)" active={!onActivity && active === s.id}
+            onClick={() => { if (onActivity) { nav.go("/settings"); if (s.id !== JK_SETTINGS_SECTIONS[0].id) goToSectionWhenMounted(s.id) } else goToSection(s.id) }} />
         ))}
+        {/* D27: its own page, last item, right under CLI keys */}
+        <JkNavRow label="Agent activity" count={null} tick="var(--bar-1)" active={onActivity} onClick={() => nav.go("/agent-activity")} />
       </nav>
       <div className="mx-[18px] mt-auto shrink-0 border-t border-border pb-[22px] pt-[21px]">
         <JkUserMenu />
@@ -169,6 +183,7 @@ async function copy(text: string, what: string) {
 }
 
 export default function JkCW_SettingsMode() {
+  const nav = useJkAppNav()
   const { user, isAuthenticated } = useAuth()
   const { subscription, planId, rank } = useSubscription()
   const { getUsageStats } = useFeatureAccess()
@@ -445,6 +460,16 @@ export default function JkCW_SettingsMode() {
           )}
           <Button variant="outline" className="mt-7 h-12 w-full text-[16px] lg:hidden" onClick={() => rank < RANK_PRO ? setUpgrade({ feature: "jk CLI" }) : setCliOpen(true)}>New key</Button>
         </JkSettingsSection>
+
+        {/* Phones: Agent activity is its own page, reached from here (the desktop rail lists it under CLI keys) */}
+        <button type="button" onClick={() => nav.go("/agent-activity")}
+          className="jk-enter flex w-full items-center justify-between gap-4 border-t border-border py-7 text-left lg:hidden" style={{ "--i": 7 } as React.CSSProperties}>
+          <span className="min-w-0">
+            <span className="block text-[22px] font-medium leading-[26px] tracking-[-0.3px] text-foreground">Agent activity</span>
+            <span className="mt-1.5 block text-[15px] leading-5 text-muted-foreground">What agents did on your account</span>
+          </span>
+          <ChevronLeft aria-hidden className="size-5 shrink-0 rotate-180 text-subtle-foreground" strokeWidth={1.8} />
+        </button>
 
         <JkSignOutButton className="mt-6 text-[16px] hover:underline lg:hidden" onConfirm={async () => { setCurrentThreadId(null); await signOut() }} />
       </div>

@@ -15,6 +15,13 @@ import {
   scrubSecrets,
   shouldAutoLog,
   summarize,
+  aggregate,
+  matchesFilter,
+  bestModelByAction,
+  summarizeAgents,
+  activityOverview,
+  filterOptions,
+  type SummaryRow,
   type AgentIdentity,
 } from "./activityLog";
 
@@ -259,5 +266,102 @@ describe("summarize", () => {
 
   it("empty input", () => {
     expect(summarize([], true)).toEqual({ total: 0, truncated: true, byModel: [], byActionType: [], byModelAndAction: [] });
+  });
+
+  it("counts rows that reported tokens and cost separately from zero totals", () => {
+    const s = summarize([
+      { model: "m", provider: "p", actionType: "a", status: "success", inputTokens: 0, outputTokens: 0, costUsd: 0 },
+      { model: "m", provider: "p", actionType: "a", status: "success" },
+      { model: "u", provider: "p", actionType: "a", status: "success" },
+    ]);
+    expect(s.byModel.find((g) => g.model === "m")).toMatchObject({ tokenRows: 1, costRows: 1, inputTokens: 0, costUsd: 0 });
+    expect(s.byModel.find((g) => g.model === "u")).toMatchObject({ tokenRows: 0, costRows: 0 });
+  });
+});
+
+const row = (o: Partial<SummaryRow> & { timestamp?: number; agentName?: string }) => ({
+  model: "opus",
+  provider: "anthropic",
+  actionType: "jobs.create",
+  status: "success" as const,
+  agentName: "Summit",
+  timestamp: 0,
+  ...o,
+});
+
+describe("aggregate", () => {
+  it("groups by any key and sorts by count", () => {
+    const g = aggregate([row({}), row({ model: "gpt" }), row({ model: "gpt", status: "error" })], (r) => ({ model: r.model }));
+    expect(g.map((x) => [x.model, x.count, x.error])).toEqual([["gpt", 2, 1], ["opus", 1, 0]]);
+  });
+});
+
+describe("matchesFilter", () => {
+  const r = { agentName: "Kepa", model: "gpt-5", actionType: "email_sent", status: "error" };
+  it("passes with no filter and applies each one", () => {
+    expect(matchesFilter(r, {})).toBe(true);
+    expect(matchesFilter(r, { agent: "Kepa", status: "error" })).toBe(true);
+    expect(matchesFilter(r, { model: "opus" })).toBe(false);
+    expect(matchesFilter(r, { actionType: "jobs.create" })).toBe(false);
+    expect(matchesFilter(r, { status: "success" })).toBe(false);
+  });
+});
+
+describe("bestModelByAction", () => {
+  it("picks the highest success rate, then more runs, then name", () => {
+    const best = bestModelByAction([
+      row({ model: "a" }), row({ model: "a", status: "error" }),
+      row({ model: "b" }),
+      row({ model: "c" }), row({ model: "c" }),
+      row({ actionType: "email_sent", model: "z" }), row({ actionType: "email_sent", model: "y" }),
+    ]);
+    expect(best["jobs.create"]).toEqual({ model: "c", successRate: 1, count: 2 });
+    expect(best["email_sent"].model).toBe("y");
+  });
+
+  it("only knows actions that ran", () => {
+    expect(bestModelByAction([])).toEqual({});
+  });
+});
+
+describe("summarizeAgents", () => {
+  it("gives each agent its numbers and the model it used most", () => {
+    const a = summarizeAgents([
+      row({ agentName: "Kepa", model: "sonnet" }), row({ agentName: "Kepa", model: "sonnet", status: "error" }), row({ agentName: "Kepa", model: "gpt" }),
+      row({ agentName: "Orbit", model: "unknown" }),
+    ]);
+    expect(a[0]).toMatchObject({ agentName: "Kepa", count: 3, success: 2, usualModel: "sonnet" });
+    expect(a[1]).toMatchObject({ agentName: "Orbit", count: 1, usualModel: "unknown" });
+  });
+});
+
+describe("activityOverview", () => {
+  it("totals, today count, best model per action", () => {
+    const rows = [
+      row({ timestamp: 100, latencyMs: 1000, inputTokens: 10, outputTokens: 5, costUsd: 0.5 }),
+      row({ timestamp: 200, status: "error", latencyMs: 3000 }),
+      row({ timestamp: 50, actionType: "email_sent", model: "gpt" }),
+    ];
+    const o = activityOverview(rows, { todayStart: 100 });
+    expect(o.total).toBe(3);
+    expect(o.today).toBe(2);
+    expect(o.totals).toMatchObject({ count: 3, error: 1, avgLatencyMs: 2000, inputTokens: 10, outputTokens: 5, costUsd: 0.5, tokenRows: 1, costRows: 1 });
+    expect(o.byActionType.find((g) => g.actionType === "jobs.create")).toMatchObject({ count: 2, error: 1, best: { model: "opus", successRate: 0.5 } });
+    expect(o.byAgent[0]).toMatchObject({ agentName: "Summit", count: 3 });
+  });
+
+  it("no rows: null totals", () => {
+    expect(activityOverview([], { todayStart: 0 }).totals).toBeNull();
+  });
+});
+
+describe("filterOptions", () => {
+  it("lists distinct values, most used first", () => {
+    const o = filterOptions([
+      { agentName: "Kepa", model: "gpt", actionType: "a" },
+      { agentName: "Orbit", model: "gpt", actionType: "b" },
+      { agentName: "Orbit", model: "opus", actionType: "b" },
+    ]);
+    expect(o).toEqual({ agents: ["Orbit", "Kepa"], models: ["gpt", "opus"], actionTypes: ["b", "a"] });
   });
 });

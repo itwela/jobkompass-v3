@@ -21,7 +21,7 @@ import { useResources } from "@/providers/jkResourcesProvider";
 
 export type JkModeId =
   | "/my-jobs" | "/documents" | "/interview-prep" | "/performance" | "/resources"
-  | "/chat" | "/help" | "/settings";
+  | "/chat" | "/help" | "/settings" | "/agent-activity";
 
 export interface JkNavItem {
   id: JkModeId;
@@ -42,7 +42,7 @@ const RAIL: Omit<JkNavItem, "count">[] = [
   { id: "/chat", label: "Chat", short: "Chat", tick: "var(--bar-2)" },
 ];
 
-const OTHER: Record<string, string> = { "/help": "Help & Guides", "/settings": "Settings" };
+const OTHER: Record<string, string> = { "/help": "Help & Guides", "/settings": "Settings", "/agent-activity": "Agent activity" };
 
 /** Phone tab bar: the three places people live, plus More (opens the menu). */
 export const JK_TABS: { id: JkModeId | "more"; label: string; tick: string }[] = [

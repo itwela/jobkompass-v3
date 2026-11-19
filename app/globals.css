@@ -31,6 +31,7 @@
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-subtle-foreground: var(--subtle-foreground);
+  --color-agent-claude: var(--agent-claude);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
@@ -53,6 +54,7 @@
   --color-warn: var(--warn);
   --color-warn-ink: var(--warn-ink);
   --color-scrim: var(--scrim);
+  --color-track: var(--track);
   --color-sky-top: var(--sky-top);
   --color-sky: var(--sky);
   --color-on-fill: var(--on-fill);
@@ -167,6 +169,8 @@ input[data-quiet-focus]:focus-visible {
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(10 18 40 / 0.45);
+  /* Empty part of a meter bar (Agent activity success / runs bars). */
+  --track: #E3E5EA;
   --sky-top: #FFFFFF;
   --sky: #FFFFFF;
   --sidebar: #FFFFFF;
@@ -242,6 +246,7 @@ input[data-quiet-focus]:focus-visible {
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --scrim: rgb(4 7 15 / 0.72);
+  --track: #172244;
   --sky-top: #0B1430;
   --sky: #11204A;
   --sidebar: #0C1530;
