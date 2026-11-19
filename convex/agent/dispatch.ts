@@ -5,6 +5,16 @@ import { agentRoutes, type AgentRoute, type ParamSpec } from "./routes";
 import { RANK_PRO } from "../plans";
 import { QUESTIONS_RULE } from "./resumeQuestions";
 import { AMBIGUOUS, INVALID } from "./resumeMove";
+import { internal } from "../_generated/api";
+import {
+  INVALID_ACTIVITY,
+  automaticRow,
+  forbiddenFields,
+  identityFromHeaders,
+  recordSafely,
+  shouldAutoLog,
+  withoutUndefined,
+} from "./activityLog";
 
 /** Taught to every agent via GET /agent/schema. */
 const RESUME_QUESTIONS_WORKFLOW = {
@@ -75,6 +85,18 @@ async function buildArgs(route: AgentRoute, request: Request): Promise<Record<st
     }
   }
 
+  if (route.rejectSecretFields) {
+    const bad = forbiddenFields(raw);
+    if (bad.length) {
+      throw new AgentError(
+        400,
+        "forbidden_field",
+        `Field(s) not allowed: ${bad.join(", ")}. Message bodies, tokens and passwords are never stored`,
+        "Send a short summary, and bodyHash (sha256 hex of the body) if you need to prove what was sent."
+      );
+    }
+  }
+
   const valid = new Set(route.params.map((p) => p.name));
   for (const k of Object.keys(raw)) {
     if (!valid.has(k)) {
@@ -101,34 +123,60 @@ async function buildArgs(route: AgentRoute, request: Request): Promise<Record<st
   return args;
 }
 
+function errorResponse(err: unknown): Response {
+  if (err instanceof AgentError) return fail(err.status, err.code, err.message, err.hint);
+  const message = err instanceof Error ? err.message : String(err);
+  const isArgError = message.includes("ArgumentValidationError") || message.includes("Validator");
+  if (message.includes(AMBIGUOUS)) return fail(409, "ambiguous", message.slice(message.indexOf(AMBIGUOUS)), "Pass the id instead of the name.");
+  if (message.includes(INVALID)) return fail(400, "invalid_param", message.slice(message.indexOf(INVALID)), "GET /agent/schema describes every route's params.");
+  if (message.includes(INVALID_ACTIVITY)) return fail(400, "invalid_param", message.slice(message.indexOf(INVALID_ACTIVITY)), "GET /agent/schema describes every route's params.");
+  const isNotFound = message.includes("not found");
+  if (isNotFound) return fail(404, "not_found", message, "List records first to find a valid id.");
+  return fail(
+    isArgError ? 400 : 500,
+    isArgError ? "invalid_args" : "server_error",
+    message,
+    isArgError ? "GET /agent/schema describes every route's params." : undefined
+  );
+}
+
 function makeHandler(route: AgentRoute) {
   return httpAction(async (ctx, request) => {
+    let userId: string;
     try {
-      const userId = await authenticate(ctx, request, { requireRank: RANK_PRO });
-      const args = await buildArgs(route, request);
+      userId = await authenticate(ctx, request, { requireRank: RANK_PRO });
+    } catch (err) {
+      return errorResponse(err);
+    }
+    const identity = identityFromHeaders(request.headers);
+    const started = Date.now();
+    let args: Record<string, unknown> = {};
+    let result: unknown;
+    let errorMessage: string | undefined;
+    let response: Response;
+    try {
+      args = await buildArgs(route, request);
+      if (route.injectIdentity) args.identity = identity;
       args.userId = userId; // every agent fn takes explicit userId and enforces ownership
-      const result =
+      result =
         route.kind === "query"
           ? await ctx.runQuery(route.fn, args)
           : route.kind === "action"
           ? await ctx.runAction(route.fn, args)
           : await ctx.runMutation(route.fn, args);
-      return ok(result);
+      response = ok(result);
     } catch (err) {
-      if (err instanceof AgentError) return fail(err.status, err.code, err.message, err.hint);
-      const message = err instanceof Error ? err.message : String(err);
-      const isArgError = message.includes("ArgumentValidationError") || message.includes("Validator");
-      if (message.includes(AMBIGUOUS)) return fail(409, "ambiguous", message.slice(message.indexOf(AMBIGUOUS)), "Pass the id instead of the name.");
-      if (message.includes(INVALID)) return fail(400, "invalid_param", message.slice(message.indexOf(INVALID)), "GET /agent/schema describes every route's params.");
-      const isNotFound = message.includes("not found");
-      if (isNotFound) return fail(404, "not_found", message, "List records first to find a valid id.");
-      return fail(
-        isArgError ? 400 : 500,
-        isArgError ? "invalid_args" : "server_error",
-        message,
-        isArgError ? "GET /agent/schema describes every route's params." : undefined
-      );
+      errorMessage = err instanceof Error ? err.message : String(err);
+      response = errorResponse(err);
     }
+    if (shouldAutoLog(route)) {
+      // Writes leave an activity row. Logging never changes or fails the response.
+      await recordSafely(async () => {
+        const row = automaticRow(identity, route, args, { result, error: errorMessage, latencyMs: Date.now() - started });
+        await ctx.runMutation(internal.agent.fns.activityRecord, { userId, row: withoutUndefined(row) });
+      });
+    }
+    return response;
   });
 }
 

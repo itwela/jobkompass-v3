@@ -11,6 +11,7 @@ import { planRank } from "../plans";
 import { setResumeShared } from "../resumeShares";
 import { foldersWithCounts } from "../documentFolders";
 import { executeCoverLetterMove, executeResumeMove } from "./resumeMove";
+import { INVALID_ACTIVITY, SUMMARY_SCAN_CAP, parseTime, sanitizeExternal, summarize, withoutUndefined } from "./activityLog";
 import { tailoringValidator } from "../tailoring";
 import { exportResumePdf } from "./resumePdf";
 import { canUseResumeTemplate, isValidResumeTemplateId, resolveResumeTemplateId } from "../../lib/templates";
@@ -1117,5 +1118,145 @@ export const interviewPrepsRemove = internalMutation({
   handler: async (ctx, { userId, id }) => {
     await owned(ctx, id, userId, "Interview prep");
     await ctx.db.delete(id);
+  },
+});
+
+// ---- agent activity log ----
+
+const identityArg = v.object({ agentName: v.string(), agentId: v.string(), model: v.string(), provider: v.string() });
+
+const activityRowArg = v.object({
+  agentName: v.string(),
+  agentId: v.string(),
+  model: v.string(),
+  provider: v.string(),
+  actionType: v.string(),
+  source: v.union(v.literal("api"), v.literal("external")),
+  route: v.optional(v.string()),
+  target: v.optional(v.string()),
+  summary: v.string(),
+  status: v.union(v.literal("success"), v.literal("error")),
+  errorMessage: v.optional(v.string()),
+  latencyMs: v.optional(v.number()),
+  inputTokens: v.optional(v.number()),
+  outputTokens: v.optional(v.number()),
+  costUsd: v.optional(v.number()),
+  bodyHash: v.optional(v.string()),
+});
+
+/** Automatic log row written by dispatch.ts after a write route (sanitized there by automaticRow). */
+export const activityRecord = internalMutation({
+  args: { userId: v.string(), row: activityRowArg },
+  handler: async (ctx, { userId, row }) => {
+    await ctx.db.insert("agentActivityLog", { ...row, userId, timestamp: Date.now() });
+  },
+});
+
+/** POST /agent/activity: an action the agent took outside JobKompass (email sent, Slack message...). */
+export const activityLog = internalMutation({
+  args: {
+    userId: v.string(),
+    identity: identityArg,
+    actionType: v.string(),
+    summary: v.string(),
+    target: v.optional(v.string()),
+    status: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    bodyHash: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, identity, ...input }) => {
+    const row = sanitizeExternal(identity, input);
+    const timestamp = Date.now();
+    const id = await ctx.db.insert("agentActivityLog", { ...withoutUndefined(row), userId, timestamp });
+    return {
+      id,
+      timestamp,
+      agentName: row.agentName,
+      agentId: row.agentId,
+      model: row.model,
+      provider: row.provider,
+      actionType: row.actionType,
+      status: row.status,
+    };
+  },
+});
+
+const activityFilterArgs = {
+  userId: v.string(),
+  agent: v.optional(v.string()),
+  agentId: v.optional(v.string()),
+  model: v.optional(v.string()),
+  actionType: v.optional(v.string()),
+  status: v.optional(v.string()),
+  from: v.optional(v.string()),
+  to: v.optional(v.string()),
+};
+
+type ActivityFilters = {
+  userId: string;
+  agent?: string;
+  agentId?: string;
+  model?: string;
+  actionType?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+/** The caller's rows, newest first, on the most selective index; remaining filters applied after. */
+function activityQuery(ctx: QueryCtx, f: ActivityFilters) {
+  if (f.status !== undefined && f.status !== "success" && f.status !== "error") {
+    throw new Error(`${INVALID_ACTIVITY}status must be success or error`);
+  }
+  const from = parseTime("from", f.from);
+  const to = parseTime("to", f.to);
+  const range = (q: any) => {
+    let r = q;
+    if (from !== undefined) r = r.gte("timestamp", from);
+    if (to !== undefined) r = r.lte("timestamp", to);
+    return r;
+  };
+  const table = ctx.db.query("agentActivityLog");
+  const base = f.agent
+    ? table.withIndex("by_user_agent", (q) => range(q.eq("userId", f.userId).eq("agentName", f.agent!)))
+    : f.model
+    ? table.withIndex("by_user_model", (q) => range(q.eq("userId", f.userId).eq("model", f.model!)))
+    : f.actionType
+    ? table.withIndex("by_user_action", (q) => range(q.eq("userId", f.userId).eq("actionType", f.actionType!)))
+    : table.withIndex("by_user_time", (q) => range(q.eq("userId", f.userId)));
+  return base.order("desc").filter((q) => {
+    const conds = [];
+    if (f.model) conds.push(q.eq(q.field("model"), f.model));
+    if (f.actionType) conds.push(q.eq(q.field("actionType"), f.actionType));
+    if (f.agentId) conds.push(q.eq(q.field("agentId"), f.agentId));
+    if (f.status) conds.push(q.eq(q.field("status"), f.status));
+    return conds.length ? q.and(...conds) : true;
+  });
+}
+
+function activityOut(r: Doc<"agentActivityLog">) {
+  const { _id, _creationTime: _c, userId: _u, ...rest } = r;
+  return { id: _id, ...rest };
+}
+
+export const activityList = internalQuery({
+  args: { ...activityFilterArgs, limit: v.optional(v.number()), cursor: v.optional(v.string()) },
+  handler: async (ctx, { limit, cursor, ...f }) => {
+    const numItems = Math.min(200, Math.max(1, Math.floor(limit ?? 50)));
+    const page = await activityQuery(ctx, f).paginate({ numItems, cursor: cursor ?? null });
+    return { items: page.page.map(activityOut), cursor: page.isDone ? null : page.continueCursor, isDone: page.isDone };
+  },
+});
+
+export const activitySummary = internalQuery({
+  args: activityFilterArgs,
+  handler: async (ctx, f) => {
+    const rows = await activityQuery(ctx, f).take(SUMMARY_SCAN_CAP + 1);
+    const truncated = rows.length > SUMMARY_SCAN_CAP;
+    return summarize(truncated ? rows.slice(0, SUMMARY_SCAN_CAP) : rows, truncated);
   },
 });

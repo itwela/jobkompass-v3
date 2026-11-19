@@ -14,6 +14,8 @@ export class CliError extends Error {
 type RequestOpts = {
   query?: Record<string, unknown>;
   body?: Record<string, unknown>;
+  /** Extra headers, e.g. X-Agent-* identity from agentHeaders(). */
+  headers?: Record<string, string>;
 };
 
 export async function apiRequest(method: string, path: string, opts: RequestOpts = {}): Promise<unknown> {
@@ -35,6 +37,7 @@ export async function apiRequest(method: string, path: string, opts: RequestOpts
   const init: RequestInit = {
     method,
     headers: {
+      ...(opts.headers ?? {}),
       Authorization: `Bearer ${apiKey}`,
       ...(opts.body ? { "Content-Type": "application/json" } : {}),
     },

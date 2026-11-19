@@ -67,6 +67,17 @@ const resourceWriteOpts: OptSpec[] = [
   { flag: "--category <cat>", api: "category", type: "str" },
 ];
 
+// --agent, --agent-id and --model are the global identity flags, so filters carry a filter- prefix.
+const activityFilterOpts: OptSpec[] = [
+  { flag: "--filter-agent <name>", api: "agent", type: "str", desc: "Agent name, e.g. Summit" },
+  { flag: "--filter-agent-id <id>", api: "agentId", type: "str" },
+  { flag: "--filter-model <model>", api: "model", type: "str", desc: "e.g. claude-opus-5-5" },
+  { flag: "--type <type>", api: "actionType", type: "str", desc: "e.g. email_sent, resumes.generate, jobs.create" },
+  { flag: "--status <s>", api: "status", type: "str", desc: "success | error" },
+  { flag: "--from <date>", api: "from", type: "str", desc: "ISO date/datetime or epoch ms" },
+  { flag: "--to <date>", api: "to", type: "str", desc: "ISO date/datetime or epoch ms" },
+];
+
 export const commands: CommandSpec[] = [
   // jobs
   { name: "jobs list", desc: "List jobs (newest updated first)", method: "GET", path: "/agent/jobs",
@@ -261,6 +272,29 @@ export const commands: CommandSpec[] = [
     ] },
   { name: "preps delete", desc: "Delete an interview prep deck", method: "DELETE", path: "/agent/interviewpreps", confirm: true,
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
+
+  // agent activity log
+  { name: "activity log", desc: "Log an action you took outside JobKompass (email sent, Slack message). Never pass the message body", method: "POST", path: "/agent/activity",
+    opts: [
+      { flag: "--type <type>", api: "actionType", type: "str", required: true, desc: "e.g. email_sent, slack_message, linkedin_message" },
+      { flag: "--target <target>", api: "target", type: "str", desc: "Recipient, thread id or document id" },
+      { flag: "--summary <text>", api: "summary", type: "str", required: true, desc: "Short description (max 280 chars; secrets are scrubbed)" },
+      { flag: "--status <s>", api: "status", type: "str", desc: "success (default) | error" },
+      { flag: "--error <message>", api: "errorMessage", type: "str", desc: "With --status error" },
+      { flag: "--latency-ms <n>", api: "latencyMs", type: "num" },
+      { flag: "--input-tokens <n>", api: "inputTokens", type: "num" },
+      { flag: "--output-tokens <n>", api: "outputTokens", type: "num" },
+      { flag: "--cost-usd <n>", api: "costUsd", type: "num" },
+      { flag: "--body-hash <sha256>", api: "bodyHash", type: "str", desc: "sha256 hex of what you sent, instead of the content" },
+    ] },
+  { name: "activity list", desc: "List agent activity, newest first (API writes are logged automatically)", method: "GET", path: "/agent/activity",
+    opts: [
+      ...activityFilterOpts,
+      { flag: "--limit <n>", api: "limit", type: "num", desc: "1-200, default 50" },
+      { flag: "--cursor <cursor>", api: "cursor", type: "str", desc: "cursor from the previous page" },
+    ] },
+  { name: "activity summary", desc: "Counts, success rate and avg latency by model and action type", method: "GET", path: "/agent/activity/summary",
+    opts: activityFilterOpts },
 
   // threads (read-only)
   { name: "threads list", desc: "List AI chat threads", method: "GET", path: "/agent/threads", opts: [] },

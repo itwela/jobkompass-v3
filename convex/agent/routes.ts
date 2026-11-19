@@ -19,7 +19,21 @@ export type AgentRoute = {
   kind: "query" | "mutation" | "action";
   params: ParamSpec[];
   description: string;
+  /** dispatch passes the caller's X-Agent-* identity as args.identity. */
+  injectIdentity?: boolean;
+  /** dispatch rejects bodies carrying FORBIDDEN_FIELDS (body, content, token, password...). */
+  rejectSecretFields?: boolean;
 };
+
+const activityFilterParams: ParamSpec[] = [
+  { name: "agent", type: "string", description: "Agent name (X-Agent-Name), e.g. Summit" },
+  { name: "agentId", type: "string" },
+  { name: "model", type: "string", description: "e.g. claude-opus-5-5" },
+  { name: "actionType", type: "string", description: "e.g. email_sent, resumes.generate, jobs.create" },
+  { name: "status", type: "string", enum: ["success", "error"] },
+  { name: "from", type: "string", description: "ISO date/datetime or epoch ms (inclusive)" },
+  { name: "to", type: "string", description: "ISO date/datetime or epoch ms (inclusive)" },
+];
 
 const jobWriteParams: ParamSpec[] = [
   { name: "compensation", type: "string" },
@@ -355,6 +369,41 @@ export const agentRoutes: AgentRoute[] = [
     method: "DELETE", path: "/agent/interviewpreps", fn: internal.agent.fns.interviewPrepsRemove, kind: "mutation",
     params: [{ name: "id", type: "string", required: true }],
     description: "Delete an interview prep deck",
+  },
+
+  // ---- agent activity log ----
+  {
+    method: "POST", path: "/agent/activity", fn: internal.agent.fns.activityLog, kind: "mutation",
+    injectIdentity: true, rejectSecretFields: true,
+    params: [
+      { name: "actionType", type: "string", required: true, description: "What you did, e.g. email_sent, slack_message, linkedin_message (a-z 0-9 _ . -)" },
+      { name: "summary", type: "string", required: true, description: "Short description (max 280 chars, secrets scrubbed). Never the message body" },
+      { name: "target", type: "string", description: "Recipient, thread id or document id (max 200 chars)" },
+      { name: "status", type: "string", enum: ["success", "error"], description: "Default success" },
+      { name: "errorMessage", type: "string", description: "With status=error" },
+      { name: "latencyMs", type: "number" },
+      { name: "inputTokens", type: "number" },
+      { name: "outputTokens", type: "number" },
+      { name: "costUsd", type: "number" },
+      { name: "bodyHash", type: "string", description: "sha256 hex of the body you sent, instead of the body" },
+    ],
+    description:
+      "Log an action you took OUTSIDE JobKompass (email sent, Slack message). Identity comes from X-Agent-Name/X-Agent-Id/X-Agent-Model/X-Agent-Provider (\"unknown\" if absent). Fields named body/content/token/password are rejected. Returns {id,timestamp,agentName,agentId,model,provider,actionType,status}",
+  },
+  {
+    method: "GET", path: "/agent/activity", fn: internal.agent.fns.activityList, kind: "query",
+    params: [
+      ...activityFilterParams,
+      { name: "limit", type: "number", description: "1-200, default 50" },
+      { name: "cursor", type: "string", description: "cursor from the previous page" },
+    ],
+    description: "List agent activity newest first. Every API write is logged automatically. Returns {items,cursor,isDone}",
+  },
+  {
+    method: "GET", path: "/agent/activity/summary", fn: internal.agent.fns.activitySummary, kind: "query",
+    params: activityFilterParams,
+    description:
+      "Counts, success rate and avg latency grouped by model, by action type, and by model x action type. Returns {total,truncated,byModel,byActionType,byModelAndAction}",
   },
 
   // ---- threads (read-only) ----

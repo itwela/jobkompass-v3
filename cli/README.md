@@ -48,6 +48,38 @@ Cover letters work the same way:
 with `--unfiled-only`, letters filed in another folder come back in `skipped` as `in_other_folder`.
 Same result shape as `jk resumes move`.
 
+## Activity log
+Every command that changes data (add, update, delete, generate, tailor, move...) leaves a row in your activity log
+with who did it, which model, the action, its target, status and latency. Reads (list, get, questions) are not logged.
+Tell JobKompass who you are with global flags or env vars (flags win). Anything not set is stored as `unknown`;
+nothing is ever guessed.
+
+| Flag | Env var | Header sent |
+|---|---|---|
+| `--agent <name>` | `JK_AGENT_NAME` | `X-Agent-Name` |
+| `--agent-id <id>` | `JK_AGENT_ID` | `X-Agent-Id` |
+| `--model <model>` | `JK_AGENT_MODEL` | `X-Agent-Model` |
+| `--provider <p>` | `JK_AGENT_PROVIDER` | `X-Agent-Provider` |
+
+    export JK_AGENT_NAME=Summit JK_AGENT_MODEL=claude-opus-5-5 JK_AGENT_PROVIDER=anthropic
+    jk jobs add --company Acme --title Engineer --link https://... --status Applied     # logged as jobs.create
+
+Log something you did outside JobKompass (an email through Gmail, a Slack message):
+
+    jk activity log --type email_sent --target jane@acme.com --summary "Follow-up on Staff Engineer application" \
+      --latency-ms 820 --input-tokens 1200 --output-tokens 300 [--status error --error "SMTP 550"] [--body-hash <sha256>]
+
+Never send the message itself. Summaries are cut to 280 chars and targets to 200, and obvious secrets (bearer tokens,
+API keys, long hex/base64 strings, `password=...`) are replaced with `[redacted]`. Fields named `body`, `content`,
+`token` or `password` are rejected; pass `--body-hash` (sha256 hex of what you sent) if you need a fingerprint.
+
+    jk activity list [--filter-agent Summit] [--filter-agent-id <id>] [--filter-model claude-opus-5-5] [--type email_sent] \
+      [--status error] [--from 2026-11-01] [--to 2026-11-30] [--limit 50] [--cursor <cursor>]
+    jk activity summary [same filters]   # count, success rate, avg latency by model, by action type, by both
+
+`list` returns `{items, cursor, isDone}`; pass `--cursor` for the next page. The filters carry a `filter-` prefix
+because `--agent`, `--agent-id` and `--model` are the identity flags.
+
 ## Resume questions: never invent a number
 Strong bullets carry numbers. Only the human knows them, so the API asks instead of guessing.
 
