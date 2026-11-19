@@ -28,6 +28,7 @@ const JkJobsCommandBar = forwardRef<HTMLInputElement, {
         onKeyDown={(e) => { if (e.key === "Escape") { e.currentTarget.blur(); onEscape?.(); } }}
         placeholder="Ask JobKompass or type a command"
         aria-label="Ask JobKompass"
+        data-quiet-focus
         className="min-w-0 flex-1 bg-transparent text-[14.5px] text-foreground outline-none placeholder:text-subtle-foreground"
       />
       <span className="hidden shrink-0 font-mono text-[11.5px] text-subtle-foreground lg:inline">

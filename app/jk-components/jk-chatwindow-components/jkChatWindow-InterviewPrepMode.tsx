@@ -135,7 +135,9 @@ export default function JkCW_InterviewPrepMode() {
       <JkAppPageHeader
         title="Interview Prep"
         sub={sub}
-        art={null}
+        art={p ? null : 'signal'}
+        artHeight={p ? undefined : 260}
+        artPosition="right 40%"
         divider={false}
         className="hidden lg:block"
         actions={
@@ -150,7 +152,7 @@ export default function JkCW_InterviewPrepMode() {
                 {preps.map((d) => <option key={d._id} value={d._id}>{d.company} · {d.role}</option>)}
               </select>
             )}
-            {newDeckButton}
+            {(p || showCreate) && newDeckButton}
           </div>
         }
       />
@@ -173,13 +175,11 @@ export default function JkCW_InterviewPrepMode() {
 
       {!p ? (
         !showCreate && (
-          <div data-enter className="mx-5 mt-6 rounded-[28px] border border-input bg-card px-6 py-12 text-center lg:mx-8">
-            <h2 className="jk-enter text-[22px] font-medium text-foreground" style={enter(0)}>No prep decks yet</h2>
-            <p className="jk-enter mx-auto mt-2 max-w-md text-[14px] text-muted-foreground" style={enter(1)}>
-              Pick a job you track and JobKompass writes flashcards, stories and a call sheet from your resume.
-            </p>
-            <div className="jk-enter mt-6" style={enter(2)}>{newDeckButton}</div>
-          </div>
+          <PrepEmpty
+            jobs={allJobs ?? []}
+            onNew={() => setShowCreate(true)}
+            onPick={(id) => { setPresetJob(id); setShowCreate(true) }}
+          />
         )
       ) : (
         <>
@@ -730,6 +730,100 @@ function CreateDeck({ jobs, presetJob, resume, onCancel, onCreate }: {
       <div className="jk-enter mt-5 flex justify-end gap-2" style={enter(3)}>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button onClick={submit} disabled={busy} className="gap-2">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{busy ? 'Writing your deck…' : 'Write the deck'}</Button>
+      </div>
+    </section>
+  )
+}
+
+/** What a deck holds — shown on the empty page so the feature explains itself. */
+const DECK_PARTS = [
+  { label: 'Cheat sheet & pitch', note: 'Your 60-second answer to "tell me about yourself"', tick: 'var(--bar-1)' },
+  { label: 'Flashcards', note: 'The questions this role will ask, answered from your resume', tick: 'var(--bar-2)' },
+  { label: 'Story bank', note: 'Situation, action, result for the projects you will lean on', tick: 'var(--bar-3)' },
+  { label: 'Questions & notes', note: 'What to ask them, and a place to write during the call', tick: 'var(--bar-4)' },
+]
+
+function PrepEmpty({ jobs, onNew, onPick }: { jobs: any[]; onNew: () => void; onPick: (jobId: string) => void }) {
+  const recent = jobs.slice(0, 3)
+  return (
+    <section data-enter className="mx-5 mt-2 grid gap-5 lg:mx-8 lg:mt-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] xl:gap-8">
+      {/* Left: the pitch and the way in */}
+      <div className="flex flex-col">
+        <h2 className="jk-enter max-w-[440px] text-[30px] font-medium leading-[1.08] tracking-[-0.8px] text-foreground lg:text-[40px] lg:tracking-[-1.2px]" style={enter(0)}>
+          Walk into the call already knowing your answers
+        </h2>
+        <p className="jk-enter mt-4 max-w-[440px] text-[14.5px] leading-relaxed text-muted-foreground" style={enter(1)}>
+          Pick a job you track. JobKompass reads the posting and your resume and writes the deck you rehearse from.
+        </p>
+        <div className="jk-enter mt-7" style={enter(2)}>
+          <Button onClick={onNew} className="h-11 rounded-full px-7 text-[14px] font-medium">New deck</Button>
+        </div>
+
+        {recent.length > 0 && (
+          <div className="jk-enter mt-10" style={enter(3)}>
+            <p className="font-mono text-[11px] uppercase tracking-[1.6px] text-subtle-foreground">Start from a job you track</p>
+            <ul className="mt-3 divide-y divide-border overflow-hidden rounded-[20px] border border-input bg-card">
+              {recent.map((j) => (
+                <li key={j._id}>
+                  <button
+                    type="button"
+                    onClick={() => onPick(j._id)}
+                    className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-accent"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-input bg-popover text-[13px] font-medium text-foreground">
+                      {(j.company || '?').trim().charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-medium text-foreground">{j.title}</span>
+                      <span className="block truncate text-[12.5px] text-muted-foreground">{j.company}</span>
+                    </span>
+                    <span className="shrink-0 text-[12.5px] text-subtle-foreground transition-colors group-hover:text-foreground">Prep this →</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Right: a real-looking deck so the page shows what you get */}
+      <div className="jk-enter relative" style={enter(2)} aria-hidden>
+        <div className="relative mx-auto max-w-[520px] pb-5">
+          <div className="absolute inset-x-8 bottom-0 top-8 rounded-[28px] border border-input bg-popover/60" />
+          <div className="absolute inset-x-4 bottom-2.5 top-4 rounded-[28px] border border-input bg-popover/80" />
+          <article className="relative rounded-[28px] border border-input bg-card p-6 shadow-[0_24px_60px_-30px_rgba(0,0,0,0.6)] lg:p-7">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-[11px] uppercase tracking-[1.6px] text-subtle-foreground">Card 1 of 24 · Role & fit</p>
+              <span className="h-2 w-2 rounded-full bg-warn" />
+            </div>
+            <p className="mt-5 text-[20px] font-medium leading-snug tracking-[-0.3px] text-foreground lg:text-[22px]">
+              Why this role, and why now?
+            </p>
+            <div className="mt-5 space-y-2.5 border-t border-border pt-5 text-[13.5px] leading-relaxed text-muted-foreground">
+              <p>Open with the problem you solved last that looks most like theirs.</p>
+              <p>Name the part of the posting that pulled you in, in their words.</p>
+              <p>Close on what you want to own in the first 90 days.</p>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {RATINGS.map((r) => (
+                <span key={r.value} className="inline-flex items-center gap-1.5 rounded-full border border-input bg-popover px-3 py-1.5 text-[12px] text-muted-foreground">
+                  <span className={cn('h-1.5 w-1.5 rounded-full', r.dot)} />{r.label}
+                </span>
+              ))}
+            </div>
+          </article>
+        </div>
+
+        <ul className="mx-auto mt-4 grid max-w-[520px] gap-px overflow-hidden rounded-[20px] border border-input bg-border sm:grid-cols-2">
+          {DECK_PARTS.map((d) => (
+            <li key={d.label} className="bg-card px-4 py-3.5">
+              <span className="flex items-center gap-2 text-[13.5px] font-medium text-foreground">
+                <span className="h-3 w-[3px] rounded-full" style={{ background: d.tick }} />{d.label}
+              </span>
+              <span className="mt-1 block text-[12.5px] leading-snug text-muted-foreground">{d.note}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   )
