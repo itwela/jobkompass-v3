@@ -220,6 +220,19 @@ export const agentRoutes: AgentRoute[] = [
   { method: "GET", path: "/agent/folders", fn: internal.agent.fns.foldersList, kind: "query", params: [], description: "List document folders: [{id,name,resumeCount,coverLetterCount}] sorted by name" },
 
   // ---- cover letters ----
+  {
+    method: "POST", path: "/agent/coverletters/move", fn: internal.agent.fns.coverLettersMove, kind: "mutation",
+    params: [
+      { name: "folder", type: "string", required: true, description: "Target folder: id, or exact name (case-insensitive). An ambiguous or unknown name is an error. GET /agent/folders lists them" },
+      { name: "coverLetterIds", type: "json", description: "Array of cover letter ids to move. Ids that aren't yours come back in skipped as not_found" },
+      { name: "all", type: "boolean", description: "true selects every cover letter not already in the target folder. Use instead of coverLetterIds" },
+      { name: "unfiledOnly", type: "boolean", description: "With all: only cover letters in no folder yet; ones filed in another folder come back in skipped as in_other_folder" },
+      { name: "dryRun", type: "boolean", description: "true returns what WOULD move without changing anything (ids or bulk)" },
+      { name: "confirm", type: "boolean", description: "Must be true for all to actually move; without it the bulk move is a dry run" },
+    ],
+    description:
+      "File cover letters into one of your folders. Only folderId changes: never content, never updatedAt, never deletes. Returns {dryRun,folder:{id,name},moved:[{id,name}],skipped:[{id,name?,reason}],alreadyInFolder:[{id,name}],counts:{moved,skipped,alreadyInFolder,total},hint?}. On a dry run, moved lists what would move",
+  },
   { method: "GET", path: "/agent/coverletters", fn: internal.agent.fns.coverLettersList, kind: "query", params: [], description: "List cover letters (metadata only)" },
   {
     method: "GET", path: "/agent/coverletters/get", fn: internal.agent.fns.coverLettersGet, kind: "query",

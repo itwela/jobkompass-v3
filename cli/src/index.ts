@@ -85,7 +85,7 @@ function register(spec: CommandSpec): void {
         spec.method === "GET" || spec.method === "DELETE"
           ? await apiRequest(spec.method, spec.path, { query: payload })
           : await apiRequest(spec.method, spec.path, { body: payload });
-      emit(data, { json: Boolean(program.opts().json) });
+      emit(data, { json: Boolean(program.opts().json), itemNoun: spec.itemNoun });
     } catch (err) {
       if (err instanceof CliError) fatal(err.code, err.message, err.hint, err.exitCode);
       throw err;

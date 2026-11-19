@@ -24,7 +24,7 @@ Run your JobKompass job search from the terminal — or let an AI agent (Claude 
     jk resources add --title "Salary guide" --url "https://..."
 
 ## Folders
-Resumes can be filed into the same folders you see in Documents (one folder per resume).
+Resumes and cover letters can be filed into the same folders you see in Documents (one folder per document).
 Moving only changes the folder: content is never touched and nothing is deleted.
 
     jk folders list                                                     # id, name, resumeCount, coverLetterCount
@@ -36,6 +36,17 @@ Moving only changes the folder: content is never touched and nothing is deleted.
 `--all-except-favorites` selects every resume not starred as a favorite and is always a dry run unless `--yes`.
 Returns `{dryRun, folder, moved, skipped, alreadyInFolder, counts: {moved, skipped, alreadyInFolder, total}}`;
 on a dry run `moved` lists what would move. Favorites and ids that aren't yours come back in `skipped` with a reason.
+
+Cover letters work the same way:
+
+    jk coverletters move --folder "Archive - Cover Letters" --ids <id1>,<id2>            # moves right away (--dry-run to preview)
+    jk coverletters move --folder "Archive - Cover Letters" --all                        # DRY RUN: every letter not already in the folder
+    jk coverletters move --folder "Archive - Cover Letters" --all --unfiled-only         # DRY RUN: only letters in no folder yet
+    jk coverletters move --folder "Archive - Cover Letters" --all --unfiled-only --yes   # actually moves
+
+`--all` is always a dry run unless `--yes`. Letters already in the folder come back in `alreadyInFolder`;
+with `--unfiled-only`, letters filed in another folder come back in `skipped` as `in_other_folder`.
+Same result shape as `jk resumes move`.
 
 ## Resume questions: never invent a number
 Strong bullets carry numbers. Only the human knows them, so the API asks instead of guessing.
