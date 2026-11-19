@@ -55,7 +55,7 @@ export function JkActivityStats({ summary }: { summary: ActivitySummary }) {
   return (
     <div className="grid grid-cols-2 gap-y-6 md:grid-cols-4 md:gap-y-0">
       {items.map((it, i) => (
-        <div key={it.label} className={cn("jk-enter min-w-0", i % 2 === 1 && "border-l border-border pl-3 max-md:pl-[11px]", i > 0 && "md:border-l md:border-border md:pl-6", i === 2 && "max-md:border-l-0 max-md:pl-0")} style={enter(i)}>
+        <div key={it.label} className={cn("jk-enter min-w-0", i % 2 === 1 && "border-l border-border pl-3 max-md:pl-[11px]", i > 0 && "md:-ml-6 md:border-l md:border-border md:pl-6", i === 2 && "max-md:border-l-0 max-md:pl-0")} style={enter(i)}>
           <div className="hidden md:block"><JkStatFigure label={it.label} value={it.value} sub={it.sub} /></div>
           <div className="md:hidden"><JkStatFigure label={it.label} value={it.value} sub={it.subM} size="md" /></div>
         </div>
@@ -77,11 +77,11 @@ export function JkActivityByModel({ summary }: { summary: ActivitySummary }) {
 
       {/* Desktop table (D27) */}
       <div className="max-md:hidden">
-        <div className="mt-[21px] grid grid-cols-[minmax(120px,1fr)_56px_minmax(150px,178px)_62px_62px_52px] border-b border-border pb-[9px] font-mono text-[9.5px] font-medium leading-[13px] text-subtle-foreground">
+        <div className="mt-[21px] grid grid-cols-[minmax(120px,1fr)_56px_minmax(150px,178px)_62px_62px_46px] border-b border-border pb-[9px] font-mono text-[9.5px] font-medium leading-[13px] text-subtle-foreground">
           <span>MODEL</span><span>RUNS</span><span>SUCCESS</span><span>AVG TIME</span><span>TOKENS</span><span className="text-right">COST</span>
         </div>
         {rows.map((m, i) => (
-          <div key={`${m.model}-${m.provider}`} className="jk-enter grid h-14 grid-cols-[minmax(120px,1fr)_56px_minmax(150px,178px)_62px_62px_52px] items-center border-b border-border" style={enter(i)}>
+          <div key={`${m.model}-${m.provider}`} className="jk-enter grid h-14 grid-cols-[minmax(120px,1fr)_56px_minmax(150px,178px)_62px_62px_46px] items-center border-b border-border" style={enter(i)}>
             <div className="min-w-0">
               <p className="truncate font-mono text-[13px] font-medium leading-4 text-foreground">{m.model}</p>
               <p className="mt-[3px] truncate text-[12px] leading-[14px] text-subtle-foreground">{m.provider}</p>
@@ -124,7 +124,7 @@ export function JkActivityByAgent({ summary }: { summary: ActivitySummary }) {
       <JkSectionLabel as="h2">By agent</JkSectionLabel>
       <div className="mt-[13px] grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(132px,1fr))]">
         {summary.byAgent.map((a, i) => (
-          <div key={a.agentName} className="jk-enter relative min-w-0 rounded-[16px] border border-input bg-card px-[14px] pb-[13px] pt-[13px] md:px-4 md:pb-[15px]" style={enter(i)}>
+          <div key={a.agentName} className="jk-enter relative min-w-0 rounded-[16px] border border-input bg-card px-[14px] pb-[13px] pt-[13px] md:pb-[15px] md:pl-4 md:pr-2" style={enter(i)}>
             <p className="truncate text-[15px] font-medium leading-[18px] text-foreground max-md:pr-14">{a.agentName}</p>
             <span className="absolute right-[14px] top-[15px] font-mono text-[11px] text-subtle-foreground md:hidden">{a.count} runs</span>
             <p className="mt-[5px] text-[22px] font-medium leading-[26px] tracking-[-0.4px] text-foreground">{fmtRate(a.successRate)}</p>
@@ -148,15 +148,15 @@ export function JkActivityByAction({ summary }: { summary: ActivitySummary }) {
         <JkSectionLabel as="h2">By action</JkSectionLabel>
         <Corner><span className="md:hidden">Best model</span><span className="max-md:hidden">Runs</span></Corner>
       </div>
-      <ul className="mt-[19px] flex flex-col gap-[18px] md:gap-[14px]">
+      <ul className="mt-[19px] flex flex-col gap-[18px] md:gap-[10px]">
         {rows.map((a, i) => (
           <li key={a.actionType} className="jk-enter" style={enter(i)}>
             <div className="flex items-baseline justify-between gap-3 font-mono text-[12.5px] font-medium leading-4 text-foreground">
               <span className="truncate">{a.actionType}</span>
               <span className="shrink-0 max-md:font-normal max-md:text-muted-foreground">{a.count}</span>
             </div>
-            <div className="mt-[5px] md:mt-[5px]"><JkRunsMeter share={a.count / most} count={a.count} failed={a.error} /></div>
-            <div className="mt-[7px] flex items-baseline justify-between gap-3 text-[12px] leading-[14px]">
+            <div className="mt-[7px]"><JkRunsMeter share={a.count / most} count={a.count} failed={a.error} /></div>
+            <div className="mt-[5px] flex items-baseline justify-between gap-3 text-[12px] leading-[14px]">
               <span className="truncate text-subtle-foreground">
                 <span className="max-md:hidden">{a.best ? `Best: ${a.best.model}, ${fmtRate(a.best.successRate)}` : ""}</span>
                 <span className="md:hidden">{[a.best ? `${a.best.model} · ${fmtRate(a.best.successRate)}` : null, a.error ? `${a.error} failed` : null].filter(Boolean).join(" · ")}</span>
@@ -173,7 +173,7 @@ export function JkActivityByAction({ summary }: { summary: ActivitySummary }) {
 // ---------------------------------------------------------------- feed
 
 const targetOf = (r: ActivityItem) => r.targetLabel ?? r.target ?? NONE
-const FEED_COLS = "grid-cols-[66px_90px_178px_176px_minmax(0,240fr)_minmax(0,200fr)_52px_110px]"
+const FEED_COLS = "grid-cols-[66px_90px_178px_176px_minmax(0,240fr)_minmax(0,216fr)_36px_110px]"
 
 export function JkActivityFeedTable({ items, selectedId, onOpen }: { items: ActivityItem[]; selectedId?: string; onOpen: (r: ActivityItem) => void }) {
   const now = Date.now()
@@ -200,7 +200,7 @@ export function JkActivityFeedTable({ items, selectedId, onOpen }: { items: Acti
             </span>
             <span role="cell" className="truncate pr-3 font-mono text-[12px] text-muted-foreground">{r.actionType}</span>
             <span role="cell" className="truncate pr-4 text-[13.5px] text-foreground">{targetOf(r)}</span>
-            <span role="cell" className={cn("truncate pr-3 text-[13.5px]", ok ? "text-muted-foreground" : "text-destructive")}>{r.summary}</span>
+            <span role="cell" className={cn("truncate pr-1 text-[13.5px]", ok ? "text-muted-foreground" : "text-destructive")}>{r.summary}</span>
             <span role="cell" className="text-right font-mono text-[12px] text-muted-foreground">{fmtSeconds(r.latencyMs)}</span>
             <span role="cell" className="pl-6"><JkActivityStatus ok={ok} /></span>
           </button>
@@ -289,7 +289,7 @@ export function JkActivityDetails({ item, onClose, onOpenJob }: { item: Activity
                 <X className="size-[18px]" strokeWidth={1.6} />
               </button>
             </div>
-            <SheetTitle className="mt-[13px] break-all font-mono text-[22px] font-medium leading-[28px] text-foreground">{r.actionType}</SheetTitle>
+            <SheetTitle className="mt-[7px] break-all font-mono text-[22px] font-medium leading-[28px] text-foreground">{r.actionType}</SheetTitle>
             <SheetDescription asChild>
               <div className="mt-[11px] flex flex-wrap items-center gap-x-4 gap-y-1 text-[13.5px] leading-4 text-muted-foreground">
                 <JkActivityStatus ok={ok} />
@@ -304,7 +304,7 @@ export function JkActivityDetails({ item, onClose, onOpenJob }: { item: Activity
             )}
             <dl className="mt-7">
               {rows.map((row) => (
-                <div key={row.k} className="grid grid-cols-[118px_minmax(0,1fr)] items-baseline border-b border-border py-[13px] first:pt-0">
+                <div key={row.k} className="grid grid-cols-[118px_minmax(0,1fr)] items-baseline border-b border-border py-[10px] leading-5 first:pt-0">
                   <dt className="font-mono text-[10px] font-medium uppercase tracking-[1.6px] text-subtle-foreground">{row.k}</dt>
                   <dd className={cn("break-words text-foreground", row.mono ? "font-mono text-[13px]" : "text-[14px]")}>{row.v}</dd>
                 </div>
@@ -418,7 +418,7 @@ export function JkActivityFilterSheet({ open, onOpenChange, options, value, onAp
           {groups.map((g) => (
             <fieldset key={g.key} className="mb-6">
               <legend className="font-mono text-[10px] font-medium uppercase leading-[13px] tracking-[1.6px] text-subtle-foreground">{g.label}</legend>
-              <div className="mt-[11px] flex flex-wrap gap-2.5">
+              <div className="mt-[11px] flex flex-wrap gap-2">
                 <Chip on={!draft[g.key]} onClick={() => setDraft({ ...draft, [g.key]: undefined })}>All</Chip>
                 {g.opts.map((o) => (
                   <Chip key={o.v} mono={g.mono} on={draft[g.key] === o.v} onClick={() => setDraft({ ...draft, [g.key]: o.v })}>{o.l}</Chip>

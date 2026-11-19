@@ -109,12 +109,12 @@ export default function JkCW_AgentActivityMode() {
             <p className="jk-enter px-5 pt-8 text-[14px] text-muted-foreground lg:px-8" style={enter(4)}>Nothing in this range. Try All time or clear a filter.</p>
           ) : (
             <>
-              <div className="grid border-b border-border min-[1360px]:grid-cols-[minmax(0,600fr)_minmax(0,481fr)]">
+              <div className="grid border-b border-border min-[1360px]:grid-cols-[minmax(0,664fr)_minmax(0,512fr)]">
                 <div className="px-5 lg:px-8 min-[1360px]:pr-8">
                   <div className="border-b border-border py-[26px] min-[1360px]:border-0 min-[1360px]:pb-0">
                     <JkActivityByModel summary={data} />
                   </div>
-                  <div className="border-b border-border py-[26px] min-[1360px]:border-0 min-[1360px]:pb-[22px] min-[1360px]:pt-[30px]">
+                  <div className="border-b border-border py-[26px] min-[1360px]:border-0 min-[1360px]:pb-3 min-[1360px]:pt-[30px]">
                     <JkActivityByAgent summary={data} />
                   </div>
                 </div>
@@ -123,7 +123,7 @@ export default function JkCW_AgentActivityMode() {
                 </div>
               </div>
 
-              <section className="px-5 pt-[26px] lg:px-8 lg:pt-7">
+              <section className="px-5 pt-[26px] lg:px-8 lg:pt-6">
                 <div className="flex items-center justify-between gap-4">
                   <JkSectionLabel as="h2">Activity</JkSectionLabel>
                   <span className="font-mono text-[9.5px] uppercase text-subtle-foreground">Newest first</span>
