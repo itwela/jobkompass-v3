@@ -1,5 +1,7 @@
 /**
- * Filing resumes into a folder from the agent API (POST /agent/resumes/move).
+ * Filing resumes (POST /agent/resumes/move) and cover letters
+ * (POST /agent/coverletters/move) into a folder from the agent API. Cover
+ * letters use the same model via `coverLetters.folderId`.
  *
  * Same storage model as the app (convex/documentFolders.ts → moveDocuments):
  * a resume belongs to at most one folder via `resumes.folderId`. This only
@@ -12,7 +14,8 @@
  */
 
 export type MoveFolder = { _id: string; name: string };
-export type MoveResume = { _id: string; name: string; folderId?: string; isFavorite?: boolean };
+export type MoveDoc = { _id: string; name: string; folderId?: string };
+export type MoveResume = MoveDoc & { isFavorite?: boolean };
 
 export type MoveRequest = {
   /** Folder id or exact name (case-insensitive). */
@@ -26,7 +29,7 @@ export type MoveRequest = {
 };
 
 export type MoveItem = { id: string; name: string };
-export type SkipItem = { id: string; name?: string; reason: "favorite" | "not_found" };
+export type SkipItem = { id: string; name?: string; reason: "favorite" | "not_found" | "in_other_folder" };
 
 export type MoveResult = {
   dryRun: boolean;
@@ -82,31 +85,63 @@ export function planResumeMove(
   if (hasIds === Boolean(req.allExceptFavorites)) {
     throw new Error(`${INVALID} pass exactly one of 'resumeIds' (non-empty) or 'allExceptFavorites: true'`);
   }
-  if (hasIds && !req.resumeIds!.every((id) => typeof id === "string")) {
-    throw new Error(`${INVALID} 'resumeIds' must be an array of strings`);
+  return planDocumentMove(
+    resumes,
+    folders,
+    req.folder,
+    hasIds
+      ? { ids: req.resumeIds!, idsParam: "resumeIds" }
+      : { skipReason: (r) => (r.isFavorite ? "favorite" : null) }
+  );
+}
+
+/**
+ * Selection for planDocumentMove: explicit ids (unknown ids -> skipped
+ * not_found; duplicates collapse), or bulk over every doc, where skipReason
+ * returns why to leave a doc alone (null = move it unless already filed there).
+ */
+export type MoveSelection<T> =
+  | { ids: string[]; idsParam: string }
+  | { skipReason: (doc: T) => SkipItem["reason"] | null; skipAlreadyInFolderFirst?: boolean };
+
+/**
+ * Shared planner for resumes and cover letters. Resolves the folder first (so
+ * a bad folder never plans anything), then sorts each selected doc into
+ * moved / alreadyInFolder / skipped. `docs` must be the CALLER's only.
+ */
+export function planDocumentMove<T extends MoveDoc>(
+  docs: T[],
+  folders: MoveFolder[],
+  folderRef: string,
+  selection: MoveSelection<T>
+): Omit<MoveResult, "dryRun" | "hint"> {
+  if ("ids" in selection && !selection.ids.every((id) => typeof id === "string")) {
+    throw new Error(`${INVALID} '${selection.idsParam}' must be an array of strings`);
   }
-  const folder = resolveFolder(folders, req.folder);
+  const folder = resolveFolder(folders, folderRef);
 
   const moved: MoveItem[] = [];
   const skipped: SkipItem[] = [];
   const alreadyInFolder: MoveItem[] = [];
 
-  const consider = (r: MoveResume) => {
+  const consider = (r: MoveDoc) => {
     if (r.folderId === folder._id) alreadyInFolder.push({ id: r._id, name: r.name });
     else moved.push({ id: r._id, name: r.name });
   };
 
-  if (hasIds) {
-    // Only the caller's own resumes are visible; anything else is "not_found".
-    const byId = new Map(resumes.map((r) => [r._id, r]));
-    for (const id of [...new Set(req.resumeIds!)]) {
+  if ("ids" in selection) {
+    // Only the caller's own docs are visible; anything else is "not_found".
+    const byId = new Map(docs.map((r) => [r._id, r]));
+    for (const id of [...new Set(selection.ids)]) {
       const r = byId.get(id);
       if (!r) skipped.push({ id, reason: "not_found" });
       else consider(r);
     }
   } else {
-    for (const r of resumes) {
-      if (r.isFavorite) skipped.push({ id: r._id, name: r.name, reason: "favorite" });
+    for (const r of docs) {
+      const inTarget = selection.skipAlreadyInFolderFirst && r.folderId === folder._id;
+      const reason = inTarget ? null : selection.skipReason(r);
+      if (reason) skipped.push({ id: r._id, name: r.name, reason });
       else consider(r);
     }
   }
@@ -133,7 +168,69 @@ export async function executeResumeMove(
   setFolder: (resumeId: string, folderId: string) => Promise<void>
 ): Promise<MoveResult> {
   const plan = planResumeMove(resumes, folders, req);
-  const apply = shouldApply(req);
+  return await applyPlan(plan, shouldApply(req), Boolean(req.allExceptFavorites), setFolder);
+}
+
+// ---- cover letters (POST /agent/coverletters/move) ----
+// Same storage as resumes: coverLetters.folderId, as written by moveDocuments.
+
+export type CoverLetterMoveRequest = {
+  /** Folder id or exact name (case-insensitive). */
+  folder: string;
+  coverLetterIds?: string[];
+  /** Bulk: every cover letter not already in the target folder. */
+  all?: boolean;
+  /** With all: only cover letters in no folder yet; ones filed elsewhere are skipped (in_other_folder). */
+  unfiledOnly?: boolean;
+  /** true never writes. Bulk moves default to a dry run unless confirm is true. */
+  dryRun?: boolean;
+  confirm?: boolean;
+};
+
+/** Same rule as resumes: dryRun always wins; bulk (all) needs confirm. */
+export function shouldApplyCoverLetterMove(req: CoverLetterMoveRequest): boolean {
+  return shouldApply({ folder: req.folder, allExceptFavorites: req.all, dryRun: req.dryRun, confirm: req.confirm });
+}
+
+export function planCoverLetterMove(
+  coverLetters: MoveDoc[],
+  folders: MoveFolder[],
+  req: CoverLetterMoveRequest
+): Omit<MoveResult, "dryRun" | "hint"> {
+  const hasIds = Array.isArray(req.coverLetterIds) && req.coverLetterIds.length > 0;
+  if (hasIds === Boolean(req.all)) {
+    throw new Error(`${INVALID} pass exactly one of 'coverLetterIds' (non-empty) or 'all: true'`);
+  }
+  if (req.unfiledOnly && !req.all) {
+    throw new Error(`${INVALID} 'unfiledOnly' only applies with 'all: true'`);
+  }
+  return planDocumentMove(
+    coverLetters,
+    folders,
+    req.folder,
+    hasIds
+      ? { ids: req.coverLetterIds!, idsParam: "coverLetterIds" }
+      : { skipReason: (c) => (req.unfiledOnly && c.folderId ? "in_other_folder" : null), skipAlreadyInFolderFirst: true }
+  );
+}
+
+/** Plans, then (unless dry) patches folderId on each cover letter to move. */
+export async function executeCoverLetterMove(
+  coverLetters: MoveDoc[],
+  folders: MoveFolder[],
+  req: CoverLetterMoveRequest,
+  setFolder: (coverLetterId: string, folderId: string) => Promise<void>
+): Promise<MoveResult> {
+  const plan = planCoverLetterMove(coverLetters, folders, req);
+  return await applyPlan(plan, shouldApplyCoverLetterMove(req), Boolean(req.all), setFolder);
+}
+
+async function applyPlan(
+  plan: Omit<MoveResult, "dryRun" | "hint">,
+  apply: boolean,
+  bulk: boolean,
+  setFolder: (id: string, folderId: string) => Promise<void>
+): Promise<MoveResult> {
   if (apply) {
     for (const item of plan.moved) await setFolder(item.id, plan.folder.id);
   }
@@ -143,7 +240,7 @@ export async function executeResumeMove(
     ...(apply
       ? {}
       : {
-          hint: req.allExceptFavorites
+          hint: bulk
             ? "Dry run: nothing changed. Re-send with confirm: true (CLI: --yes) to move these."
             : "Dry run: nothing changed. Re-send without dryRun to move these.",
         }),

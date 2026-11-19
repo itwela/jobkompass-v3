@@ -16,6 +16,8 @@ export type CommandSpec = {
   opts: OptSpec[];
   /** Destructive: refuse without --yes. */
   confirm?: boolean;
+  /** What a move result counts, for the pretty summary line (default "resume"). */
+  itemNoun?: string;
 };
 
 /** "--ids a, b,,c" -> ["a","b","c"] (trimmed, empties and duplicates dropped). */
@@ -179,6 +181,15 @@ export const commands: CommandSpec[] = [
 
   // coverletters
   { name: "coverletters list", desc: "List cover letters (metadata)", method: "GET", path: "/agent/coverletters", opts: [] },
+  { name: "coverletters move", desc: "File cover letters into a folder (only the folder changes; nothing is deleted). Bulk is a dry run unless --yes", method: "POST", path: "/agent/coverletters/move", itemNoun: "cover letter",
+    opts: [
+      { flag: "--folder <name|id>", api: "folder", type: "str", required: true, desc: "Folder id or exact name (case-insensitive); see 'jk folders list'" },
+      { flag: "--ids <ids>", api: "coverLetterIds", type: "list", desc: "Comma-separated cover letter ids" },
+      { flag: "--all", api: "all", type: "bool", desc: "Every cover letter not already in the folder (dry run unless --yes)" },
+      { flag: "--unfiled-only", api: "unfiledOnly", type: "bool", desc: "With --all: only cover letters in no folder yet" },
+      { flag: "--dry-run", api: "dryRun", type: "bool", desc: "Show what would move; change nothing" },
+      { flag: "--yes", api: "confirm", type: "bool", desc: "Confirm a bulk move (--all)" },
+    ] },
   { name: "coverletters get", desc: "Get a cover letter with content", method: "GET", path: "/agent/coverletters/get",
     opts: [{ flag: "--id <id>", api: "id", type: "str", required: true }] },
   { name: "coverletters duplicate", desc: "Duplicate a cover letter", method: "POST", path: "/agent/coverletters/duplicate",

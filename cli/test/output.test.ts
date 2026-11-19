@@ -25,6 +25,30 @@ describe("resumes move output", () => {
   });
 });
 
+describe("coverletters move output", () => {
+  const result = {
+    dryRun: true,
+    folder: { id: "f9", name: "Archive - Cover Letters" },
+    moved: [{ id: "c1", name: "Acme CL" }],
+    skipped: [{ id: "c3", name: "Filed in work", reason: "in_other_folder" }],
+    alreadyInFolder: [{ id: "c4", name: "Old" }],
+    counts: { moved: 1, skipped: 1, alreadyInFolder: 1, total: 3 },
+    hint: "Dry run: nothing changed. Re-send with confirm: true (CLI: --yes) to move these.",
+  };
+
+  it("uses the cover letter noun and lists titles", () => {
+    const out = formatOutput(result, false, "cover letter");
+    expect(out.split("\n")[0]).toBe("DRY RUN: would move 1 of 3 cover letter(s) into 'Archive - Cover Letters' (f9).");
+    expect(out).toContain("Already in folder: 1. Skipped: 1.");
+    expect(out).toContain("c1  Acme CL");
+    expect(out).toContain("c3  Filed in work  (in_other_folder)");
+  });
+
+  it("machine mode is the raw JSON", () => {
+    expect(JSON.parse(formatOutput(result, true, "cover letter"))).toEqual(result);
+  });
+});
+
 describe("renderPretty", () => {
   it("renders array of objects as aligned columns", () => {
     const out = renderPretty([

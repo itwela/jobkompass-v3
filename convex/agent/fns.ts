@@ -10,7 +10,7 @@ import { nextStatusHistory } from "../jobStatusHistory";
 import { planRank } from "../plans";
 import { setResumeShared } from "../resumeShares";
 import { foldersWithCounts } from "../documentFolders";
-import { executeResumeMove } from "./resumeMove";
+import { executeCoverLetterMove, executeResumeMove } from "./resumeMove";
 import { tailoringValidator } from "../tailoring";
 import { exportResumePdf } from "./resumePdf";
 import { canUseResumeTemplate, isValidResumeTemplateId, resolveResumeTemplateId } from "../../lib/templates";
@@ -283,6 +283,46 @@ export const resumesMove = internalMutation({
           throw new Error("Resume or folder not found");
         }
         await ctx.db.patch(resume._id, { folderId: folder._id });
+      }
+    );
+  },
+});
+
+/**
+ * Files one or many cover letters into one of the caller's folders. Same
+ * storage and rules as resumesMove / documentFolders.moveDocuments: only
+ * folderId is written (no content, no updatedAt, nothing deleted). Bulk
+ * (all, optionally unfiledOnly) is a dry run unless confirm is true.
+ */
+export const coverLettersMove = internalMutation({
+  args: {
+    userId: v.string(),
+    folder: v.string(),
+    coverLetterIds: v.optional(v.array(v.string())),
+    all: v.optional(v.boolean()),
+    unfiledOnly: v.optional(v.boolean()),
+    dryRun: v.optional(v.boolean()),
+    confirm: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { userId, ...req }) => {
+    const [folders, coverLetters] = await Promise.all([
+      ctx.db.query("documentFolders").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("coverLetters").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+    ]);
+    const ownLetters = new Map(coverLetters.map((c) => [c._id as string, c]));
+    const ownFolders = new Map(folders.map((f) => [f._id as string, f]));
+    return await executeCoverLetterMove(
+      coverLetters.map((c) => ({ _id: c._id, name: c.name, folderId: c.folderId })),
+      folders.map((f) => ({ _id: f._id, name: f.name })),
+      req,
+      async (coverLetterId, folderId) => {
+        // Both rows came from by_user queries; re-checked at the write anyway.
+        const letter = ownLetters.get(coverLetterId);
+        const folder = ownFolders.get(folderId);
+        if (!letter || letter.userId !== userId || !folder || folder.userId !== userId) {
+          throw new Error("Cover letter or folder not found");
+        }
+        await ctx.db.patch(letter._id, { folderId: folder._id });
       }
     );
   },

@@ -42,11 +42,11 @@ function isMoveResult(data: unknown): data is MoveShape {
   return Boolean(d && typeof d === "object" && typeof d.dryRun === "boolean" && d.counts && d.folder && Array.isArray(d.moved));
 }
 
-/** Pretty output for `jk resumes move`: a summary line, then the resumes. */
-export function renderMove(r: MoveShape): string {
+/** Pretty output for `jk resumes move` / `jk coverletters move`: a summary line, then the items. */
+export function renderMove(r: MoveShape, itemNoun = "resume"): string {
   const verb = r.dryRun ? "DRY RUN: would move" : "Moved";
   const lines = [
-    `${verb} ${r.counts.moved} of ${r.counts.total} resume(s) into '${r.folder.name}' (${r.folder.id}).`,
+    `${verb} ${r.counts.moved} of ${r.counts.total} ${itemNoun}(s) into '${r.folder.name}' (${r.folder.id}).`,
     `Already in folder: ${r.counts.alreadyInFolder}. Skipped: ${r.counts.skipped}.`,
   ];
   if (r.moved.length) lines.push("", ...r.moved.map((m) => `  ${m.id}  ${m.name}`));
@@ -55,9 +55,9 @@ export function renderMove(r: MoveShape): string {
   return lines.join("\n");
 }
 
-export function formatOutput(data: unknown, machine: boolean): string {
+export function formatOutput(data: unknown, machine: boolean, itemNoun?: string): string {
   if (machine) return JSON.stringify(data, null, 2);
-  if (isMoveResult(data)) return renderMove(data);
+  if (isMoveResult(data)) return renderMove(data, itemNoun);
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const { notice, ...rest } = data as Record<string, unknown>;
     if (typeof notice === "string" && notice) return `Notice: ${notice}\n\n${renderPretty(rest)}`;
@@ -65,7 +65,7 @@ export function formatOutput(data: unknown, machine: boolean): string {
   return renderPretty(data);
 }
 
-export function emit(data: unknown, opts: { json?: boolean } = {}): void {
+export function emit(data: unknown, opts: { json?: boolean; itemNoun?: string } = {}): void {
   const machine = Boolean(opts.json) || !process.stdout.isTTY;
-  process.stdout.write(formatOutput(data, machine) + "\n");
+  process.stdout.write(formatOutput(data, machine, opts.itemNoun) + "\n");
 }

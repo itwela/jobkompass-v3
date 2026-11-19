@@ -60,6 +60,19 @@ describe("folder commands", () => {
     expect(find("resumes move")!.confirm).toBeUndefined();
   });
 
+  it("coverletters move maps flags to the API params", () => {
+    const spec = find("coverletters move")!;
+    expect(spec).toMatchObject({ method: "POST", path: "/agent/coverletters/move", itemNoun: "cover letter" });
+    expect(spec.confirm).toBeUndefined(); // server dry-runs bulk without --yes
+    const by = (api: string) => spec.opts.find((o) => o.api === api);
+    expect(by("folder")).toMatchObject({ flag: "--folder <name|id>", type: "str", required: true });
+    expect(by("coverLetterIds")).toMatchObject({ flag: "--ids <ids>", type: "list" });
+    expect(by("all")).toMatchObject({ flag: "--all", type: "bool" });
+    expect(by("unfiledOnly")).toMatchObject({ flag: "--unfiled-only", type: "bool" });
+    expect(by("dryRun")).toMatchObject({ flag: "--dry-run", type: "bool" });
+    expect(by("confirm")).toMatchObject({ flag: "--yes", type: "bool" });
+  });
+
   it("parseList splits comma ids, trims, drops empties and duplicates", () => {
     expect(parseList("a, b,,c ,a")).toEqual(["a", "b", "c"]);
     expect(parseList("")).toEqual([]);
