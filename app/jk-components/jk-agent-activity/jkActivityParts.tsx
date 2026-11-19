@@ -8,6 +8,7 @@
  *   <JkRunsMeter share ok failed />                   By action bar: runs share in blue, failed share in red after a 2px gap
  *   <JkStatFigure label value sub size?="lg"|"md" />  headline figure (ACTIONS / 412 / 38 today)
  *   <JkFilterPill label value options onChange />     desktop filter: "Agent  All ⌄" dropdown
+ *   <JkModelIcon model provider? />                   the landing's agent mark for a model, neutral when unknown
  *
  * Types for the data come straight from the Convex queries (convex/agent/activity.ts).
  */
@@ -15,6 +16,8 @@ import { ChevronDown } from "lucide-react"
 import type { FunctionReturnType } from "convex/server"
 import type { api } from "@/convex/_generated/api"
 import { cn } from "@/lib/utils"
+import { modelMark } from "@/lib/agentActivity/modelMark"
+import JkAgentMark from "../jkAgentMark"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -28,6 +31,11 @@ export type ActivityFilters = { agent?: string; model?: string; actionType?: str
 export function modelTone(model: string, index: number): string {
   if (model === "unknown") return "var(--subtle-foreground)"
   return ["var(--bar-1)", "var(--bar-2)", "var(--bar-3)", "var(--bar-4)"][index % 4]
+}
+
+/** The model's agent mark, always in colour so it reads at a glance. Default 16px. */
+export function JkModelIcon({ model, provider, className }: { model?: string | null; provider?: string | null; className?: string }) {
+  return <JkAgentMark mark={modelMark(model, provider)} colour className={cn("size-4", className)} />
 }
 
 export function JkActivityStatus({ ok, size = "md", className }: { ok: boolean; size?: "md" | "sm"; className?: string }) {
@@ -84,12 +92,14 @@ export function JkStatFigure({ label, value, sub, size = "lg" }: { label: string
   )
 }
 
-export function JkFilterPill({ label, value, options, onChange, mono }: {
+export function JkFilterPill({ label, value, options, onChange, mono, icon }: {
   label: string
   value: string | undefined
   options: { value: string; label: string }[]
   onChange: (v: string | undefined) => void
   mono?: boolean
+  /** An icon before each option and the chosen value (the Model filter shows agent marks). */
+  icon?: (value: string) => React.ReactNode
 }) {
   const current = options.find((o) => o.value === value)?.label ?? "All"
   return (
@@ -99,6 +109,7 @@ export function JkFilterPill({ label, value, options, onChange, mono }: {
           className={cn("flex h-9 max-w-[260px] items-center gap-1.5 rounded-full border border-input pl-4 pr-3 text-[13px] outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50",
             value ? "bg-accent" : "bg-card")}>
           <span className="text-subtle-foreground">{label}</span>
+          {icon && value && <span className="ml-0.5 flex shrink-0">{icon(value)}</span>}
           <span className={cn("truncate font-medium text-foreground", mono && value && "font-mono text-[12px]")}>{current}</span>
           <ChevronDown aria-hidden className="ml-1.5 size-4 shrink-0 text-subtle-foreground" strokeWidth={1.6} />
         </button>
@@ -107,7 +118,7 @@ export function JkFilterPill({ label, value, options, onChange, mono }: {
         <DropdownMenuRadioGroup value={value ?? ""} onValueChange={(v) => onChange(v || undefined)}>
           <DropdownMenuRadioItem value="">All</DropdownMenuRadioItem>
           {options.map((o) => (
-            <DropdownMenuRadioItem key={o.value} value={o.value} className={cn(mono && "font-mono text-[12.5px]")}>{o.label}</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem key={o.value} value={o.value} className={cn("gap-2", mono && "font-mono text-[12.5px]")}>{icon?.(o.value)}{o.label}</DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>

@@ -21,7 +21,7 @@ import JkSegmented from "../jk-app/jkSegmented"
 import JkSectionLabel from "../jk-app/jkSectionLabel"
 import { useJkAppNav } from "../jk-app/jkAppNav"
 import { goToSectionWhenMounted } from "./jkChatWindow-SettingsMode"
-import { JkFilterPill, type ActivityFilters, type ActivityItem, type ActivitySummary } from "../jk-agent-activity/jkActivityParts"
+import { JkFilterPill, JkModelIcon, type ActivityFilters, type ActivityItem, type ActivitySummary } from "../jk-agent-activity/jkActivityParts"
 import {
   JkActivityByAction, JkActivityByAgent, JkActivityByModel, JkActivityDetails, JkActivityEmpty,
   JkActivityFeedCards, JkActivityFeedTable, JkActivityFilterButton, JkActivityFilterSheet, JkActivityStats,
@@ -79,7 +79,7 @@ export default function JkCW_AgentActivityMode() {
         bottom={empty || !data ? undefined : (
           <div className="flex flex-wrap gap-2.5 pt-[21px]">
             <JkFilterPill label="Agent" value={filters.agent} onChange={setFilter("agent")} options={data.options.agents.map((a) => ({ value: a, label: a }))} />
-            <JkFilterPill label="Model" mono value={filters.model} onChange={setFilter("model")} options={data.options.models.map((m) => ({ value: m, label: m }))} />
+            <JkFilterPill label="Model" mono icon={(m) => <JkModelIcon model={m} className="size-3.5" />} value={filters.model} onChange={setFilter("model")} options={data.options.models.map((m) => ({ value: m, label: m }))} />
             <JkFilterPill label="Action" mono value={filters.actionType} onChange={setFilter("actionType")} options={data.options.actionTypes.map((a) => ({ value: a, label: a }))} />
             <JkFilterPill label="Status" value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v as ActivityFilters["status"] }))}
               options={[{ value: "success", label: "Done" }, { value: "error", label: "Failed" }]} />

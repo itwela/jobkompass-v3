@@ -1,5 +1,6 @@
 import JkArt from "../jkArt";
 import { CLI_AGENTS } from "./jkLandingAgents";
+import JkAgentMark, { AGENT_MARKS } from "../jkAgentMark";
 import JkCopyAgentPrompt from "./jkCopyAgentPrompt";
 import { CLI_NOTES, CLI_STEPS } from "./jkLandingData";
 import { LandingContainer, Reveal, SectionHeading } from "./jkLandingShell";
@@ -107,8 +108,8 @@ function AgentRow() {
       <ul className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-6 lg:flex lg:flex-wrap lg:gap-3">
         {CLI_AGENTS.map((a) => (
           <li key={a.name}>
-            <a href={a.href} target="_blank" rel="noopener noreferrer" data-tone={a.tone} className="jk-agent flex h-full cursor-pointer flex-col items-center gap-2 rounded-2xl border border-border bg-background/70 px-2 py-3.5 transition-colors hover:border-border-strong lg:flex-row lg:gap-2.5 lg:px-4 lg:py-2.5">
-              {a.img ? <img src={a.img} alt="" aria-hidden className="size-6 lg:size-5" /> : <svg viewBox="0 0 24 24" aria-hidden className="size-6 fill-current transition-colors lg:size-5"><path d={a.path} /></svg>}
+            <a href={a.href} target="_blank" rel="noopener noreferrer" data-tone={AGENT_MARKS[a.mark].tone} className="jk-agent flex h-full cursor-pointer flex-col items-center gap-2 rounded-2xl border border-border bg-background/70 px-2 py-3.5 transition-colors hover:border-border-strong lg:flex-row lg:gap-2.5 lg:px-4 lg:py-2.5">
+              <JkAgentMark mark={a.mark} className="size-6 transition-colors lg:size-5" />
               <span className="text-center text-xs font-medium text-muted-foreground transition-colors lg:text-sm">{a.name}</span>
             </a>
           </li>

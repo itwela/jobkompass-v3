@@ -25,7 +25,7 @@ import {
   NONE, fmtCost, fmtFeedTime, fmtRate, fmtSeconds, fmtStamp, fmtTokenSplit, fmtTokens, fmtWhen,
 } from "@/lib/agentActivity/format"
 import {
-  JkActivityStatus, JkMeter, JkRunsMeter, JkStatFigure, modelTone,
+  JkActivityStatus, JkMeter, JkModelIcon, JkRunsMeter, JkStatFigure, modelTone,
   type ActivityFilters, type ActivityItem, type ActivitySummary,
 } from "./jkActivityParts"
 
@@ -82,9 +82,12 @@ export function JkActivityByModel({ summary }: { summary: ActivitySummary }) {
         </div>
         {rows.map((m, i) => (
           <div key={`${m.model}-${m.provider}`} className="jk-enter grid h-14 grid-cols-[minmax(120px,1fr)_56px_minmax(150px,178px)_62px_62px_46px] items-center border-b border-border" style={enter(i)}>
-            <div className="min-w-0">
-              <p className="truncate font-mono text-[13px] font-medium leading-4 text-foreground">{m.model}</p>
-              <p className="mt-[3px] truncate text-[12px] leading-[14px] text-subtle-foreground">{m.provider}</p>
+            <div className="flex min-w-0 items-center gap-2.5 pr-3">
+              <JkModelIcon model={m.model} provider={m.provider} className="size-[18px]" />
+              <div className="min-w-0">
+                <p className="truncate font-mono text-[13px] font-medium leading-4 text-foreground">{m.model}</p>
+                <p className="mt-[3px] truncate text-[12px] leading-[14px] text-subtle-foreground">{m.provider}</p>
+              </div>
             </div>
             <span className="font-mono text-[13px] text-foreground">{m.count}</span>
             <span className="flex items-center gap-3 pr-2">
@@ -102,8 +105,8 @@ export function JkActivityByModel({ summary }: { summary: ActivitySummary }) {
       <ul className="mt-[17px] flex flex-col gap-[22px] md:hidden">
         {rows.map((m, i) => (
           <li key={`${m.model}-${m.provider}`} className="jk-enter" style={enter(i)}>
-            <div className="flex items-baseline justify-between gap-3 font-mono text-[13.5px] font-medium text-foreground">
-              <span className="truncate">{m.model}</span><span className="shrink-0">{fmtRate(m.successRate)}</span>
+            <div className="flex items-center justify-between gap-3 font-mono text-[13.5px] font-medium text-foreground">
+              <span className="flex min-w-0 items-center gap-2"><JkModelIcon model={m.model} provider={m.provider} /><span className="truncate">{m.model}</span></span><span className="shrink-0">{fmtRate(m.successRate)}</span>
             </div>
             <JkMeter value={m.successRate} tone={modelTone(m.model, i)} className="mt-[9px]" />
             <p className="mt-[7px] text-[12.5px] leading-[15px] text-subtle-foreground">
@@ -129,7 +132,9 @@ export function JkActivityByAgent({ summary }: { summary: ActivitySummary }) {
             <span className="absolute right-[14px] top-[15px] font-mono text-[11px] text-subtle-foreground md:hidden">{a.count} runs</span>
             <p className="mt-[5px] text-[22px] font-medium leading-[26px] tracking-[-0.4px] text-foreground">{fmtRate(a.successRate)}</p>
             <p className="mt-[7px] font-mono text-[11px] leading-[14px] text-subtle-foreground max-md:hidden">{a.count} runs</p>
-            <p className="mt-1 truncate font-mono text-[11px] leading-[14px] text-muted-foreground max-md:mt-[7px] max-md:text-[10.5px]">{a.usualModel}</p>
+            <p className="mt-1 flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] text-muted-foreground max-md:mt-[7px] max-md:text-[10.5px]">
+              <JkModelIcon model={a.usualModel} className="size-3.5" /><span className="truncate">{a.usualModel}</span>
+            </p>
           </div>
         ))}
       </div>
@@ -156,10 +161,11 @@ export function JkActivityByAction({ summary }: { summary: ActivitySummary }) {
               <span className="shrink-0 max-md:font-normal max-md:text-muted-foreground">{a.count}</span>
             </div>
             <div className="mt-[7px]"><JkRunsMeter share={a.count / most} count={a.count} failed={a.error} /></div>
-            <div className="mt-[5px] flex items-baseline justify-between gap-3 text-[12px] leading-[14px]">
-              <span className="truncate text-subtle-foreground">
-                <span className="max-md:hidden">{a.best ? `Best: ${a.best.model}, ${fmtRate(a.best.successRate)}` : ""}</span>
-                <span className="md:hidden">{[a.best ? `${a.best.model} · ${fmtRate(a.best.successRate)}` : null, a.error ? `${a.error} failed` : null].filter(Boolean).join(" · ")}</span>
+            <div className="mt-[5px] flex items-center justify-between gap-3 text-[12px] leading-[14px]">
+              <span className="flex min-w-0 items-center gap-1.5 text-subtle-foreground">
+                {a.best && <JkModelIcon model={a.best.model} className="size-3.5" />}
+                <span className="truncate max-md:hidden">{a.best ? `Best: ${a.best.model}, ${fmtRate(a.best.successRate)}` : ""}</span>
+                <span className="truncate md:hidden">{[a.best ? `${a.best.model} · ${fmtRate(a.best.successRate)}` : null, a.error ? `${a.error} failed` : null].filter(Boolean).join(" · ")}</span>
               </span>
               {a.error > 0 && <span className="shrink-0 text-destructive max-md:hidden">{a.error} failed</span>}
             </div>
@@ -194,9 +200,12 @@ export function JkActivityFeedTable({ items, selectedId, onOpen }: { items: Acti
             {on && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-bar-4" />}
             <span role="cell" className="font-mono text-[12px] text-muted-foreground">{fmtFeedTime(r.timestamp, now)}</span>
             <span role="cell" className="truncate pr-3 text-[14px] font-medium text-foreground">{r.agentName}</span>
-            <span role="cell" className="min-w-0 pr-3">
-              <span className="block truncate font-mono text-[12.5px] leading-4 text-foreground">{r.model}</span>
-              <span className="mt-0.5 block truncate text-[11.5px] leading-[14px] text-subtle-foreground">{r.provider}</span>
+            <span role="cell" className="flex min-w-0 items-center gap-2 pr-3">
+              <JkModelIcon model={r.model} provider={r.provider} />
+              <span className="min-w-0">
+                <span className="block truncate font-mono text-[12.5px] leading-4 text-foreground">{r.model}</span>
+                <span className="mt-0.5 block truncate text-[11.5px] leading-[14px] text-subtle-foreground">{r.provider}</span>
+              </span>
             </span>
             <span role="cell" className="truncate pr-3 font-mono text-[12px] text-muted-foreground">{r.actionType}</span>
             <span role="cell" className="truncate pr-4 text-[13.5px] text-foreground">{targetOf(r)}</span>
@@ -226,8 +235,9 @@ export function JkActivityFeedCards({ items, onOpen }: { items: ActivityItem[]; 
               </span>
               <span className="mt-[9px] block truncate text-[15px] font-medium leading-[18px] text-foreground">{targetOf(r)}</span>
               <span className={cn("mt-[6px] block truncate text-[13.5px] leading-4", ok ? "text-muted-foreground" : "text-destructive")}>{r.summary}</span>
-              <span className="mt-[11px] block truncate font-mono text-[11px] leading-[14px] text-subtle-foreground">
-                {[r.agentName, r.model, fmtSeconds(r.latencyMs), fmtFeedTime(r.timestamp, now)].join(" · ")}
+              <span className="mt-[11px] flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] text-subtle-foreground">
+                <JkModelIcon model={r.model} provider={r.provider} className="size-3.5" />
+                <span className="truncate">{[r.agentName, r.model, fmtSeconds(r.latencyMs), fmtFeedTime(r.timestamp, now)].join(" · ")}</span>
               </span>
             </button>
           </li>
@@ -262,10 +272,10 @@ export function JkActivityDetails({ item, onClose, onOpenJob }: { item: Activity
   useEffect(() => { if (item) setShown(item) }, [item])
   const r = item ?? shown
   const ok = r?.status === "success"
-  const rows: { k: string; v: string; mono?: boolean }[] = r ? [
+  const rows: { k: string; v: string; mono?: boolean; icon?: boolean }[] = r ? [
     { k: "Agent", v: r.agentName },
-    { k: "Model", v: r.model, mono: true },
-    { k: "Provider", v: r.provider },
+    { k: "Model", v: r.model, mono: true, icon: true },
+    { k: "Provider", v: r.provider, icon: true },
     { k: "Target", v: targetOf(r) },
     { k: "Summary", v: r.summary },
     { k: "Started", v: fmtStamp(r.timestamp), mono: true },
@@ -306,7 +316,10 @@ export function JkActivityDetails({ item, onClose, onOpenJob }: { item: Activity
               {rows.map((row) => (
                 <div key={row.k} className="grid grid-cols-[118px_minmax(0,1fr)] items-baseline border-b border-border py-[10px] leading-5 first:pt-0">
                   <dt className="font-mono text-[10px] font-medium uppercase tracking-[1.6px] text-subtle-foreground">{row.k}</dt>
-                  <dd className={cn("break-words text-foreground", row.mono ? "font-mono text-[13px]" : "text-[14px]")}>{row.v}</dd>
+                  <dd className={cn("break-words text-foreground", row.mono ? "font-mono text-[13px]" : "text-[14px]", row.icon && "flex min-w-0 items-center gap-2")}>
+                    {row.icon && <JkModelIcon model={r.model} provider={r.provider} />}
+                    {row.icon ? <span className="min-w-0 break-words">{row.v}</span> : row.v}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -373,13 +386,14 @@ export function JkActivityFilterButton({ filters, onClick }: { filters: Activity
   )
 }
 
-function Chip({ on, children, mono: isMono, onClick }: { on: boolean; children: React.ReactNode; mono?: boolean; onClick: () => void }) {
+function Chip({ on, children, mono: isMono, icon, onClick }: { on: boolean; children: React.ReactNode; mono?: boolean; icon?: React.ReactNode; onClick: () => void }) {
   return (
     <button type="button" aria-pressed={on} onClick={onClick}
-      className={cn("h-[34px] max-w-full truncate rounded-full border px-[14px] transition-colors",
+      className={cn("inline-flex h-[34px] max-w-full items-center gap-[7px] rounded-full border px-[14px] transition-colors", icon && "pl-[11px]",
         isMono ? "font-mono text-[12.5px]" : "text-[13.5px]",
         on ? "border-border-strong bg-accent font-medium text-foreground" : "border-input text-muted-foreground hover:text-foreground")}>
-      {children}
+      {icon}
+      <span className="truncate">{children}</span>
     </button>
   )
 }
@@ -421,7 +435,7 @@ export function JkActivityFilterSheet({ open, onOpenChange, options, value, onAp
               <div className="mt-[11px] flex flex-wrap gap-2">
                 <Chip on={!draft[g.key]} onClick={() => setDraft({ ...draft, [g.key]: undefined })}>All</Chip>
                 {g.opts.map((o) => (
-                  <Chip key={o.v} mono={g.mono} on={draft[g.key] === o.v} onClick={() => setDraft({ ...draft, [g.key]: o.v })}>{o.l}</Chip>
+                  <Chip key={o.v} mono={g.mono} icon={g.key === "model" ? <JkModelIcon model={o.v} className="size-3.5" /> : undefined} on={draft[g.key] === o.v} onClick={() => setDraft({ ...draft, [g.key]: o.v })}>{o.l}</Chip>
                 ))}
               </div>
             </fieldset>
