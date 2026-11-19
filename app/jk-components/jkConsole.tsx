@@ -48,9 +48,10 @@ export default function JkConsole() {
         if (JK_TOP_LEVEL.includes(currentMode.id)) lastTop.current = currentMode.id
     }, [currentMode.id])
     const goBack = useCallback(() => {
-        const target = allModes.find(m => m.id === lastTop.current)
+        // Agent activity is reached from Settings, so back returns there.
+        const target = allModes.find(m => m.id === (currentMode.id === '/agent-activity' ? '/settings' : lastTop.current))
         if (target) setCurrentMode(target)
-    }, [allModes, setCurrentMode])
+    }, [allModes, setCurrentMode, currentMode.id])
     const closeMenu = useCallback(() => setMenuOpen(false), [])
 
     // Land in a specific mode on load (/app?mode=settings)
@@ -81,7 +82,7 @@ export default function JkConsole() {
             {/* Desktop rail: fixed, never scrolls with the content */}
             <aside className="hidden h-full shrink-0 lg:flex">
                 {/* Settings brings its own rail: Back to My Jobs + section nav (D13) */}
-                {currentMode.id === '/settings' ? <JkSettingsRail key="settings-rail" /> : <JkSidebar />}
+                {currentMode.id === '/settings' || currentMode.id === '/agent-activity' ? <JkSettingsRail key="settings-rail" /> : <JkSidebar />}
             </aside>
 
             {/* Content surface */}

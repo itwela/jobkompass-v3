@@ -93,6 +93,7 @@ export function JobKompassChatWindowProvider({ children }: { children: React.Rea
     { id: '/chat', name: 'Chat', command: 'Chat' },
     { id: '/help', name: 'Help', command: 'Help' },
     { id: '/settings', name: 'Settings', command: 'Settings' },
+    { id: '/agent-activity', name: 'Agent activity', command: 'Agent activity' },
   ]);
   // STUB -----
 

@@ -262,8 +262,6 @@ function finish(a: Acc): SummaryGroup {
   };
 }
 
-type GroupKeys = { model?: string; provider?: string; actionType?: string; agentName?: string };
-
 export type SummaryRow = Pick<ActivityRow, "model" | "provider" | "actionType" | "status" | "latencyMs" | "inputTokens" | "outputTokens" | "costUsd"> & {
   agentName?: string;
 };
@@ -301,9 +299,9 @@ export function summarize(rows: SummaryRow[], truncated = false) {
   return {
     total: rows.length,
     truncated,
-    byModel: aggregate(rows, (r) => ({ model: r.model, provider: r.provider })) as (GroupKeys & SummaryGroup)[],
-    byActionType: aggregate(rows, (r) => ({ actionType: r.actionType })) as (GroupKeys & SummaryGroup)[],
-    byModelAndAction: aggregate(rows, (r) => ({ model: r.model, actionType: r.actionType })) as (GroupKeys & SummaryGroup)[],
+    byModel: aggregate(rows, (r) => ({ model: r.model, provider: r.provider })),
+    byActionType: aggregate(rows, (r) => ({ actionType: r.actionType })),
+    byModelAndAction: aggregate(rows, (r) => ({ model: r.model, actionType: r.actionType })),
   };
 }
 
