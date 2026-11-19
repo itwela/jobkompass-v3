@@ -37,7 +37,7 @@ const SAVE_NOTE =
  * (users.convex_user_id, falling back to the auth id). Agent fns query by that id,
  * so a key minted here must carry it or `jk jobs list` would come back empty.
  */
-async function currentConvexUserId(ctx: QueryCtx | MutationCtx): Promise<string | null> {
+export async function currentConvexUserId(ctx: QueryCtx | MutationCtx): Promise<string | null> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return null;
   const user = await ctx.db.get(userId);

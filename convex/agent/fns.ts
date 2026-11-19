@@ -1196,7 +1196,7 @@ const activityFilterArgs = {
   to: v.optional(v.string()),
 };
 
-type ActivityFilters = {
+export type ActivityFilters = {
   userId: string;
   agent?: string;
   agentId?: string;
@@ -1208,7 +1208,7 @@ type ActivityFilters = {
 };
 
 /** The caller's rows, newest first, on the most selective index; remaining filters applied after. */
-function activityQuery(ctx: QueryCtx, f: ActivityFilters) {
+export function activityQuery(ctx: QueryCtx, f: ActivityFilters) {
   if (f.status !== undefined && f.status !== "success" && f.status !== "error") {
     throw new Error(`${INVALID_ACTIVITY}status must be success or error`);
   }
@@ -1238,7 +1238,7 @@ function activityQuery(ctx: QueryCtx, f: ActivityFilters) {
   });
 }
 
-function activityOut(r: Doc<"agentActivityLog">) {
+export function activityOut(r: Doc<"agentActivityLog">) {
   const { _id, _creationTime: _c, userId: _u, ...rest } = r;
   return { id: _id, ...rest };
 }
