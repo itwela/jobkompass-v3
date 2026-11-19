@@ -9,6 +9,8 @@ import { shouldSeedBaseResume } from "../baseResume";
 import { nextStatusHistory } from "../jobStatusHistory";
 import { planRank } from "../plans";
 import { setResumeShared } from "../resumeShares";
+import { foldersWithCounts } from "../documentFolders";
+import { executeResumeMove } from "./resumeMove";
 import { tailoringValidator } from "../tailoring";
 import { exportResumePdf } from "./resumePdf";
 import { canUseResumeTemplate, isValidResumeTemplateId, resolveResumeTemplateId } from "../../lib/templates";
@@ -233,6 +235,56 @@ export const resumesRename = internalMutation({
   handler: async (ctx, { userId, id, name }) => {
     await owned(ctx, id, userId, "Resume");
     await ctx.db.patch(id, { name, updatedAt: Date.now() });
+  },
+});
+
+// ---- folders ----
+export const foldersList = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) =>
+    (await foldersWithCounts(ctx, userId)).map((f) => ({
+      id: f._id,
+      name: f.name,
+      resumeCount: f.resumeCount,
+      coverLetterCount: f.coverLetterCount,
+    })),
+});
+
+/**
+ * Files one or many resumes into one of the caller's folders. Only folderId is
+ * written (same as documentFolders.moveDocuments: no updatedAt bump, nothing
+ * deleted). Bulk (allExceptFavorites) is a dry run unless confirm is true.
+ */
+export const resumesMove = internalMutation({
+  args: {
+    userId: v.string(),
+    folder: v.string(),
+    resumeIds: v.optional(v.array(v.string())),
+    allExceptFavorites: v.optional(v.boolean()),
+    dryRun: v.optional(v.boolean()),
+    confirm: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { userId, ...req }) => {
+    const [folders, resumes] = await Promise.all([
+      ctx.db.query("documentFolders").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("resumes").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+    ]);
+    const ownResumes = new Map(resumes.map((r) => [r._id as string, r]));
+    const ownFolders = new Map(folders.map((f) => [f._id as string, f]));
+    return await executeResumeMove(
+      resumes.map((r) => ({ _id: r._id, name: r.name, folderId: r.folderId, isFavorite: r.isFavorite })),
+      folders.map((f) => ({ _id: f._id, name: f.name })),
+      req,
+      async (resumeId, folderId) => {
+        // Both rows came from by_user queries; re-checked at the write anyway.
+        const resume = ownResumes.get(resumeId);
+        const folder = ownFolders.get(folderId);
+        if (!resume || resume.userId !== userId || !folder || folder.userId !== userId) {
+          throw new Error("Resume or folder not found");
+        }
+        await ctx.db.patch(resume._id, { folderId: folder._id });
+      }
+    );
   },
 });
 

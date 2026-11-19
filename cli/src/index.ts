@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
-import { commands, type CommandSpec, type OptSpec } from "./commands";
+import { commands, parseList, type CommandSpec, type OptSpec } from "./commands";
 import { apiRequest, CliError } from "./client";
 import { emit } from "./output";
 import { resolveDate } from "./dates";
@@ -24,6 +24,8 @@ function coerceOpt(spec: OptSpec, raw: unknown): unknown {
     }
     case "bool":
       return true; // value-less flag
+    case "list":
+      return parseList(String(raw));
     case "json":
       try {
         const text = String(raw);

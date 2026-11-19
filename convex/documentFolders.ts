@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 const MAX_FOLDER_NAME_LENGTH = 60;
@@ -10,36 +11,43 @@ function normalizeName(raw: string): string {
   return name;
 }
 
+/**
+ * The user's folders with member counts, sorted by name. Shared by the app's
+ * listFolders query and the agent API (GET /agent/folders).
+ */
+export async function foldersWithCounts(ctx: QueryCtx, userId: string) {
+  const folders = await ctx.db
+    .query("documentFolders")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+
+  const [resumes, coverLetters] = await Promise.all([
+    ctx.db
+      .query("resumes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect(),
+    ctx.db
+      .query("coverLetters")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect(),
+  ]);
+
+  return folders
+    .map((folder) => ({
+      ...folder,
+      resumeCount: resumes.filter((r) => r.folderId === folder._id).length,
+      coverLetterCount: coverLetters.filter((c) => c.folderId === folder._id)
+        .length,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export const listFolders = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    const folders = await ctx.db
-      .query("documentFolders")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-
-    const [resumes, coverLetters] = await Promise.all([
-      ctx.db
-        .query("resumes")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
-      ctx.db
-        .query("coverLetters")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
-    ]);
-
-    return folders
-      .map((folder) => ({
-        ...folder,
-        resumeCount: resumes.filter((r) => r.folderId === folder._id).length,
-        coverLetterCount: coverLetters.filter((c) => c.folderId === folder._id)
-          .length,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return await foldersWithCounts(ctx, userId);
   },
 });
 

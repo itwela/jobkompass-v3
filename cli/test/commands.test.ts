@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commands } from "../src/commands";
+import { commands, parseList } from "../src/commands";
 
 const find = (name: string) => commands.find((c) => c.name === name);
 
@@ -37,5 +37,31 @@ describe("resume question commands", () => {
       const flags = c.opts.map((o) => o.flag.split(" ")[0]);
       expect(new Set(flags).size).toBe(flags.length);
     }
+  });
+});
+
+describe("folder commands", () => {
+  it("registers folders list and resumes move against the right routes", () => {
+    expect(find("folders list")).toMatchObject({ method: "GET", path: "/agent/folders" });
+    expect(find("resumes move")).toMatchObject({ method: "POST", path: "/agent/resumes/move" });
+  });
+
+  it("resumes move maps flags to the API params", () => {
+    const opts = find("resumes move")!.opts;
+    const by = (api: string) => opts.find((o) => o.api === api);
+    expect(by("folder")).toMatchObject({ flag: "--folder <name|id>", type: "str", required: true });
+    expect(by("resumeIds")).toMatchObject({ flag: "--ids <ids>", type: "list" });
+    expect(by("allExceptFavorites")).toMatchObject({ flag: "--all-except-favorites", type: "bool" });
+    expect(by("dryRun")).toMatchObject({ flag: "--dry-run", type: "bool" });
+    expect(by("confirm")).toMatchObject({ flag: "--yes", type: "bool" });
+  });
+
+  it("resumes move is not a generic confirm command (the server dry-runs bulk without --yes)", () => {
+    expect(find("resumes move")!.confirm).toBeUndefined();
+  });
+
+  it("parseList splits comma ids, trims, drops empties and duplicates", () => {
+    expect(parseList("a, b,,c ,a")).toEqual(["a", "b", "c"]);
+    expect(parseList("")).toEqual([]);
   });
 });

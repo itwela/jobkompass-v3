@@ -23,6 +23,20 @@ Run your JobKompass job search from the terminal — or let an AI agent (Claude 
     jk resumes list
     jk resources add --title "Salary guide" --url "https://..."
 
+## Folders
+Resumes can be filed into the same folders you see in Documents (one folder per resume).
+Moving only changes the folder: content is never touched and nothing is deleted.
+
+    jk folders list                                                     # id, name, resumeCount, coverLetterCount
+    jk resumes move --folder "archived resumes" --ids <id1>,<id2>       # moves right away (--dry-run to preview)
+    jk resumes move --folder "archived resumes" --all-except-favorites  # DRY RUN: lists what would move
+    jk resumes move --folder "archived resumes" --all-except-favorites --yes   # actually moves
+
+`--folder` takes an id or an exact name (case-insensitive); an unknown or ambiguous name is an error, so pass the id.
+`--all-except-favorites` selects every resume not starred as a favorite and is always a dry run unless `--yes`.
+Returns `{dryRun, folder, moved, skipped, alreadyInFolder, counts: {moved, skipped, alreadyInFolder, total}}`;
+on a dry run `moved` lists what would move. Favorites and ids that aren't yours come back in `skipped` with a reason.
+
 ## Resume questions: never invent a number
 Strong bullets carry numbers. Only the human knows them, so the API asks instead of guessing.
 

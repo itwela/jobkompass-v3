@@ -1,7 +1,7 @@
 export type OptSpec = {
   flag: string;            // commander flag, e.g. "--id <id>"
   api: string;             // server param name
-  type: "str" | "num" | "bool" | "json" | "date";
+  type: "str" | "num" | "bool" | "json" | "date" | "list"; // list: comma-separated -> string[]
   required?: boolean;
   default?: string;        // commander-level default (pre-coercion)
   desc?: string;
@@ -17,6 +17,11 @@ export type CommandSpec = {
   /** Destructive: refuse without --yes. */
   confirm?: boolean;
 };
+
+/** "--ids a, b,,c" -> ["a","b","c"] (trimmed, empties and duplicates dropped). */
+export function parseList(raw: string): string[] {
+  return [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))];
+}
 
 const jobWriteOpts: OptSpec[] = [
   { flag: "--compensation <c>", api: "compensation", type: "str" },
@@ -159,6 +164,18 @@ export const commands: CommandSpec[] = [
       { flag: "--template <id>", api: "template", type: "str", desc: "jake, joseph or mar (default: your default template, then the base's)" },
       { flag: "--instructions <text>", api: "instructions", type: "str", desc: "One-off instruction (wording and emphasis only, never new facts); added after your saved resume preferences" },
     ] },
+
+  { name: "resumes move", desc: "File resumes into a folder (only the folder changes; nothing is deleted). Bulk is a dry run unless --yes", method: "POST", path: "/agent/resumes/move",
+    opts: [
+      { flag: "--folder <name|id>", api: "folder", type: "str", required: true, desc: "Folder id or exact name (case-insensitive); see 'jk folders list'" },
+      { flag: "--ids <ids>", api: "resumeIds", type: "list", desc: "Comma-separated resume ids" },
+      { flag: "--all-except-favorites", api: "allExceptFavorites", type: "bool", desc: "Every resume that is not a favorite (dry run unless --yes)" },
+      { flag: "--dry-run", api: "dryRun", type: "bool", desc: "Show what would move; change nothing" },
+      { flag: "--yes", api: "confirm", type: "bool", desc: "Confirm a bulk move (--all-except-favorites)" },
+    ] },
+
+  // folders
+  { name: "folders list", desc: "List document folders with resume/cover letter counts", method: "GET", path: "/agent/folders", opts: [] },
 
   // coverletters
   { name: "coverletters list", desc: "List cover letters (metadata)", method: "GET", path: "/agent/coverletters", opts: [] },
