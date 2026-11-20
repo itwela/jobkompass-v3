@@ -35,6 +35,16 @@ describe("modelMark", () => {
     expect(modelMark("groking-tool")).toBeNull()
     expect(modelMark("grokker")).toBeNull()
   })
+  it("maps DeepSeek models and provider, even when routed via opencode", () => {
+    for (const m of ["deepseek-flash", "deepseek-v4-pro", "deepseek-v4.1-flash-free", "DeepSeek", "  DEEPSEEK-R1 ", "deepseek/deepseek-r1", "opencode/deepseek-v4.1-flash-free"]) expect(modelMark(m)).toBe("deepseek")
+    expect(modelMark("deepseek-v4.1-flash-free", "opencode")).toBe("deepseek")
+    expect(modelMark("deepseek-v4-pro", "deepseek")).toBe("deepseek")
+    expect(modelMark(undefined, "DeepSeek")).toBe("deepseek")
+    expect(modelMark("unknown", "deep-seek")).toBe("deepseek")
+    expect(modelMark("deepseeker")).toBeNull()
+    expect(modelMark("deepseekv3")).toBeNull()
+    expect(modelMark("some-model", "opencode")).toBeNull()
+  })
   it("returns null for unknown, empty and marks the landing does not have", () => {
     expect(modelMark("unknown", "unknown")).toBeNull()
     expect(modelMark("", "")).toBeNull()
