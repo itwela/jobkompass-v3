@@ -9,11 +9,10 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useAction, useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery } from "convex/react"
 import { useAuthActions } from "@convex-dev/auth/react"
-import { ChevronLeft, Copy, KeyRound, X } from "lucide-react"
+import { ChevronLeft, Copy, X } from "lucide-react"
 import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
 import { useAuth } from "@/providers/jkAuthProvider"
 import { useSubscription } from "@/providers/jkSubscriptionProvider"
 import { useFeatureAccess } from "@/hooks/useFeatureAccess"
@@ -34,6 +33,7 @@ import { JkFieldLabel, jkFieldCls } from "../jkField"
 import JkUpgradeModal from "../jkUpgradeModal"
 import JkSignOutButton from "../jkSignOutButton"
 import { JkConfirmText } from "../jkConfirm"
+import { JkCliKeys } from "../jk-cli-keys/jkCliKeys"
 import JkArt from "../jkArt"
 import { JkDefaultTemplateProbe } from "../jkDefaultTemplate"
 
@@ -167,13 +167,7 @@ const TEMPLATE_BLURB: Record<string, string> = {
   mar: "Times, early career",
 }
 
-const fmtDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-function fmtUsed(ms?: number) {
-  if (!ms) return "never used"
-  const today = new Date(); const d = new Date(ms)
-  return d.toDateString() === today.toDateString() ? "last used today" : `last used ${fmtDay(ms)}`
-}
 /** jkx_live_4f9a…c21e with a dotted middle, as the frame shows it. */
 const maskKey = (key: string) => key.length <= 16 ? key : `${key.slice(0, 13)}${"·".repeat(16)}${key.slice(-4)}`
 
@@ -201,17 +195,11 @@ export default function JkCW_SettingsMode() {
   const generateApiKey = useMutation(api.extensionApiKeys.generate)
   const revokeApiKey = useMutation(api.extensionApiKeys.revoke)
 
-  const cliKeys = useQuery(api.agent.keys.listMine, isAuthenticated ? {} : "skip")
-  const generateCliKey = useAction(api.agent.keys.generateMine)
-  const revokeCliKey = useMutation(api.agent.keys.revokeMine)
-
   const [upgrade, setUpgrade] = useState<{ feature: string; requiredPlan?: "plus" | "pro" } | null>(null)
   const [profile, setProfile] = useState({ name: "", username: "", email: "" })
   const [savingProfile, setSavingProfile] = useState(false)
   const [newPref, setNewPref] = useState("")
-  const [cliName, setCliName] = useState("")
   const [cliOpen, setCliOpen] = useState(false)
-  const [freshCliKey, setFreshCliKey] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
   useEffect(() => {
@@ -280,15 +268,6 @@ export default function JkCW_SettingsMode() {
     if (rank < RANK_PLUS) { setUpgrade({ feature: "Chrome extension" }); return }
     setBusy("ext")
     try { await generateApiKey() } catch (e) { toast.error("Key not created", { description: e instanceof Error ? e.message : "Try again", duration: 3000 }) }
-    setBusy(null)
-  }
-
-  const createCliKey = async () => {
-    setBusy("cli")
-    try {
-      const r = await generateCliKey({ name: cliName.trim() || undefined })
-      setFreshCliKey(r.key); setCliName(""); setCliOpen(false)
-    } catch (e) { toast.error("Key not created", { description: e instanceof Error ? e.message : "Try again", duration: 3000 }) }
     setBusy(null)
   }
 
@@ -424,40 +403,8 @@ export default function JkCW_SettingsMode() {
         {/* CLI keys */}
         <JkSettingsSection id="cli" index={4} title="CLI keys" sub="Let Claude Code, Cursor, or any agent run jk for you"
           action={<Button variant="outline" className="h-10 px-8 text-[13.5px] max-lg:hidden" onClick={() => rank < RANK_PRO ? setUpgrade({ feature: "jk CLI" }) : setCliOpen(true)}>New key</Button>}>
-          {freshCliKey && (
-            <div className="mb-4 rounded-[16px] border border-plan/60 bg-accent p-4">
-              <p className="text-[13px] text-muted-foreground">Copy this key now. It is shown once.</p>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="min-w-0 flex-1 break-all font-mono text-[13px] text-foreground">{freshCliKey}</code>
-                <button type="button" aria-label="Copy CLI key" onClick={() => copy(freshCliKey, "CLI key")} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><Copy className="size-4" /></button>
-                <button type="button" aria-label="Hide key" onClick={() => setFreshCliKey(null)} className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><X className="size-4" /></button>
-              </div>
-            </div>
-          )}
-          {cliOpen && (
-            <form className="mb-4 flex gap-2.5" onSubmit={(e) => { e.preventDefault(); void createCliKey() }}>
-              <input autoFocus value={cliName} onChange={(e) => setCliName(e.target.value)} placeholder="Name it, e.g. laptop" aria-label="Key name" className={cn(jkFieldCls, "h-11 flex-1 font-mono text-[13px]")} />
-              <Button type="submit" className="h-11 px-5" disabled={busy === "cli"}>{busy === "cli" ? "Creating…" : "Create"}</Button>
-              <Button type="button" variant="ghost" className="h-11 px-4" onClick={() => setCliOpen(false)}>Cancel</Button>
-            </form>
-          )}
-          {cliKeys && cliKeys.length > 0 ? (
-            <ul className="flex flex-col gap-5 lg:gap-[17px]">
-              {cliKeys.map((k, i) => (
-                <li key={k._id} className="grid grid-cols-[28px_1fr_auto] items-center gap-x-3 lg:grid-cols-[28px_152px_1fr_auto]">
-                  <KeyRound className="size-4 -scale-x-100" style={{ color: i % 2 ? "var(--bar-4)" : "var(--bar-2)" }} />
-                  <span className="truncate font-mono text-[13px] text-foreground max-lg:text-[15px]">{k.name}</span>
-                  <span className="text-[12.5px] text-muted-foreground max-lg:col-start-2 max-lg:row-start-2 max-lg:mt-0.5 max-lg:text-[14px]">
-                    <span className="max-lg:hidden">created {fmtDay(k.createdAt)} · </span>{fmtUsed(k.lastUsedAt)}
-                  </span>
-                  <JkConfirmText disabled={busy === k._id} onConfirm={async () => { setBusy(k._id); try { await revokeCliKey({ id: k._id as Id<"agentApiKeys"> }) } finally { setBusy(null) } }}
-                    className="text-[12.5px] text-subtle-foreground transition-colors hover:text-destructive max-lg:col-start-3 max-lg:row-span-2 max-lg:row-start-1 max-lg:text-[14px]">Revoke</JkConfirmText>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-[13.5px] text-muted-foreground">No keys yet. {rank < RANK_PRO ? "The jk CLI is part of Pro." : "Create one to use jk from your terminal or an agent."}</p>
-          )}
+          <JkCliKeys creating={cliOpen} onCreatingChange={setCliOpen}
+            emptyNote={`No keys yet. ${rank < RANK_PRO ? "The jk CLI is part of Pro." : "Create one to use jk from your terminal or an agent."}`} />
           <Button variant="outline" className="mt-7 h-12 w-full text-[16px] lg:hidden" onClick={() => rank < RANK_PRO ? setUpgrade({ feature: "jk CLI" }) : setCliOpen(true)}>New key</Button>
         </JkSettingsSection>
 

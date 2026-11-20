@@ -6,11 +6,12 @@
  *
  *   <JkActivityStats summary />             ACTIONS · SUCCESS RATE · AVERAGE TIME · TOKENS (4-up, 2x2 on phones)
  *   <JkActivityByModel summary />           table with success bars on a full 0-100% scale; list on phones
- *   <JkActivityByAgent summary />           one card per agent
+ *   <JkActivityByAgent summary onScopeKeys />  one card per agent; Unknown nudges to scope a key (D30)
+ *   <JkActivityUnknownBanner … />           when every row is an unknown agent
  *   <JkActivityByAction summary />          runs bars with the failed share, best model per action
  *   <JkActivityFeedTable items onOpen />    the activity table (wide screens)
  *   <JkActivityFeedCards items onOpen />    the activity as cards (phones, narrow desktop)
- *   <JkActivityDetails item onClose />      D28 details panel (never shows message bodies; none are stored)
+ *   <JkActivityDetails item onClose … />    D31 details panel: key name, identity source, client (never message bodies)
  *   <JkActivityEmpty onManageKeys />        D29
  *   <JkActivityFilterSheet … />             M27
  */
@@ -24,6 +25,9 @@ import JkSectionLabel from "../jk-app/jkSectionLabel"
 import {
   NONE, fmtCost, fmtFeedTime, fmtRate, fmtSeconds, fmtStamp, fmtTokenSplit, fmtTokens, fmtWhen,
 } from "@/lib/agentActivity/format"
+import {
+  agentDisplayName, allUnknown, canScopeKey, identityNote, identitySourceLabel, isUnknownAgent, keyNameLabel,
+} from "@/lib/agentActivity/identity"
 import {
   JkActivityStatus, JkMeter, JkModelIcon, JkRunsMeter, JkStatFigure, modelTone,
   type ActivityFilters, type ActivityItem, type ActivitySummary,
@@ -121,24 +125,48 @@ export function JkActivityByModel({ summary }: { summary: ActivitySummary }) {
 
 // ---------------------------------------------------------------- by agent
 
-export function JkActivityByAgent({ summary }: { summary: ActivitySummary }) {
+export function JkActivityByAgent({ summary, onScopeKeys }: { summary: ActivitySummary; onScopeKeys: () => void }) {
   return (
     <section>
       <JkSectionLabel as="h2">By agent</JkSectionLabel>
       <div className="mt-[13px] grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(132px,1fr))]">
-        {summary.byAgent.map((a, i) => (
-          <div key={a.agentName} className="jk-enter relative min-w-0 rounded-[16px] border border-input bg-card px-[14px] pb-[13px] pt-[13px] md:pb-[15px] md:pl-4 md:pr-2" style={enter(i)}>
-            <p className="truncate text-[15px] font-medium leading-[18px] text-foreground max-md:pr-14">{a.agentName}</p>
-            <span className="absolute right-[14px] top-[15px] font-mono text-[11px] text-subtle-foreground md:hidden">{a.count} runs</span>
-            <p className="mt-[5px] text-[22px] font-medium leading-[26px] tracking-[-0.4px] text-foreground">{fmtRate(a.successRate)}</p>
-            <p className="mt-[7px] font-mono text-[11px] leading-[14px] text-subtle-foreground max-md:hidden">{a.count} runs</p>
-            <p className="mt-1 flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] text-muted-foreground max-md:mt-[7px] max-md:text-[10.5px]">
-              <JkModelIcon model={a.usualModel} className="size-3.5" /><span className="truncate">{a.usualModel}</span>
-            </p>
-          </div>
-        ))}
+        {summary.byAgent.map((a, i) => {
+          const unknown = isUnknownAgent(a.agentName)
+          return (
+            <div key={a.agentName} className="jk-enter relative min-w-0 rounded-[16px] border border-input bg-card px-[14px] pb-[13px] pt-[13px] md:pb-[15px] md:pl-4 md:pr-2" style={enter(i)}>
+              <p className={cn("truncate text-[15px] font-medium leading-[18px] max-md:pr-14", unknown ? "text-muted-foreground" : "text-foreground")}>{agentDisplayName(a.agentName)}</p>
+              <span className="absolute right-[14px] top-[15px] font-mono text-[11px] text-subtle-foreground md:hidden">{a.count} runs</span>
+              <p className="mt-[5px] text-[22px] font-medium leading-[26px] tracking-[-0.4px] text-foreground">{fmtRate(a.successRate)}</p>
+              <p className="mt-[7px] font-mono text-[11px] leading-[14px] text-subtle-foreground max-md:hidden">{a.count} runs</p>
+              {unknown ? (
+                // Nudge: an unknown agent gets a name once its key is tied to one.
+                <button type="button" onClick={onScopeKeys}
+                  className="mt-1 text-left text-[11.5px] leading-4 text-muted-foreground underline decoration-border-strong underline-offset-[3px] transition-colors hover:text-foreground max-md:mt-[7px]">
+                  Scope a key to<br />name this agent
+                </button>
+              ) : (
+                <p className="mt-1 flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] text-muted-foreground max-md:mt-[7px] max-md:text-[10.5px]">
+                  <JkModelIcon model={a.usualModel} className="size-3.5" /><span className="truncate">{a.usualModel}</span>
+                </p>
+              )}
+            </div>
+          )
+        })}
       </div>
     </section>
+  )
+}
+
+/** Shown above the feed when no row names its agent yet. */
+export function JkActivityUnknownBanner({ summary, onScopeKeys }: { summary: ActivitySummary; onScopeKeys: () => void }) {
+  if (!allUnknown(summary.byAgent)) return null
+  return (
+    <div className="jk-enter flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-[16px] border border-input bg-card px-4 py-[14px]" style={enter(3)}>
+      <p className="min-w-0 max-w-[560px] text-[13.5px] leading-[19px] text-muted-foreground">
+        None of these actions name their agent. Tie each key to an agent and its activity shows who did what.
+      </p>
+      <Button variant="outline" className="h-9 shrink-0 rounded-full px-5 text-[13px]" onClick={onScopeKeys}>Scope a key</Button>
+    </div>
   )
 }
 
@@ -179,7 +207,12 @@ export function JkActivityByAction({ summary }: { summary: ActivitySummary }) {
 // ---------------------------------------------------------------- feed
 
 const targetOf = (r: ActivityItem) => r.targetLabel ?? r.target ?? NONE
-const FEED_COLS = "grid-cols-[66px_90px_178px_176px_minmax(0,240fr)_minmax(0,216fr)_36px_110px]"
+const FEED_COLS = "grid-cols-[60px_220px_184px_172px_minmax(0,172fr)_minmax(0,160fr)_36px_110px]"
+
+/** The agent's name; "unknown" reads as a muted "Unknown". */
+function JkAgentName({ name, className }: { name: string; className?: string }) {
+  return <span className={cn("font-medium", isUnknownAgent(name) ? "text-muted-foreground" : "text-foreground", className)}>{agentDisplayName(name)}</span>
+}
 
 export function JkActivityFeedTable({ items, selectedId, onOpen }: { items: ActivityItem[]; selectedId?: string; onOpen: (r: ActivityItem) => void }) {
   const now = Date.now()
@@ -195,11 +228,14 @@ export function JkActivityFeedTable({ items, selectedId, onOpen }: { items: Acti
         const on = selectedId === r.id
         return (
           <button key={r.id} type="button" role="row" onClick={() => onOpen(r)}
-            className={cn("jk-enter relative grid h-[52px] w-full items-center border-b border-border px-8 text-left transition-colors hover:bg-muted", FEED_COLS, on && "bg-muted")}
+            className={cn("jk-enter relative grid h-14 w-full items-center border-b border-border px-8 text-left transition-colors hover:bg-muted", FEED_COLS, on && "bg-muted")}
             style={enter(Math.min(i, 12))}>
             {on && <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] bg-bar-4" />}
             <span role="cell" className="font-mono text-[12px] text-muted-foreground">{fmtFeedTime(r.timestamp, now)}</span>
-            <span role="cell" className="truncate pr-3 text-[14px] font-medium text-foreground">{r.agentName}</span>
+            <span role="cell" className="min-w-0 pr-3">
+              <JkAgentName name={r.agentName} className="block truncate text-[14px] leading-[18px]" />
+              <span className="mt-[3px] block truncate text-[11.5px] leading-[14px] text-subtle-foreground">{identityNote(r)}</span>
+            </span>
             <span role="cell" className="flex min-w-0 items-center gap-2 pr-3">
               <JkModelIcon model={r.model} provider={r.provider} />
               <span className="min-w-0">
@@ -230,14 +266,15 @@ export function JkActivityFeedCards({ items, onOpen }: { items: ActivityItem[]; 
             <button type="button" onClick={() => onOpen(r)}
               className="block w-full rounded-[16px] border border-input bg-card px-4 pb-[15px] pt-[15px] text-left transition-colors hover:bg-muted">
               <span className="flex items-center justify-between gap-3">
-                <span className="truncate font-mono text-[12.5px] font-medium text-muted-foreground">{r.actionType}</span>
+                <JkAgentName name={r.agentName} className="truncate text-[14px] leading-[18px]" />
                 <JkActivityStatus ok={ok} size="sm" className="shrink-0" />
               </span>
-              <span className="mt-[9px] block truncate text-[15px] font-medium leading-[18px] text-foreground">{targetOf(r)}</span>
-              <span className={cn("mt-[6px] block truncate text-[13.5px] leading-4", ok ? "text-muted-foreground" : "text-destructive")}>{r.summary}</span>
+              <span className="mt-[3px] block truncate text-[11.5px] leading-[14px] text-subtle-foreground">{identityNote(r)}</span>
+              <span className="mt-[10px] block truncate text-[15px] font-medium leading-[18px] text-foreground">{targetOf(r)}</span>
+              <span className={cn("mt-[5px] block truncate text-[13.5px] leading-4", ok ? "text-muted-foreground" : "text-destructive")}>{r.summary}</span>
               <span className="mt-[11px] flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] text-subtle-foreground">
                 <JkModelIcon model={r.model} provider={r.provider} className="size-3.5" />
-                <span className="truncate">{[r.agentName, r.model, fmtSeconds(r.latencyMs), fmtFeedTime(r.timestamp, now)].join(" · ")}</span>
+                <span className="truncate">{[r.model, r.actionType, fmtFeedTime(r.timestamp, now)].join(" · ")}</span>
               </span>
             </button>
           </li>
@@ -254,7 +291,10 @@ function detailsText(r: ActivityItem): string {
     `Action: ${r.actionType}`,
     `Status: ${r.status === "success" ? "Done" : "Failed"}`,
     ...(r.errorMessage ? [`Error: ${r.errorMessage}`] : []),
-    `Agent: ${r.agentName}`,
+    `Agent: ${agentDisplayName(r.agentName)} (${identityNote(r)})`,
+    `Key name: ${keyNameLabel(r)}`,
+    `Identity: ${identitySourceLabel(r)}`,
+    ...(r.client ? [`Client: ${r.client}`] : []),
     `Model: ${r.model}`,
     `Provider: ${r.provider}`,
     `Target: ${targetOf(r)}`,
@@ -266,20 +306,26 @@ function detailsText(r: ActivityItem): string {
   ].join("\n")
 }
 
-export function JkActivityDetails({ item, onClose, onOpenJob }: { item: ActivityItem | null; onClose: () => void; onOpenJob: (jobId: string) => void }) {
+export function JkActivityDetails({ item, onClose, onOpenJob, onScopeKey }: {
+  item: ActivityItem | null
+  onClose: () => void
+  onOpenJob: (jobId: string) => void
+  /** Settings > CLI keys with this key's identity open. */
+  onScopeKey: (keyId: string) => void
+}) {
   // Keep the last row on screen while the panel slides out.
   const [shown, setShown] = useState<ActivityItem | null>(item)
   useEffect(() => { if (item) setShown(item) }, [item])
   const r = item ?? shown
   const ok = r?.status === "success"
+  const scope = r ? canScopeKey(r) : false
   const rows: { k: string; v: string; mono?: boolean; icon?: boolean }[] = r ? [
-    { k: "Agent", v: r.agentName },
-    { k: "Model", v: r.model, mono: true, icon: true },
-    { k: "Provider", v: r.provider, icon: true },
+    { k: "Key name", v: keyNameLabel(r), mono: !!r.keyScoped && !!r.keyName },
+    { k: "Identity", v: identitySourceLabel(r) },
+    ...(r.client ? [{ k: "Client", v: r.client, mono: true }] : []),
+    { k: "Model", v: r.provider && r.provider !== "unknown" ? `${r.model} · ${r.provider}` : r.model, mono: true, icon: true },
     { k: "Target", v: targetOf(r) },
-    { k: "Summary", v: r.summary },
     { k: "Started", v: fmtStamp(r.timestamp), mono: true },
-    { k: "Took", v: fmtSeconds(r.latencyMs), mono: true },
     { k: "Tokens", v: fmtTokenSplit(r.inputTokens, r.outputTokens), mono: true },
     { k: "Cost", v: fmtCost(r.costUsd ?? 0, typeof r.costUsd === "number"), mono: true },
   ] : []
@@ -303,7 +349,7 @@ export function JkActivityDetails({ item, onClose, onOpenJob }: { item: Activity
             <SheetDescription asChild>
               <div className="mt-[11px] flex flex-wrap items-center gap-x-4 gap-y-1 text-[13.5px] leading-4 text-muted-foreground">
                 <JkActivityStatus ok={ok} />
-                <span>{fmtWhen(r.timestamp)} · took {fmtSeconds(r.latencyMs)}</span>
+                <span>{agentDisplayName(r.agentName)} · {fmtWhen(r.timestamp)} · took {fmtSeconds(r.latencyMs)}</span>
               </div>
             </SheetDescription>
             {!ok && (
@@ -323,11 +369,20 @@ export function JkActivityDetails({ item, onClose, onOpenJob }: { item: Activity
                 </div>
               ))}
             </dl>
-            <div className="mt-[39px] flex flex-wrap gap-3">
+            {scope && (
+              <p className="mt-[23px] rounded-[16px] border border-input px-4 py-[13px] text-[13px] leading-[19px] text-muted-foreground">
+                Scope this key to an agent so its name<br className="max-sm:hidden" /> comes from the key, not the request.
+              </p>
+            )}
+            <div className={cn("flex flex-wrap gap-3", scope ? "mt-5" : "mt-[39px]")}>
               {r.targetJobId && (
                 <Button className="h-11 rounded-full px-[25px] text-[14px]" onClick={() => onOpenJob(r.targetJobId!)}>Open the job</Button>
               )}
-              <Button variant="outline" className="h-11 rounded-full px-[26px] text-[14px]" onClick={copy}>Copy details</Button>
+              {scope ? (
+                <Button variant="outline" className="h-11 rounded-full px-[28px] text-[14px]" onClick={() => onScopeKey(r.keyId!)}>Scope this key</Button>
+              ) : (
+                <Button variant="outline" className="h-11 rounded-full px-[26px] text-[14px]" onClick={copy}>Copy details</Button>
+              )}
             </div>
           </div>
         )}
@@ -371,8 +426,8 @@ export function JkActivityEmpty({ onManageKeys }: { onManageKeys: () => void }) 
 // ---------------------------------------------------------------- phone filters (M26 row + M27 sheet)
 
 export function filterSummary(f: ActivityFilters): string {
-  const parts = [f.agent, f.model, f.actionType, f.status === "success" ? "Done" : f.status === "error" ? "Failed" : undefined].filter(Boolean)
-  return parts.length ? parts.join(", ") : "All agents, models and actions"
+  const parts = [f.agent ? agentDisplayName(f.agent) : undefined, f.model, f.actionType, f.status === "success" ? "Done" : f.status === "error" ? "Failed" : undefined].filter(Boolean)
+  return parts.length ? parts.join(", ") : "All agents and models"
 }
 
 export function JkActivityFilterButton({ filters, onClick }: { filters: ActivityFilters; onClick: () => void }) {
@@ -414,10 +469,9 @@ export function JkActivityFilterSheet({ open, onOpenChange, options, value, onAp
   useEffect(() => { onDraftChange(draft) }, [draft, onDraftChange])
   const n = count
   const groups: { key: keyof ActivityFilters; label: string; mono?: boolean; opts: { v: string; l: string }[] }[] = [
-    { key: "agent", label: "Agent", opts: options.agents.map((a) => ({ v: a, l: a })) },
+    { key: "agent", label: "Agent", opts: options.agents.map((a) => ({ v: a, l: agentDisplayName(a) })) },
     { key: "model", label: "Model", mono: true, opts: options.models.map((m) => ({ v: m, l: m })) },
     { key: "status", label: "Status", opts: [{ v: "success", l: "Done" }, { v: "error", l: "Failed" }] },
-    { key: "actionType", label: "Action", mono: true, opts: options.actionTypes.map((a) => ({ v: a, l: a })) },
   ]
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

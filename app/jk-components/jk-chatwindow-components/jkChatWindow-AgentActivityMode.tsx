@@ -21,10 +21,13 @@ import JkSegmented from "../jk-app/jkSegmented"
 import JkSectionLabel from "../jk-app/jkSectionLabel"
 import { useJkAppNav } from "../jk-app/jkAppNav"
 import { goToSectionWhenMounted } from "./jkChatWindow-SettingsMode"
+import { openKeyIdentityOnMount } from "../jk-cli-keys/jkCliKeys"
+import { agentDisplayName, allUnknown } from "@/lib/agentActivity/identity"
 import { JkFilterPill, JkModelIcon, type ActivityFilters, type ActivityItem, type ActivitySummary } from "../jk-agent-activity/jkActivityParts"
 import {
   JkActivityByAction, JkActivityByAgent, JkActivityByModel, JkActivityDetails, JkActivityEmpty,
   JkActivityFeedCards, JkActivityFeedTable, JkActivityFilterButton, JkActivityFilterSheet, JkActivityStats,
+  JkActivityUnknownBanner,
 } from "../jk-agent-activity/jkActivitySections"
 
 const RANGES: { value: ActivityRange; label: string }[] = [
@@ -33,7 +36,7 @@ const RANGES: { value: ActivityRange; label: string }[] = [
   { value: "all", label: "All time" },
 ]
 const PAGE = 25
-const SUB = "What agents did on your account, and how each model held up"
+const SUB = "What your agents did on your account, and how each model held up"
 const enter = (i: number) => ({ "--i": i } as React.CSSProperties)
 
 export default function JkCW_AgentActivityMode() {
@@ -62,6 +65,7 @@ export default function JkCW_AgentActivityMode() {
 
   const openJob = (jobId: string) => { setSelected(null); setSelectedJobId(jobId as Id<"jobs">); nav.go("/my-jobs") }
   const manageKeys = () => { nav.go("/settings"); goToSectionWhenMounted("cli") }
+  const scopeKey = (keyId: string) => { setSelected(null); openKeyIdentityOnMount(keyId); manageKeys() }
 
   const empty = summary !== undefined && summary !== null && !summary.hasAny
   const data = summary && summary.hasAny ? (summary as ActivitySummary) : null
@@ -78,7 +82,7 @@ export default function JkCW_AgentActivityMode() {
         )}
         bottom={empty || !data ? undefined : (
           <div className="flex flex-wrap gap-2.5 pt-[21px]">
-            <JkFilterPill label="Agent" value={filters.agent} onChange={setFilter("agent")} options={data.options.agents.map((a) => ({ value: a, label: a }))} />
+            <JkFilterPill label="Agent" value={filters.agent} onChange={setFilter("agent")} options={data.options.agents.map((a) => ({ value: a, label: agentDisplayName(a) }))} />
             <JkFilterPill label="Model" mono icon={(m) => <JkModelIcon model={m} className="size-3.5" />} value={filters.model} onChange={setFilter("model")} options={data.options.models.map((m) => ({ value: m, label: m }))} />
             <JkFilterPill label="Action" mono value={filters.actionType} onChange={setFilter("actionType")} options={data.options.actionTypes.map((a) => ({ value: a, label: a }))} />
             <JkFilterPill label="Status" value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v as ActivityFilters["status"] }))}
@@ -115,7 +119,7 @@ export default function JkCW_AgentActivityMode() {
                     <JkActivityByModel summary={data} />
                   </div>
                   <div className="border-b border-border py-[26px] min-[1360px]:border-0 min-[1360px]:pb-3 min-[1360px]:pt-[30px]">
-                    <JkActivityByAgent summary={data} />
+                    <JkActivityByAgent summary={data} onScopeKeys={manageKeys} />
                   </div>
                 </div>
                 <div className="px-5 py-[26px] lg:px-8 min-[1360px]:border-l min-[1360px]:border-border">
@@ -124,6 +128,7 @@ export default function JkCW_AgentActivityMode() {
               </div>
 
               <section className="px-5 pt-[26px] lg:px-8 lg:pt-6">
+                {allUnknown(data.byAgent) && <div className="mb-6"><JkActivityUnknownBanner summary={data} onScopeKeys={manageKeys} /></div>}
                 <div className="flex items-center justify-between gap-4">
                   <JkSectionLabel as="h2">Activity</JkSectionLabel>
                   <span className="font-mono text-[9.5px] uppercase text-subtle-foreground">Newest first</span>
@@ -146,7 +151,7 @@ export default function JkCW_AgentActivityMode() {
             </>
           )}
 
-          <JkActivityDetails item={selected} onClose={() => setSelected(null)} onOpenJob={openJob} />
+          <JkActivityDetails item={selected} onClose={() => setSelected(null)} onOpenJob={openJob} onScopeKey={scopeKey} />
           <JkActivityFilterSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}
