@@ -2,7 +2,7 @@
  * Which landing-page agent mark to show for a model id or provider name.
  * Only marks the landing already ships are returned; anything else is null (neutral icon).
  */
-export type ModelMark = "claude" | "openai" | "gemini" | "copilot" | "muse" | "cursor"
+export type ModelMark = "claude" | "openai" | "gemini" | "copilot" | "muse" | "cursor" | "grok" | "deepseek"
 
 const MODEL_PREFIXES: [ModelMark, string[]][] = [
   ["claude", ["claude", "anthropic"]],
@@ -11,6 +11,8 @@ const MODEL_PREFIXES: [ModelMark, string[]][] = [
   ["copilot", ["copilot"]],
   ["muse", ["muse"]],
   ["cursor", ["cursor"]],
+  ["grok", ["grok"]],
+  ["deepseek", ["deepseek"]],
 ]
 
 const PROVIDERS: Record<string, ModelMark> = {
@@ -25,6 +27,11 @@ const PROVIDERS: Record<string, ModelMark> = {
   copilot: "copilot",
   muse: "muse",
   cursor: "cursor",
+  xai: "grok",
+  "x-ai": "grok",
+  grok: "grok",
+  deepseek: "deepseek",
+  "deep-seek": "deepseek",
 }
 
 function fromModel(model: string): ModelMark | null {
@@ -34,8 +41,8 @@ function fromModel(model: string): ModelMark | null {
   for (const [mark, prefixes] of MODEL_PREFIXES) {
     for (const p of prefixes) {
       if (!id.startsWith(p)) continue
-      // "o1" etc. must be followed by a separator or end, so "o1x" or "ollama" don't match.
-      if (/^o\d$/.test(p) && id.length > p.length && /[a-z0-9]/.test(id[p.length])) continue
+      // "o1"/"grok"/"deepseek" must be followed by a separator or end, so "o1x", "ollama" "groking-tool" or "deepseeker" don't match.
+      if ((/^o\d$/.test(p) || p === "grok" || p === "deepseek") && id.length > p.length && /[a-z0-9]/.test(id[p.length])) continue
       return mark
     }
   }
