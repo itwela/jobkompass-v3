@@ -21,6 +21,9 @@ import {
   summarizeAgents,
   activityOverview,
   filterOptions,
+  resolveIdentity,
+  refinesModel,
+  clientFromHeaders,
   type SummaryRow,
   type AgentIdentity,
 } from "./activityLog";
@@ -363,5 +366,131 @@ describe("filterOptions", () => {
       { agentName: "Orbit", model: "opus", actionType: "b" },
     ]);
     expect(o).toEqual({ agents: ["Orbit", "Kepa"], models: ["gpt", "opus"], actionTypes: ["b", "a"] });
+  });
+});
+
+// ---- agent identity: the key beats the request ----
+
+describe("resolveIdentity", () => {
+  const scopedKey = { agentName: "Claude Code", agentId: "cc-laptop", model: "claude-opus-5-5", provider: "anthropic" };
+  const spoof = { "X-Agent-Name": "Totally Not Claude", "X-Agent-Id": "evil", "X-Agent-Model": "gpt-5", "X-Agent-Provider": "openai" };
+
+  it("key only: the key names the call", () => {
+    expect(resolveIdentity(scopedKey, headers({}))).toEqual({ identity: scopedKey, identitySource: "key" });
+  });
+
+  it("header only (legacy key): self-reported", () => {
+    expect(resolveIdentity(null, headers({ "X-Agent-Name": "Summit", "X-Agent-Model": "claude-opus-5-5" }))).toEqual({
+      identity: { agentName: "Summit", agentId: "unknown", model: "claude-opus-5-5", provider: "unknown" },
+      identitySource: "header",
+    });
+  });
+
+  it("both differ: every field the key sets wins; headers cannot override", () => {
+    expect(resolveIdentity(scopedKey, headers(spoof))).toEqual({ identity: scopedKey, identitySource: "key" });
+  });
+
+  it("a header can add model detail to the key's model, never swap it", () => {
+    const key = { agentName: "Claude Code", model: "claude-sonnet", provider: "anthropic" };
+    expect(resolveIdentity(key, headers({ "X-Agent-Model": "claude-sonnet-5-5" })).identity.model).toBe("claude-sonnet-5-5");
+    expect(resolveIdentity(key, headers({ "X-Agent-Model": "claude-sonnetx" })).identity.model).toBe("claude-sonnet");
+    expect(resolveIdentity(key, headers({ "X-Agent-Model": "gpt-5" })).identity.model).toBe("claude-sonnet");
+    expect(resolveIdentity(key, headers({ "X-Agent-Model": "claude" })).identity.model).toBe("claude-sonnet");
+  });
+
+  it("model detail never touches the key's name, id or provider", () => {
+    const key = { agentName: "Claude Code", model: "claude-sonnet", provider: "anthropic" };
+    const r = resolveIdentity(key, headers({ ...spoof, "X-Agent-Model": "claude-sonnet-5-5" }));
+    expect(r.identity).toMatchObject({ agentName: "Claude Code", provider: "anthropic", model: "claude-sonnet-5-5" });
+  });
+
+  it("a field the key leaves empty is filled by the header; the key's fields still win", () => {
+    const key = { agentName: "Codex", provider: "openai" };
+    expect(resolveIdentity(key, headers(spoof))).toEqual({
+      identity: { agentName: "Codex", agentId: "evil", model: "gpt-5", provider: "openai" },
+      identitySource: "key",
+    });
+  });
+
+  it("nothing anywhere: unknown, source none", () => {
+    expect(resolveIdentity(null, headers({ "User-Agent": "jk/0.6.0" }))).toEqual({
+      identity: { agentName: "unknown", agentId: "unknown", model: "unknown", provider: "unknown" },
+      identitySource: "none",
+    });
+    expect(resolveIdentity({}, headers({})).identitySource).toBe("none");
+  });
+
+  it("X-Agent-Source: profile marks a self-reported identity from the CLI profile", () => {
+    expect(resolveIdentity(null, headers({ "X-Agent-Name": "Summit", "X-Agent-Source": "profile" })).identitySource).toBe("profile");
+    // a scoped key is still the source, whatever the request claims
+    expect(resolveIdentity(scopedKey, headers({ "X-Agent-Source": "profile" })).identitySource).toBe("key");
+    // the source header alone names nothing
+    expect(resolveIdentity(null, headers({ "X-Agent-Source": "profile" })).identitySource).toBe("none");
+  });
+
+  it("blank key fields count as unset", () => {
+    expect(resolveIdentity({ agentName: "   ", model: "" }, headers({ "X-Agent-Name": "Summit" }))).toMatchObject({
+      identity: { agentName: "Summit" },
+      identitySource: "header",
+    });
+  });
+});
+
+describe("refinesModel", () => {
+  it.each([
+    ["claude-sonnet", "claude-sonnet-5-5", true],
+    ["gpt-5", "gpt-5.1", true],
+    ["gpt-5", "gpt-5", false],
+    ["gpt-5", "gpt-50", false],
+    ["claude", "gpt-5-claude", false],
+  ])("%s + %s -> %s", (base, detail, want) => {
+    expect(refinesModel(base, detail)).toBe(want);
+  });
+});
+
+describe("clientFromHeaders", () => {
+  it("keeps a short User-Agent for display and caps it", () => {
+    expect(clientFromHeaders(headers({ "User-Agent": "jk/0.6.0" }))).toBe("jk/0.6.0");
+    expect(clientFromHeaders(headers({ "User-Agent": "x".repeat(300) }))!.length).toBeLessThanOrEqual(80);
+    expect(clientFromHeaders(headers({}))).toBeUndefined();
+  });
+});
+
+describe("row meta (keyId, identitySource, client)", () => {
+  const route = { method: "POST", path: "/agent/jobs", description: "Add a job" };
+
+  it("automatic rows store the key id, source and client", () => {
+    const row = automaticRow(summit, route, {}, { latencyMs: 3 }, { keyId: "k1", identitySource: "key", client: "jk/0.6.0" });
+    expect(row).toMatchObject({ keyId: "k1", identitySource: "key", client: "jk/0.6.0", agentName: "Summit" });
+  });
+
+  it("external rows store them too", () => {
+    const row = sanitizeExternal(summit, { actionType: "email_sent", summary: "Sent" }, { keyId: "k2", identitySource: "header" });
+    expect(row).toMatchObject({ keyId: "k2", identitySource: "header" });
+  });
+
+  it("unknown sources are dropped, not stored", () => {
+    const row = automaticRow(summit, route, {}, { latencyMs: 3 }, { identitySource: "admin" as never });
+    expect(row.identitySource).toBeUndefined();
+  });
+
+  it("old rows without meta still aggregate and filter", () => {
+    const old = { agentName: "unknown", agentId: "unknown", model: "unknown", provider: "unknown", actionType: "jobs.create", status: "success" as const };
+    expect(summarizeAgents([old])[0]).toMatchObject({ agentName: "unknown", count: 1 });
+    expect(matchesFilter(old, { agent: "unknown" })).toBe(true);
+  });
+
+  it("keys routes are logged as keys.create / keys.delete; listing is not logged", () => {
+    expect(actionTypeFor({ method: "POST", path: "/agent/keys" })).toBe("keys.create");
+    expect(actionTypeFor({ method: "DELETE", path: "/agent/keys" })).toBe("keys.delete");
+    expect(shouldAutoLog({ method: "GET", path: "/agent/keys" })).toBe(false);
+  });
+
+  it("a created key's row targets the key id and never holds the plaintext key", () => {
+    const keysRoute = agentRoutes.find((r) => r.method === "POST" && r.path === "/agent/keys")!;
+    const plaintext = "jk_sk_" + "a1".repeat(24);
+    const row = automaticRow(summit, keysRoute, { name: "laptop", agentName: "Claude Code" }, { result: { id: "key123", key: plaintext, name: "laptop" }, latencyMs: 9 });
+    expect(row.target).toBe("key123");
+    expect(JSON.stringify(row)).not.toContain(plaintext);
   });
 });

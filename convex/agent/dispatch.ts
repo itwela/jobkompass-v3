@@ -1,6 +1,7 @@
 import type { HttpRouter } from "convex/server";
 import { httpAction } from "../_generated/server";
-import { AgentError, authenticate } from "./auth";
+import { AgentError, authenticate, type AuthedKey } from "./auth";
+import { KEY_FORBIDDEN } from "./keyIdentity";
 import { agentRoutes, type AgentRoute, type ParamSpec } from "./routes";
 import { RANK_PRO } from "../plans";
 import { QUESTIONS_RULE } from "./resumeQuestions";
@@ -9,9 +10,11 @@ import { internal } from "../_generated/api";
 import {
   INVALID_ACTIVITY,
   automaticRow,
+  clientFromHeaders,
   forbiddenFields,
-  identityFromHeaders,
   recordSafely,
+  resolveIdentity,
+  type RowMeta,
   shouldAutoLog,
   withoutUndefined,
 } from "./activityLog";
@@ -30,6 +33,23 @@ const RESUME_QUESTIONS_WORKFLOW = {
   scorecard: "{bullets, quantified, dutyStyle, quantifiedPct, mustHaves?: {met, total, missing, matched?: [{term, evidence}]}} — mustHaves only when a jobId is given",
   questionSource: "template (built-in, free, default) | ai (aiQuestions/ai=true; model questions about YOUR text, which is never rewritten) | none (every bullet has a number or is answered)",
 };
+
+/** Taught to every agent via GET /agent/schema: who a row is attributed to. */
+export const IDENTITY_DOC = {
+  precedence: [
+    "A key tied to an agent (created with an identity) names every call made with it. Request headers never override a field the key sets.",
+    "Exception: model detail. If the key's model is 'claude-sonnet' and X-Agent-Model is 'claude-sonnet-5-5', the row keeps the longer one.",
+    "Fields the key does not set come from X-Agent-Name, X-Agent-Id, X-Agent-Model, X-Agent-Provider (self-reported).",
+    "Nothing set anywhere: 'unknown' (shown as Unknown agent).",
+  ],
+  identitySource: "key | header | profile | none, stored on every activity row",
+  keys: "POST /agent/keys creates a key (shown once). A key tied to an agent cannot create keys.",
+};
+
+/** GET /agent/ping: who the key belongs to and the identity it carries. */
+export function pingBody(key: AuthedKey) {
+  return { userId: key.userId, app: "jobkompass", key: { name: key.keyName, scoped: key.scoped, identity: key.identity } };
+}
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -129,6 +149,7 @@ function errorResponse(err: unknown): Response {
   const isArgError = message.includes("ArgumentValidationError") || message.includes("Validator");
   if (message.includes(AMBIGUOUS)) return fail(409, "ambiguous", message.slice(message.indexOf(AMBIGUOUS)), "Pass the id instead of the name.");
   if (message.includes(INVALID)) return fail(400, "invalid_param", message.slice(message.indexOf(INVALID)), "GET /agent/schema describes every route's params.");
+  if (message.includes(KEY_FORBIDDEN)) return fail(403, "forbidden", message.slice(message.indexOf(KEY_FORBIDDEN)));
   if (message.includes(INVALID_ACTIVITY)) return fail(400, "invalid_param", message.slice(message.indexOf(INVALID_ACTIVITY)), "GET /agent/schema describes every route's params.");
   const isNotFound = message.includes("not found");
   if (isNotFound) return fail(404, "not_found", message, "List records first to find a valid id.");
@@ -142,13 +163,16 @@ function errorResponse(err: unknown): Response {
 
 function makeHandler(route: AgentRoute) {
   return httpAction(async (ctx, request) => {
-    let userId: string;
+    let key: AuthedKey;
     try {
-      userId = await authenticate(ctx, request, { requireRank: RANK_PRO });
+      key = await authenticate(ctx, request, { requireRank: RANK_PRO });
     } catch (err) {
       return errorResponse(err);
     }
-    const identity = identityFromHeaders(request.headers);
+    const userId = key.userId;
+    // The key's identity wins over anything the request says about itself.
+    const { identity, identitySource } = resolveIdentity(key.identity, request.headers);
+    const meta: RowMeta = { keyId: key.keyId, identitySource, client: clientFromHeaders(request.headers) };
     const started = Date.now();
     let args: Record<string, unknown> = {};
     let result: unknown;
@@ -156,7 +180,11 @@ function makeHandler(route: AgentRoute) {
     let response: Response;
     try {
       args = await buildArgs(route, request);
-      if (route.injectIdentity) args.identity = identity;
+      if (route.injectIdentity) {
+        args.identity = identity;
+        args.identityMeta = withoutUndefined(meta);
+      }
+      if (route.injectCallerKey) args.callerKey = { id: key.keyId, scoped: key.scoped };
       args.userId = userId; // every agent fn takes explicit userId and enforces ownership
       result =
         route.kind === "query"
@@ -172,8 +200,9 @@ function makeHandler(route: AgentRoute) {
     if (shouldAutoLog(route)) {
       // Writes leave an activity row. Logging never changes or fails the response.
       await recordSafely(async () => {
-        const row = automaticRow(identity, route, args, { result, error: errorMessage, latencyMs: Date.now() - started });
-        await ctx.runMutation(internal.agent.fns.activityRecord, { userId, row: withoutUndefined(row) });
+        const row = automaticRow(identity, route, args, { result, error: errorMessage, latencyMs: Date.now() - started }, meta);
+        const { keyId: _keyId, ...rest } = withoutUndefined(row);
+        await ctx.runMutation(internal.agent.fns.activityRecord, { userId, row: { ...rest, keyId: key.keyId } });
       });
     }
     return response;
@@ -186,8 +215,8 @@ export function registerAgentRoutes(http: HttpRouter): void {
     method: "GET",
     handler: httpAction(async (ctx, request) => {
       try {
-        const userId = await authenticate(ctx, request);
-        return ok({ userId, app: "jobkompass" });
+        const key = await authenticate(ctx, request);
+        return ok(pingBody(key));
       } catch (err) {
         if (err instanceof AgentError) return fail(err.status, err.code, err.message, err.hint);
         throw err;
@@ -205,6 +234,7 @@ export function registerAgentRoutes(http: HttpRouter): void {
           app: "jobkompass",
           envelope: "{ ok: true, data } | { ok: false, error: { code, message, hint } }",
           auth: "Authorization: Bearer <key>",
+          identity: IDENTITY_DOC,
           routes: agentRoutes.map(({ fn: _fn, ...rest }) => rest),
           workflows: { resumeQuestions: RESUME_QUESTIONS_WORKFLOW },
         });

@@ -9,7 +9,7 @@ import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { currentConvexUserId } from "./keys";
-import { activityOut, activityQuery } from "./fns";
+import { activityOut, activityQuery, keyInfoFor } from "./fns";
 import { SUMMARY_SCAN_CAP, activityOverview, filterOptions, matchesFilter } from "./activityLog";
 
 const filterArgs = {
@@ -52,10 +52,12 @@ export const listMine = query({
     const userId = await currentConvexUserId(ctx);
     if (!userId) return { page: [], isDone: true, continueCursor: "" };
     const result = await activityQuery(ctx, { userId, ...f, from: asTime(from), to: asTime(to) }).paginate(paginationOpts);
+    const keyOf = await keyInfoFor(ctx, userId, result.page);
     const page = await Promise.all(
       result.page.map(async (r) => {
         const { label, jobId } = await targetLabel(ctx, userId, r.target);
-        return { ...activityOut(r), targetLabel: label, targetJobId: jobId };
+        const key = keyOf(r);
+        return { ...activityOut(r), targetLabel: label, targetJobId: jobId, keyName: key?.keyName, keyScoped: key?.keyScoped };
       })
     );
     return { ...result, page };

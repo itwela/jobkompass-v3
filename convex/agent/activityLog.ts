@@ -77,6 +77,59 @@ export function identityFromHeaders(headers: { get(name: string): string | null 
   };
 }
 
+/** Where a row's identity came from: the key, the request headers, the CLI's saved profile, or nowhere. */
+export type IdentitySource = "key" | "header" | "profile" | "none";
+export const IDENTITY_SOURCES: IdentitySource[] = ["key", "header", "profile", "none"];
+
+/** The CLI sends `X-Agent-Source: profile` when the identity came from a saved profile, not a flag or env. */
+export const IDENTITY_SOURCE_HEADER = "X-Agent-Source";
+export const CLIENT_MAX = 80;
+
+/** True when `detail` adds to `base` (key "claude-sonnet", header "claude-sonnet-5-5"); never a different model. */
+export function refinesModel(base: string, detail: string): boolean {
+  if (detail.length <= base.length) return false;
+  if (!detail.toLowerCase().startsWith(base.toLowerCase())) return false;
+  return /[-_.:/@ ]/.test(detail[base.length]);
+}
+
+/**
+ * Who made the call. Precedence per field:
+ * - set on the key: the key wins and the header is ignored. The one exception is model detail: a
+ *   header model that extends the key's model (key "claude-sonnet", header "claude-sonnet-5-5") is kept.
+ * - not set on the key: the header fills it.
+ * - nowhere: "unknown".
+ * identitySource is "key" for any key that carries an identity, else "header" / "profile" when a
+ * header named something, else "none".
+ */
+export function resolveIdentity(
+  key: Partial<AgentIdentity> | null | undefined,
+  headers: { get(name: string): string | null }
+): { identity: AgentIdentity; identitySource: IdentitySource } {
+  const sent = identityFromHeaders(headers);
+  const fromKey = (f: keyof AgentIdentity) => clean(key?.[f], IDENTITY_MAX);
+  const scoped = (["agentName", "agentId", "model", "provider"] as const).some((f) => fromKey(f));
+  const pick = (f: keyof AgentIdentity): string => {
+    const k = fromKey(f);
+    if (!k) return sent[f];
+    if (f === "model" && sent.model !== UNKNOWN && refinesModel(k, sent.model)) return sent.model;
+    return k;
+  };
+  const identity: AgentIdentity = { agentName: pick("agentName"), agentId: pick("agentId"), model: pick("model"), provider: pick("provider") };
+  if (scoped) return { identity, identitySource: "key" };
+  const anySent = Object.values(sent).some((v) => v !== UNKNOWN);
+  if (!anySent) return { identity, identitySource: "none" };
+  const profile = (headers.get(IDENTITY_SOURCE_HEADER) ?? "").trim().toLowerCase() === "profile";
+  return { identity, identitySource: profile ? "profile" : "header" };
+}
+
+/** The caller's User-Agent, trimmed, for display only (e.g. "jk/0.6.0"). */
+export function clientFromHeaders(headers: { get(name: string): string | null }): string | undefined {
+  return clean(headers.get("User-Agent") ?? undefined, CLIENT_MAX);
+}
+
+/** What every row records about how it was made, besides the identity itself. */
+export type RowMeta = { keyId?: string; identitySource?: IdentitySource; client?: string };
+
 /** Keys of a raw request body that are forbidden (case-insensitive). */
 export function forbiddenFields(raw: Record<string, unknown>): string[] {
   return Object.keys(raw).filter((k) => FORBIDDEN_FIELDS.includes(k.toLowerCase()));
@@ -133,7 +186,7 @@ export type ActivityInput = {
   bodyHash?: string;
 };
 
-export type ActivityRow = AgentIdentity & {
+export type ActivityRow = AgentIdentity & RowMeta & {
   actionType: string;
   source: "api" | "external";
   route?: string;
@@ -159,7 +212,7 @@ function nonNegative(name: string, v: number | undefined, integer: boolean): num
 }
 
 /** Validate + redact an externally reported action. Throws INVALID_ACTIVITY errors. */
-export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput): ActivityRow {
+export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput, meta: RowMeta = {}): ActivityRow {
   const actionType = input.actionType.trim().toLowerCase();
   if (!ACTION_TYPE_RE.test(actionType)) {
     throw new Error(`${INVALID_ACTIVITY}actionType must be 1-64 chars of a-z, 0-9, _ . - (e.g. email_sent)`);
@@ -175,6 +228,7 @@ export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput):
   }
   return {
     ...identity,
+    ...metaOf(meta),
     actionType,
     source: "external",
     target: clean(input.target, TARGET_MAX),
@@ -189,15 +243,26 @@ export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput):
   };
 }
 
+/** Only known sources; client cleaned again (it is display text from a header). */
+function metaOf(meta: RowMeta): RowMeta {
+  return {
+    keyId: meta.keyId,
+    identitySource: meta.identitySource && IDENTITY_SOURCES.includes(meta.identitySource) ? meta.identitySource : undefined,
+    client: clean(meta.client, CLIENT_MAX),
+  };
+}
+
 /** Build the row for an automatic (API route) log. */
 export function automaticRow(
   identity: AgentIdentity,
   route: { method: string; path: string; description: string },
   args: Record<string, unknown>,
-  outcome: { result?: unknown; error?: string; latencyMs: number }
+  outcome: { result?: unknown; error?: string; latencyMs: number },
+  meta: RowMeta = {}
 ): ActivityRow {
   return {
     ...identity,
+    ...metaOf(meta),
     actionType: actionTypeFor(route),
     source: "api",
     route: `${route.method} ${route.path}`,

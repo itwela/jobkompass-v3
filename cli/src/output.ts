@@ -70,11 +70,50 @@ function isActivitySummary(data: unknown): data is ActivitySummaryShape {
   return Boolean(d && typeof d === "object" && typeof d.total === "number" && Array.isArray(d.byModel) && Array.isArray(d.byActionType));
 }
 
+/**
+ * Where an activity row's agent name came from: `via key "laptop"` (the key names it),
+ * `self-reported` (headers), or `unknown agent`. Rows from before scoped keys have no source.
+ */
+export function identityNote(r: { agentName?: unknown; identitySource?: unknown; keyName?: unknown }): string {
+  if (r.identitySource === "key") return typeof r.keyName === "string" && r.keyName ? `via key "${r.keyName}"` : "via key";
+  if (r.identitySource === "header" || r.identitySource === "profile") return "self-reported";
+  if (r.identitySource === "none" || !r.agentName || r.agentName === "unknown") return "unknown agent";
+  return "self-reported";
+}
+
+/** "Claude Code (via key "laptop")", "unknown agent". */
+export function agentLabel(r: { agentName?: unknown; identitySource?: unknown; keyName?: unknown }): string {
+  const note = identityNote(r);
+  if (note === "unknown agent") return note;
+  return `${String(r.agentName)} (${note})`;
+}
+
+type KeyRow = { id: string; name: string; scoped: boolean; identity: Record<string, string> | null; createdAt: number; lastUsedAt?: number; current?: boolean };
+
+function isKeyList(data: unknown): data is KeyRow[] {
+  return Array.isArray(data) && data.length > 0 && data.every((k) => k && typeof k === "object" && typeof k.id === "string" && typeof k.scoped === "boolean" && "identity" in k && typeof k.createdAt === "number");
+}
+
+const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** Pretty `jk keys list`: one row per key; identity as "Agent · model · provider". */
+export function renderKeys(keys: KeyRow[]): string {
+  return renderPretty(
+    keys.map((k) => ({
+      id: k.id,
+      name: k.current ? `${k.name} (this key)` : k.name,
+      identity: k.identity ? [k.identity.agentName, k.identity.model, k.identity.provider, k.identity.agentId].filter(Boolean).join(" · ") : "none (agent reports its own)",
+      created: day(k.createdAt),
+      lastUsed: k.lastUsedAt ? day(k.lastUsedAt) : "never",
+    }))
+  );
+}
+
 /** Pretty `jk activity list`: one row per action, then the next-page command. */
 export function renderActivityPage(p: ActivityPage): string {
   const rows = p.items.map((r) => ({
     when: typeof r.timestamp === "number" ? new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19) : "",
-    agent: r.agentName,
+    agent: agentLabel(r),
     model: r.model,
     action: r.actionType,
     status: r.status,
@@ -107,6 +146,7 @@ export function formatOutput(data: unknown, machine: boolean, itemNoun?: string)
   if (isMoveResult(data)) return renderMove(data, itemNoun);
   if (isActivityPage(data)) return renderActivityPage(data);
   if (isActivitySummary(data)) return renderActivitySummary(data);
+  if (isKeyList(data)) return renderKeys(data);
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const { notice, ...rest } = data as Record<string, unknown>;
     if (typeof notice === "string" && notice) return `Notice: ${notice}\n\n${renderPretty(rest)}`;

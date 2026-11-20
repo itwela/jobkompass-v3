@@ -9,7 +9,18 @@ import {
 } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import type { QueryCtx, MutationCtx } from "../_generated/server";
+import type { ActionCtx, QueryCtx, MutationCtx } from "../_generated/server";
+import {
+  KEY_NOT_FOUND,
+  assertCanMintKeys,
+  assertCanRevoke,
+  cleanKeyIdentity,
+  identityPatch,
+  isScoped,
+  keyIdentityOf,
+  keyOut,
+  type KeyIdentity,
+} from "./keyIdentity";
 
 export async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
@@ -67,20 +78,58 @@ export const generate = internalAction({
  * An action, not a mutation, because hashing needs Web Crypto (`crypto.subtle`),
  * which is only guaranteed in the action runtime — same reason `generate` is one.
  */
+const identityArgs = {
+  agentName: v.optional(v.string()),
+  agentId: v.optional(v.string()),
+  model: v.optional(v.string()),
+  provider: v.optional(v.string()),
+};
+
+/** Mint, hash and store a key. The plaintext is returned once and never stored or logged. */
+async function mintKey(
+  ctx: ActionCtx,
+  userId: string,
+  name: string | undefined,
+  raw: KeyIdentity
+): Promise<{ id: string; key: string; name: string; identity: KeyIdentity | null; note: string }> {
+  const key = newPlaintextKey();
+  const keyHash = await sha256Hex(key);
+  const identity = cleanKeyIdentity(raw);
+  const cleanName = name?.trim() || "cli";
+  const id: string = await ctx.runMutation(internal.agent.keys.insert, { userId, name: cleanName, keyHash, ...identity });
+  return { id, key, name: cleanName, identity: isScoped(identity) ? identity : null, note: SAVE_NOTE };
+}
+
+/**
+ * Generate a CLI key for the signed-in user, optionally tied to an agent (identity fields).
+ * Returns the plaintext key ONCE; only its SHA-256 hash is stored, so it can never be shown again.
+ *
+ * An action, not a mutation, because hashing needs Web Crypto (`crypto.subtle`),
+ * which is only guaranteed in the action runtime — same reason `generate` is one.
+ */
 export const generateMine = action({
-  args: { name: v.optional(v.string()) },
-  handler: async (ctx, { name }): Promise<{ key: string; note: string }> => {
+  args: { name: v.optional(v.string()), ...identityArgs },
+  handler: async (ctx, { name, ...identity }): Promise<{ id: string; key: string; name: string; identity: KeyIdentity | null; note: string }> => {
     const userId: string | null = await ctx.runQuery(api.auth.getConvexUserId, {});
     if (!userId) throw new Error("Not authenticated");
+    return mintKey(ctx, userId, name, identity);
+  },
+});
 
-    const key = newPlaintextKey();
-    const keyHash = await sha256Hex(key);
-    await ctx.runMutation(internal.agent.keys.insert, {
-      userId,
-      name: name?.trim() || "cli",
-      keyHash,
-    });
-    return { key, note: SAVE_NOTE };
+/**
+ * Set or clear the identity on one of the signed-in user's keys. A blank field clears it.
+ * Past activity keeps the identity it was logged with.
+ */
+export const setIdentityMine = mutation({
+  args: { id: v.id("agentApiKeys"), ...identityArgs },
+  handler: async (ctx, { id, ...identity }) => {
+    const userId = await currentConvexUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const row = await ctx.db.get(id);
+    if (!row || row.userId !== userId || row.revokedAt !== undefined) throw new Error(KEY_NOT_FOUND);
+    const patch = identityPatch(identity);
+    await ctx.db.patch(id, patch);
+    return { success: true, scoped: isScoped(patch) };
   },
 });
 
@@ -115,12 +164,13 @@ export const revokeMine = mutation({
 });
 
 export const insert = internalMutation({
-  args: { userId: v.string(), name: v.string(), keyHash: v.string() },
+  args: { userId: v.string(), name: v.string(), keyHash: v.string(), ...identityArgs },
   handler: async (ctx, args) => {
-    await ctx.db.insert("agentApiKeys", { ...args, createdAt: Date.now() });
+    return await ctx.db.insert("agentApiKeys", { ...args, createdAt: Date.now() });
   },
 });
 
+/** The key behind a Bearer token: owner, id, name, and the identity it carries (null = legacy key). */
 export const lookupByHash = internalQuery({
   args: { keyHash: v.string() },
   handler: async (ctx, { keyHash }) => {
@@ -129,7 +179,47 @@ export const lookupByHash = internalQuery({
       .withIndex("by_hash", (q) => q.eq("keyHash", keyHash))
       .first();
     if (!row || row.revokedAt !== undefined) return null;
-    return { userId: row.userId, keyId: row._id };
+    return { userId: row.userId, keyId: row._id, keyName: row.name, identity: keyIdentityOf(row) };
+  },
+});
+
+// ---- Agent API: /agent/keys (jk keys create|list|revoke) ----
+
+const callerKeyArg = v.object({ id: v.string(), scoped: v.boolean() });
+
+/** POST /agent/keys. Refused for a scoped key, so a leaked agent key cannot mint more. */
+export const createFromAgent = internalAction({
+  args: { userId: v.string(), callerKey: callerKeyArg, name: v.optional(v.string()), ...identityArgs },
+  handler: async (ctx, { userId, callerKey, name, ...identity }) => {
+    assertCanMintKeys(callerKey);
+    return mintKey(ctx, userId, name, identity);
+  },
+});
+
+/** GET /agent/keys: the caller's active keys. Never the hash or the key. */
+export const listFromAgent = internalQuery({
+  args: { userId: v.string(), callerKey: callerKeyArg },
+  handler: async (ctx, { userId, callerKey }) => {
+    const rows = await ctx.db
+      .query("agentApiKeys")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return rows
+      .filter((r) => r.revokedAt === undefined)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((r) => ({ ...keyOut(r), current: r._id === callerKey.id }));
+  },
+});
+
+/** DELETE /agent/keys: revoke one of the caller's keys; the calling key only with self=true. */
+export const revokeFromAgent = internalMutation({
+  args: { userId: v.string(), callerKey: callerKeyArg, id: v.string(), self: v.optional(v.boolean()) },
+  handler: async (ctx, { userId, callerKey, id, self }) => {
+    const keyId = ctx.db.normalizeId("agentApiKeys", id);
+    const row = keyId ? await ctx.db.get(keyId) : null;
+    assertCanRevoke(row, userId, { id, callerKeyId: callerKey.id, self });
+    await ctx.db.patch(keyId!, { revokedAt: Date.now() });
+    return { id, revoked: true };
   },
 });
 

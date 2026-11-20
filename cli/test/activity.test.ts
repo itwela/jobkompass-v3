@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { agentHeaders } from "../src/agent";
+import { agentHeaders, clientHeaders, keyIdentityBody } from "../src/agent";
 import { commands } from "../src/commands";
-import { formatOutput } from "../src/output";
+import { agentLabel, formatOutput, identityNote } from "../src/output";
+import pkg from "../package.json";
 
 const find = (name: string) => commands.find((c) => c.name === name)!;
 
@@ -32,6 +33,72 @@ describe("agentHeaders", () => {
 
   it("drops values that are not valid header text instead of failing", () => {
     expect(agentHeaders({ agent: "a\nb" }, {})).toEqual({});
+  });
+});
+
+describe("clientHeaders", () => {
+  it("names the client as jk/<version>", () => {
+    expect(clientHeaders("0.6.0")).toEqual({ "User-Agent": "jk/0.6.0" });
+  });
+
+  it("the package is 0.6.0", () => {
+    expect(pkg.version).toBe("0.6.0");
+  });
+});
+
+describe("keyIdentityBody (jk keys create)", () => {
+  it("maps the identity flags to the key's fields", () => {
+    expect(keyIdentityBody({ agent: "Claude Code", agentId: "cc-1", model: "claude-opus-5-5", provider: "anthropic" })).toEqual({
+      agentName: "Claude Code",
+      agentId: "cc-1",
+      model: "claude-opus-5-5",
+      provider: "anthropic",
+    });
+  });
+
+  it("no flags: an unscoped key; blanks dropped", () => {
+    expect(keyIdentityBody({})).toEqual({});
+    expect(keyIdentityBody({ agent: "  ", model: "gpt-5" })).toEqual({ model: "gpt-5" });
+  });
+});
+
+describe("identity in activity output", () => {
+  it("names where the agent came from", () => {
+    expect(identityNote({ agentName: "Claude Code", identitySource: "key", keyName: "laptop" })).toBe('via key "laptop"');
+    expect(identityNote({ agentName: "Codex", identitySource: "header" })).toBe("self-reported");
+    expect(identityNote({ agentName: "Codex", identitySource: "profile" })).toBe("self-reported");
+    expect(identityNote({ agentName: "unknown", identitySource: "none" })).toBe("unknown agent");
+  });
+
+  it("rows from before identity sources still read", () => {
+    expect(identityNote({ agentName: "Summit" })).toBe("self-reported");
+    expect(identityNote({ agentName: "unknown" })).toBe("unknown agent");
+  });
+
+  it("the pretty table shows the agent with its source", () => {
+    const out = formatOutput({ items: [{ timestamp: 0, agentName: "Claude Code", identitySource: "key", keyName: "laptop", model: "m", actionType: "jobs.create", status: "success" }], cursor: null, isDone: true }, false);
+    expect(out).toContain('Claude Code (via key "laptop")');
+    expect(agentLabel({ agentName: "unknown", identitySource: "none" })).toBe("unknown agent");
+  });
+});
+
+describe("keys list output", () => {
+  const keys = [
+    { id: "k1", name: "laptop", scoped: true, identity: { agentName: "Claude Code", model: "claude-opus-5-5", provider: "anthropic" }, createdAt: Date.UTC(2026, 10, 3), lastUsedAt: Date.UTC(2026, 10, 19), current: true },
+    { id: "k2", name: "old-ci", scoped: false, identity: null, createdAt: Date.UTC(2026, 7, 2) },
+  ];
+
+  it("pretty: identity as one line, legacy keys say so, never a key", () => {
+    const out = formatOutput(keys, false);
+    expect(out).toContain("Claude Code · claude-opus-5-5 · anthropic");
+    expect(out).toContain("laptop (this key)");
+    expect(out).toContain("none (agent reports its own)");
+    expect(out).toContain("never");
+    expect(out).not.toContain("jk_sk_");
+  });
+
+  it("machine mode is the raw JSON", () => {
+    expect(JSON.parse(formatOutput(keys, true))).toEqual(keys);
   });
 });
 

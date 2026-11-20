@@ -21,6 +21,8 @@ export type AgentRoute = {
   description: string;
   /** dispatch passes the caller's X-Agent-* identity as args.identity. */
   injectIdentity?: boolean;
+  /** dispatch passes the calling key as args.callerKey = {id, scoped}. */
+  injectCallerKey?: boolean;
   /** dispatch rejects bodies carrying FORBIDDEN_FIELDS (body, content, token, password...). */
   rejectSecretFields?: boolean;
 };
@@ -404,6 +406,32 @@ export const agentRoutes: AgentRoute[] = [
     params: activityFilterParams,
     description:
       "Counts, success rate and avg latency grouped by model, by action type, and by model x action type. Returns {total,truncated,byModel,byActionType,byModelAndAction}",
+  },
+
+  // ---- CLI keys ----
+  {
+    method: "POST", path: "/agent/keys", fn: internal.agent.keys.createFromAgent, kind: "action", injectCallerKey: true,
+    params: [
+      { name: "name", type: "string", description: "Key name, e.g. laptop (default cli)" },
+      { name: "agentName", type: "string", description: "Tie the key to an agent, e.g. Claude Code. Activity from the key always shows it" },
+      { name: "agentId", type: "string" },
+      { name: "model", type: "string", description: "e.g. claude-opus-5-5" },
+      { name: "provider", type: "string", description: "e.g. anthropic" },
+    ],
+    description:
+      "Create a CLI key, optionally tied to an agent. Returns {id,key,name,identity}; the key is shown once and never stored. A key tied to an agent cannot create keys (403)",
+  },
+  {
+    method: "GET", path: "/agent/keys", fn: internal.agent.keys.listFromAgent, kind: "query", injectCallerKey: true, params: [],
+    description: "List your active CLI keys: id, name, identity, created, last used, current (the key making this call). Never the key itself",
+  },
+  {
+    method: "DELETE", path: "/agent/keys", fn: internal.agent.keys.revokeFromAgent, kind: "mutation", injectCallerKey: true,
+    params: [
+      { name: "id", type: "string", required: true },
+      { name: "self", type: "boolean", description: "Required to revoke the key making this call" },
+    ],
+    description: "Revoke one of your CLI keys",
   },
 
   // ---- threads (read-only) ----
