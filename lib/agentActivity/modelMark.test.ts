@@ -27,13 +27,20 @@ describe("modelMark", () => {
     expect(modelMark("muse-spark")).toBe("muse")
     expect(modelMark("cursor-small")).toBe("cursor")
   })
+  it("maps Grok Bot and Grok/xAI models to grok without a provider", () => {
+    for (const m of ["Grok Bot", "grok bot", "GROK BOT", "  Grok Bot  ", "grok", "grok-4.5", "Grok-4", "xai/grok-3", "x-ai/grok-code-fast"]) expect(modelMark(m)).toBe("grok")
+    expect(modelMark("Grok Bot", "")).toBe("grok")
+    expect(modelMark("unknown", "xAI")).toBe("grok")
+    expect(modelMark(undefined, "x-ai")).toBe("grok")
+    expect(modelMark("groking-tool")).toBeNull()
+    expect(modelMark("grokker")).toBeNull()
+  })
   it("returns null for unknown, empty and marks the landing does not have", () => {
     expect(modelMark("unknown", "unknown")).toBeNull()
     expect(modelMark("", "")).toBeNull()
     expect(modelMark(undefined, null)).toBeNull()
     expect(modelMark("llama-3.1-70b", "Meta")).toBeNull()
     expect(modelMark("mistral-large", "Mistral")).toBeNull()
-    expect(modelMark("grok-4", "xAI")).toBeNull()
   })
   it("prefers the model over the provider", () => {
     expect(modelMark("gpt-5", "Anthropic")).toBe("openai")
