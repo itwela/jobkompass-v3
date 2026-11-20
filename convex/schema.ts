@@ -396,6 +396,8 @@ const schema = defineSchema({
     // How the identity was decided. Optional: rows from before scoped keys have none.
     keyId: v.optional(v.id("agentApiKeys")),
     identitySource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("profile"), v.literal("none"))),
+    // Where the model came from (resolveModel). Optional: older rows have none.
+    modelSource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("body"), v.literal("none"))),
     client: v.optional(v.string()), // truncated User-Agent, display only
   })
     .index("by_user_time", ["userId", "timestamp"])

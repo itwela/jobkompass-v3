@@ -23,11 +23,12 @@ import { useJkAppNav } from "../jk-app/jkAppNav"
 import { goToSectionWhenMounted } from "./jkChatWindow-SettingsMode"
 import { openKeyIdentityOnMount } from "../jk-cli-keys/jkCliKeys"
 import { agentDisplayName, allUnknown } from "@/lib/agentActivity/identity"
+import { modelDisplayName } from "@/lib/agentActivity/modelIdentity"
 import { JkFilterPill, JkModelIcon, type ActivityFilters, type ActivityItem, type ActivitySummary } from "../jk-agent-activity/jkActivityParts"
 import {
   JkActivityByAction, JkActivityByAgent, JkActivityByModel, JkActivityDetails, JkActivityEmpty,
   JkActivityFeedCards, JkActivityFeedTable, JkActivityFilterButton, JkActivityFilterSheet, JkActivityStats,
-  JkActivityUnknownBanner,
+  JkActivityUnknownBanner, JkActivityUnknownModelBanner,
 } from "../jk-agent-activity/jkActivitySections"
 
 const RANGES: { value: ActivityRange; label: string }[] = [
@@ -83,7 +84,7 @@ export default function JkCW_AgentActivityMode() {
         bottom={empty || !data ? undefined : (
           <div className="flex flex-wrap gap-2.5 pt-[21px]">
             <JkFilterPill label="Agent" value={filters.agent} onChange={setFilter("agent")} options={data.options.agents.map((a) => ({ value: a, label: agentDisplayName(a) }))} />
-            <JkFilterPill label="Model" mono icon={(m) => <JkModelIcon model={m} className="size-3.5" />} value={filters.model} onChange={setFilter("model")} options={data.options.models.map((m) => ({ value: m, label: m }))} />
+            <JkFilterPill label="Model" mono icon={(m) => <JkModelIcon model={m} className="size-3.5" />} value={filters.model} onChange={setFilter("model")} options={data.options.models.map((m) => ({ value: m, label: modelDisplayName(m) }))} />
             <JkFilterPill label="Action" mono value={filters.actionType} onChange={setFilter("actionType")} options={data.options.actionTypes.map((a) => ({ value: a, label: a }))} />
             <JkFilterPill label="Status" value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v as ActivityFilters["status"] }))}
               options={[{ value: "success", label: "Done" }, { value: "error", label: "Failed" }]} />
@@ -116,7 +117,7 @@ export default function JkCW_AgentActivityMode() {
               <div className="grid border-b border-border min-[1360px]:grid-cols-[minmax(0,664fr)_minmax(0,512fr)]">
                 <div className="px-5 lg:px-8 min-[1360px]:pr-8">
                   <div className="border-b border-border py-[26px] min-[1360px]:border-0 min-[1360px]:pb-0">
-                    <JkActivityByModel summary={data} />
+                    <JkActivityByModel summary={data} onManageKeys={manageKeys} />
                   </div>
                   <div className="border-b border-border py-[26px] min-[1360px]:border-0 min-[1360px]:pb-3 min-[1360px]:pt-[30px]">
                     <JkActivityByAgent summary={data} onScopeKeys={manageKeys} />
@@ -129,15 +130,16 @@ export default function JkCW_AgentActivityMode() {
 
               <section className="px-5 pt-[26px] lg:px-8 lg:pt-6">
                 {allUnknown(data.byAgent) && <div className="mb-6"><JkActivityUnknownBanner summary={data} onScopeKeys={manageKeys} /></div>}
+                {!allUnknown(data.byAgent) && <div className="empty:hidden mb-6"><JkActivityUnknownModelBanner summary={data} onManageKeys={manageKeys} /></div>}
                 <div className="flex items-center justify-between gap-4">
                   <JkSectionLabel as="h2">Activity</JkSectionLabel>
                   <span className="font-mono text-[9.5px] uppercase text-subtle-foreground">Newest first</span>
                 </div>
                 <div className="mt-[21px] max-[1359px]:hidden">
-                  <JkActivityFeedTable items={feed.results} selectedId={selected?.id} onOpen={setSelected} />
+                  <JkActivityFeedTable items={feed.results} selectedId={selected?.id} onOpen={setSelected} fix={{ onScopeKey: scopeKey, onManageKeys: manageKeys }} />
                 </div>
                 <div className="mt-[15px] min-[1360px]:hidden">
-                  <JkActivityFeedCards items={feed.results} onOpen={setSelected} />
+                  <JkActivityFeedCards items={feed.results} onOpen={setSelected} fix={{ onScopeKey: scopeKey, onManageKeys: manageKeys }} />
                 </div>
                 <div className="mt-[22px] flex flex-col items-center gap-4 min-[1360px]:items-start">
                   {feed.status === "CanLoadMore" && (
@@ -151,7 +153,7 @@ export default function JkCW_AgentActivityMode() {
             </>
           )}
 
-          <JkActivityDetails item={selected} onClose={() => setSelected(null)} onOpenJob={openJob} onScopeKey={scopeKey} />
+          <JkActivityDetails item={selected} onClose={() => setSelected(null)} onOpenJob={openJob} onScopeKey={scopeKey} onManageKeys={() => { setSelected(null); manageKeys() }} />
           <JkActivityFilterSheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}

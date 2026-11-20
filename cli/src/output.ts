@@ -102,19 +102,25 @@ export function renderKeys(keys: KeyRow[]): string {
     keys.map((k) => ({
       id: k.id,
       name: k.current ? `${k.name} (this key)` : k.name,
-      identity: k.identity ? [k.identity.agentName, k.identity.model, k.identity.provider, k.identity.agentId].filter(Boolean).join(" · ") : "none (agent reports its own)",
+      model: k.identity?.model ?? "no model",
+      identity: k.identity ? [k.identity.agentName, k.identity.provider, k.identity.agentId].filter(Boolean).join(" · ") || "model only" : "none (agent reports its own)",
       created: day(k.createdAt),
       lastUsed: k.lastUsedAt ? day(k.lastUsedAt) : "never",
     }))
   );
 }
 
+/** The model as shown in tables: "unknown model" when none was recorded. */
+export function modelLabel(model: unknown): string {
+  return typeof model === "string" && model.trim() && model !== "unknown" ? model : "unknown model";
+}
+
 /** Pretty `jk activity list`: one row per action, then the next-page command. */
 export function renderActivityPage(p: ActivityPage): string {
   const rows = p.items.map((r) => ({
     when: typeof r.timestamp === "number" ? new Date(r.timestamp).toISOString().replace("T", " ").slice(0, 19) : "",
+    model: modelLabel(r.model),
     agent: agentLabel(r),
-    model: r.model,
     action: r.actionType,
     status: r.status,
     ms: r.latencyMs,
@@ -130,12 +136,15 @@ export function renderActivityPage(p: ActivityPage): string {
 export function renderActivitySummary(s: ActivitySummaryShape): string {
   const pct = (g: Group) => ({
     ...Object.fromEntries(Object.entries(g).filter(([k]) => !["count", "success", "error", "successRate", "avgLatencyMs", "inputTokens", "outputTokens", "costUsd"].includes(k))),
+    ...("model" in g ? { model: modelLabel(g.model) } : {}),
     count: g.count,
     success: `${Math.round(g.successRate * 1000) / 10}%`,
     avgMs: g.avgLatencyMs ?? "",
   });
   const lines = [`${s.total} action(s)${s.truncated ? " (truncated: narrow with --from/--to)" : ""}.`];
   lines.push("", "By model:", renderPretty(s.byModel.map(pct)));
+  const unknown = s.byModel.find((g) => modelLabel(g.model) === "unknown model");
+  if (unknown) lines.push("", `${unknown.count} action(s) have no model. Tie the key to a model: jk keys create --agent <name> --model <m> --provider <p>, or send --model / JK_AGENT_MODEL.`);
   lines.push("", "By action type:", renderPretty(s.byActionType.map(pct)));
   lines.push("", "By model and action type:", renderPretty(s.byModelAndAction.map(pct)));
   return lines.join("\n");

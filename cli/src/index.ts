@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { commands, parseList, type CommandSpec, type OptSpec } from "./commands";
 import { apiRequest, CliError } from "./client";
 import { emit } from "./output";
-import { UNSCOPED_KEY_NOTICE, agentHeaders, clientHeaders, keyIdentityBody, type AgentFlags } from "./agent";
+import { UNSCOPED_KEY_NOTICE, agentHeaders, clientHeaders, keyIdentityBody, keyModelWarning, type AgentFlags } from "./agent";
 import { resolveDate } from "./dates";
 import { configPath, deleteConfig, loadConfig, saveConfig } from "./config";
 import pkg from "../package.json";
@@ -100,7 +100,12 @@ function register(spec: CommandSpec): void {
       const value = coerceOpt(opt, options[flagName]);
       if (value !== undefined) payload[opt.api] = value;
     }
-    if (spec.identityBody) Object.assign(payload, keyIdentityBody(identityFlags()));
+    if (spec.identityBody) {
+      const body = keyIdentityBody(identityFlags());
+      Object.assign(payload, body);
+      const warning = keyModelWarning(body);
+      if (warning) process.stderr.write(`warning: ${warning}\n`);
+    }
     try {
       const data =
         spec.method === "GET" || spec.method === "DELETE"

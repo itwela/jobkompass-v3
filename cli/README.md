@@ -82,8 +82,10 @@ because `--agent`, `--agent-id` and `--model` are the identity flags.
 
 ## Keys tied to an agent
 Flags and env vars are self-reported. To make the name stick, give each agent its own key with an identity. Every call
-made with that key is logged under that identity, and request headers can't override it. The one thing a header can
-add is model detail: a key set to `claude-sonnet` with `--model claude-sonnet-5-5` is logged as `claude-sonnet-5-5`.
+made with that key is logged under that identity, and request headers can't override it.
+
+The model on each action comes from: the key's model, else `--model` / `JK_AGENT_MODEL` (sent as `X-Agent-Model`),
+else `model` in a raw `POST /agent/activity` body, else `unknown model`. `jk keys create` warns when `--model` is missing.
 
     jk keys create --name laptop --agent "Claude Code" --model claude-opus-5-5 --provider anthropic [--agent-id cc-laptop]
     jk keys list                       # name, identity, created, last used. Never the key itself

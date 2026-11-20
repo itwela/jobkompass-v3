@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { toast } from "@/lib/toast"
 import { cn } from "@/lib/utils"
 import { modelMark } from "@/lib/agentActivity/modelMark"
+import { keyModelHint } from "@/lib/agentActivity/modelIdentity"
 import { fmtKeyCreated, fmtKeyUsed, hasIdentity, identityTail, maskKey, type KeyIdentity } from "@/lib/agentActivity/identity"
 import JkAgentMark from "../jkAgentMark"
 import JkSectionLabel from "../jk-app/jkSectionLabel"
@@ -31,9 +32,9 @@ import { JkConfirmText } from "../jkConfirm"
 
 type KeyRow = { _id: string; name: string; createdAt: number; lastUsedAt?: number } & KeyIdentity
 
-const FIELDS: { key: keyof KeyIdentity; label: string; mono?: boolean; placeholder: string }[] = [
+const FIELDS: { key: keyof KeyIdentity; label: string; mono?: boolean; placeholder: string; recommended?: boolean }[] = [
   { key: "agentName", label: "Agent name", placeholder: "e.g. Claude Code" },
-  { key: "model", label: "Model", mono: true, placeholder: "e.g. claude-opus-5-5" },
+  { key: "model", label: "Model", mono: true, placeholder: "e.g. claude-opus-5-5", recommended: true },
   { key: "provider", label: "Provider", mono: true, placeholder: "e.g. anthropic" },
   { key: "agentId", label: "Agent id", mono: true, placeholder: "Optional, e.g. cc-laptop-01" },
 ]
@@ -73,7 +74,7 @@ function IdentityFields({ value, onChange, layout, idPrefix }: { value: KeyIdent
     <div className={cn("grid gap-x-4 gap-y-[19px]", layout === "grid" && "sm:grid-cols-2")}>
       {FIELDS.map((f) => (
         <div key={f.key} className="min-w-0">
-          <JkFieldLabel htmlFor={`${idPrefix}-${f.key}`}>{f.label}</JkFieldLabel>
+          <JkFieldLabel htmlFor={`${idPrefix}-${f.key}`} aside={f.recommended ? <span className="text-[11.5px] leading-[13px] text-subtle-foreground">Recommended</span> : undefined}>{f.label}</JkFieldLabel>
           <input id={`${idPrefix}-${f.key}`} value={value[f.key] ?? ""} onChange={(e) => onChange({ ...value, [f.key]: e.target.value })}
             placeholder={f.placeholder} maxLength={120} autoComplete="off" spellCheck={false}
             className={cn(jkFieldCls, "h-[45px]", f.mono ? "font-mono text-[13px]" : "text-[14px]")} />
@@ -144,7 +145,7 @@ export function JkCliKeys({ creating, onCreatingChange, emptyNote }: {
   const revoke = useMutation(api.agent.keys.revokeMine)
 
   const [name, setName] = useState("")
-  const [tie, setTie] = useState(false)
+  const [tie, setTie] = useState(true)
   const [identity, setIdentity] = useState<KeyIdentity>(EMPTY)
   const [busy, setBusy] = useState<string | null>(null)
   const [fresh, setFresh] = useState<{ key: string; identity: KeyIdentity | null } | null>(null)
@@ -158,7 +159,7 @@ export function JkCliKeys({ creating, onCreatingChange, emptyNote }: {
     if (k) setEditing(k)
   }, [keys])
 
-  const reset = () => { setName(""); setTie(false); setIdentity(EMPTY) }
+  const reset = () => { setName(""); setTie(true); setIdentity(EMPTY) }
   const create = async () => {
     setBusy("create")
     try {
@@ -199,13 +200,15 @@ export function JkCliKeys({ creating, onCreatingChange, emptyNote }: {
           <button type="button" aria-expanded={tie} onClick={() => setTie((t) => !t)}
             className="mt-[15px] flex items-center gap-2.5 text-[13.5px] text-foreground">
             <ChevronRight aria-hidden className={cn("size-4 text-muted-foreground transition-transform", tie && "rotate-90")} strokeWidth={1.6} />
-            Tie this key to an agent
-            <span className="ml-2.5 text-subtle-foreground">(optional)</span>
+            Tie this key to an agent and model
+            <span className="ml-2.5 text-subtle-foreground">(recommended)</span>
           </button>
           {tie && (
             <div className="mt-[17px]">
               <IdentityFields value={identity} onChange={setIdentity} layout="grid" idPrefix="new-key" />
-              <p className="mt-[15px] text-[13px] leading-[18px] text-subtle-foreground">Activity from this key will always show this identity.</p>
+              <p className="mt-[15px] text-[13px] leading-[18px] text-subtle-foreground">
+                {identity.model?.trim() ? "Activity from this key will always show this identity." : "Without a model, activity shows Unknown model unless the agent sends one."}
+              </p>
             </div>
           )}
         </form>
@@ -225,10 +228,15 @@ export function JkCliKeys({ creating, onCreatingChange, emptyNote }: {
                     <KeyRound aria-hidden className="size-4 -scale-x-100" style={tone} />
                     <span className="truncate pr-3 font-mono text-[13.5px] text-foreground">{k.name}</span>
                     <span className="flex min-w-0 items-center gap-[30px] pr-3">
-                      {scoped ? <JkIdentityChip identity={k} /> : (
+                      {scoped ? (
+                        <>
+                          <JkIdentityChip identity={k} />
+                          {keyModelHint(k) && <NoModel onClick={() => setEditing(k)} />}
+                        </>
+                      ) : (
                         <>
                           <span className="truncate text-[13px] text-subtle-foreground">No identity (agent reports its own)</span>
-                          <AddIdentity onClick={() => setEditing(k)} />
+                          <NoModel onClick={() => setEditing(k)} />
                         </>
                       )}
                     </span>
@@ -247,13 +255,13 @@ export function JkCliKeys({ creating, onCreatingChange, emptyNote }: {
                     <span className="col-start-2 col-end-4 text-[14px] leading-[18px] text-muted-foreground">{fmtKeyCreated(k.createdAt)} · {fmtKeyUsed(k.lastUsedAt, now)}</span>
                     {scoped ? (
                       <span className="col-start-2 col-end-4 mt-[6px] flex items-center justify-between gap-3">
-                        <JkIdentityChip identity={k} provider={false} />
+                        <span className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1"><JkIdentityChip identity={k} provider={false} />{keyModelHint(k) && <NoModel onClick={() => setEditing(k)} className="text-[13.5px]" />}</span>
                         <button type="button" onClick={() => setEditing(k)} className="shrink-0 text-[14px] text-muted-foreground hover:text-foreground">Edit</button>
                       </span>
                     ) : (
                       <span className="col-start-2 col-end-4 mt-[6px] flex flex-col items-start gap-1">
                         <span className="text-[13.5px] leading-[18px] text-subtle-foreground">No identity (agent reports its own)</span>
-                        <AddIdentity onClick={() => setEditing(k)} className="text-[14px]" />
+                        <NoModel onClick={() => setEditing(k)} className="text-[14px]" />
                       </span>
                     )}
                   </div>
@@ -274,12 +282,16 @@ export function JkCliKeys({ creating, onCreatingChange, emptyNote }: {
   )
 }
 
-function AddIdentity({ onClick, className }: { onClick: () => void; className?: string }) {
+/** "No model · Add model": activity from this key shows Unknown model until it has one. Opens Edit identity. */
+function NoModel({ onClick, className }: { onClick: () => void; className?: string }) {
   return (
-    <button type="button" onClick={onClick}
-      className={cn("shrink-0 border-b border-foreground/60 pb-[3px] text-[13px] leading-4 text-foreground transition-colors hover:border-foreground", className)}>
-      Add identity
-    </button>
+    <span className={cn("inline-flex shrink-0 items-baseline gap-2.5 text-[13px] leading-4", className)}>
+      <span className="text-subtle-foreground">No model</span>
+      <button type="button" onClick={onClick}
+        className="border-b border-foreground/60 pb-[3px] text-foreground transition-colors hover:border-foreground">
+        Add model
+      </button>
+    </span>
   )
 }
 

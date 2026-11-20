@@ -31,7 +31,7 @@ describe("scoped key round trip", () => {
     expect(stored).toEqual({ agentName: "Claude Code", model: "claude-opus-5-5", provider: "anthropic" });
     const looked = keyIdentityOf(row(stored));
     const spoof = new Headers({ "X-Agent-Name": "Someone Else", "X-Agent-Provider": "openai" });
-    expect(resolveIdentity(looked, spoof)).toEqual({
+    expect(resolveIdentity(looked, spoof)).toMatchObject({
       identity: { agentName: "Claude Code", agentId: "unknown", model: "claude-opus-5-5", provider: "anthropic" },
       identitySource: "key",
     });

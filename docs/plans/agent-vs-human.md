@@ -42,8 +42,30 @@ New pure fn `resolveIdentity(keyIdentity, headers)` in `activityLog.ts`:
 - Field set on the key: key wins, header ignored and not stored. `identitySource: "key"`.
 - Field not set on the key: header fills it (`"header"`, or `"profile"` when the CLI sends `X-Agent-Source: profile`).
 - Nothing anywhere: `"unknown"`, `identitySource: "none"`, shown as "Unknown agent".
-- Open: may a header add model detail? Proposal: only when the key's model is a prefix of the header value
-  (key `claude-sonnet`, header `claude-sonnet-5-5`). Agent name, id and provider never come from a header on a scoped key.
+- Model detail from a header on a scoped key: dropped. A model set on the key always wins (see Model identification).
+
+## Model identification (top requirement)
+
+"As long as we can identify the model, that's what I care about." Every agent action records a model whenever
+possible, by one pure function, `resolveModel` in `convex/agent/activityLog.ts`, used by both auto-logged routes
+(`dispatch.ts` via `resolveIdentity`) and `POST /agent/activity` (`sanitizeExternal`):
+
+1. **Key model.** The key carries a model (`jk keys create --model`, or Settings > CLI keys). It always wins; no
+   header or body can change it. `modelSource: "key"`.
+2. **`X-Agent-Model` header.** The key has no model. `jk` sends the header from `--model`, else `JK_AGENT_MODEL`
+   (flag beats env). Other clients set the header directly. `modelSource: "header"`.
+3. **`model` in the `POST /agent/activity` body.** Only for externally logged actions, only when 1 and 2 named none.
+   `modelSource: "body"`.
+4. **Nothing.** Stored as `"unknown"`, `modelSource: "none"`, shown as "Unknown model".
+
+Values are trimmed, secret-scrubbed and capped at 120 chars; blank values and the literal `unknown` count as unset.
+`modelSource` is an optional field on `agentActivityLog` (older rows have none and the UI falls back on the model).
+
+Where an unknown model shows, the UI points at the fix: "Name the model" on the feed row and By model row, a details
+panel note with `jk keys create --agent <name> --model <m> --provider <p>` (or `--model` / `JK_AGENT_MODEL`), and a
+banner above the feed once 10% or more of the rows have no model. Settings > CLI keys shows "No model · Add model" on
+keys without one, and the create form opens "Tie this key to an agent and model" with Model marked Recommended.
+`jk keys create` warns (does not fail) when `--model` is missing; `jk activity list/summary` print `unknown model`.
 
 ## 3. Key routes and `jk keys`
 

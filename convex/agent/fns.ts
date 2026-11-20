@@ -1129,6 +1129,7 @@ const identityArg = v.object({ agentName: v.string(), agentId: v.string(), model
 const rowMetaFields = {
   keyId: v.optional(v.id("agentApiKeys")),
   identitySource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("profile"), v.literal("none"))),
+  modelSource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("body"), v.literal("none"))),
   client: v.optional(v.string()),
 };
 
@@ -1176,6 +1177,7 @@ export const activityLog = internalMutation({
     outputTokens: v.optional(v.number()),
     costUsd: v.optional(v.number()),
     bodyHash: v.optional(v.string()),
+    model: v.optional(v.string()),
   },
   handler: async (ctx, { userId, identity, identityMeta, ...input }) => {
     const row = sanitizeExternal(identity, input, identityMeta ?? {});
@@ -1195,6 +1197,7 @@ export const activityLog = internalMutation({
       model: row.model,
       provider: row.provider,
       identitySource: row.identitySource ?? "none",
+      modelSource: row.modelSource ?? "none",
       actionType: row.actionType,
       status: row.status,
     };

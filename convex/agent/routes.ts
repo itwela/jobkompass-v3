@@ -388,6 +388,7 @@ export const agentRoutes: AgentRoute[] = [
       { name: "outputTokens", type: "number" },
       { name: "costUsd", type: "number" },
       { name: "bodyHash", type: "string", description: "sha256 hex of the body you sent, instead of the body" },
+      { name: "model", type: "string", description: "Model you ran on. Used only when the key and X-Agent-Model name none" },
     ],
     description:
       "Log an action you took OUTSIDE JobKompass (email sent, Slack message). Identity comes from X-Agent-Name/X-Agent-Id/X-Agent-Model/X-Agent-Provider (\"unknown\" if absent). Fields named body/content/token/password are rejected. Returns {id,timestamp,agentName,agentId,model,provider,actionType,status}",

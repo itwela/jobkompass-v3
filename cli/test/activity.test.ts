@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { agentHeaders, clientHeaders, keyIdentityBody } from "../src/agent";
+import { NO_MODEL_WARNING, agentHeaders, clientHeaders, keyIdentityBody, keyModelWarning } from "../src/agent";
 import { commands } from "../src/commands";
-import { agentLabel, formatOutput, identityNote } from "../src/output";
+import { agentLabel, formatOutput, identityNote, modelLabel } from "../src/output";
 import pkg from "../package.json";
 
 const find = (name: string) => commands.find((c) => c.name === name)!;
@@ -88,9 +88,11 @@ describe("keys list output", () => {
     { id: "k2", name: "old-ci", scoped: false, identity: null, createdAt: Date.UTC(2026, 7, 2) },
   ];
 
-  it("pretty: identity as one line, legacy keys say so, never a key", () => {
+  it("pretty: model column first, identity on one line, legacy keys say so, never a key", () => {
     const out = formatOutput(keys, false);
-    expect(out).toContain("Claude Code · claude-opus-5-5 · anthropic");
+    expect(out).toContain("claude-opus-5-5");
+    expect(out).toContain("Claude Code · anthropic");
+    expect(out).toContain("no model");
     expect(out).toContain("laptop (this key)");
     expect(out).toContain("none (agent reports its own)");
     expect(out).toContain("never");
@@ -166,5 +168,50 @@ describe("activity output", () => {
 
   it("machine mode is the raw JSON", () => {
     expect(JSON.parse(formatOutput(page, true))).toEqual(page);
+  });
+});
+
+describe("model identification (CLI side)", () => {
+  it("--model flag is sent as X-Agent-Model", () => {
+    expect(agentHeaders({ model: "claude-opus-5-5" }, {})["X-Agent-Model"]).toBe("claude-opus-5-5");
+  });
+  it("JK_AGENT_MODEL env var is sent when there is no flag", () => {
+    expect(agentHeaders({}, { JK_AGENT_MODEL: "gpt-5" })["X-Agent-Model"]).toBe("gpt-5");
+  });
+  it("the flag beats the env var", () => {
+    expect(agentHeaders({ model: "flag" }, { JK_AGENT_MODEL: "env" })["X-Agent-Model"]).toBe("flag");
+  });
+  it("blank / whitespace / non-latin1 values are not sent", () => {
+    expect(agentHeaders({ model: "   " }, {})).not.toHaveProperty("X-Agent-Model");
+    expect(agentHeaders({}, { JK_AGENT_MODEL: "" })).not.toHaveProperty("X-Agent-Model");
+    expect(agentHeaders({ model: "bad\nvalue" }, {})).not.toHaveProperty("X-Agent-Model");
+  });
+  it("keys create warns (does not fail) when --model is missing", () => {
+    expect(keyModelWarning(keyIdentityBody({ agent: "Claude Code" }))).toBe(NO_MODEL_WARNING);
+    expect(keyModelWarning(keyIdentityBody({ model: "  " }))).toBe(NO_MODEL_WARNING);
+    expect(keyModelWarning(keyIdentityBody({ agent: "A", model: "opus" }))).toBeUndefined();
+    expect(NO_MODEL_WARNING).toContain("Unknown model");
+    expect(NO_MODEL_WARNING).toContain("JK_AGENT_MODEL");
+  });
+  it("activity list shows a model column, 'unknown model' when missing", () => {
+    const out = formatOutput({ items: [
+      { timestamp: 0, agentName: "A", model: "unknown", actionType: "jobs.create", status: "success" },
+      { timestamp: 0, agentName: "B", model: "gpt-5", actionType: "jobs.create", status: "success" },
+    ], cursor: null, isDone: true }, false);
+    expect(out).toContain("model");
+    expect(out).toContain("unknown model");
+    expect(out).toContain("gpt-5");
+  });
+  it("activity summary says 'unknown model' and points to the fix", () => {
+    const g = { count: 2, success: 2, error: 0, successRate: 1, avgLatencyMs: null, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+    const out = formatOutput({ total: 2, truncated: false, byModel: [{ model: "unknown", provider: "unknown", ...g }], byActionType: [{ actionType: "a", ...g }], byModelAndAction: [{ model: "unknown", actionType: "a", ...g }] }, false);
+    expect(out).toContain("unknown model");
+    expect(out).toContain("2 action(s) have no model");
+  });
+  it("modelLabel", () => {
+    expect(modelLabel("opus")).toBe("opus");
+    expect(modelLabel("unknown")).toBe("unknown model");
+    expect(modelLabel(undefined)).toBe("unknown model");
+    expect(modelLabel(" ")).toBe("unknown model");
   });
 });

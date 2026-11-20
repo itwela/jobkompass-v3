@@ -38,7 +38,7 @@ const RESUME_QUESTIONS_WORKFLOW = {
 export const IDENTITY_DOC = {
   precedence: [
     "A key tied to an agent (created with an identity) names every call made with it. Request headers never override a field the key sets.",
-    "Exception: model detail. If the key's model is 'claude-sonnet' and X-Agent-Model is 'claude-sonnet-5-5', the row keeps the longer one.",
+    "Model: the key's model always wins; else X-Agent-Model (jk sends --model, then JK_AGENT_MODEL); else model in the POST /agent/activity body; else 'unknown'. Rows record modelSource: key | header | body | none.",
     "Fields the key does not set come from X-Agent-Name, X-Agent-Id, X-Agent-Model, X-Agent-Provider (self-reported).",
     "Nothing set anywhere: 'unknown' (shown as Unknown agent).",
   ],
@@ -171,8 +171,9 @@ function makeHandler(route: AgentRoute) {
     }
     const userId = key.userId;
     // The key's identity wins over anything the request says about itself.
-    const { identity, identitySource } = resolveIdentity(key.identity, request.headers);
-    const meta: RowMeta = { keyId: key.keyId, identitySource, client: clientFromHeaders(request.headers) };
+    // Model: key, else X-Agent-Model, else "unknown" (resolveModel); same rule for every route.
+    const { identity, identitySource, modelSource } = resolveIdentity(key.identity, request.headers);
+    const meta: RowMeta = { keyId: key.keyId, identitySource, modelSource, client: clientFromHeaders(request.headers) };
     const started = Date.now();
     let args: Record<string, unknown> = {};
     let result: unknown;

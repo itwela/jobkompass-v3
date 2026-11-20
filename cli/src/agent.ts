@@ -21,6 +21,14 @@ const HEADER = {
 export const UNSCOPED_KEY_NOTICE =
   "This key has no agent identity, so activity shows whatever the agent sends, or Unknown agent. Tie it to an agent in Settings > CLI keys, or create one with 'jk keys create --agent <name> --model <m> --provider <p>'.";
 
+export const NO_MODEL_WARNING =
+  "No model set; activity from this key will show Unknown model unless the agent sends X-Agent-Model / JK_AGENT_MODEL. Add one with --model <m>.";
+
+/** `jk keys create` warns (never fails) when the new key carries no model. */
+export function keyModelWarning(body: Record<string, string>): string | undefined {
+  return body.model ? undefined : NO_MODEL_WARNING;
+}
+
 /** Sent on every request so the activity log can show which client made a call (display only). */
 export function clientHeaders(version: string): Record<string, string> {
   return { "User-Agent": `jk/${version}` };
