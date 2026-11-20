@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { commands, parseList, type CommandSpec, type OptSpec } from "./commands";
 import { apiRequest, CliError } from "./client";
 import { emit } from "./output";
-import { agentHeaders } from "./agent";
+import { UNSCOPED_KEY_NOTICE, agentHeaders, clientHeaders, keyIdentityBody, keyModelWarning, type AgentFlags } from "./agent";
 import { resolveDate } from "./dates";
 import { configPath, deleteConfig, loadConfig, saveConfig } from "./config";
 import pkg from "../package.json";
@@ -19,9 +19,19 @@ program
   .option("--provider <p>", "Model provider, e.g. anthropic (env JK_AGENT_PROVIDER)")
   .version(pkg.version);
 
-function identityHeaders(): Record<string, string> {
+function identityFlags(): AgentFlags {
   const { agent, agentId, model, provider } = program.opts();
-  return agentHeaders({ agent, agentId, model, provider });
+  return { agent, agentId, model, provider };
+}
+
+function identityHeaders(): Record<string, string> {
+  return { ...clientHeaders(pkg.version), ...agentHeaders(identityFlags()) };
+}
+
+/** `jk auth status` / `login`: say so when the key does not name its agent. */
+function withKeyNotice(data: unknown): object {
+  const d = (data ?? {}) as { key?: { scoped?: boolean } };
+  return d.key && d.key.scoped === false ? { notice: UNSCOPED_KEY_NOTICE, ...d } : d;
 }
 
 function coerceOpt(spec: OptSpec, raw: unknown): unknown {
@@ -90,6 +100,12 @@ function register(spec: CommandSpec): void {
       const value = coerceOpt(opt, options[flagName]);
       if (value !== undefined) payload[opt.api] = value;
     }
+    if (spec.identityBody) {
+      const body = keyIdentityBody(identityFlags());
+      Object.assign(payload, body);
+      const warning = keyModelWarning(body);
+      if (warning) process.stderr.write(`warning: ${warning}\n`);
+    }
     try {
       const data =
         spec.method === "GET" || spec.method === "DELETE"
@@ -113,8 +129,8 @@ auth
   .action(async (key: string) => {
     saveConfig({ apiKey: key });
     try {
-      const data = await apiRequest("GET", "/agent/ping");
-      emit({ saved: true, ...(data as object) }, { json: Boolean(program.opts().json) });
+      const data = await apiRequest("GET", "/agent/ping", { headers: identityHeaders() });
+      emit({ saved: true, ...withKeyNotice(data) }, { json: Boolean(program.opts().json) });
     } catch (err) {
       deleteConfig();
       if (err instanceof CliError) fatal(err.code, `Key rejected: ${err.message}`, err.hint, err.exitCode);
@@ -126,8 +142,8 @@ auth
   .description("Verify the configured key")
   .action(async () => {
     try {
-      const data = await apiRequest("GET", "/agent/ping");
-      emit({ authenticated: true, baseUrl: loadConfig().baseUrl, ...(data as object) }, { json: Boolean(program.opts().json) });
+      const data = await apiRequest("GET", "/agent/ping", { headers: identityHeaders() });
+      emit({ authenticated: true, baseUrl: loadConfig().baseUrl, ...withKeyNotice(data) }, { json: Boolean(program.opts().json) });
     } catch (err) {
       if (err instanceof CliError) fatal(err.code, err.message, err.hint, err.exitCode);
       throw err;
@@ -147,7 +163,7 @@ program
   .description("Full machine-readable API surface (teach an agent everything in one call)")
   .action(async () => {
     try {
-      const data = await apiRequest("GET", "/agent/schema");
+      const data = await apiRequest("GET", "/agent/schema", { headers: identityHeaders() });
       emit(data, { json: true });
     } catch (err) {
       if (err instanceof CliError) fatal(err.code, err.message, err.hint, err.exitCode);

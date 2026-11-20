@@ -21,6 +21,10 @@ import {
   summarizeAgents,
   activityOverview,
   filterOptions,
+  resolveIdentity,
+  resolveModel,
+  IDENTITY_MAX,
+  clientFromHeaders,
   type SummaryRow,
   type AgentIdentity,
 } from "./activityLog";
@@ -363,5 +367,188 @@ describe("filterOptions", () => {
       { agentName: "Orbit", model: "opus", actionType: "b" },
     ]);
     expect(o).toEqual({ agents: ["Orbit", "Kepa"], models: ["gpt", "opus"], actionTypes: ["b", "a"] });
+  });
+});
+
+// ---- agent identity: the key beats the request ----
+
+describe("resolveIdentity", () => {
+  const scopedKey = { agentName: "Claude Code", agentId: "cc-laptop", model: "claude-opus-5-5", provider: "anthropic" };
+  const spoof = { "X-Agent-Name": "Totally Not Claude", "X-Agent-Id": "evil", "X-Agent-Model": "gpt-5", "X-Agent-Provider": "openai" };
+
+  it("key only: the key names the call", () => {
+    expect(resolveIdentity(scopedKey, headers({}))).toMatchObject({ identity: scopedKey, identitySource: "key" });
+  });
+
+  it("header only (legacy key): self-reported", () => {
+    expect(resolveIdentity(null, headers({ "X-Agent-Name": "Summit", "X-Agent-Model": "claude-opus-5-5" }))).toMatchObject({
+      identity: { agentName: "Summit", agentId: "unknown", model: "claude-opus-5-5", provider: "unknown" },
+      identitySource: "header",
+    });
+  });
+
+  it("both differ: every field the key sets wins; headers cannot override", () => {
+    expect(resolveIdentity(scopedKey, headers(spoof))).toMatchObject({ identity: scopedKey, identitySource: "key" });
+  });
+
+  it("the key's model always wins; a header cannot swap or extend it", () => {
+    const key = { agentName: "Claude Code", model: "claude-sonnet", provider: "anthropic" };
+    for (const m of ["claude-sonnet-5-5", "gpt-5", "claude"]) {
+      expect(resolveIdentity(key, headers({ "X-Agent-Model": m }))).toMatchObject({ identity: { model: "claude-sonnet" }, modelSource: "key" });
+    }
+  });
+
+  it("a field the key leaves empty is filled by the header; the key's fields still win", () => {
+    const key = { agentName: "Codex", provider: "openai" };
+    expect(resolveIdentity(key, headers(spoof))).toMatchObject({
+      identity: { agentName: "Codex", agentId: "evil", model: "gpt-5", provider: "openai" },
+      identitySource: "key",
+    });
+  });
+
+  it("nothing anywhere: unknown, source none", () => {
+    expect(resolveIdentity(null, headers({ "User-Agent": "jk/0.6.0" }))).toMatchObject({
+      identity: { agentName: "unknown", agentId: "unknown", model: "unknown", provider: "unknown" },
+      identitySource: "none",
+    });
+    expect(resolveIdentity({}, headers({})).identitySource).toBe("none");
+  });
+
+  it("X-Agent-Source: profile marks a self-reported identity from the CLI profile", () => {
+    expect(resolveIdentity(null, headers({ "X-Agent-Name": "Summit", "X-Agent-Source": "profile" })).identitySource).toBe("profile");
+    // a scoped key is still the source, whatever the request claims
+    expect(resolveIdentity(scopedKey, headers({ "X-Agent-Source": "profile" })).identitySource).toBe("key");
+    // the source header alone names nothing
+    expect(resolveIdentity(null, headers({ "X-Agent-Source": "profile" })).identitySource).toBe("none");
+  });
+
+  it("blank key fields count as unset", () => {
+    expect(resolveIdentity({ agentName: "   ", model: "" }, headers({ "X-Agent-Name": "Summit" }))).toMatchObject({
+      identity: { agentName: "Summit" },
+      identitySource: "header",
+    });
+  });
+});
+
+
+describe("clientFromHeaders", () => {
+  it("keeps a short User-Agent for display and caps it", () => {
+    expect(clientFromHeaders(headers({ "User-Agent": "jk/0.6.0" }))).toBe("jk/0.6.0");
+    expect(clientFromHeaders(headers({ "User-Agent": "x".repeat(300) }))!.length).toBeLessThanOrEqual(80);
+    expect(clientFromHeaders(headers({}))).toBeUndefined();
+  });
+});
+
+describe("row meta (keyId, identitySource, client)", () => {
+  const route = { method: "POST", path: "/agent/jobs", description: "Add a job" };
+
+  it("automatic rows store the key id, source and client", () => {
+    const row = automaticRow(summit, route, {}, { latencyMs: 3 }, { keyId: "k1", identitySource: "key", client: "jk/0.6.0" });
+    expect(row).toMatchObject({ keyId: "k1", identitySource: "key", client: "jk/0.6.0", agentName: "Summit" });
+  });
+
+  it("external rows store them too", () => {
+    const row = sanitizeExternal(summit, { actionType: "email_sent", summary: "Sent" }, { keyId: "k2", identitySource: "header" });
+    expect(row).toMatchObject({ keyId: "k2", identitySource: "header" });
+  });
+
+  it("unknown sources are dropped, not stored", () => {
+    const row = automaticRow(summit, route, {}, { latencyMs: 3 }, { identitySource: "admin" as never });
+    expect(row.identitySource).toBeUndefined();
+  });
+
+  it("old rows without meta still aggregate and filter", () => {
+    const old = { agentName: "unknown", agentId: "unknown", model: "unknown", provider: "unknown", actionType: "jobs.create", status: "success" as const };
+    expect(summarizeAgents([old])[0]).toMatchObject({ agentName: "unknown", count: 1 });
+    expect(matchesFilter(old, { agent: "unknown" })).toBe(true);
+  });
+
+  it("keys routes are logged as keys.create / keys.delete; listing is not logged", () => {
+    expect(actionTypeFor({ method: "POST", path: "/agent/keys" })).toBe("keys.create");
+    expect(actionTypeFor({ method: "DELETE", path: "/agent/keys" })).toBe("keys.delete");
+    expect(shouldAutoLog({ method: "GET", path: "/agent/keys" })).toBe(false);
+  });
+
+  it("a created key's row targets the key id and never holds the plaintext key", () => {
+    const keysRoute = agentRoutes.find((r) => r.method === "POST" && r.path === "/agent/keys")!;
+    const plaintext = "jk_sk_" + "a1".repeat(24);
+    const row = automaticRow(summit, keysRoute, { name: "laptop", agentName: "Claude Code" }, { result: { id: "key123", key: plaintext, name: "laptop" }, latencyMs: 9 });
+    expect(row.target).toBe("key123");
+    expect(JSON.stringify(row)).not.toContain(plaintext);
+  });
+});
+
+describe("resolveModel (model identification)", () => {
+  it("key model wins over header and body", () => {
+    expect(resolveModel({ key: "claude-opus-5-5", header: "gpt-5", body: "x" })).toEqual({ model: "claude-opus-5-5", modelSource: "key" });
+  });
+  it("header fills when the key has no model", () => {
+    expect(resolveModel({ header: "gpt-5" })).toEqual({ model: "gpt-5", modelSource: "header" });
+    expect(resolveModel({ key: "", header: "gpt-5" })).toEqual({ model: "gpt-5", modelSource: "header" });
+  });
+  it("body fills only when key and header are both empty", () => {
+    expect(resolveModel({ body: "gemini-3" })).toEqual({ model: "gemini-3", modelSource: "body" });
+    expect(resolveModel({ header: "gpt-5", body: "gemini-3" }).modelSource).toBe("header");
+  });
+  it("neither: unknown, source none", () => {
+    expect(resolveModel({})).toEqual({ model: "unknown", modelSource: "none" });
+    expect(resolveModel({ key: null, header: undefined, body: 42 })).toEqual({ model: "unknown", modelSource: "none" });
+  });
+  it("blank and whitespace values count as unset", () => {
+    expect(resolveModel({ key: "   ", header: "\t\n", body: " " })).toEqual({ model: "unknown", modelSource: "none" });
+    expect(resolveModel({ key: "  ", header: "  gpt-5  " })).toEqual({ model: "gpt-5", modelSource: "header" });
+  });
+  it("a literal 'unknown' does not count as a model", () => {
+    expect(resolveModel({ key: "unknown", header: "gpt-5" })).toEqual({ model: "gpt-5", modelSource: "header" });
+  });
+  it("oversized values are capped at IDENTITY_MAX", () => {
+    const r = resolveModel({ header: "model x ".repeat(80) });
+    expect(r.modelSource).toBe("header");
+    expect(r.model.length).toBe(IDENTITY_MAX);
+  });
+  it("secrets in a model value are scrubbed", () => {
+    expect(resolveModel({ header: "Bearer abcdefghijklmnop" }).model).toBe("[redacted]");
+  });
+});
+
+describe("model source through resolveIdentity (automatic routes)", () => {
+  const h = (o: Record<string, string>) => ({ get: (n: string) => o[Object.keys(o).find((k) => k.toLowerCase() === n.toLowerCase()) ?? ""] ?? null });
+  it("scoped key with a model: key", () => {
+    expect(resolveIdentity({ agentName: "A", model: "opus" }, h({ "X-Agent-Model": "gpt" }))).toMatchObject({ identity: { model: "opus" }, modelSource: "key" });
+  });
+  it("scoped key without a model: header fills the model", () => {
+    expect(resolveIdentity({ agentName: "A" }, h({ "X-Agent-Model": "gpt-5" }))).toMatchObject({ identity: { agentName: "A", model: "gpt-5" }, identitySource: "key", modelSource: "header" });
+  });
+  it("legacy key (no identity) with header: header", () => {
+    expect(resolveIdentity(null, h({ "X-Agent-Model": "gpt-5" }))).toMatchObject({ identity: { model: "gpt-5" }, modelSource: "header" });
+  });
+  it("legacy key, nothing sent: unknown / none", () => {
+    expect(resolveIdentity(null, h({}))).toMatchObject({ identity: { model: "unknown" }, modelSource: "none" });
+  });
+  it("automaticRow stores the model and its source", () => {
+    const { identity, modelSource } = resolveIdentity(null, h({ "X-Agent-Model": "gpt-5" }));
+    const row = automaticRow(identity, { method: "POST", path: "/agent/jobs", description: "d" }, {}, { latencyMs: 1 }, { modelSource });
+    expect(row).toMatchObject({ model: "gpt-5", modelSource: "header" });
+  });
+});
+
+describe("model source on POST /agent/activity (sanitizeExternal)", () => {
+  const unk = { agentName: "unknown", agentId: "unknown", model: "unknown", provider: "unknown" };
+  const input = { actionType: "email_sent", summary: "sent" };
+  it("same rule as automatic rows: key/header model is kept and the body is ignored", () => {
+    const r = sanitizeExternal({ ...unk, model: "opus" }, { ...input, model: "gpt" }, { modelSource: "key" });
+    expect(r).toMatchObject({ model: "opus", modelSource: "key" });
+    const h = sanitizeExternal({ ...unk, model: "gpt-5" }, { ...input, model: "x" }, { modelSource: "header" });
+    expect(h).toMatchObject({ model: "gpt-5", modelSource: "header" });
+  });
+  it("body model fills when neither key nor header named one", () => {
+    expect(sanitizeExternal(unk, { ...input, model: " gemini-3 " }, { modelSource: "none" })).toMatchObject({ model: "gemini-3", modelSource: "body" });
+  });
+  it("nothing anywhere: unknown / none", () => {
+    expect(sanitizeExternal(unk, input, { modelSource: "none" })).toMatchObject({ model: "unknown", modelSource: "none" });
+    expect(sanitizeExternal(unk, { ...input, model: "   " }, {})).toMatchObject({ model: "unknown", modelSource: "none" });
+  });
+  it("rejects an unknown modelSource value", () => {
+    expect(sanitizeExternal({ ...unk, model: "m" }, input, { modelSource: "bogus" as never }).modelSource).toBeUndefined();
   });
 });

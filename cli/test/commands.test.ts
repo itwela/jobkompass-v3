@@ -3,6 +3,28 @@ import { commands, parseList } from "../src/commands";
 
 const find = (name: string) => commands.find((c) => c.name === name);
 
+describe("keys commands", () => {
+  it("map to the /agent/keys routes", () => {
+    expect(find("keys create")).toMatchObject({ method: "POST", path: "/agent/keys", identityBody: true });
+    expect(find("keys list")).toMatchObject({ method: "GET", path: "/agent/keys" });
+    expect(find("keys revoke")).toMatchObject({ method: "DELETE", path: "/agent/keys", confirm: true });
+  });
+
+  it("create takes --name; identity comes from the global --agent/--model/--provider/--agent-id flags", () => {
+    expect(find("keys create")!.opts).toEqual([{ flag: "--name <name>", api: "name", type: "str", desc: "e.g. laptop (default cli)" }]);
+  });
+
+  it("revoke requires --id and takes --self", () => {
+    const opts = find("keys revoke")!.opts;
+    expect(opts.find((o) => o.api === "id")).toMatchObject({ flag: "--id <id>", required: true });
+    expect(opts.find((o) => o.api === "self")).toMatchObject({ flag: "--self", type: "bool" });
+  });
+
+  it("list sends nothing", () => {
+    expect(find("keys list")!.opts).toEqual([]);
+  });
+});
+
 describe("resume question commands", () => {
   it("registers questions, answer and tailor against the right routes", () => {
     expect(find("resumes questions")).toMatchObject({ method: "GET", path: "/agent/resumes/questions" });

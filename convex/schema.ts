@@ -362,12 +362,18 @@ const schema = defineSchema({
     createdAt: v.number(),
     lastUsedAt: v.optional(v.number()),
     revokedAt: v.optional(v.number()),
+    // Optional identity: activity made with this key is named by these, never by request headers.
+    // Legacy keys have none and keep working (the agent reports its own identity).
+    agentName: v.optional(v.string()),
+    agentId: v.optional(v.string()),
+    model: v.optional(v.string()),
+    provider: v.optional(v.string()),
   })
     .index("by_hash", ["keyHash"])
     .index("by_user", ["userId"]),
 
   // What agents did through the Agent API (automatic) or outside it (POST /agent/activity).
-  // Identity comes from X-Agent-* headers; "unknown" when not sent. Never bodies or secrets.
+  // Identity comes from the key when it carries one, else X-Agent-* headers; "unknown" when neither. Never bodies or secrets.
   agentActivityLog: defineTable({
     userId: v.string(),
     timestamp: v.number(),
@@ -387,6 +393,12 @@ const schema = defineSchema({
     outputTokens: v.optional(v.number()),
     costUsd: v.optional(v.number()),
     bodyHash: v.optional(v.string()),
+    // How the identity was decided. Optional: rows from before scoped keys have none.
+    keyId: v.optional(v.id("agentApiKeys")),
+    identitySource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("profile"), v.literal("none"))),
+    // Where the model came from (resolveModel). Optional: older rows have none.
+    modelSource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("body"), v.literal("none"))),
+    client: v.optional(v.string()), // truncated User-Agent, display only
   })
     .index("by_user_time", ["userId", "timestamp"])
     .index("by_user_agent", ["userId", "agentName", "timestamp"])

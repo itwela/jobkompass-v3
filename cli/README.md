@@ -80,6 +80,24 @@ API keys, long hex/base64 strings, `password=...`) are replaced with `[redacted]
 `list` returns `{items, cursor, isDone}`; pass `--cursor` for the next page. The filters carry a `filter-` prefix
 because `--agent`, `--agent-id` and `--model` are the identity flags.
 
+## Keys tied to an agent
+Flags and env vars are self-reported. To make the name stick, give each agent its own key with an identity. Every call
+made with that key is logged under that identity, and request headers can't override it.
+
+The model on each action comes from: the key's model, else `--model` / `JK_AGENT_MODEL` (sent as `X-Agent-Model`),
+else `model` in a raw `POST /agent/activity` body, else `unknown model`. `jk keys create` warns when `--model` is missing.
+
+    jk keys create --name laptop --agent "Claude Code" --model claude-opus-5-5 --provider anthropic [--agent-id cc-laptop]
+    jk keys list                       # name, identity, created, last used. Never the key itself
+    jk keys revoke --id <id> --yes     # add --self to revoke the key this CLI is using
+
+The new key is printed once. A key tied to an agent can't create keys, so a leaked agent key can't make more.
+You can also create keys and edit their identity in JobKompass under Settings → CLI keys. Editing an identity doesn't
+change past activity. `jk auth status` warns when the configured key has no identity.
+
+Each row records where its identity came from (`identitySource`: `key`, `header` or `none`), the key's name, and the
+client (`jk/0.6.0`).
+
 ## Resume questions: never invent a number
 Strong bullets carry numbers. Only the human knows them, so the API asks instead of guessing.
 

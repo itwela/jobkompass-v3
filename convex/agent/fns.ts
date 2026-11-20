@@ -12,6 +12,7 @@ import { setResumeShared } from "../resumeShares";
 import { foldersWithCounts } from "../documentFolders";
 import { executeCoverLetterMove, executeResumeMove } from "./resumeMove";
 import { INVALID_ACTIVITY, SUMMARY_SCAN_CAP, parseTime, sanitizeExternal, summarize, withoutUndefined } from "./activityLog";
+import { isScoped, keyIdentityOf } from "./keyIdentity";
 import { tailoringValidator } from "../tailoring";
 import { exportResumePdf } from "./resumePdf";
 import { canUseResumeTemplate, isValidResumeTemplateId, resolveResumeTemplateId } from "../../lib/templates";
@@ -1125,6 +1126,13 @@ export const interviewPrepsRemove = internalMutation({
 
 const identityArg = v.object({ agentName: v.string(), agentId: v.string(), model: v.string(), provider: v.string() });
 
+const rowMetaFields = {
+  keyId: v.optional(v.id("agentApiKeys")),
+  identitySource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("profile"), v.literal("none"))),
+  modelSource: v.optional(v.union(v.literal("key"), v.literal("header"), v.literal("body"), v.literal("none"))),
+  client: v.optional(v.string()),
+};
+
 const activityRowArg = v.object({
   agentName: v.string(),
   agentId: v.string(),
@@ -1142,6 +1150,7 @@ const activityRowArg = v.object({
   outputTokens: v.optional(v.number()),
   costUsd: v.optional(v.number()),
   bodyHash: v.optional(v.string()),
+  ...rowMetaFields,
 });
 
 /** Automatic log row written by dispatch.ts after a write route (sanitized there by automaticRow). */
@@ -1157,6 +1166,7 @@ export const activityLog = internalMutation({
   args: {
     userId: v.string(),
     identity: identityArg,
+    identityMeta: v.optional(v.object(rowMetaFields)),
     actionType: v.string(),
     summary: v.string(),
     target: v.optional(v.string()),
@@ -1167,11 +1177,18 @@ export const activityLog = internalMutation({
     outputTokens: v.optional(v.number()),
     costUsd: v.optional(v.number()),
     bodyHash: v.optional(v.string()),
+    model: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, identity, ...input }) => {
-    const row = sanitizeExternal(identity, input);
+  handler: async (ctx, { userId, identity, identityMeta, ...input }) => {
+    const row = sanitizeExternal(identity, input, identityMeta ?? {});
     const timestamp = Date.now();
-    const id = await ctx.db.insert("agentActivityLog", { ...withoutUndefined(row), userId, timestamp });
+    const { keyId: _keyId, ...rest } = withoutUndefined(row);
+    const id = await ctx.db.insert("agentActivityLog", {
+      ...rest,
+      ...(identityMeta?.keyId ? { keyId: identityMeta.keyId } : {}),
+      userId,
+      timestamp,
+    });
     return {
       id,
       timestamp,
@@ -1179,6 +1196,8 @@ export const activityLog = internalMutation({
       agentId: row.agentId,
       model: row.model,
       provider: row.provider,
+      identitySource: row.identitySource ?? "none",
+      modelSource: row.modelSource ?? "none",
       actionType: row.actionType,
       status: row.status,
     };
@@ -1243,12 +1262,28 @@ export function activityOut(r: Doc<"agentActivityLog">) {
   return { id: _id, ...rest };
 }
 
+/**
+ * Per row, the current name of the key it was made with and whether that key carries an identity
+ * now (read at display time; rows store only the key id). Only the user's own keys are named.
+ */
+export async function keyInfoFor(ctx: QueryCtx, userId: string, rows: { keyId?: Id<"agentApiKeys"> }[]) {
+  const cache = new Map<string, { keyName: string; keyScoped: boolean } | null>();
+  for (const r of rows) {
+    if (!r.keyId || cache.has(r.keyId)) continue;
+    const key = await ctx.db.get(r.keyId);
+    cache.set(r.keyId, key && key.userId === userId ? { keyName: key.name, keyScoped: isScoped(keyIdentityOf(key)) } : null);
+  }
+  return (r: { keyId?: Id<"agentApiKeys"> }) => (r.keyId ? cache.get(r.keyId) ?? null : null);
+}
+
 export const activityList = internalQuery({
   args: { ...activityFilterArgs, limit: v.optional(v.number()), cursor: v.optional(v.string()) },
   handler: async (ctx, { limit, cursor, ...f }) => {
     const numItems = Math.min(200, Math.max(1, Math.floor(limit ?? 50)));
     const page = await activityQuery(ctx, f).paginate({ numItems, cursor: cursor ?? null });
-    return { items: page.page.map(activityOut), cursor: page.isDone ? null : page.continueCursor, isDone: page.isDone };
+    const keyOf = await keyInfoFor(ctx, f.userId, page.page);
+    const items = page.page.map((r) => ({ ...activityOut(r), keyName: keyOf(r)?.keyName }));
+    return { items, cursor: page.isDone ? null : page.continueCursor, isDone: page.isDone };
   },
 });
 

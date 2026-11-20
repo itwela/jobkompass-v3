@@ -1,6 +1,7 @@
 import { internal } from "../_generated/api";
 import type { GenericActionCtx } from "convex/server";
-import type { DataModel } from "../_generated/dataModel";
+import type { DataModel, Id } from "../_generated/dataModel";
+import type { KeyIdentity } from "./keyIdentity";
 import { sha256Hex } from "./keys";
 import { rankLabel, type PlanRank } from "../plans";
 
@@ -15,11 +16,20 @@ export class AgentError extends Error {
   }
 }
 
+/** The key a request authenticated with. identity is null for a legacy key (no identity set). */
+export type AuthedKey = {
+  userId: string;
+  keyId: Id<"agentApiKeys">;
+  keyName: string;
+  identity: KeyIdentity | null;
+  scoped: boolean;
+};
+
 export async function authenticate(
   ctx: GenericActionCtx<DataModel>,
   request: Request,
   opts?: { requireRank?: PlanRank }
-): Promise<string> {
+): Promise<AuthedKey> {
   const header = request.headers.get("Authorization") ?? "";
   const key = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!key) {
@@ -51,5 +61,5 @@ export async function authenticate(
     }
   }
 
-  return match.userId;
+  return { userId: match.userId, keyId: match.keyId, keyName: match.keyName, identity: match.identity, scoped: match.identity !== null };
 }

@@ -77,6 +77,67 @@ export function identityFromHeaders(headers: { get(name: string): string | null 
   };
 }
 
+/** Where a row's identity came from: the key, the request headers, the CLI's saved profile, or nowhere. */
+export type IdentitySource = "key" | "header" | "profile" | "none";
+export const IDENTITY_SOURCES: IdentitySource[] = ["key", "header", "profile", "none"];
+
+/** The CLI sends `X-Agent-Source: profile` when the identity came from a saved profile, not a flag or env. */
+export const IDENTITY_SOURCE_HEADER = "X-Agent-Source";
+export const CLIENT_MAX = 80;
+
+/** Where a row's model came from: the key, the request (X-Agent-Model header, or `model` in the POST /agent/activity body), or nowhere. */
+export type ModelSource = "key" | "header" | "body" | "none";
+export const MODEL_SOURCES: ModelSource[] = ["key", "header", "body", "none"];
+
+/**
+ * Model identification: the one rule every agent action uses (automatic rows and POST /agent/activity).
+ *   1. the key's model, when the key sets one. It always wins; the request cannot change it.
+ *   2. else the X-Agent-Model header (the CLI sends --model, then JK_AGENT_MODEL).
+ *   3. else `model` in the POST /agent/activity body.
+ *   4. else "unknown", source "none".
+ * Each value is trimmed, secret-scrubbed and capped at IDENTITY_MAX; a blank value counts as unset.
+ */
+export function resolveModel(input: { key?: unknown; header?: unknown; body?: unknown }): { model: string; modelSource: ModelSource } {
+  const key = clean(input.key, IDENTITY_MAX);
+  if (key && key !== UNKNOWN) return { model: key, modelSource: "key" };
+  const header = clean(input.header, IDENTITY_MAX);
+  if (header && header !== UNKNOWN) return { model: header, modelSource: "header" };
+  const body = clean(input.body, IDENTITY_MAX);
+  if (body && body !== UNKNOWN) return { model: body, modelSource: "body" };
+  return { model: UNKNOWN, modelSource: "none" };
+}
+
+/**
+ * Who made the call. Per field: the key's value when it sets one (headers never override it), else
+ * the header, else "unknown". The model follows resolveModel and its source is returned as modelSource.
+ * identitySource is "key" for any key that carries an identity, else "header" / "profile" when a
+ * header named something, else "none".
+ */
+export function resolveIdentity(
+  key: Partial<AgentIdentity> | null | undefined,
+  headers: { get(name: string): string | null }
+): { identity: AgentIdentity; identitySource: IdentitySource; modelSource: ModelSource } {
+  const sent = identityFromHeaders(headers);
+  const fromKey = (f: keyof AgentIdentity) => clean(key?.[f], IDENTITY_MAX);
+  const scoped = (["agentName", "agentId", "model", "provider"] as const).some((f) => fromKey(f));
+  const pick = (f: keyof AgentIdentity): string => fromKey(f) ?? sent[f];
+  const { model, modelSource } = resolveModel({ key: key?.model, header: headers.get(IDENTITY_HEADERS.model) });
+  const identity: AgentIdentity = { agentName: pick("agentName"), agentId: pick("agentId"), model, provider: pick("provider") };
+  if (scoped) return { identity, identitySource: "key", modelSource };
+  const anySent = Object.values(sent).some((v) => v !== UNKNOWN);
+  if (!anySent) return { identity, identitySource: "none", modelSource };
+  const profile = (headers.get(IDENTITY_SOURCE_HEADER) ?? "").trim().toLowerCase() === "profile";
+  return { identity, identitySource: profile ? "profile" : "header", modelSource };
+}
+
+/** The caller's User-Agent, trimmed, for display only (e.g. "jk/0.6.0"). */
+export function clientFromHeaders(headers: { get(name: string): string | null }): string | undefined {
+  return clean(headers.get("User-Agent") ?? undefined, CLIENT_MAX);
+}
+
+/** What every row records about how it was made, besides the identity itself. */
+export type RowMeta = { keyId?: string; identitySource?: IdentitySource; modelSource?: ModelSource; client?: string };
+
 /** Keys of a raw request body that are forbidden (case-insensitive). */
 export function forbiddenFields(raw: Record<string, unknown>): string[] {
   return Object.keys(raw).filter((k) => FORBIDDEN_FIELDS.includes(k.toLowerCase()));
@@ -131,9 +192,11 @@ export type ActivityInput = {
   outputTokens?: number;
   costUsd?: number;
   bodyHash?: string;
+  /** Self-reported model; used only when neither the key nor X-Agent-Model names one. */
+  model?: string;
 };
 
-export type ActivityRow = AgentIdentity & {
+export type ActivityRow = AgentIdentity & RowMeta & {
   actionType: string;
   source: "api" | "external";
   route?: string;
@@ -159,7 +222,7 @@ function nonNegative(name: string, v: number | undefined, integer: boolean): num
 }
 
 /** Validate + redact an externally reported action. Throws INVALID_ACTIVITY errors. */
-export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput): ActivityRow {
+export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput, meta: RowMeta = {}): ActivityRow {
   const actionType = input.actionType.trim().toLowerCase();
   if (!ACTION_TYPE_RE.test(actionType)) {
     throw new Error(`${INVALID_ACTIVITY}actionType must be 1-64 chars of a-z, 0-9, _ . - (e.g. email_sent)`);
@@ -173,8 +236,18 @@ export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput):
     bodyHash = input.bodyHash.trim().toLowerCase();
     if (!BODY_HASH_RE.test(bodyHash)) throw new Error(`${INVALID_ACTIVITY}bodyHash must be a sha256 hex digest (64 hex chars)`);
   }
+  // Body model fills in only when the key and header named none (resolveModel step 3).
+  let model = identity.model;
+  let modelSource = meta.modelSource;
+  if ((modelSource === undefined || modelSource === "none") && model === UNKNOWN) {
+    const r = resolveModel({ body: input.model });
+    model = r.model;
+    modelSource = r.modelSource;
+  }
   return {
     ...identity,
+    model,
+    ...metaOf({ ...meta, modelSource }),
     actionType,
     source: "external",
     target: clean(input.target, TARGET_MAX),
@@ -189,15 +262,27 @@ export function sanitizeExternal(identity: AgentIdentity, input: ActivityInput):
   };
 }
 
+/** Only known sources; client cleaned again (it is display text from a header). */
+function metaOf(meta: RowMeta): RowMeta {
+  return {
+    keyId: meta.keyId,
+    identitySource: meta.identitySource && IDENTITY_SOURCES.includes(meta.identitySource) ? meta.identitySource : undefined,
+    modelSource: meta.modelSource && MODEL_SOURCES.includes(meta.modelSource) ? meta.modelSource : undefined,
+    client: clean(meta.client, CLIENT_MAX),
+  };
+}
+
 /** Build the row for an automatic (API route) log. */
 export function automaticRow(
   identity: AgentIdentity,
   route: { method: string; path: string; description: string },
   args: Record<string, unknown>,
-  outcome: { result?: unknown; error?: string; latencyMs: number }
+  outcome: { result?: unknown; error?: string; latencyMs: number },
+  meta: RowMeta = {}
 ): ActivityRow {
   return {
     ...identity,
+    ...metaOf(meta),
     actionType: actionTypeFor(route),
     source: "api",
     route: `${route.method} ${route.path}`,

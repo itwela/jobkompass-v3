@@ -18,6 +18,8 @@ export type CommandSpec = {
   confirm?: boolean;
   /** What a move result counts, for the pretty summary line (default "resume"). */
   itemNoun?: string;
+  /** Send the global --agent/--agent-id/--model/--provider flags in the body as the key's identity. */
+  identityBody?: boolean;
 };
 
 /** "--ids a, b,,c" -> ["a","b","c"] (trimmed, empties and duplicates dropped). */
@@ -295,6 +297,17 @@ export const commands: CommandSpec[] = [
     ] },
   { name: "activity summary", desc: "Counts, success rate and avg latency by model and action type", method: "GET", path: "/agent/activity/summary",
     opts: activityFilterOpts },
+
+  // CLI keys. The key is printed once on create; a key tied to an agent cannot create keys.
+  { name: "keys create", desc: "Create a CLI key. Tie it to an agent with --agent, --model, --provider [--agent-id]; activity from it always shows that agent. The key is shown once",
+    method: "POST", path: "/agent/keys", identityBody: true,
+    opts: [{ flag: "--name <name>", api: "name", type: "str", desc: "e.g. laptop (default cli)" }] },
+  { name: "keys list", desc: "List your CLI keys: name, identity, created, last used (never the key itself)", method: "GET", path: "/agent/keys", opts: [] },
+  { name: "keys revoke", desc: "Revoke one of your CLI keys", method: "DELETE", path: "/agent/keys", confirm: true,
+    opts: [
+      { flag: "--id <id>", api: "id", type: "str", required: true },
+      { flag: "--self", api: "self", type: "bool", desc: "Allow revoking the key this CLI is using" },
+    ] },
 
   // threads (read-only)
   { name: "threads list", desc: "List AI chat threads", method: "GET", path: "/agent/threads", opts: [] },
