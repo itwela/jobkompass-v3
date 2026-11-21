@@ -444,6 +444,12 @@ export const promoteToJob = mutation({
       link: lead.rawSnippet.startsWith("http") ? lead.rawSnippet : "",
       status: "Interested",
       resumeUsed: lead.draftResumeId ? String(lead.draftResumeId) : undefined,
+      source: {
+        kind: "gmail",
+        inbox: (await ctx.db.get(lead.sourceAccountId))?.email,
+        sender: lead.senderEmail,
+        received: new Date(lead.createdAt).toISOString().slice(0, 10),
+      },
     });
 
     await ctx.db.patch(args.leadId, { status: "promoted" as const, promotedAt: Date.now(), updatedAt: Date.now() });

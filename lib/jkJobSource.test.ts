@@ -42,3 +42,38 @@ describe("jobSource", () => {
     expect(s.sender).toBe("Anurag Mohan <anurag.m@saxonglobal.com>")
   })
 })
+
+import { buildJobSource, deriveJobSource } from "./jkJobSource"
+
+describe("buildJobSource (stored on new jobs)", () => {
+  it("fills an email job from the link and notes when the caller says nothing", () => {
+    const s = buildJobSource({ link: "https://mail.google.com/mail/u/0/#all/1", notes: "deanandnostrand@gmail.com, 2026-11-20 4:34 PM ET, Jane Doe <jane@agency.com>" })
+    expect(s).toEqual({ kind: "gmail", inbox: "deanandnostrand@gmail.com", sender: "Jane Doe <jane@agency.com>", received: "2026-11-20 4:34 PM ET", url: "https://mail.google.com/mail/u/0/#all/1" })
+  })
+
+  it("lets the caller's details win and names the app from the link", () => {
+    const s = buildJobSource({ link: "https://outlook.cloud.microsoft/mail/x", notes: "" }, { kind: "email", inbox: "iibomu@wgu.edu", sender: "Utkarsh <u@g.com>", received: "Nov 19" })
+    expect(s).toMatchObject({ kind: "outlook", inbox: "iibomu@wgu.edu", sender: "Utkarsh <u@g.com>", received: "Nov 19" })
+  })
+
+  it("keeps an email from a posting link as email, with the posting to open", () => {
+    const s = buildJobSource({ link: "https://jobs.lever.co/acme/1" }, { kind: "email", inbox: "me@gmail.com" })
+    expect(s).toEqual({ kind: "email", inbox: "me@gmail.com", url: "https://jobs.lever.co/acme/1" })
+  })
+
+  it("marks extension saves with the site", () => {
+    expect(buildJobSource({ link: "https://www.linkedin.com/jobs/view/1" }, { kind: "extension" })).toMatchObject({ kind: "extension", site: "LinkedIn", host: "linkedin.com" })
+  })
+
+  it("never stores undefined fields", () => {
+    const s = buildJobSource({ link: "" })
+    expect(s).toEqual({ kind: "none" })
+    expect(Object.values(buildJobSource({ link: "https://x.com/j" })).every((v) => v !== undefined)).toBe(true)
+  })
+
+  it("prefers a stored source over reading the link", async () => {
+    const { jobSource } = await import("./jkJobSource")
+    expect(jobSource({ link: "https://mail.google.com/x", source: { kind: "extension" } }).kind).toBe("extension")
+    expect(deriveJobSource({ link: "https://mail.google.com/x" }).kind).toBe("gmail")
+  })
+})

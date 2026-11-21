@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { nextStatusHistory } from "./jobStatusHistory";
+import { jobSourceInputValidator } from "./jobSourceValidator";
+import { buildJobSource } from "../lib/jkJobSource";
 
 const PLAN_LIMITS: Record<string, number | null> = {
   free: 10,
@@ -210,6 +212,8 @@ export const add = mutation({
     resumeUsed: v.optional(v.string()),
     coverLetterUsed: v.optional(v.string()),
     notes: v.optional(v.string()),
+    /** Where the job came from; the link and notes fill anything left out. */
+    source: v.optional(jobSourceInputValidator),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -225,6 +229,7 @@ export const add = mutation({
     return await ctx.db.insert("jobs", {
       userId: convexUserId, // Use convex_user_id as the sole identifier
       ...args,
+      source: buildJobSource(args, args.source),
       statusHistory: nextStatusHistory(undefined, undefined, args.status, now) ?? undefined,
       createdAt: now,
       updatedAt: now,
@@ -335,6 +340,8 @@ export const addInternal = internalMutation({
     resumeUsed: v.optional(v.string()),
     coverLetterUsed: v.optional(v.string()),
     notes: v.optional(v.string()),
+    /** Where the job came from; the link and notes fill anything left out. */
+    source: v.optional(jobSourceInputValidator),
   },
   handler: async (ctx, args) => {
     // userId must be the convex_user_id
@@ -344,6 +351,7 @@ export const addInternal = internalMutation({
     return await ctx.db.insert("jobs", {
       userId, // Use convex_user_id as the sole identifier
       ...jobData,
+      source: buildJobSource(jobData, jobData.source),
       statusHistory: nextStatusHistory(undefined, undefined, jobData.status, now) ?? undefined,
       createdAt: now,
       updatedAt: now,
@@ -370,6 +378,8 @@ export const addForAgent = mutation({
     resumeUsed: v.optional(v.string()),
     coverLetterUsed: v.optional(v.string()),
     notes: v.optional(v.string()),
+    /** Where the job came from; the link and notes fill anything left out. */
+    source: v.optional(jobSourceInputValidator),
   },
   handler: async (ctx, args) => {
     // Note: This is a special mutation for the agent
@@ -380,6 +390,7 @@ export const addForAgent = mutation({
     return await ctx.db.insert("jobs", {
       userId, // Use convex_user_id as the sole identifier
       ...jobData,
+      source: buildJobSource(jobData, jobData.source),
       statusHistory: nextStatusHistory(undefined, undefined, jobData.status, now) ?? undefined,
       createdAt: now,
       updatedAt: now,
@@ -387,3 +398,22 @@ export const addForAgent = mutation({
   },
 });
 
+
+/**
+ * One-off: store `source` on jobs saved before it existed, read from their link and notes.
+ * Skips jobs that already have one. Run per batch until `remaining` is 0:
+ *   npx convex run jobs:backfillSource '{"cursor": null}'
+ */
+export const backfillSource = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db.query("jobs").paginate({ cursor, numItems: 200 });
+    let patched = 0;
+    for (const job of page.page) {
+      if (job.source) continue;
+      await ctx.db.patch(job._id, { source: buildJobSource(job) });
+      patched++;
+    }
+    return { patched, isDone: page.isDone, cursor: page.continueCursor };
+  },
+});

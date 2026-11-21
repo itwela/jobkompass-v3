@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import { jobSourceKind } from "../jobSourceValidator";
+import { buildJobSource } from "../../lib/jkJobSource";
 import { documentsUsedSince } from "../documentCount";
 import { internalMutation, internalQuery, internalAction } from "../_generated/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -133,10 +135,19 @@ export const jobsGet = internalQuery({
 });
 
 export const jobsAdd = internalMutation({
-  args: { userId: v.string(), ...jobFields },
-  handler: async (ctx, args) => {
+  args: {
+    userId: v.string(),
+    ...jobFields,
+    // Where the job came from, flat so the HTTP route and jk CLI can pass them as plain params.
+    sourceKind: v.optional(jobSourceKind),
+    sourceInbox: v.optional(v.string()),
+    sourceSender: v.optional(v.string()),
+    sourceReceived: v.optional(v.string()),
+  },
+  handler: async (ctx, { sourceKind, sourceInbox, sourceSender, sourceReceived, ...args }) => {
     const now = Date.now();
-    return await ctx.db.insert("jobs", { ...args, statusHistory: nextStatusHistory(undefined, undefined, args.status, now) ?? undefined, createdAt: now, updatedAt: now });
+    const source = buildJobSource(args, { kind: sourceKind, inbox: sourceInbox, sender: sourceSender, received: sourceReceived });
+    return await ctx.db.insert("jobs", { ...args, source, statusHistory: nextStatusHistory(undefined, undefined, args.status, now) ?? undefined, createdAt: now, updatedAt: now });
   },
 });
 

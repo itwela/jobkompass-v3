@@ -47,6 +47,7 @@ import type * as http from "../http.js";
 import type * as inputSanitizer from "../inputSanitizer.js";
 import type * as interviewPreps from "../interviewPreps.js";
 import type * as jobLeads from "../jobLeads.js";
+import type * as jobSourceValidator from "../jobSourceValidator.js";
 import type * as jobStatusHistory from "../jobStatusHistory.js";
 import type * as jobs from "../jobs.js";
 import type * as performanceInsights from "../performanceInsights.js";
@@ -108,6 +109,7 @@ declare const fullApi: ApiFromModules<{
   inputSanitizer: typeof inputSanitizer;
   interviewPreps: typeof interviewPreps;
   jobLeads: typeof jobLeads;
+  jobSourceValidator: typeof jobSourceValidator;
   jobStatusHistory: typeof jobStatusHistory;
   jobs: typeof jobs;
   performanceInsights: typeof performanceInsights;
