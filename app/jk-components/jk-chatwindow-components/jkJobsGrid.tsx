@@ -16,6 +16,8 @@ import type { Job } from "@/providers/jkJobsProvider";
 import type { Id } from "@/convex/_generated/dataModel";
 import { JkStatusGlyph } from "../jkStatusChip";
 import { JkCompBars, JkJobLogo, JkMonoLabel } from "../jk-jobs/jkJobBits";
+import { JkJobAddedByCell, JkJobSourceCell, type JobAgent } from "../jk-jobs/jkJobOrigin";
+import { jobSource } from "@/lib/jkJobSource";
 
 type JobId = Id<"jobs">;
 
@@ -71,12 +73,14 @@ export function sortJobs(jobs: Job[], sort: JkJobSort): Job[] {
   });
 }
 
-const TABLE_COLS = "grid grid-cols-[minmax(0,1fr)_minmax(120px,166px)_124px_84px_56px] items-center gap-x-0";
+const TABLE_COLS = "grid grid-cols-[minmax(0,1fr)_minmax(120px,166px)_124px_60px_76px_84px_56px] items-center gap-x-0";
 
 export function JkJobsTable({
-  jobs, total, focusedId, selectionMode, selectedIds, onRowClick, onRowOpen, onToggle, sort = null, onSort,
+  jobs, total, focusedId, selectionMode, selectedIds, onRowClick, onRowOpen, onToggle, sort = null, onSort, agentsByJob,
 }: {
   jobs: Job[];
+  /** Agents that added or changed each job (api.agent.activity.jobAgentsMine), keyed by job id. */
+  agentsByJob?: Map<string, JobAgent[]>;
   total: number;
   sort?: JkJobSort;
   onSort?: (key: JkJobSortKey) => void;
@@ -90,9 +94,13 @@ export function JkJobsTable({
   return (
     <div role="table" aria-label="Jobs" aria-rowcount={jobs.length} className="min-w-0">
       <div role="row" className={cn(TABLE_COLS, "sticky top-0 z-[1] h-10 border-b border-border bg-background pl-8 pr-5")}>
-        {SORT_COLS.map((c) => {
+        {SORT_COLS.flatMap((c) => {
           const on = sort?.key === c.key;
-          return (
+          const extra = c.key === "status" ? [
+            <span key="source" role="columnheader" className="min-w-0 pl-0.5"><JkMonoLabel as="span" className="tracking-[0.12em]">Source</JkMonoLabel></span>,
+            <span key="by" role="columnheader" className="min-w-0 pl-0.5"><JkMonoLabel as="span" className="tracking-[0.12em]">Added by</JkMonoLabel></span>,
+          ] : [];
+          return [
             <span key={c.key} role="columnheader" aria-sort={on ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"} className="min-w-0">
               <button type="button" onClick={() => onSort?.(c.key)} title={`Sort by ${c.label.toLowerCase()}`}
                 className={cn("group/h -ml-1.5 flex h-7 items-center gap-1 rounded-md px-1.5 transition-colors hover:bg-accent", on && "text-foreground")}>
@@ -100,8 +108,9 @@ export function JkJobsTable({
                 {on ? (sort!.dir === "asc" ? <ArrowUp className="size-3" strokeWidth={2} /> : <ArrowDown className="size-3" strokeWidth={2} />)
                   : <ArrowUp aria-hidden className="size-3 text-subtle-foreground opacity-0 transition-opacity group-hover/h:opacity-60" strokeWidth={2} />}
               </button>
-            </span>
-          );
+            </span>,
+            ...extra,
+          ];
         })}
       </div>
       <div data-enter className="relative">
@@ -139,6 +148,8 @@ export function JkJobsTable({
                 <JkStatusGlyph status={job.status} className="size-[13px]" />
                 <span className="truncate text-[13.5px] text-foreground">{job.status}</span>
               </div>
+              <div role="cell" className="flex items-center"><JkJobSourceCell source={jobSource(job)} savedAt={job.createdAt} /></div>
+              <div role="cell" className="flex items-center"><JkJobAddedByCell agents={agentsByJob?.get(job._id) ?? []} savedAt={job.createdAt} /></div>
               <div role="cell" className="truncate font-mono text-[12px] text-muted-foreground">{date ?? "-"}</div>
               <div role="cell"><JkCompBars compensation={job.compensation} /></div>
             </div>

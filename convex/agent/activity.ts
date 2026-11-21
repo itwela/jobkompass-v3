@@ -88,3 +88,38 @@ export const summaryMine = query({
     };
   },
 });
+
+/** How far back the My Jobs "Added by" column looks (newest rows first). */
+const JOB_AGENTS_SCAN_CAP = 3000;
+
+/**
+ * Which agents touched which of the user's jobs, for the My Jobs "Added by" column.
+ * One entry per job and agent, with that agent's job actions oldest first. Jobs no agent
+ * touched are absent (the user did them). Rows aimed at several targets are skipped.
+ */
+export const jobAgentsMine = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await currentConvexUserId(ctx);
+    if (!userId) return [];
+    const rows = await ctx.db
+      .query("agentActivityLog")
+      .withIndex("by_user_time", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(JOB_AGENTS_SCAN_CAP);
+    const byKey = new Map<string, { jobId: string; agentName: string; model: string; provider: string; actions: { at: number; actionType: string; ok: boolean }[] }>();
+    for (const r of rows) {
+      if (!r.actionType.startsWith("jobs.") || !r.target || r.target.includes(",")) continue;
+      const jobId = ctx.db.normalizeId("jobs", r.target);
+      if (!jobId) continue;
+      const key = `${jobId}|${r.agentName}`;
+      let e = byKey.get(key);
+      if (!e) {
+        e = { jobId, agentName: r.agentName, model: r.model, provider: r.provider, actions: [] };
+        byKey.set(key, e);
+      }
+      e.actions.push({ at: r.timestamp, actionType: r.actionType, ok: r.status === "success" });
+    }
+    return [...byKey.values()].map((e) => ({ ...e, actions: e.actions.reverse() }));
+  },
+});

@@ -10,6 +10,9 @@
  */
 import { JkConfirmButton } from "../jkConfirm";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { JobAgent } from "../jk-jobs/jkJobOrigin";
 import { ChevronDown, LogIn, Plus, Search, X } from "lucide-react";
 import { useJobs, type Job } from "@/providers/jkJobsProvider";
 import { useJobKompassResume } from "@/providers/jkResumeProvider";
@@ -115,6 +118,12 @@ export default function JkCW_MyJobsMode() {
   // Column sort for the table (click a heading). J/K and the rail follow the same order.
   const [sort, setSort] = useState<JkJobSort>(null);
   const shownJobs = useMemo(() => sortJobs(filteredJobs, sort), [filteredJobs, sort]);
+  const jobAgents = useQuery(api.agent.activity.jobAgentsMine, isAuthenticated ? {} : "skip");
+  const agentsByJob = useMemo(() => {
+    const m = new Map<string, JobAgent[]>();
+    for (const a of jobAgents ?? []) m.set(a.jobId, [...(m.get(a.jobId) ?? []), a]);
+    return m;
+  }, [jobAgents]);
 
   const [focusedId, setFocusedId] = useState<JobId | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -343,6 +352,7 @@ export default function JkCW_MyJobsMode() {
             <JkJobsPhoneList jobs={shownJobs} total={total} selectionMode={selectionMode} selectedIds={selectedJobIds} onOpen={(id) => setSelectedJobId(id)} onToggle={toggleJobSelection} />
           ) : view === "table" ? (
             <JkJobsTable
+              agentsByJob={agentsByJob}
               sort={sort}
               onSort={(key) => setSort((cur) => nextJobSort(cur, key))}
               jobs={shownJobs}

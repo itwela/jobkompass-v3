@@ -9,14 +9,18 @@
  */
 
 import type * as agent_activity from "../agent/activity.js";
+import type * as agent_activityLog from "../agent/activityLog.js";
 import type * as agent_auth from "../agent/auth.js";
 import type * as agent_dispatch from "../agent/dispatch.js";
 import type * as agent_fns from "../agent/fns.js";
 import type * as agent_keyIdentity from "../agent/keyIdentity.js";
 import type * as agent_keys from "../agent/keys.js";
+import type * as agent_resumeMove from "../agent/resumeMove.js";
+import type * as agent_resumePdf from "../agent/resumePdf.js";
 import type * as agent_resumeQuestions from "../agent/resumeQuestions.js";
 import type * as agent_routes from "../agent/routes.js";
 import type * as agent_tailor from "../agent/tailor.js";
+import type * as agent_tailorFlow from "../agent/tailorFlow.js";
 import type * as auth from "../auth.js";
 import type * as authLinking from "../authLinking.js";
 import type * as authPasswordReset from "../authPasswordReset.js";
@@ -66,14 +70,18 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "agent/activity": typeof agent_activity;
+  "agent/activityLog": typeof agent_activityLog;
   "agent/auth": typeof agent_auth;
   "agent/dispatch": typeof agent_dispatch;
   "agent/fns": typeof agent_fns;
   "agent/keyIdentity": typeof agent_keyIdentity;
   "agent/keys": typeof agent_keys;
+  "agent/resumeMove": typeof agent_resumeMove;
+  "agent/resumePdf": typeof agent_resumePdf;
   "agent/resumeQuestions": typeof agent_resumeQuestions;
   "agent/routes": typeof agent_routes;
   "agent/tailor": typeof agent_tailor;
+  "agent/tailorFlow": typeof agent_tailorFlow;
   auth: typeof auth;
   authLinking: typeof authLinking;
   authPasswordReset: typeof authPasswordReset;
