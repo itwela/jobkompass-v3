@@ -6,7 +6,7 @@
  * agent added or changed it, with what it did and when. A blank cell still explains itself.
  */
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
-import { Globe } from "lucide-react"
+import { Globe, Mail, Puzzle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { JobSource } from "@/lib/jkJobSource"
 import { modelMark } from "@/lib/agentActivity/modelMark"
@@ -37,7 +37,9 @@ export function JkOutlookMark({ className }: { className?: string }) {
 function SourceMark({ source, className }: { source: JobSource; className?: string }) {
   if (source.kind === "gmail") return <JkGmailMark className={className} />
   if (source.kind === "outlook") return <JkOutlookMark className={className} />
+  if (source.kind === "email") return <Mail aria-hidden strokeWidth={1.6} className={cn("shrink-0 text-bar-4-ink", className)} />
   if (source.kind === "web") return <Globe aria-hidden strokeWidth={1.6} className={cn("shrink-0 text-bar-4-ink", className)} />
+  if (source.kind === "extension") return <Puzzle aria-hidden strokeWidth={1.6} className={cn("shrink-0 text-bar-4-ink", className)} />
   return null
 }
 
@@ -102,24 +104,16 @@ function OpenLink({ href, children }: { href: string; children: React.ReactNode 
 
 export function JkJobSourceCell({ source, savedAt }: { source: JobSource; savedAt: number }) {
   const icon = <SourceMark source={source} className="size-[18px]" />
-  if (source.kind === "gmail" || source.kind === "outlook") {
-    const app = source.kind === "gmail" ? "Gmail" : "Outlook"
-    return (
-      <OriginCard icon={icon} head={`Came from your ${app}`} sub={source.inbox ?? app} rows={[
-        ["From", source.sender ?? "-"],
-        ["Received", source.received ?? "-"],
-        ["Open", <OpenLink key="o" href={source.url!}>{source.kind === "gmail" ? "Thread in Gmail" : "Message in Outlook"}</OpenLink>],
-      ]}>{icon}</OriginCard>
-    )
+  if (source.kind === "gmail" || source.kind === "outlook" || source.kind === "email") {
+    const app = { gmail: "Gmail", outlook: "Outlook", email: "email" }[source.kind]
+    const rows: [string, React.ReactNode][] = [["From", source.sender ?? "-"], ["Received", source.received ?? "-"]]
+    if (source.url) rows.push(["Open", <OpenLink key="o" href={source.url}>{source.kind === "gmail" ? "Thread in Gmail" : source.kind === "outlook" ? "Message in Outlook" : "Link"}</OpenLink>])
+    return <OriginCard icon={icon} head={`Came from your ${app}`} sub={source.inbox ?? (source.kind === "email" ? undefined : app)} rows={rows}>{icon}</OriginCard>
   }
-  if (source.kind === "web") {
-    return (
-      <OriginCard icon={icon} head="Found online" sub={source.site} rows={[
-        ["Site", source.host!],
-        ["Saved", when(savedAt)],
-        ["Open", <OpenLink key="o" href={source.url!}>Original posting</OpenLink>],
-      ]}>{icon}</OriginCard>
-    )
+  if (source.kind === "web" || source.kind === "extension") {
+    const rows: [string, React.ReactNode][] = [["Site", source.host ?? "-"], ["Saved", when(savedAt)]]
+    if (source.url) rows.push(["Open", <OpenLink key="o" href={source.url}>Original posting</OpenLink>])
+    return <OriginCard icon={icon} head={source.kind === "extension" ? "Saved with the Chrome extension" : "Found online"} sub={source.site} rows={rows}>{icon}</OriginCard>
   }
   return <OriginCard head="No source saved" rows={[["Why", "Added without a posting or email link"]]}><span aria-label="No source" /></OriginCard>
 }

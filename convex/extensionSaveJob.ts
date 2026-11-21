@@ -117,6 +117,7 @@ export const parseAndSave = internalAction({
       title,
       link: args.pageUrl,
       status: finalStatus,
+      source: { kind: "extension" },
       compensation,
       description,
       skills,

@@ -1,4 +1,5 @@
 import { defineSchema, defineTable } from "convex/server";
+import { jobSourceValidator } from "./jobSourceValidator";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { tailoringValidator } from "./tailoring";
@@ -155,6 +156,9 @@ const documentsTables = {
     // mustHavesKey fingerprints the description they came from (lib/chat/mustHaves.ts).
     mustHaves: v.optional(v.array(v.string())),
     mustHavesKey: v.optional(v.string()),
+    // Where the job came from (Gmail, Outlook, a site online, the extension). Set when the job
+    // is added (lib/jkJobSource.ts buildJobSource); older jobs have none and the UI derives it.
+    source: v.optional(jobSourceValidator),
   }).index("by_user", ["userId"])
     .index("by_username", ["username"]),
 
